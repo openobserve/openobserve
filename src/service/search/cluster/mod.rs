@@ -157,6 +157,7 @@ pub async fn search(
         let (unique_files, inverted_index_count) = if is_first_page {
             // should be query size * 2
             let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+            let limit_count = 2000;
             let mut total_count = 0;
             // get deleted file
             let deleted_files = idx_resp
@@ -186,6 +187,7 @@ pub async fn search(
                     }
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
+
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
@@ -204,13 +206,19 @@ pub async fn search(
                     }
                 }
             }
-            (
-                term_map
-                    .into_iter()
-                    .flat_map(|(_, filenames)| filenames)
-                    .collect::<HashSet<_>>(),
-                Some(total_count),
-            )
+
+            let file_list = term_map
+                .into_iter()
+                .flat_map(|(_, filenames)| filenames)
+                .collect::<HashSet<_>>();
+            log::info!(
+                "[trace_id {trace_id}] search: inverted index search, term count: {}, file count: {}",
+                terms.len(),
+                file_list.len()
+            );
+            log::info!("file_list: {:?}", file_list);
+
+            (file_list, Some(total_count))
         } else {
             (
                 idx_resp
