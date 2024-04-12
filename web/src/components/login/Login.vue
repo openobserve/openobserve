@@ -19,23 +19,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex justify-center text-center"
       v-if="
-        config.isEnterprise == 'true' &&
-        store.state.zoConfig.custom_logo_text != ''
+        (config.isEnterprise == 'true' &&
+          store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+          store.state.zoConfig.custom_logo_text != '') ||
+        (config.isEnterprise == 'true' &&
+          store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+          store.state.zoConfig.custom_logo_img != null)
       "
     >
-      <div class="text-h5 text-bold q-pa-none text-centered full-width">
-        {{ store.state.zoConfig.custom_logo_text }}
-      </div>
-
-      <div class="text-caption full-width text-centered">
+      <span
+        v-if="
+          store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+          store.state.zoConfig?.custom_logo_text != ''
+        "
+        class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
+        >{{ store.state.zoConfig.custom_logo_text }}</span
+      >
+      <span class="full-width">
         <img
-          :src="getImageURL('images/common/spark-logo-connector.png')"
-          class="q-mt-sm"
-          style="width: 30px"
+          v-if="
+            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+            store.state.zoConfig?.custom_logo_img != null
+          "
+          :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+          style="max-width: 150px; max-height: 31px"
         />
-      </div>
+      </span>
+      <img
+        class="appLogo"
+        style="height: auto"
+        :style="
+          store.state.zoConfig.custom_logo_text != ''
+            ? 'width: 150px;'
+            : 'width: 250px;'
+        "
+        :src="
+          store?.state?.theme == 'dark'
+            ? getImageURL('images/common/open_observe_logo_2.svg')
+            : getImageURL('images/common/open_observe_logo.svg')
+        "
+      />
     </div>
-    <div class="flex justify-center q-mb-lg">
+    <div class="flex justify-center q-mb-lg" v-else>
       <img
         class="appLogo"
         style="height: auto"
@@ -92,7 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform"
+class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -207,7 +233,7 @@ export default defineComponent({
           color: "warning",
           textColor: "white",
           icon: "warning",
-          message: "Please input",
+          message: "Please input valid username or password.",
         });
       } else {
         submitting.value = true;
