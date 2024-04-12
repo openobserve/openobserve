@@ -23,7 +23,7 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamType},
     metrics,
     utils::asynchronism::file::get_file_contents,
-    CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON,
+    RwAHashMap, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -33,7 +33,11 @@ use tokio::{
     sync::RwLock,
 };
 
-use crate::common::{infra::config::SEARCHING_FILES, meta::stream::StreamParams};
+use crate::common::meta::stream::StreamParams;
+
+// SEARCHING_FILES for searching files, in use, should not move to s3
+static SEARCHING_FILES: Lazy<RwAHashMap<String, usize>> =
+    Lazy::new(|| tokio::sync::RwLock::new(Default::default()));
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -402,16 +406,20 @@ impl RwFile {
 pub async fn lock_files(files: &[String]) {
     let mut locker = SEARCHING_FILES.write().await;
     for file in files.iter() {
-        // log::info!("lock acquire file: {}", file);
-        locker.insert(file.clone());
+        let entry = locker.entry(file.clone()).or_insert(0);
+        *entry += 1;
     }
 }
 
 pub async fn release_files(files: &[String]) {
     let mut locker = SEARCHING_FILES.write().await;
     for file in files.iter() {
-        // log::info!("lock released file: {}", file);
-        locker.remove(file);
+        if let Some(entry) = locker.get_mut(file) {
+            *entry -= 1;
+            if *entry == 0 {
+                locker.remove(file);
+            }
+        }
     }
     locker.shrink_to_fit();
 }

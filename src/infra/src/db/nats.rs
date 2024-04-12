@@ -462,7 +462,7 @@ pub async fn create_table() -> Result<()> {
 
 pub async fn connect() -> async_nats::Client {
     if CONFIG.common.print_key_config {
-        log::info!("Nats init config: {:?}", CONFIG.etcd);
+        log::info!("Nats init config: {:?}", CONFIG.nats);
     }
 
     let mut opts = async_nats::ConnectOptions::new()
