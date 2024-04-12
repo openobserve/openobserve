@@ -135,6 +135,7 @@ pub async fn get_latest_traces(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let (org_id, stream_name) = path.into_inner();
 
     let mut http_span = None;
     let trace_id = if CONFIG.common.tracing_enabled {
@@ -143,7 +144,11 @@ pub async fn get_latest_traces(
         });
         ctx.span().span_context().trace_id().to_string()
     } else if CONFIG.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/{stream_name}/traces/latest");
+        let span = tracing::info_span!(
+            "/api/{org_id}/{stream_name}/traces/latest",
+            org_id = org_id.clone(),
+            stream_name = stream_name.clone()
+        );
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
         trace_id
@@ -151,7 +156,6 @@ pub async fn get_latest_traces(
         ider::uuid()
     };
 
-    let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     // Check permissions on stream
