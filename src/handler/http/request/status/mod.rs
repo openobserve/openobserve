@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,10 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
-use infra::{cache, file_list};
+use infra::{
+    cache, file_list,
+    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST},
+};
 use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]

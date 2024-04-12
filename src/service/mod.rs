@@ -68,7 +68,7 @@ pub async fn get_formatted_stream_name(
 ) -> String {
     let mut stream_name = params.stream_name.to_string();
 
-    let schema = db::schema::get(&params.org_id, &stream_name, params.stream_type)
+    let schema = infra::schema::get(&params.org_id, &stream_name, params.stream_type)
         .await
         .unwrap();
 
@@ -76,7 +76,7 @@ pub async fn get_formatted_stream_name(
         stream_name = RE_CORRECT_STREAM_NAME
             .replace_all(&stream_name, "_")
             .to_string();
-        db::schema::get(&params.org_id, &stream_name, params.stream_type)
+        infra::schema::get(&params.org_id, &stream_name, params.stream_type)
             .await
             .unwrap()
     } else {

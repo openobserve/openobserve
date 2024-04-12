@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,14 +19,14 @@ use std::{
 };
 
 use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::StreamType;
+use config::meta::stream::{StreamSettings, StreamType};
 
 use crate::{
     common::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamDeleteFields, StreamSettings},
+            stream::{ListStream, StreamDeleteFields},
         },
         utils::http::get_stream_type_from_request,
     },

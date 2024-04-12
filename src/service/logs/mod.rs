@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,25 +18,21 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    meta::stream::{PartitionTimeLevel, StreamType},
+    meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
     utils::{
         json::{estimate_json_bytes, Map, Value},
         schema_ext::SchemaExt,
     },
     CONFIG,
 };
+use infra::schema::unwrap_partition_time_level;
 
 use super::ingestion::{get_string_value, TriggerAlertData};
 use crate::{
-    common::meta::{
-        alerts::Alert,
-        ingestion::RecordStatus,
-        stream::{SchemaRecords, StreamPartition},
-    },
+    common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
     service::{
         ingestion::get_wal_time_key,
         schema::{check_for_schema, SchemaCache},
-        stream::unwrap_partition_time_level,
     },
 };
 

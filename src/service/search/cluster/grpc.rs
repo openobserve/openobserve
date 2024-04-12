@@ -16,12 +16,14 @@
 use std::sync::Arc;
 
 use arrow::ipc;
+use config::meta::stream::StreamType;
 use infra::errors::Result;
 use proto::cluster_rpc;
 
 pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::SearchResponse> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+    let stream_type = StreamType::from(req.stream_type.as_str());
     let job = req.job.clone();
 
     // handle request time range
@@ -36,6 +38,15 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     // execution
     let _query_fn = req.query.as_ref().unwrap().query_fn.clone();
     req.query.as_mut().unwrap().query_fn = "".to_string();
+
+    log::info!(
+        "[trace_id {trace_id}] grpc->cluster_search in: part_id: {}, stream: {}/{}/{}, time range: {:?}",
+        req.job.as_ref().unwrap().partition,
+        sql.org_id,
+        stream_type,
+        sql.stream_name,
+        sql.meta.time_range
+    );
 
     // handle query function
     let (merge_results, scan_stats, inverted_index_count, _) =
