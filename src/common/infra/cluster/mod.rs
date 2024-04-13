@@ -303,7 +303,7 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
         if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
             continue;
         }
-        let url = format!("{}/healthz", node.http_addr);
+        let url = format!("{}{}/healthz", node.http_addr, CONFIG.common.base_uri);
         let resp = client.get(url).timeout(HEALTH_CHECK_TIMEOUT).send().await;
         if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!("[CLUSTER] node {} health check failed", node.name);
