@@ -13,13 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use version_compare::Version;
+
 pub mod dashboards;
 pub mod file_list;
 pub mod meta;
 pub mod schema;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
-    if old_ver == "v0.0.0" {
+    let old_ver = Version::from(old_ver).unwrap();
+    let new_ver = Version::from(new_ver).unwrap();
+    let zero = Version::from("v0.0.0").unwrap();
+    if old_ver == zero {
         // new install
         return Ok(());
     }
@@ -28,11 +33,14 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     }
 
     log::info!("Upgrading from {} to {}", old_ver, new_ver);
-    if old_ver < "v0.5.3" && new_ver.starts_with("v0.6.") {
+    let v053 = Version::from("v0.5.3").unwrap();
+    if old_ver < v053 && new_ver.to_string().starts_with("v0.6.") {
         upgrade_052_053().await?;
         return Ok(());
     }
-    if old_ver < "v0.9.3" {
+
+    let v093 = Version::from("v0.9.3").unwrap();
+    if old_ver < v093 {
         upgrade_092_093().await?;
         return Ok(());
     }
