@@ -114,7 +114,6 @@ pub async fn search(
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
-        let trim_chars = DEFAULT_INDEX_TRIM_CHARS.chars().collect::<Vec<_>>();
         let terms = meta
             .fts_terms
             .iter()
@@ -122,7 +121,7 @@ pub async fn search(
                 let mut tokenized_search_terms = vec![];
                 t.split(|c| CONFIG.common.inverted_index_split_chars.contains(c))
                     .for_each(|s| {
-                        let s = s.trim_matches(trim_chars.as_slice());
+                        let s = s.trim_matches(|c| DEFAULT_INDEX_TRIM_CHARS.contains(c));
                         if !s.is_empty() && s.len() >= INDEX_MIN_CHAR_LEN {
                             tokenized_search_terms.push(s.to_lowercase())
                         }
