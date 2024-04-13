@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,12 @@ use tokio::{
 };
 
 use crate::common::meta::stream::StreamParams;
+
+type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
+
+// MANAGER for manage using WAL files, in use, should not move to s3
+static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
+
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
 static SEARCHING_FILES: Lazy<tokio::sync::RwLock<SearchingFileLocker>> =
@@ -76,10 +82,6 @@ impl SearchingFileLocker {
         self.inner.get(file).is_some()
     }
 }
-// MANAGER for manage using WAL files, in use, should not move to s3
-static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
-
-type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
 
 struct Manager {
     data: Arc<Vec<RwData>>,
