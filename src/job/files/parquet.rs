@@ -473,6 +473,7 @@ async fn merge_files(
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
+    let start = std::time::Instant::now();
     let (mut new_file_meta, _) = match merge_parquet_files(
         tmp_dir.name(),
         stream_type,
@@ -520,11 +521,12 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
+        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {:?}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
         new_file_meta.compressed_size,
+        start.elapsed().as_millis(),
     );
 
     let buf = Bytes::from(buf);
