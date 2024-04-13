@@ -27,7 +27,7 @@ use config::{
         },
     },
     utils::json,
-    CONFIG, INDEX_MIN_CHAR_LEN,
+    CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -69,7 +69,6 @@ pub async fn search(
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
 
-    // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
 
     // get nodes from cluster
@@ -122,6 +121,7 @@ pub async fn search(
                 let mut tokenized_search_terms = vec![];
                 t.split(|c| CONFIG.common.inverted_index_split_chars.contains(c))
                     .for_each(|s| {
+                        let s = s.trim_matches(|c| DEFAULT_INDEX_TRIM_CHARS.contains(c));
                         if !s.is_empty() && s.len() >= INDEX_MIN_CHAR_LEN {
                             tokenized_search_terms.push(s.to_lowercase())
                         }
