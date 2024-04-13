@@ -23,7 +23,7 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamType},
     metrics,
     utils::asynchronism::file::get_file_contents,
-    RwAHashMap, CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON,
+    CONFIG, FILE_EXT_ARROW, FILE_EXT_JSON,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -36,9 +36,46 @@ use tokio::{
 use crate::common::meta::stream::StreamParams;
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
-static SEARCHING_FILES: Lazy<RwAHashMap<String, usize>> =
-    Lazy::new(|| tokio::sync::RwLock::new(Default::default()));
+static SEARCHING_FILES: Lazy<tokio::sync::RwLock<SearchingFileLocker>> =
+    Lazy::new(|| tokio::sync::RwLock::new(SearchingFileLocker::new()));
 
+struct SearchingFileLocker {
+    inner: HashMap<String, usize>,
+}
+
+impl SearchingFileLocker {
+    pub fn new() -> Self {
+        Self {
+            inner: Default::default(),
+        }
+    }
+
+    pub fn lock(&mut self, file: String) {
+        let entry = self.inner.entry(file).or_insert(0);
+        *entry += 1;
+    }
+
+    pub fn release(&mut self, file: &str) {
+        if let Some(entry) = self.inner.get_mut(file) {
+            *entry -= 1;
+            if *entry == 0 {
+                self.inner.remove(file);
+            }
+        }
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.inner.shrink_to_fit()
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn exist(&self, file: &str) -> bool {
+        self.inner.get(file).is_some()
+    }
+}
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
@@ -406,26 +443,20 @@ impl RwFile {
 pub async fn lock_files(files: &[String]) {
     let mut locker = SEARCHING_FILES.write().await;
     for file in files.iter() {
-        let entry = locker.entry(file.clone()).or_insert(0);
-        *entry += 1;
+        locker.lock(file.clone());
     }
 }
 
 pub async fn release_files(files: &[String]) {
     let mut locker = SEARCHING_FILES.write().await;
     for file in files.iter() {
-        if let Some(entry) = locker.get_mut(file) {
-            *entry -= 1;
-            if *entry == 0 {
-                locker.remove(file);
-            }
-        }
+        locker.release(file);
     }
     locker.shrink_to_fit();
 }
 
 pub async fn lock_files_exists(file: &str) -> bool {
-    SEARCHING_FILES.read().await.get(file).is_some()
+    SEARCHING_FILES.read().await.exist(file)
 }
 
 #[cfg(test)]
