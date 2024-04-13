@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::{json as arrow_json, record_batch::RecordBatch};
-use async_recursion::async_recursion;
 use config::{
     meta::search,
     utils::{flatten, json},
@@ -27,7 +26,6 @@ use vector_enrichment::TableRegistry;
 
 use crate::common::meta::functions::VRLResultResolver;
 
-#[async_recursion]
 #[tracing::instrument(
     name = "service:search:cluster",
     skip(req),
