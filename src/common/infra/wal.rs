@@ -40,7 +40,6 @@ type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
-
 // SEARCHING_FILES for searching files, in use, should not move to s3
 static SEARCHING_FILES: Lazy<tokio::sync::RwLock<SearchingFileLocker>> =
     Lazy::new(|| tokio::sync::RwLock::new(SearchingFileLocker::new()));
