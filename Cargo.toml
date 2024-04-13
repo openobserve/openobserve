@@ -48,7 +48,7 @@ actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.20"
-actix-web-opentelemetry = { version = "0.16", features = ["metrics"] }
+actix-web-opentelemetry = { version = "0.17", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
   "support-rust-embed-for-web",
@@ -97,9 +97,9 @@ maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
-opentelemetry = "0.21"
-opentelemetry_sdk = { version = "0.21", features = ["rt-tokio", "trace"] }
-opentelemetry-otlp = { version = "0.14", features = [
+opentelemetry = "0.22"
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio", "trace"] }
+opentelemetry-otlp = { version = "0.15", features = [
   "http-proto",
   "serialize",
   "serde",
@@ -276,7 +276,7 @@ tonic = { version = "0.11", features = ["prost", "gzip"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.22"
+tracing-opentelemetry = "0.23"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
