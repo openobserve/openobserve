@@ -5080,7 +5080,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "actix-cors",
  "actix-multipart",
@@ -5179,6 +5179,7 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
+ "version-compare",
  "vrl",
  "zstd",
 ]
@@ -8418,6 +8419,12 @@ dependencies = [
  "thiserror",
  "time",
 ]
+
+[[package]]
+name = "version-compare"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "852e951cb7832cb45cb1169900d19760cfa39b82bc0ea9c0e5a14ae88411c98b"
 
 [[package]]
 name = "version_check"

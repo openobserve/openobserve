@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.9.3"
+version = "0.10.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -151,6 +151,7 @@ uaparser = "0.6.1"
 url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
+version-compare = "0.2.0"
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "66667dd291482a440c5eb2032ef3cbfb7377b53b" }
 vrl = { version = "0.8.1", features = ["value", "compiler", "test"] }
 zstd.workspace = true
