@@ -25,7 +25,7 @@ use chrono::{Duration, Utc};
 use config::{
     cluster,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, Routing, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -110,6 +110,8 @@ pub async fn ingest(
 
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
 
+    let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
+
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
@@ -140,6 +142,18 @@ pub async fn ingest(
             }
 
             next_line_is_data = true;
+
+            // Start get routing keys
+            crate::service::ingestion::get_stream_routing(
+                StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_owned().into(),
+                },
+                &mut stream_routing_map,
+            )
+            .await;
+            // End get stream keys
 
             // Start Register Transfoms for stream
 
@@ -189,16 +203,38 @@ pub async fn ingest(
         } else {
             next_line_is_data = false;
 
-            let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
-            let buf = &mut stream_data.data;
-
-            // Start row based transform
-
-            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
 
+            let temp = vec![];
+            let routing = stream_routing_map.get(&stream_name).unwrap_or(&temp);
+
+            for route in routing {
+                let mut is_routed = true;
+                let val = &route.routing;
+                for q_condition in val.iter() {
+                    is_routed = is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
+                }
+                if is_routed && !val.is_empty() {
+                    stream_name = route.destination.clone();
+                    if !stream_data_map.contains_key(&stream_name) {
+                        stream_data_map.insert(
+                            stream_name.clone(),
+                            BulkStreamData {
+                                data: HashMap::new(),
+                            },
+                        );
+                    }
+                    break;
+                }
+            }
+
+            let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
+            let buf = &mut stream_data.data;
+
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+
+            // Start row based transform
             if let Some(transforms) = stream_transform_map.get(&key) {
                 let mut ret_value = value.clone();
                 ret_value = crate::service::ingestion::apply_stream_transform(

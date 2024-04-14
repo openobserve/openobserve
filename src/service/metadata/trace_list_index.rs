@@ -184,6 +184,9 @@ impl TraceListIndex {
                 full_text_search_keys: vec![],
                 bloom_filter_fields: vec!["trace_id".to_string()],
                 data_retention: 0,
+                routing: None,
+                flatten_level: None,
+                defined_schema_fields: None,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)

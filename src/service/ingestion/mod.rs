@@ -23,7 +23,7 @@ use chrono::{TimeZone, Utc};
 use config::{
     cluster,
     meta::{
-        stream::{PartitionTimeLevel, PartitioningDetails, StreamPartition, StreamType},
+        stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
         usage::RequestStats,
     },
     utils::{
@@ -44,7 +44,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::SchemaRecords,
+            stream::{SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,
     },
@@ -449,6 +449,29 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
         }
         Value::Null => Value::Null,
     }
+}
+
+pub async fn get_stream_routing(
+    stream_params: StreamParams,
+    stream_routing_map: &mut HashMap<String, Vec<Routing>>,
+) {
+    let stream_settings = infra::schema::get_settings(
+        &stream_params.org_id,
+        &stream_params.stream_name,
+        stream_params.stream_type,
+    )
+    .await
+    .unwrap_or_default();
+    let res: Vec<Routing> = stream_settings
+        .routing
+        .iter()
+        .map(|(k, v)| Routing {
+            destination: k.to_string(),
+            routing: v.clone(),
+        })
+        .collect();
+
+    stream_routing_map.insert(stream_params.stream_name.to_string(), res);
 }
 
 #[cfg(test)]

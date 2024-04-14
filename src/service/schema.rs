@@ -628,6 +628,9 @@ pub async fn add_stream_schema(
             full_text_search_keys: vec![],
             bloom_filter_fields: vec![],
             data_retention: 0,
+            routing: None,
+            flatten_level: None,
+            defined_schema_fields: None,
         };
         metadata.insert(
             "settings".to_string(),
