@@ -781,6 +781,7 @@ const useLogs = () => {
             }
           }
 
+          console.log(req.query.sql);
           const preSQLQuery = req.query.sql;
           req.query.sql = [];
 
@@ -1809,92 +1810,6 @@ const useLogs = () => {
                 schema: true,
               });
             }
-          }
-        }
-
-        const streamSchemas = await getMultiStreams(multiStreamObj);
-
-        // for multistream we are grouping the schema in the form of array
-        // there will be one "common" group and stream specific groups on logs page
-        // another variable to maintain expand/collapse feature
-        const finalArray: any = {
-          common: [],
-          ...Object.fromEntries(
-            selectedStreamValues.map((stream: any) => [stream, []])
-          ),
-        };
-        searchObj.data.stream.expandGroupRows = {
-          common: true,
-          ...Object.fromEntries(
-            selectedStreamValues.map((stream: any) => [
-              stream,
-              searchObj.data.stream.selectedStream.length > 1 ? false : true,
-            ])
-          ),
-        };
-
-        const fieldToStreamsMap: any = {};
-        const commonFieldNames = new Set();
-        for (const stream of searchObj.data.streamResults.list) {
-          if (
-            selectedStreamValues.includes(stream.name) &&
-            stream.hasOwnProperty("schema")
-          ) {
-            ftsKeys = [
-              ...ftsKeys,
-              ...Object.values(stream.settings.full_text_search_keys),
-            ];
-
-            stream.schema.forEach((schema: any) => {
-              const otherStreams = searchObj.data.streamResults.list.filter(
-                (otherStream: { schema: any[]; name: any }) =>
-                  otherStream.schema?.some(
-                    (otherSchema: { name: any }) =>
-                      otherSchema.name === schema.name &&
-                      otherStream.name !== stream.name &&
-                      selectedStreamValues.includes(otherStream.name)
-                  )
-              );
-
-              if (otherStreams.length > 0) {
-                if (!fieldToStreamsMap[schema.name]) {
-                  fieldToStreamsMap[schema.name] = [stream.name];
-                } else if (
-                  !fieldToStreamsMap[schema.name].includes(stream.name)
-                ) {
-                  fieldToStreamsMap[schema.name].push(stream.name);
-                }
-
-                console.log("commonFieldNames", commonFieldNames);
-                // If the field is part of other streams, add to common array
-                if (!commonFieldNames.has(schema.name)) {
-                  commonFieldNames.add(schema.name);
-                  finalArray.common.push({
-                    ...schema,
-                    label: false,
-                    streams: [],
-                    ftsKey: false,
-                    isSchemaField: true,
-                    showValues: schema.name !== timestampField,
-                    group: "common",
-                  });
-                }
-              } else {
-                // If not in other streams, add to stream-specific array
-                if (!commonFieldNames.has(schema.name)) {
-                  commonFieldNames.add(schema.name);
-                  finalArray[stream.name].push({
-                    ...schema,
-                    label: false,
-                    ftsKey: ftsKeys.includes(schema.name),
-                    isSchemaField: true,
-                    showValues: schema.name !== timestampField,
-                    streams: [stream.name],
-                    group: stream.name,
-                  });
-                }
-              }
-            });
           }
         }
 
