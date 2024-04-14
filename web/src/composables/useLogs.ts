@@ -781,6 +781,7 @@ const useLogs = () => {
             }
           }
 
+          console.log(req.query.sql);
           const preSQLQuery = req.query.sql;
           req.query.sql = [];
 
@@ -1822,6 +1823,10 @@ const useLogs = () => {
           }
         }
 
+        searchObj.data.stream.interestingFieldList = [
+          ...new Set(searchObj.data.stream.interestingFieldList),
+        ];
+
         const streamSchemas = await getMultiStreams(multiStreamObj);
 
         // for multistream we are grouping the schema in the form of array
@@ -1875,7 +1880,6 @@ const useLogs = () => {
                   fieldToStreamsMap[schema.name].push(stream.name);
                 }
 
-                console.log("commonFieldNames", commonFieldNames);
                 // If the field is part of other streams, add to common array
                 if (!commonFieldNames.has(schema.name)) {
                   commonFieldNames.add(schema.name);
@@ -1887,6 +1891,12 @@ const useLogs = () => {
                     isSchemaField: true,
                     showValues: schema.name !== timestampField,
                     group: "common",
+                    isInterestingField:
+                      searchObj.data.stream.interestingFieldList.includes(
+                        schema.name
+                      )
+                        ? true
+                        : false,
                   });
                 }
               } else {
@@ -1901,6 +1911,12 @@ const useLogs = () => {
                     showValues: schema.name !== timestampField,
                     streams: [stream.name],
                     group: stream.name,
+                    isInterestingField:
+                      searchObj.data.stream.interestingFieldList.includes(
+                        schema.name
+                      )
+                        ? true
+                        : false,
                   });
                 }
               }
