@@ -1052,7 +1052,7 @@ export default defineComponent({
           parsedSQL.hasOwnProperty("from") &&
           parsedSQL?.from.length > 0 &&
           parsedSQL?.from[0].table !==
-            searchObj.data.stream.selectedStream.value
+            searchObj.data.stream.selectedStream[0].value
         ) {
           searchObj.data.stream.selectedStream = {
             label: parsedSQL.from[0].table,
@@ -1101,7 +1101,7 @@ export default defineComponent({
                   localFields[
                     searchObj.organizationIdetifier +
                       "_" +
-                      searchObj.data.stream.selectedStream.value
+                      searchObj.data.stream.selectedStream[0].value
                   ] = searchObj.data.stream.interestingFieldList;
                   useLocalInterestingFields(localFields);
                 }
