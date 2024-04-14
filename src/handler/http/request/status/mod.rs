@@ -374,8 +374,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
-                .cookie(access_token_cookie)
                 .cookie(refresh_token_cookie)
+                .cookie(access_token_cookie)
                 .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
