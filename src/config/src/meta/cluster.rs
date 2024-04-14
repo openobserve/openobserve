@@ -33,6 +33,29 @@ pub struct Node {
     pub broadcasted: bool,
 }
 
+impl Node {
+    fn new() -> Self {
+        Node {
+            id: 0,
+            uuid: "".to_string(),
+            name: "".to_string(),
+            http_addr: "".to_string(),
+            grpc_addr: "".to_string(),
+            role: vec![],
+            cpu_num: 0,
+            status: NodeStatus::Prepare,
+            scheduled: false,
+            broadcasted: false,
+        }
+    }
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node::new()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum NodeStatus {
     Prepare,

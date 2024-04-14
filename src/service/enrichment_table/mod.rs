@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,13 +32,13 @@ use config::{
     CONFIG,
 };
 use futures::{StreamExt, TryStreamExt};
-use infra::cache::stats;
+use infra::{
+    cache::stats,
+    schema::{STREAM_SCHEMAS, STREAM_SETTINGS},
+};
 
 use crate::{
-    common::{
-        infra::config::{STREAM_SCHEMAS, STREAM_SETTINGS},
-        meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
-    },
+    common::meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         compact::retention,
         db, format_stream_name,

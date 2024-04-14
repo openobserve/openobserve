@@ -39,12 +39,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-    service::{
-        db,
-        search::{
-            datafusion::exec::{prepare_datafusion_context, register_table},
-            MetadataMap,
-        },
+    service::search::{
+        datafusion::exec::{prepare_datafusion_context, register_table},
+        MetadataMap,
     },
 };
 
@@ -122,7 +119,7 @@ pub(crate) async fn create_context(
 
     // fetch all schema versions, get latest schema
     let stream_type = StreamType::Metrics;
-    let schema = db::schema::get(org_id, stream_name, stream_type)
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .map_err(|err| {
             log::error!("get schema error: {}", err);

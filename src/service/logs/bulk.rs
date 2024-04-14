@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,11 +24,15 @@ use anyhow::{Error, Result};
 use chrono::{Duration, Utc};
 use config::{
     cluster,
-    meta::{stream::StreamType, usage::UsageType},
+    meta::{
+        stream::{PartitioningDetails, StreamType},
+        usage::UsageType,
+    },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
     BLOCKED_STREAMS, CONFIG, DISTINCT_FIELDS,
 };
+use infra::schema::unwrap_partition_time_level;
 
 use super::{add_record, cast_to_schema_v1, StreamMeta};
 use crate::{
@@ -39,7 +43,7 @@ use crate::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
             StreamSchemaChk,
         },
-        stream::{PartitioningDetails, StreamParams},
+        stream::StreamParams,
     },
     service::{
         db,
@@ -191,7 +195,7 @@ pub async fn ingest(
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
             // JSON Flattening
-            let mut value = flatten::flatten(value)?;
+            let mut value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
 
             if let Some(transforms) = stream_transform_map.get(&key) {
                 let mut ret_value = value.clone();
@@ -547,10 +551,7 @@ async fn process_record(
                     let hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp,
                         &partition_keys,
-                        crate::service::stream::unwrap_partition_time_level(
-                            partition_time_level,
-                            StreamType::Logs,
-                        ),
+                        unwrap_partition_time_level(partition_time_level, StreamType::Logs),
                         &local_rec,
                         Some(schema_key),
                     );

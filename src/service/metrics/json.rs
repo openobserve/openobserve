@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,12 +19,16 @@ use actix_web::{http, web};
 use anyhow::{anyhow, Result};
 use config::{
     cluster,
-    meta::{stream::StreamType, usage::UsageType},
+    meta::{
+        stream::{PartitioningDetails, StreamType},
+        usage::UsageType,
+    },
     metrics,
     utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
     CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
+use infra::schema::unwrap_partition_time_level;
 use vrl::compiler::runtime::Runtime;
 
 use super::get_exclude_labels;
@@ -33,13 +37,12 @@ use crate::{
         authz::Authz,
         ingestion::{IngestionResponse, StreamStatus},
         prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-        stream::{PartitioningDetails, SchemaRecords},
+        stream::SchemaRecords,
     },
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
         schema::{check_for_schema, SchemaCache},
-        stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
 };
@@ -95,7 +98,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // check metrics type for Histogram & Summary
         if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
             if !stream_schema_map.contains_key(&stream_name) {
-                let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+                let mut schema =
+                    infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
                 if schema == Schema::empty() {
                     // create the metadata for the stream
                     let metadata = Metadata {
@@ -188,7 +192,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         // check schema
         if !stream_schema_map.contains_key(&stream_name) {
-            let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+            let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
             if schema.fields().is_empty() {
                 let mut schema_reader = BufReader::new(record_str.as_bytes());
                 let inferred_schema =

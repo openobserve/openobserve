@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ use config::{
     CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT,
 };
 use hashbrown::HashSet;
-use infra::{cache::stats, db as infra_db};
+use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS};
 use segment::{message::Track, Client, Message};
 use sysinfo::SystemExt;
 

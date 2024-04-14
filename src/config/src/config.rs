@@ -672,6 +672,8 @@ pub struct Limit {
     pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
+    pub ingest_flatten_level: u32,
     #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
     pub ignore_file_retention_by_stream: bool,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
@@ -737,7 +739,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_META_TRANSACTION_RETRIES",
         help = "max time of transaction will retry",
-        default = 10
+        default = 3
     )]
     pub meta_transaction_retries: usize,
     #[env_config(
@@ -905,6 +907,8 @@ pub struct Nats {
     pub command_timeout: u64,
     #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
+    #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
+    pub queue_max_age: u64,
 }
 
 #[derive(Debug, EnvConfig)]

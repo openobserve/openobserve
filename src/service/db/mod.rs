@@ -16,6 +16,8 @@
 use bytes::Bytes;
 use hashbrown::HashMap;
 use infra::{db as infra_db, errors::Result};
+#[cfg(feature = "enterprise")]
+use {infra::errors::Error, o2_enterprise::enterprise::common::infra::config::O2_CONFIG};
 
 pub mod alerts;
 pub mod compact;
@@ -49,20 +51,21 @@ pub(crate) async fn put(
     need_watch: bool,
     start_dt: Option<i64>,
 ) -> Result<()> {
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.super_cluster.enabled {
+        o2_enterprise::enterprise::super_cluster::queue::put(
+            key,
+            value.clone(),
+            need_watch,
+            start_dt,
+        )
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    }
+
     let db = infra_db::get_db().await;
     db.put(key, value, need_watch, start_dt).await
-}
-
-#[inline]
-pub(crate) async fn get_for_update(
-    key: &str,
-    need_watch: bool,
-    start_dt: Option<i64>,
-    update_fn: Box<infra_db::UpdateFn>,
-) -> Result<()> {
-    let db = infra_db::get_db().await;
-    db.get_for_update(key, need_watch, start_dt, update_fn)
-        .await
 }
 
 #[inline]
@@ -72,6 +75,19 @@ pub(crate) async fn delete(
     need_watch: bool,
     start_dt: Option<i64>,
 ) -> Result<()> {
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.super_cluster.enabled {
+        o2_enterprise::enterprise::super_cluster::queue::delete(
+            key,
+            with_prefix,
+            need_watch,
+            start_dt,
+        )
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    }
+
     let db = infra_db::get_db().await;
     db.delete(key, with_prefix, need_watch, start_dt).await?;
     Ok(())
@@ -79,6 +95,14 @@ pub(crate) async fn delete(
 
 #[inline]
 pub(crate) async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.super_cluster.enabled {
+        o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch, None)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+    }
+
     let db = infra_db::get_db().await;
     db.delete_if_exists(key, with_prefix, need_watch).await
 }

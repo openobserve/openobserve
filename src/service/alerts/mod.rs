@@ -123,7 +123,7 @@ pub async fn save(
     }
 
     // before saving alert check column type to decide numeric condition
-    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if stream_name.is_empty() || schema.fields().is_empty() {
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
@@ -460,6 +460,7 @@ impl QueryCondition {
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            clusters: vec![],
             timeout: 0,
         };
         let trace_id = ider::uuid();
@@ -552,7 +553,7 @@ impl Condition {
 }
 
 async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, anyhow::Error> {
-    let schema = db::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
+    let schema = infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
     let mut wheres = Vec::with_capacity(conditions.len());
     for cond in conditions.iter() {
         let data_type = match schema.field_with_name(&cond.column) {
@@ -972,6 +973,12 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             .replace("{alert_start_time}", &alert_start_time_str)
             .replace("{alert_end_time}", &alert_end_time_str);
 
+        if let Some(contidion) = &alert.query_condition.promql_condition {
+            resp = resp
+                .replace("{alert_promql_operator}", &contidion.operator.to_string())
+                .replace("{alert_promql_value}", &contidion.value.to_string());
+        }
+
         if let Some(attrs) = &alert.context_attributes {
             for (key, value) in attrs.iter() {
                 process_variable_replace(&mut resp, key, &VarValue::Str(value));
@@ -1170,6 +1177,13 @@ async fn process_dest_template(
         .replace("{alert_start_time}", &alert_start_time_str)
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url);
+
+    if let Some(contidion) = &alert.query_condition.promql_condition {
+        resp = resp
+            .replace("{alert_promql_operator}", &contidion.operator.to_string())
+            .replace("{alert_promql_value}", &contidion.value.to_string());
+    }
+
     process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val));
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {

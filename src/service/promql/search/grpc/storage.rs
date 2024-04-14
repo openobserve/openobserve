@@ -19,7 +19,7 @@ use config::{
     is_local_disk_storage,
     meta::{
         search::{ScanStats, SearchType, Session as SearchSession, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
     CONFIG,
 };
@@ -30,15 +30,17 @@ use datafusion::{
     prelude::SessionContext,
 };
 use hashbrown::HashMap;
-use infra::cache::file_data;
+use infra::{
+    cache::file_data,
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+};
 use tokio::sync::Semaphore;
 
 use crate::{
-    common::meta::stream::{StreamParams, StreamPartition},
+    common::meta::stream::StreamParams,
     service::{
         db, file_list,
         search::{datafusion::exec::register_table, match_source},
-        stream,
     },
 };
 
@@ -62,7 +64,7 @@ pub(crate) async fn create_context(
 
     // get latest schema
     let stream_type = StreamType::Metrics;
-    let schema = match db::schema::get(org_id, stream_name, stream_type).await {
+    let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
             log::error!("get schema error: {}", err);
@@ -71,9 +73,9 @@ pub(crate) async fn create_context(
             ));
         }
     };
-    let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // rewrite partition filters
     let partition_keys: HashMap<&str, &StreamPartition> = stream_settings

@@ -55,6 +55,8 @@ pub struct Request {
     #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
+    pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    #[serde(default)]
     pub timeout: i64,
 }
 
@@ -307,12 +309,12 @@ pub struct SearchPartitionResponse {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct JobStatusResponse {
-    pub status: Vec<JobStatus>,
+pub struct QueryStatusResponse {
+    pub status: Vec<QueryStatus>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct JobStatus {
+pub struct QueryStatus {
     pub trace_id: String,
     pub status: String,
     pub created_at: i64,
@@ -332,7 +334,7 @@ pub struct QueryInfo {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct CancelJobResponse {
+pub struct CancelQueryResponse {
     pub trace_id: String,
     pub is_success: bool,
 }
@@ -516,6 +518,7 @@ mod tests {
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),
+            clusters: vec![],
             timeout: 0,
         };
         req.aggs

@@ -558,7 +558,6 @@ const useLogs = () => {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
 
-        console.log(parsedSQL);
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
           return false;
@@ -724,6 +723,14 @@ const useLogs = () => {
     }
   }
 
+  const isNonAggregatedQuery = (parsedSQL: any = null) => {
+    return !(
+      parsedSQL?.groupby ||
+      hasAggregation(parsedSQL?.columns) ||
+      parsedSQL?.limit
+    );
+  };
+
   const getQueryPartitions = async (queryReq: any) => {
     // const queryReq = buildSearch();
     searchObj.data.queryResults.hits = [];
@@ -741,11 +748,10 @@ const useLogs = () => {
     };
 
     const parsedSQL: any = fnParsedSQL();
+
     if (
       !searchObj.meta.sqlMode ||
-      (searchObj.meta.sqlMode &&
-        parsedSQL.groupby == null &&
-        !hasAggregation(parsedSQL.columns))
+      (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
     ) {
       const partitionQueryReq: any = {
         sql: queryReq.query.sql,
@@ -1051,6 +1057,10 @@ const useLogs = () => {
 
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
+
+        // Removing sql_mode from histogram query, as it is not required
+        delete searchObj.data.histogramQuery.query.sql_mode;
+
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
         // get the current page detail and set it into query request
@@ -1102,18 +1112,36 @@ const useLogs = () => {
 
         // based on pagination request, get the data
         await getPaginatedData(queryReq);
+        const parsedSQL: any = fnParsedSQL();
+
         if (
           (searchObj.data.queryResults.aggs == undefined &&
             searchObj.data.resultGrid.currentPage == 1 &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
-            searchObj.meta.sqlMode == false) ||
+            (!searchObj.meta.sqlMode ||
+              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
           getHistogramQueryData(searchObj.data.histogramQuery);
+        } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: getHistogramTitle(),
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "Histogram is not available for aggregation queries.",
+            errorDetail: "",
+          };
+        } else {
+          console.log("Histogram is not available for aggregation queries.");
         }
       } else {
         searchObj.loading = false;
@@ -2220,38 +2248,46 @@ const useLogs = () => {
     streamName: string
   ) => {
     // Parse the SQL query into an AST
-    const parsedQuery: any = parser.astify(sql);
+    try {
+      const parsedQuery: any = parser.astify(sql);
 
-    // Check for the presence of an ORDER BY clause
-    const hasOrderBy = !!(
-      parsedQuery.orderby && parsedQuery.orderby.length > 0
-    );
+      if (!parsedQuery.columns.length || !parsedQuery.from) {
+        return sql;
+      }
 
-    // Check if _timestamp is in the SELECT clause if not SELECT *
-    const includesTimestamp = !!parsedQuery.columns.find(
-      (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
-    );
+      // Check for the presence of an ORDER BY clause
+      const hasOrderBy = !!(
+        parsedQuery.orderby && parsedQuery.orderby.length > 0
+      );
 
-    // If ORDER BY is present and doesn't include _timestamp, append it
-    if (!hasOrderBy) {
-      // If no ORDER BY clause, add it
-      parsedQuery.orderby = [
-        {
-          expr: {
-            type: "column_ref",
-            table: null,
-            column: column,
+      // Check if _timestamp is in the SELECT clause if not SELECT *
+      const includesTimestamp = !!parsedQuery.columns.find(
+        (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
+      );
+
+      // If ORDER BY is present and doesn't include _timestamp, append it
+      if (!hasOrderBy) {
+        // If no ORDER BY clause, add it
+        parsedQuery.orderby = [
+          {
+            expr: {
+              type: "column_ref",
+              table: null,
+              column: column,
+            },
+            type: type,
           },
-          type: type,
-        },
-      ];
-    }
+        ];
+      }
 
-    // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-    return quoteTableNameDirectly(
-      parser.sqlify(parsedQuery).replace(/`/g, ""),
-      streamName
-    );
+      // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
+      return quoteTableNameDirectly(
+        parser.sqlify(parsedQuery).replace(/`/g, ""),
+        streamName
+      );
+    } catch (err) {
+      return sql;
+    }
   };
 
   function quoteTableNameDirectly(sql: string, streamName: string) {

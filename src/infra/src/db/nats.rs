@@ -82,6 +82,10 @@ impl NatsDb {
         }
     }
 
+    pub fn super_cluster() -> Self {
+        Self::new("super_cluster_kv_")
+    }
+
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let bucket_name = bucket.status().await?.bucket;
@@ -458,7 +462,7 @@ pub async fn create_table() -> Result<()> {
 
 pub async fn connect() -> async_nats::Client {
     if CONFIG.common.print_key_config {
-        log::info!("Nats init config: {:?}", CONFIG.etcd);
+        log::info!("Nats init config: {:?}", CONFIG.nats);
     }
 
     let mut opts = async_nats::ConnectOptions::new()

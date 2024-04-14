@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,11 +20,15 @@ use bytes::BytesMut;
 use chrono::Utc;
 use config::{
     cluster,
-    meta::{stream::StreamType, usage::UsageType},
+    meta::{
+        stream::{PartitioningDetails, StreamType},
+        usage::UsageType,
+    },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG,
 };
+use infra::schema::unwrap_partition_time_level;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
@@ -38,7 +42,7 @@ use crate::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-        stream::{PartitioningDetails, SchemaRecords},
+        stream::SchemaRecords,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
@@ -49,7 +53,6 @@ use crate::{
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
         schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
-        stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
 };
