@@ -371,12 +371,19 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             } else {
                 refresh_token_cookie.set_same_site(cookie::SameSite::None)
             };
+            println!("access_token_cookie {:?}", access_token_cookie);
 
-            Ok(HttpResponse::Found()
+            let resp = HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
                 .cookie(refresh_token_cookie)
                 .cookie(access_token_cookie)
-                .finish())
+                .finish();
+
+            for cookie in resp.cookies() {
+                println!("cookie {:?}", cookie);
+            }
+
+            Ok(resp)
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
     }
