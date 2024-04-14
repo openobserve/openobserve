@@ -914,7 +914,7 @@ export default defineComponent({
               localFields[
                 searchObj.organizationIdetifier +
                   "_" +
-                  searchObj.data.stream.selectedStream.value
+                  searchObj.data.stream.selectedStream[0].value
               ] = searchObj.data.stream.interestingFieldList;
               useLocalInterestingFields(localFields);
             }

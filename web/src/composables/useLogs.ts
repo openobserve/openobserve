@@ -426,7 +426,7 @@ const useLogs = () => {
       typeof searchObj.data.stream.selectedStream == "object" &&
       searchObj.data.stream.selectedStream.hasOwnProperty("value")
     ) {
-      query["stream"] = searchObj.data.stream.selectedStream.value;
+      query["stream"] = searchObj.data.stream.selectedStream.join(",");
     }
 
     if (date.type == "relative") {
@@ -582,10 +582,12 @@ const useLogs = () => {
         searchObj.data.stream.interestingFieldList.length > 0 &&
         searchObj.meta.quickMode
       ) {
-        req.query.sql = req.query.sql.replace(
-          "[FIELD_LIST]",
-          searchObj.data.stream.interestingFieldList.join(",")
-        );
+        if (searchObj.data.stream.selectedStream.length == 1) {
+          req.query.sql = req.query.sql.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(",")
+          );
+        }
       } else {
         req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
       }
@@ -779,6 +781,7 @@ const useLogs = () => {
             }
           }
 
+          console.log(req.query.sql);
           const preSQLQuery = req.query.sql;
           req.query.sql = [];
 
@@ -786,7 +789,32 @@ const useLogs = () => {
             .join(",")
             .split(",")
             .forEach((item: any) => {
-              req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
+              let finalQuery: string = preSQLQuery.replace(
+                "[INDEX_NAME]",
+                item
+              );
+
+              console.log(searchObj.data.stream);
+              const listOfFields: any = [];
+              for (const field of searchObj.data.stream.interestingFieldList) {
+                for (const streamField of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if (
+                    streamField?.name == field &&
+                    streamField?.streams.indexOf(item) > -1
+                  ) {
+                    listOfFields.push(field);
+                  }
+                }
+              }
+              console.log(JSON.stringify(listOfFields));
+
+              finalQuery = finalQuery.replace(
+                "[FIELD_LIST]",
+                listOfFields.join(",")
+              );
+
+              req.query.sql.push(finalQuery);
             });
         } else {
           req.query.sql = req.query.sql.replace(
@@ -1177,7 +1205,7 @@ const useLogs = () => {
       searchObj.meta.searchApplied = true;
       if (
         !searchObj.data.stream.streamLists?.length ||
-        searchObj.data.stream.selectedStream.value == ""
+        searchObj.data.stream.selectedStream.length == 0
       ) {
         searchObj.loading = false;
         return;
@@ -1700,8 +1728,12 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
       searchObj.data.stream.expandGroupRows = [];
+      const localInterestingFields: any = useLocalInterestingFields();
+      let environmentInterestingFields = [];
+      const schemaInterestingFields: any = {};
       let ftsKeys: any = new Set();
       let schemaFields: any = new Set();
+      const multiStreamObj: any = [];
       if (searchObj.data.streamResults.list.length > 0) {
         const queryResult: {
           name: string;
@@ -1710,8 +1742,6 @@ const useLogs = () => {
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
         const timestampField = store.state.zoConfig.timestamp_column;
-        const schemaInterestingFields: any = {};
-        const multiStreamObj: any = [];
 
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
@@ -1741,6 +1771,34 @@ const useLogs = () => {
             }
 
             if (
+              localInterestingFields.value != null &&
+              localInterestingFields.value[
+                searchObj.organizationIdetifier + "_" + stream.name
+              ] !== undefined &&
+              localInterestingFields.value[
+                searchObj.organizationIdetifier + "_" + stream.name
+              ].length > 0
+            ) {
+              searchObj.data.stream.interestingFieldList.push(
+                ...localInterestingFields.value[
+                  searchObj.organizationIdetifier + "_" + stream.name
+                ]
+              );
+            } else {
+              if (schemaInterestingFields.hasOwnProperty(stream.name)) {
+                searchObj.data.stream.interestingFieldList.push(
+                  ...schemaInterestingFields[stream.name]
+                );
+              }
+            }
+            if (
+              store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
+            ) {
+              environmentInterestingFields =
+                store.state?.zoConfig?.default_quick_mode_fields;
+            }
+
+            if (
               selectedStreamValues.includes(stream.name) &&
               !stream.hasOwnProperty("schema")
             ) {
@@ -1752,6 +1810,10 @@ const useLogs = () => {
             }
           }
         }
+
+        searchObj.data.stream.interestingFieldList = [
+          ...new Set(searchObj.data.stream.interestingFieldList),
+        ];
 
         const streamSchemas = await getMultiStreams(multiStreamObj);
 
@@ -1806,7 +1868,6 @@ const useLogs = () => {
                   fieldToStreamsMap[schema.name].push(stream.name);
                 }
 
-                console.log("commonFieldNames", commonFieldNames);
                 // If the field is part of other streams, add to common array
                 if (!commonFieldNames.has(schema.name)) {
                   commonFieldNames.add(schema.name);
@@ -1818,6 +1879,12 @@ const useLogs = () => {
                     isSchemaField: true,
                     showValues: schema.name !== timestampField,
                     group: "common",
+                    isInterestingField:
+                      searchObj.data.stream.interestingFieldList.includes(
+                        schema.name
+                      )
+                        ? true
+                        : false,
                   });
                 }
               } else {
@@ -1832,6 +1899,12 @@ const useLogs = () => {
                     showValues: schema.name !== timestampField,
                     streams: [stream.name],
                     group: stream.name,
+                    isInterestingField:
+                      searchObj.data.stream.interestingFieldList.includes(
+                        schema.name
+                      )
+                        ? true
+                        : false,
                   });
                 }
               }
@@ -1839,10 +1912,10 @@ const useLogs = () => {
           }
         }
 
-        // queryResult.forEach((field: any) => {
-        for (const field of queryResult) {
-          tempFieldsName.push(field.name);
-        }
+        // // queryResult.forEach((field: any) => {
+        // for (const field of queryResult) {
+        //   tempFieldsName.push(field.name);
+        // }
 
         if (
           searchObj.data.queryResults.hasOwnProperty("hits") &&
@@ -1879,6 +1952,10 @@ const useLogs = () => {
                 isSchemaField: false,
                 showValues: attribute !== timestampField,
                 group: "common",
+                isInterestingField:
+                  searchObj.data.stream.interestingFieldList.includes(attribute)
+                    ? true
+                    : false,
               });
             }
           }
@@ -1950,7 +2027,6 @@ const useLogs = () => {
         }
 
         let fields: any = {};
-        const localInterestingFields: any = useLocalInterestingFields();
         console.log("schemaInterestingFields:", schemaInterestingFields);
         console.log("localInterestingFields:", localInterestingFields);
         for (const stream of searchObj.data.streamResults.list) {
@@ -1958,38 +2034,9 @@ const useLogs = () => {
             selectedStreamValues.includes(stream.name) &&
             stream.hasOwnProperty("schema")
           ) {
-            if (
-              localInterestingFields.value != null &&
-              localInterestingFields.value[
-                searchObj.organizationIdetifier + "_" + stream.name
-              ] !== undefined &&
-              localInterestingFields.value[
-                searchObj.organizationIdetifier + "_" + stream.name
-              ].length > 0
-            ) {
-              searchObj.data.stream.interestingFieldList.push(
-                localInterestingFields.value[
-                  searchObj.organizationIdetifier + "_" + stream.name
-                ]
-              );
-            } else {
-              if (schemaInterestingFields.hasOwnProperty(stream.name)) {
-                searchObj.data.stream.interestingFieldList.push(
-                  ...schemaInterestingFields[stream.name]
-                );
-              }
-            }
-            let environmentInterestingFields = [];
-            if (
-              store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
-            ) {
-              environmentInterestingFields =
-                store.state?.zoConfig?.default_quick_mode_fields;
-            }
-
             let index = -1;
 
-            console.log(searchObj.data.stream.selectedStreamFields)
+            console.log(searchObj.data.stream.selectedStreamFields);
             fields = {};
             for (const row of queryResult) {
               // let keys = deepKeys(row);
@@ -2009,19 +2056,23 @@ const useLogs = () => {
                         searchObj.data.stream.interestingFieldList.push(
                           row.name
                         );
-                        const localInterestingFields: any =
-                          useLocalInterestingFields();
+
                         let localFields: any = {};
-                        if (localInterestingFields.value != null) {
+                        if (
+                          localInterestingFields.value[stream?.name] != null
+                        ) {
                           localFields = localInterestingFields.value;
                         }
-                        localFields[
-                          searchObj.organizationIdetifier + "_" + row.name
-                        ] = {
+
+                        console.log(Object.keys(localFields).length);
+                        searchObj.data.stream.selectedStreamFields[index] = {
                           ...searchObj.data.stream.selectedStreamFields[index],
-                          isInterestingField: true,
+                          isInterestingField:
+                            Object.keys(localFields).length > 0 &&
+                            localFields.indexOf(stream?.name) > -1
+                              ? true
+                              : false,
                         };
-                        useLocalInterestingFields(localFields);
                       }
                     }
                   }

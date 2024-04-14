@@ -55,7 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
-                      searchObj.data.stream.selectedStream.value || 'default'
+                      searchObj.data.stream.selectedStream.join(',') ||
+                      'default'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -144,7 +145,7 @@ size="10rem" /><br />
                 </div>
                 <div
                   v-else-if="
-                    searchObj.data.stream.selectedStream.label == '' &&
+                    searchObj.data.stream.selectedStream.length == 0 &&
                     searchObj.loading == false
                   "
                   class="row"
@@ -153,7 +154,8 @@ size="10rem" /><br />
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -172,7 +174,8 @@ size="10rem" /><br />
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -189,7 +192,8 @@ size="10rem" /><br />
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -274,7 +278,7 @@ export default defineComponent({
           button: "Search Data",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.value,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
           show_query: this.searchObj.meta.showQuery,
           show_histogram: this.searchObj.meta.showHistogram,
           sqlMode: this.searchObj.meta.sqlMode,
@@ -301,7 +305,7 @@ export default defineComponent({
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.value,
+            stream_name: this.searchObj.data.stream.selectedStream.join(","),
             page: "Search Logs",
           });
         }
@@ -325,7 +329,7 @@ export default defineComponent({
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.value,
+            stream_name: this.searchObj.data.stream.selectedStream.join(","),
             page: "Search Logs",
           });
         }
@@ -359,7 +363,7 @@ export default defineComponent({
             button: "Get Less Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.value,
+            stream_name: this.searchObj.data.stream.selectedStream.join(","),
             page: "Search Logs",
           });
         }
@@ -436,7 +440,7 @@ export default defineComponent({
 
       const isStreamChanged =
         queryParams.stream_type !== searchObj.data.stream.streamType ||
-        queryParams.stream !== searchObj.data.stream.selectedStream.value;
+        queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
       if (
         isStreamChanged &&
@@ -576,7 +580,7 @@ export default defineComponent({
             }
             searchObj.data.query =
               `SELECT [FIELD_LIST]${selectFields} FROM "` +
-              searchObj.data.stream.selectedStream.value +
+              searchObj.data.stream.selectedStream.join(",") +
               `" ` +
               whereClause;
 
@@ -600,7 +604,7 @@ export default defineComponent({
             searchObj.data.query,
             store.state.zoConfig.timestamp_column,
             "DESC",
-            searchObj.data.stream.selectedStream.value
+            searchObj.data.stream.selectedStream.join(",")
           );
 
           searchObj.data.editorValue = searchObj.data.query;
@@ -708,8 +712,8 @@ export default defineComponent({
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream.value,
-            `"${searchObj.data.stream.selectedStream.value}"`
+            searchObj.data.stream.selectedStream[0].value,
+            `"${searchObj.data.stream.selectedStream[0].value}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
