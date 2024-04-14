@@ -550,7 +550,7 @@ impl From<&str> for StreamSettings {
             bloom_filter_fields,
             data_retention,
             routing: Some(routing),
-            flatten_level,
+            flatten_level: Some(flatten_level),
             defined_schema_fields: Some(defined_schema_fields),
         }
     }
