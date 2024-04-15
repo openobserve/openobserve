@@ -88,11 +88,6 @@ export default defineComponent({
           );
         console.log("optionName updated", optionName.value);
 
-        // Update the autocomplete options based on the updated optionName
-        fieldsFilterFn.value = useSelectAutoComplete2(
-          toRef(optionName),
-          "name"
-        ).filterFn;
         fieldsFilteredOptions.value = useSelectAutoComplete2(
           toRef(optionName),
           "name"
