@@ -11,5 +11,5 @@ serde_json.workspace = true
 tonic.workspace = true
 
 [build-dependencies]
-tonic-build = { version = "0.9", features = ["prost"] }
-prost-build = "0.11"
+tonic-build = { version = "0.11", features = ["prost"] }
+prost-build = "0.12"

@@ -737,7 +737,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_META_TRANSACTION_RETRIES",
         help = "max time of transaction will retry",
-        default = 10
+        default = 3
     )]
     pub meta_transaction_retries: usize,
     #[env_config(
