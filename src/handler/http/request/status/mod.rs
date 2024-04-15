@@ -394,20 +394,38 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
-    let token = if req.headers().contains_key(header::AUTHORIZATION) {
-        req.headers()
-            .get(header::AUTHORIZATION)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string()
+    let token = if let Some(cookie) = req.cookie("auth_tokens") {
+        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        auth_tokens.refresh_token
     } else {
         return HttpResponse::Unauthorized().finish();
     };
 
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
-        Ok(token_response) => HttpResponse::Ok().json(token_response),
+        Ok(access_token) => {
+            let tokens = json::to_string(&AuthTokens {
+                access_token,
+                refresh_token: token,
+            })
+            .unwrap();
+
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                cookie::time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+            );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
+
+            HttpResponse::Ok().cookie(auth_cookie).finish()
+        }
         Err(_) => {
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
