@@ -113,7 +113,8 @@ export default defineComponent({
         ].config.promql_legend;
       console.log("inputValue", inputValue);
 
-      const newValue = inputValue + option;
+      const openingBraceIndex = inputValue.lastIndexOf("{");
+      const newValue = inputValue.slice(0, openingBraceIndex + 1) + option;
       console.log("newValue", newValue);
 
       dashboardPanelData.data.queries[
