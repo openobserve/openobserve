@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
+use arrow_schema::{DataType, Field, Schema};
 use config::{
     cluster,
     meta::{
@@ -30,7 +31,7 @@ use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
 use tracing::{info_span, Instrument};
 
-use super::datafusion;
+use super::{datafusion, sql::Sql};
 use crate::service::db;
 mod storage;
 mod wal;
@@ -337,4 +338,60 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+// generate parquet file search schema
+// TODO: add order by and group by field to schema
+fn generate_search_schema(
+    sql: Arc<Sql>,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    schema: &Schema,
+) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
+    // cacluate the diff between latest schema and group schema
+    let mut diff_fields = HashMap::new();
+    let mut new_fields = Vec::new();
+    for field in sql.meta.fields.iter() {
+        let mut group_field = None;
+        let mut latest_field = None;
+        if let Ok(field) = schema.field_with_name(field) {
+            group_field = Some(field);
+        };
+        if let Some(field) = schema_latest_map.get(field) {
+            latest_field = Some(field.as_ref());
+        };
+
+        match (group_field, latest_field) {
+            // When group_field is None and latest_field is Some, clone latest_field
+            (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
+
+            // When both group_field and latest_field are Some, compare their data types
+            (Some(group_field), Some(latest_field))
+                if group_field.data_type() != latest_field.data_type() =>
+            {
+                new_fields.push(Arc::new(latest_field.clone()));
+                diff_fields.insert(field.to_string(), latest_field.data_type().clone());
+            }
+
+            // When both group_field and latest_field are Some, and their data types are the same
+            (Some(group_field), Some(_)) => new_fields.push(Arc::new(group_field.clone())),
+
+            // should we return error
+            _ => {}
+        }
+    }
+
+    for (field, alias) in sql.meta.field_alias.iter() {
+        if let Some(v) = diff_fields.get(field) {
+            diff_fields.insert(alias.to_string(), v.clone());
+        }
+    }
+
+    let mut schema = Schema::new(new_fields);
+    // self add _timestamp if no exist
+    if schema.field_with_name("_timestamp").is_err() {
+        let field = Arc::new(Field::new("_timestamp", DataType::Int64, false));
+        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
+    }
+
+    Ok((Arc::new(schema), diff_fields))
 }
