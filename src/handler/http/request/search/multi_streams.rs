@@ -123,6 +123,17 @@ pub async fn search_multi(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
+    let mut query_fn = multi_req
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(&v).ok());
+
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
+
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
@@ -180,14 +191,7 @@ pub async fn search_multi(
             // Check permissions on stream ends
         }
 
-        let mut query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
-
-        if let Some(vrl_function) = &query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                query_fn = Some(format!("{} \n .", vrl_function));
-            }
-        }
-        req.query.query_fn = query_fn;
+        req.query.query_fn = query_fn.clone();
 
         for fn_name in functions::get_all_transform_keys(&org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
