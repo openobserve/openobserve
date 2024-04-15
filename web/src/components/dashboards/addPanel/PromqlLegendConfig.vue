@@ -59,7 +59,7 @@
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, toRef } from "vue";
+import { ref, defineComponent, toRef, watch } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete2 } from "@/composables/useSelectAutoComplete2";
@@ -71,10 +71,34 @@ export default defineComponent({
     const showOptions = ref(false);
     let hideOptionsTimeout: any;
 
-    const optionName = dashboardPanelData.meta.stream.selectedStreamFields.map(
-      (item: any) => item?.name
+    const optionName = ref(
+      dashboardPanelData.meta.stream.selectedStreamFields.map(
+        (item: any) => item?.name
+      )
     );
-    console.log("optionName", optionName);
+    console.log("optionName", optionName.value);
+
+    // Watch for changes in the selectedStreamFields and update the optionName
+    watch(
+      () => dashboardPanelData.meta.stream.selectedStreamFields,
+      () => {
+        optionName.value =
+          dashboardPanelData.meta.stream.selectedStreamFields.map(
+            (item: any) => item?.name
+          );
+        console.log("optionName updated", optionName.value);
+
+        // Update the autocomplete options based on the updated optionName
+        fieldsFilterFn.value = useSelectAutoComplete2(
+          toRef(optionName),
+          "name"
+        ).filterFn;
+        fieldsFilteredOptions.value = useSelectAutoComplete2(
+          toRef(optionName),
+          "name"
+        ).filteredOptions;
+      }
+    );
 
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete2(toRef(optionName), "name");
@@ -93,7 +117,7 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.promql_legend;
       console.log("inputValue", inputValue);
-      
+
       const newValue = inputValue + option;
       console.log("newValue", newValue);
 
