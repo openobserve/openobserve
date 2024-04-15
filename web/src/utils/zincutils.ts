@@ -95,11 +95,32 @@ export const getUserInfo = (loginString: string) => {
     for (const token of tokens) {
       const propArr = token.split("=");
       if (propArr[0] == "id_token") {
-        decToken = getDecodedAccessToken(propArr[1]);
-        const encodedSessionData: any = b64EncodeStandard(
-          JSON.stringify(decToken)
-        );
-        useLocalUserInfo(encodedSessionData);
+        const tokenString = propArr[1];
+        const parts = tokenString.split(".");
+        if (parts.length === 3) {
+          try {
+            // Attempt to parse the token as a JWT
+            const header = JSON.parse(atob(parts[0]));
+            const payload = JSON.parse(atob(parts[1]));
+            const signature = parts[2];
+            payload["family_name"] = payload["name"];
+            payload["given_name"] = "";
+            const encodedSessionData: any = b64EncodeStandard(
+              JSON.stringify(payload)
+            );
+            useLocalUserInfo(encodedSessionData);
+          } catch (error) {
+            // If parsing fails, it's not a valid JWT
+            console.error("Invalid JWT token:", error);
+            return null;
+          }
+        } else {
+          decToken = getDecodedAccessToken(propArr[1]);
+          const encodedSessionData: any = b64EncodeStandard(
+            JSON.stringify(decToken)
+          );
+          useLocalUserInfo(encodedSessionData);
+        }
       }
     }
 
@@ -118,7 +139,11 @@ export const getLoginURL = () => {
 };
 
 export const getLogoutURL = () => {
-  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${config.aws_user_pools_web_client_id}&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${config.oauth.redirectSignOut}&state=random_string`;
+  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${
+    config.aws_user_pools_web_client_id
+  }&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${
+    config.oauth.redirectSignOut
+  }&state=random_string`;
 };
 
 export const getDecodedAccessToken = (token: string) => {
