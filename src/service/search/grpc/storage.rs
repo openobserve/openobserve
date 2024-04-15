@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use arrow_schema::{DataType, Field};
 use config::{
     is_local_disk_storage,
     meta::{
@@ -177,12 +178,12 @@ pub async fn search(
     // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field.data_type());
+        schema_latest_map.insert(field.name(), field);
     }
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
-        let mut schema = schema_versions[ver]
+        let schema = schema_versions[ver]
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
@@ -196,34 +197,10 @@ pub async fn search(
             },
             work_group: Some(work_group.to_string()),
         };
-        // cacluate the diff between latest schema and group schema
-        let mut diff_fields = HashMap::new();
-        let group_fields = schema.fields();
-        for field in group_fields {
-            if let Some(data_type) = schema_latest_map.get(field.name()) {
-                if *data_type != field.data_type() {
-                    diff_fields.insert(field.name().clone(), (*data_type).clone());
-                }
-            }
-        }
-        for (field, alias) in sql.meta.field_alias.iter() {
-            if let Some(v) = diff_fields.get(field) {
-                diff_fields.insert(alias.to_string(), v.clone());
-            }
-        }
-        // add not exists field for wal infered schema
-        let mut new_fields = Vec::new();
-        for field in sql.meta.fields.iter() {
-            if schema.field_with_name(field).is_err() {
-                if let Ok(field) = schema_latest.field_with_name(field) {
-                    new_fields.push(Arc::new(field.clone()));
-                }
-            }
-        }
-        if !new_fields.is_empty() {
-            let new_schema = Schema::new(new_fields);
-            schema = Schema::try_merge(vec![schema, new_schema])?;
-        }
+
+        let (schema, diff_fields) =
+            generate_search_schema(sql.clone(), &schema_latest_map, &schema)?;
+
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
             trace_id,
@@ -250,7 +227,6 @@ pub async fn search(
             )));
         }
 
-        let schema = Arc::new(schema);
         let task = tokio::task::spawn(
             async move {
                 tokio::select! {
@@ -314,6 +290,52 @@ pub async fn search(
     }
 
     Ok((results, scan_stats))
+}
+
+fn generate_search_schema(
+    sql: Arc<Sql>,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    schema: &Schema,
+) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
+    // cacluate the diff between latest schema and group schema
+    let mut diff_fields = HashMap::new();
+    let mut new_fields = Vec::new();
+    for field in sql.meta.fields.iter() {
+        let mut group_field = None;
+        let mut latest_field = None;
+        if let Ok(field) = schema.field_with_name(field) {
+            group_field = Some(field);
+        };
+        if let Some(field) = schema_latest_map.get(field) {
+            latest_field = Some(field.as_ref());
+        };
+
+        if group_field.is_none() && latest_field.is_some() {
+            new_fields.push(Arc::new(latest_field.unwrap().clone()));
+        } else if group_field.is_some() && latest_field.is_some() {
+            if group_field.unwrap().data_type() != latest_field.unwrap().data_type() {
+                new_fields.push(Arc::new(latest_field.unwrap().clone()));
+                diff_fields.insert(field.to_string(), latest_field.unwrap().data_type().clone());
+            } else {
+                new_fields.push(Arc::new(group_field.unwrap().clone()));
+            }
+        }
+    }
+
+    for (field, alias) in sql.meta.field_alias.iter() {
+        if let Some(v) = diff_fields.get(field) {
+            diff_fields.insert(alias.to_string(), v.clone());
+        }
+    }
+
+    let mut schema = Schema::new(new_fields);
+    // self add _timestamp if no exist
+    if schema.field_with_name("_timestamp").is_err() {
+        let field = Arc::new(Field::new("_timestamp", DataType::Int64, false));
+        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
+    }
+
+    Ok((Arc::new(schema), diff_fields))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
