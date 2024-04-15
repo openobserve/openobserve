@@ -15,6 +15,7 @@
 
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use config::utils::json;
 #[cfg(feature = "enterprise")]
 use config::CONFIG;
 use futures::future::{ready, Ready};
@@ -140,7 +141,10 @@ impl FromRequest for AuthExtractor {
         use config::meta::stream::StreamType;
         use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::common::utils::http::{get_folder, get_stream_type_from_request};
+        use crate::common::{
+            meta::user::AuthTokens,
+            utils::http::{get_folder, get_stream_type_from_request},
+        };
 
         let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         let stream_type = match get_stream_type_from_request(&query) {
@@ -300,8 +304,10 @@ impl FromRequest for AuthExtractor {
             )
         };
 
-        let auth_str = if let Some(cookie) = req.cookie("access_token") {
-            let access_token = cookie.value().to_string();
+        let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
+            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let access_token = auth_tokens.access_token;
+
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
@@ -411,7 +417,9 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let auth_str = if let Some(cookie) = req.cookie("access_token") {
+        let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
+            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let access_token = auth_tokens.access_token;
             let access_token = cookie.value().to_string();
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token

@@ -15,7 +15,13 @@
 
 use std::io::Error;
 
-use actix_web::{cookie, get, http::header, put, web, HttpRequest, HttpResponse};
+use actix_web::{
+    cookie,
+    cookie::{Cookie, SameSite},
+    get,
+    http::header,
+    put, web, HttpRequest, HttpResponse,
+};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
@@ -47,7 +53,7 @@ use {
 use crate::{
     common::{
         infra::{cluster, config::*},
-        meta::{functions::ZoFunction, http::HttpResponse as MetaHttpResponse},
+        meta::{functions::ZoFunction, http::HttpResponse as MetaHttpResponse, user::AuthTokens},
     },
     service::{db, search::datafusion::DEFAULT_FUNCTIONS},
 };
@@ -308,6 +314,8 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
+    use crate::common::meta::user::AuthTokens;
+
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
         Some(code) => code,
@@ -333,50 +341,41 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
     match exchange_code(code).await {
         Ok(login_data) => {
-            let token = login_data.access_token;
+            let access_token = login_data.access_token;
             let keys = get_jwks().await;
             let token_ver =
-                verify_decode_token(&token, &keys, &O2_CONFIG.dex.client_id, true).await;
+                verify_decode_token(&access_token, &keys, &O2_CONFIG.dex.client_id, true).await;
 
             match token_ver {
                 Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
 
-            let mut access_token_cookie = cookie::Cookie::new("access_token", token);
-            access_token_cookie.set_expires(
-                cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
-            );
-            access_token_cookie.set_http_only(true);
-            access_token_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-            access_token_cookie.set_path("/");
-            if CONFIG.auth.cookie_same_site_lax {
-                access_token_cookie.set_same_site(cookie::SameSite::Lax)
-            } else {
-                access_token_cookie.set_same_site(cookie::SameSite::None)
-            };
+            let tokens = json::to_string(&AuthTokens {
+                access_token,
+                refresh_token: login_data.refresh_token,
+            })
+            .unwrap();
 
-            let mut refresh_token_cookie =
-                cookie::Cookie::new("refresh_token", login_data.refresh_token);
-            refresh_token_cookie.set_expires(
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
             );
-            refresh_token_cookie.set_http_only(true);
-            refresh_token_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-            refresh_token_cookie.set_path("/");
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
             if CONFIG.auth.cookie_same_site_lax {
-                refresh_token_cookie.set_same_site(cookie::SameSite::Lax)
+                auth_cookie.set_same_site(SameSite::Lax);
             } else {
-                refresh_token_cookie.set_same_site(cookie::SameSite::None)
-            };
-            println!("access_token_cookie {:?}", access_token_cookie);
+                auth_cookie.set_same_site(SameSite::None);
+            }
+
+            // println!("auth_tokens {:?}", &tokens);
 
             let resp = HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
-                .cookie(refresh_token_cookie)
-                .cookie(access_token_cookie)
+                .cookie(auth_cookie)
                 .finish();
 
             for cookie in resp.cookies() {
@@ -419,29 +418,24 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     match refresh_token(&token).await {
         Ok(token_response) => HttpResponse::Ok().json(token_response),
         Err(_) => {
-            let mut access_cookie = cookie::Cookie::new("access_token", "");
-            access_cookie.set_http_only(true);
-            access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-            access_cookie.set_path("/");
+            let tokens = json::to_string(&AuthTokens::default()).unwrap();
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                cookie::time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+            );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
 
-            if CONFIG.auth.cookie_same_site_lax {
-                access_cookie.set_same_site(cookie::SameSite::Lax)
-            } else {
-                access_cookie.set_same_site(cookie::SameSite::None)
-            };
-            let mut refresh_cookie = cookie::Cookie::new("refresh_token", "");
-            refresh_cookie.set_http_only(true);
-            refresh_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-            refresh_cookie.set_path("/");
-            if CONFIG.auth.cookie_same_site_lax {
-                refresh_cookie.set_same_site(cookie::SameSite::Lax)
-            } else {
-                refresh_cookie.set_same_site(cookie::SameSite::None)
-            };
             HttpResponse::Unauthorized()
                 .append_header((header::LOCATION, "/"))
-                .cookie(access_cookie)
-                .cookie(refresh_cookie)
+                .cookie(auth_cookie)
                 .finish()
         }
     }
@@ -449,20 +443,24 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 
 #[get("/logout")]
 async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
-    let mut access_cookie = cookie::Cookie::new("access_token", "");
-    access_cookie.set_http_only(true);
-    access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-    access_cookie.set_path("/");
-    access_cookie.set_same_site(cookie::SameSite::Lax);
-    let mut refresh_cookie = cookie::Cookie::new("refresh_token", "");
-    refresh_cookie.set_http_only(true);
-    refresh_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-    refresh_cookie.set_path("/");
-    refresh_cookie.set_same_site(cookie::SameSite::Lax);
+    let tokens = json::to_string(&AuthTokens::default()).unwrap();
+    let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+    auth_cookie.set_expires(
+        cookie::time::OffsetDateTime::now_utc()
+            + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+    );
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if CONFIG.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(SameSite::None);
+    }
+
     HttpResponse::Ok()
         .append_header((header::LOCATION, "/"))
-        .cookie(access_cookie)
-        .cookie(refresh_cookie)
+        .cookie(auth_cookie)
         .finish()
 }
 
