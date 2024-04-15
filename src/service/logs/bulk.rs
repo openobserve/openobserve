@@ -112,6 +112,8 @@ pub async fn ingest(
 
     let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
 
+    let mut user_defined_schema_map: HashMap<String, Vec<String>> = HashMap::new();
+
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
@@ -140,6 +142,16 @@ pub async fn ingest(
                 });
                 continue; // skip
             }
+
+            crate::service::ingestion::get_user_defined_schema(
+                StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_owned().into(),
+                },
+                &mut user_defined_schema_map,
+            )
+            .await;
 
             next_line_is_data = true;
 
@@ -268,6 +280,13 @@ pub async fn ingest(
                 json::Value::Object(v) => v,
                 _ => unreachable!(),
             };
+
+            match user_defined_schema_map.get(&stream_name) {
+                Some(fields) => {
+                    crate::service::logs::refactor_map(&mut local_val, fields);
+                }
+                None => {}
+            }
 
             // set _id
             if !doc_id.is_empty() {

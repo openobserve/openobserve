@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
@@ -450,7 +447,7 @@ struct StreamMeta<'a> {
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
-pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &HashSet<String>) {
+pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &Vec<String>) {
     let mut non_interesting_concat = String::new();
 
     for (key, value) in original_map.iter() {

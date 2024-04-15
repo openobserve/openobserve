@@ -464,6 +464,7 @@ pub async fn get_stream_routing(
     .unwrap_or_default();
     let res: Vec<Routing> = stream_settings
         .routing
+        .unwrap_or_default()
         .iter()
         .map(|(k, v)| Routing {
             destination: k.to_string(),
@@ -472,6 +473,25 @@ pub async fn get_stream_routing(
         .collect();
 
     stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+}
+
+pub async fn get_user_defined_schema(
+    stream_params: StreamParams,
+    user_defined_schema_map: &mut HashMap<String, Vec<String>>,
+) {
+    let stream_settings = infra::schema::get_settings(
+        &stream_params.org_id,
+        &stream_params.stream_name,
+        stream_params.stream_type,
+    )
+    .await
+    .unwrap_or_default();
+    match stream_settings.defined_schema_fields {
+        Some(fields) => {
+            user_defined_schema_map.insert(stream_params.stream_name.to_string(), fields);
+        }
+        None => return,
+    }
 }
 
 #[cfg(test)]
