@@ -40,11 +40,6 @@ const useOSRoutes = () => {
       name: "callback",
       component: Login,
     },
-    {
-      path: "/web/cb",
-      name: "callback",
-      component: Login,
-    },
   ];
 
   const homeChildRoutes: any[] = [...useIngestionRoutes()];
