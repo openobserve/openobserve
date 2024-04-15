@@ -424,7 +424,6 @@ impl FromRequest for AuthExtractor {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
             let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
-            let access_token = cookie.value().to_string();
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
