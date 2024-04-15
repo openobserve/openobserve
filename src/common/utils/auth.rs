@@ -24,7 +24,11 @@ use futures::future::{ready, Ready};
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
-    meta::{authz::Authz, organization::DEFAULT_ORG, user::UserRole},
+    meta::{
+        authz::Authz,
+        organization::DEFAULT_ORG,
+        user::{AuthTokens, UserRole},
+    },
 };
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
