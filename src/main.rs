@@ -148,7 +148,7 @@ async fn main() -> Result<(), anyhow::Error> {
             )
         })?;
         None
-    } else if CONFIG.common.tracing_enabled {
+    } else if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
         enable_tracing()?;
         None
     } else {
@@ -222,7 +222,11 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // init http server
-    if let Err(e) = init_http_server().await {
+    if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        if let Err(e) = init_http_server_without_tracing().await {
+            log::error!("HTTP server runs failed: {}", e);
+        }
+    } else if let Err(e) = init_http_server().await {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
@@ -423,6 +427,94 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
             .wrap(RequestTracing::new())
+    })
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
+        15,
+        CONFIG.limit.keep_alive,
+    ))))
+    .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
+    .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
+    .bind(haddr)?;
+
+    let server = server
+        .workers(CONFIG.limit.http_worker_num)
+        .worker_max_blocking_threads(
+            CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
+        )
+        .disable_signals()
+        .run();
+    let handle = server.handle();
+    tokio::task::spawn(async move {
+        graceful_shutdown(handle).await;
+    });
+    server.await?;
+    Ok(())
+}
+
+async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
+    // metrics
+    let prometheus = config::metrics::create_prometheus_handler();
+
+    let thread_id = Arc::new(AtomicU16::new(0));
+    let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
+        format!("[::]:{}", CONFIG.http.port).parse()?
+    } else {
+        let ip = if !CONFIG.http.addr.is_empty() {
+            CONFIG.http.addr.clone()
+        } else {
+            "0.0.0.0".to_string()
+        };
+        format!("{}:{}", ip, CONFIG.http.port).parse()?
+    };
+
+    let server = HttpServer::new(move || {
+        let local_id = thread_id.load(Ordering::SeqCst) as usize;
+        if CONFIG.common.feature_per_thread_lock {
+            thread_id.fetch_add(1, Ordering::SeqCst);
+        }
+        log::info!(
+            "starting HTTP server at: {}, thread_id: {}",
+            haddr,
+            local_id
+        );
+        let mut app = App::new().wrap(prometheus.clone());
+        if is_router(&LOCAL_NODE_ROLE) {
+            let client = awc::Client::builder()
+                .connector(awc::Connector::new().limit(CONFIG.route.max_connections))
+                .timeout(Duration::from_secs(CONFIG.route.timeout))
+                .disable_redirects()
+                .finish();
+            app = app
+                .service(
+                    // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
+                    web::scope(&CONFIG.common.base_uri)
+                        .service(router::http::config)
+                        .service(router::http::config_paths)
+                        .service(router::http::api)
+                        .service(router::http::aws)
+                        .service(router::http::gcp)
+                        .service(router::http::rum)
+                        .configure(get_basic_routes)
+                        .configure(get_proxy_routes),
+                )
+                .app_data(web::Data::new(client))
+        } else {
+            app = app.service(
+                web::scope(&CONFIG.common.base_uri)
+                    .configure(get_config_routes)
+                    .configure(get_service_routes)
+                    .configure(get_other_service_routes)
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
+            )
+        }
+        app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+            .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
+            .app_data(web::Data::new(local_id%10))
+            .wrap(middleware::Compress::default())
+            .wrap(middleware::Logger::new(
+                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            ))
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
         15,
