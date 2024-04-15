@@ -35,7 +35,7 @@ static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
 /// max idle time in seconds before shut down
 static WORKER_MAX_IDLE: f64 = 60.0;
 
-/// Multi-consumer side of the TaskQueue. Created and maaged by TaskQueue asscoaited with a stream.
+/// Multi-consumer side of the TaskQueue. Created and manged by TaskQueue associated with a stream.
 /// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold
 /// the receiver. Each initialized worker has two tasks to perform. Worker will shut down
 /// when corresponding producer closes their channel.
@@ -80,22 +80,24 @@ impl Workers {
     pub async fn shut_down(&self) {
         let mut rw = self.handles.write().await;
         let join_res = join_all(rw.drain(..)).await;
-        join_res.iter().for_each(|res| {
+        for res in join_res {
             if let Err(e) = res {
-                log::error!(
-                    "TaskQueue({})-Worker error when closing: {:?}",
-                    self.tq_index,
-                    e
-                )
+                if !e.is_cancelled() {
+                    log::error!(
+                        "TaskQueue({})-Worker error when closing: {:?}",
+                        self.tq_index,
+                        e
+                    )
+                }
             }
-        });
+        }
     }
 }
 
 /// Initializes a background worker (TaskQueue consumer) with two tasks.
 /// The main task is receiving and processing IngestEntry sent by TaskQueue producers.
 /// The side task is persisting pending tasks to disk.
-/// The worker is asscoaited with a stream by stream_name.
+/// The worker is associated with a stream by stream_name.
 fn init_worker(tq_index: usize, receiver: Arc<Receiver<IngestEntry>>) -> Worker {
     tokio::spawn(async move {
         let worker_id = ider::generate();
@@ -133,7 +135,7 @@ async fn process_job(
     receiver: Arc<Receiver<IngestEntry>>,
     store_sig_s: Sender<Option<Vec<IngestEntry>>>,
 ) -> Result<()> {
-    let mut interval =
+    let mut wait_interval =
         tokio::time::interval(tokio::time::Duration::from_secs(WORKER_DEFAULT_WAIT_TIME));
     let mut time = std::time::Instant::now();
 
@@ -141,6 +143,7 @@ async fn process_job(
 
     while time.elapsed().as_secs_f64() <= WORKER_MAX_IDLE {
         if receiver.is_closed() {
+            // closed by TaskQueue::shut_down()
             break;
         }
 
@@ -170,7 +173,7 @@ async fn process_job(
             }
             time = std::time::Instant::now();
         }
-        interval.tick().await;
+        wait_interval.tick().await;
     }
     log::info!("TaskQueue({tq_index})-Worker({worker_id}) shutting down.");
     store_sig_s.close(); // signal persist job to close

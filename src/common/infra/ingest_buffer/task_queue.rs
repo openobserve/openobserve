@@ -29,27 +29,25 @@ static MIN_WORKER_CNT: usize = 3;
 /// max # of requests could be held in channel.
 static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more workers
 
-/// A global hash map that maps stream of a TaskQueue instsance.
-static TQMANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
+/// A global hash map that maps stream of a TaskQueue instance.
+static TQ_MANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
 
 pub(super) async fn init() -> Result<()> {
-    _ = TQMANAGER.read().await.task_queues.len();
+    _ = TQ_MANAGER.read().await.task_queues.len();
     Ok(())
 }
 
 /// Sends a task to a TaskQueue based on stream name. To be called by server api endpoitns.
 pub async fn send_task(task: IngestEntry) -> Result<()> {
-    let mut w = TQMANAGER.write().await;
+    let mut w = TQ_MANAGER.write().await;
     w.send_task(task).await
 }
 
 /// Gracefully terminates all running TaskQueues
 pub async fn shut_down() {
-    if CONFIG.common.feature_ingest_buffer_enabled {
-        log::info!("Shutting down TaskQueueManager");
-        let mut w = TQMANAGER.write().await;
-        w.terminal_all().await;
-    }
+    log::info!("Shutting down TaskQueueManager");
+    let mut w = TQ_MANAGER.write().await;
+    w.terminal_all().await;
 }
 
 struct TaskQueueManager {
@@ -79,7 +77,7 @@ impl TaskQueueManager {
     async fn send_task(&mut self, task: IngestEntry) -> Result<()> {
         let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
             return Err(anyhow::anyhow!(
-                "TaskQueueManager not able to find TaskQeueue."
+                "TaskQueueManager not able to find TaskQueue."
             ));
         };
         if tq.workers.running_worker_count().await == 0 {

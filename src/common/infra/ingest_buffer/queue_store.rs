@@ -32,12 +32,12 @@ const FILE_EXTENSION: &str = "wal";
 /// Delimiter for writing and reading IngestEntries to/from wal files
 const DELIMITER: u8 = b'|';
 
-/// Writes the given array of IngestEntries to disk at direcotry formatted by
+/// Writes the given array of IngestEntries to disk at directory formatted by
 /// pattern {data_wal_dir}/ingest_buffer/{stream_name}/{worker_id}.wal.
 ///
 /// Overwrites if previously persisted.
 ///
-/// Bytes of IngestEntries are written to wal file one by one seperated by delimiter (|)
+/// Bytes of IngestEntries are written to wal file one by one separated by delimiter (|)
 ///
 /// `entry|entry|entry|...`
 pub(super) async fn persist_job(
@@ -48,18 +48,11 @@ pub(super) async fn persist_job(
     let path = build_file_path(tq_index, &worker_id);
 
     while let Ok(tasks) = store_sig_r.recv().await {
-        log::info!("TaskQueue({tq_index})-worker({worker_id}) persist job starts");
-
-        match persist_job_inner(&path, tasks) {
-            Err(e) => {
-                log::error!(
-                    "TaskQueue({tq_index})-worker({worker_id}) failed to persist tasks: {:?} ",
-                    e
-                );
-            }
-            Ok(_) => {
-                log::info!("TaskQueue({tq_index})-worker({worker_id}) persist job done");
-            }
+        if let Err(e) = persist_job_inner(&path, tasks) {
+            log::error!(
+                "TaskQueue({tq_index})-worker({worker_id}) failed to persist tasks: {:?} ",
+                e
+            );
         }
     }
     Ok(())
@@ -110,7 +103,7 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
                     entries.len(),
                     wal_file
                 );
-                // Hack (stream_name = 0, worker_id=0)
+                // Hack temp tq_index & worker_id and max 1 retry
                 process_tasks_with_retries(0, "0", &entries, 1).await;
             }
             _ => {
