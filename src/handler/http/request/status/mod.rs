@@ -403,10 +403,10 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
-        Ok(access_token) => {
+        Ok((access_token, refresh_token)) => {
             let tokens = json::to_string(&AuthTokens {
                 access_token,
-                refresh_token: token,
+                refresh_token,
             })
             .unwrap();
 
