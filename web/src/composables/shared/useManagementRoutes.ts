@@ -26,7 +26,7 @@ const useManagementRoutes = () => {
       ],
     },
   ];
-  if (config.isCloud == "true" || config.isEnterprise == "true") {
+  if (config.isEnterprise == "true") {
     routes[0].children.push(
       ...[
         {
