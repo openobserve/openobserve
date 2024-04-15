@@ -370,19 +370,10 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             } else {
                 auth_cookie.set_same_site(SameSite::None);
             }
-
-            // println!("auth_tokens {:?}", &tokens);
-
-            let resp = HttpResponse::Found()
+            Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
                 .cookie(auth_cookie)
-                .finish();
-
-            for cookie in resp.cookies() {
-                println!("cookie {:?}", cookie);
-            }
-
-            Ok(resp)
+                .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
     }

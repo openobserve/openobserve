@@ -145,10 +145,7 @@ impl FromRequest for AuthExtractor {
         use config::meta::stream::StreamType;
         use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::common::{
-            meta::user::AuthTokens,
-            utils::http::{get_folder, get_stream_type_from_request},
-        };
+        use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
         let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         let stream_type = match get_stream_type_from_request(&query) {
