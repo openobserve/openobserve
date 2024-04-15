@@ -35,6 +35,7 @@
       hide-header
       row-key="index"
       wrap-cells
+      data-test="queryList-table"
     >
     </q-table>
   </q-card>

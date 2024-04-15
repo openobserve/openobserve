@@ -34,6 +34,7 @@
             round
             flat
             @click="listSchema(props)"
+            data-test="queryList-btn"
           />
           <q-btn
             :icon="outlinedCancel"
@@ -46,6 +47,7 @@
             round
             flat
             @click="confirmDeleteAction(props)"
+            data-test="cancelQuery-btn"
           />
         </q-td>
       </template>
@@ -67,6 +69,7 @@
                 dense
                 class="q-ml-auto q-mb-xs no-border search-input"
                 :placeholder="t('queries.search')"
+                data-test="running-queries-search-input"
               >
                 <template #prepend>
                   <q-icon name="search" />
@@ -94,7 +97,7 @@
 
       <template #bottom="scope">
         <q-table-pagination
-          data-test="log-stream-table-pagination"
+          data-test="query-stream-table-pagination"
           :scope="scope"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
