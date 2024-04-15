@@ -68,7 +68,7 @@ pub async fn search(
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let trace_id = if trace_id.is_empty() {
-        if CONFIG.common.tracing_enabled {
+        if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
