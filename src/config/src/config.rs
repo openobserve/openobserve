@@ -793,10 +793,12 @@ pub struct MemoryCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 10)] // MB
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 50)] // MB
     pub gc_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
+    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
+    pub skip_disk_check: bool,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
     pub datafusion_max_size: usize,
@@ -821,7 +823,7 @@ pub struct DiskCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
-    #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 10)] // MB
+    #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 100)] // MB
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
