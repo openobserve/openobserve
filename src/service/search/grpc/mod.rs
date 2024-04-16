@@ -434,7 +434,7 @@ fn generate_select_start_search_schema(
             diff_fields.insert(alias.to_string(), v.clone());
         }
     }
-    // add not exists field for wal infered schema
+    // add not exists field in group schema but used in sql
     let mut new_fields = Vec::new();
     for field in sql.meta.fields.iter() {
         if schema.field_with_name(field).is_err() {
