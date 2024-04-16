@@ -322,7 +322,7 @@ async fn exec_query(
     {
         query = rewrite::rewrite_count_distinct_sql(&query, true)?;
     } else {
-        query = rewrite::add_group_by_field_to_select(&query)?;
+        query = rewrite::add_group_by_order_by_field_to_select(&query)?;
     }
 
     // Debug SQL
@@ -703,7 +703,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
 
     let mut sql = sql.to_string();
     if !is_final_phase {
-        sql = rewrite::add_group_by_field_to_select(&sql)?;
+        sql = rewrite::add_group_by_order_by_field_to_select(&sql)?;
     }
 
     let mut fields = Vec::new();
