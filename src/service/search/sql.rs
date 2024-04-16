@@ -450,8 +450,6 @@ impl Sql {
                 }
             }
         }
-        println!("\n\nfulltext: {:?}\n\n", fulltext);
-        println!("\n\nindexed_text: {:?}\n\n", indexed_text);
 
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
