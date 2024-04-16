@@ -54,7 +54,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER},
+    service::{db, metadata, search::SEARCH_SERVER, usage},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -239,6 +239,9 @@ async fn main() -> Result<(), anyhow::Error> {
     grpc_shutudown_tx.send(()).ok();
     grpc_stopped_rx.await.ok();
     log::info!("gRPC server stopped");
+
+    // flush usage report
+    usage::flush_usage().await;
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
