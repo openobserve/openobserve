@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -178,7 +178,9 @@ pub async fn get_folder(path: web::Path<(String, String)>) -> Result<HttpRespons
     ),
 )]
 #[delete("/{org_id}/folders/{folder_id}")]
-async fn delete_folder(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+async fn delete_folder(
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
     let (org_id, folder_id) = path.into_inner();
     folders::delete_folder(&org_id, &folder_id).await
 }

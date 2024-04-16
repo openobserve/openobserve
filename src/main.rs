@@ -231,6 +231,13 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("HTTP server stopped");
 
+    // flush audit data
+    #[cfg(feature = "enterprise")]
+    usage::flush_audit().await;
+
+    // flush usage report
+    usage::flush_usage().await;
+
     // leave the cluster
     _ = cluster::leave().await;
     log::info!("Node left cluster");
@@ -239,9 +246,6 @@ async fn main() -> Result<(), anyhow::Error> {
     grpc_shutudown_tx.send(()).ok();
     grpc_stopped_rx.await.ok();
     log::info!("gRPC server stopped");
-
-    // flush usage report
-    usage::flush_usage().await;
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
