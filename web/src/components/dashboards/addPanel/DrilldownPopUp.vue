@@ -576,18 +576,46 @@ export default defineComponent({
       if (dashboardPanelData.data.type == "sankey") {
         return [
           {
-            label: "Source",
+            label: "Edge Source",
             value: "${edge.__source}",
           },
           {
-            label: "Target",
+            label: "Edge Target",
             value: "${edge.__target}",
           },
           {
-            label: "Value",
+            label: "Edge Value",
             value: "${edge.__value}",
           },
+          {
+            label: "Node Name",
+            value: "${node.__name}",
+          },
+          {
+            label: "Node Value",
+            value: "${node.__value}",
+          },
         ];
+      } else if (dashboardPanelData.data.type == "table") {
+        const options: any = [];
+        dashboardPanelData.data.queries.forEach((query: any) => {
+          // take all field from x, y and z
+          const panelFields: any = [
+            ...query.fields.x,
+            ...query.fields.y,
+            ...query.fields.z,
+          ];
+          console.log("panelFields", panelFields);
+          panelFields.forEach((field: any) => {
+            // we have label and alias, use both in dynamic values
+            options.push({
+              label: field.label,
+              value: "${row.field[\""+field.label+"\"]}",
+            })
+          });
+          console.log("fields", options);
+        });
+        return options;
       } else {
         return [
           {
@@ -602,7 +630,7 @@ export default defineComponent({
       }
     };
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useAutoCompleteForPromql(toRef(options), "name");
+      useAutoCompleteForPromql(toRef(options), "label");
 
     console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
 
