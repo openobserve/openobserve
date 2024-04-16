@@ -447,7 +447,7 @@ struct StreamMeta<'a> {
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
-pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &Vec<String>) {
+pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &[String]) {
     let mut non_schema_map = HashMap::new();
 
     for (key, value) in original_map.iter() {

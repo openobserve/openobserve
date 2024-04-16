@@ -486,11 +486,8 @@ pub async fn get_user_defined_schema(
     )
     .await
     .unwrap_or_default();
-    match stream_settings.defined_schema_fields {
-        Some(fields) => {
-            user_defined_schema_map.insert(stream_params.stream_name.to_string(), fields);
-        }
-        None => return,
+    if let Some(fields) = stream_settings.defined_schema_fields {
+        user_defined_schema_map.insert(stream_params.stream_name.to_string(), fields);
     }
 }
 

@@ -217,26 +217,28 @@ pub async fn ingest(
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
 
-            let temp = vec![];
-            let routing = stream_routing_map.get(&stream_name).unwrap_or(&temp);
-
-            for route in routing {
-                let mut is_routed = true;
-                let val = &route.routing;
-                for q_condition in val.iter() {
-                    is_routed = is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
-                }
-                if is_routed && !val.is_empty() {
-                    stream_name = route.destination.clone();
-                    if !stream_data_map.contains_key(&stream_name) {
-                        stream_data_map.insert(
-                            stream_name.clone(),
-                            BulkStreamData {
-                                data: HashMap::new(),
-                            },
-                        );
+            if let Some(routing) = stream_routing_map.get(&stream_name) {
+                if !routing.is_empty() {
+                    for route in routing {
+                        let mut is_routed = true;
+                        let val = &route.routing;
+                        for q_condition in val.iter() {
+                            is_routed =
+                                is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
+                        }
+                        if is_routed && !val.is_empty() {
+                            stream_name = route.destination.clone();
+                            if !stream_data_map.contains_key(&stream_name) {
+                                stream_data_map.insert(
+                                    stream_name.clone(),
+                                    BulkStreamData {
+                                        data: HashMap::new(),
+                                    },
+                                );
+                            }
+                            break;
+                        }
                     }
-                    break;
                 }
             }
 
@@ -280,11 +282,8 @@ pub async fn ingest(
                 _ => unreachable!(),
             };
 
-            match user_defined_schema_map.get(&stream_name) {
-                Some(fields) => {
-                    crate::service::logs::refactor_map(&mut local_val, fields);
-                }
-                None => {}
+            if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                crate::service::logs::refactor_map(&mut local_val, fields);
             }
 
             // set _id
