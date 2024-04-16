@@ -87,7 +87,7 @@ async fn ingest_inner(
     let mut trigger: Option<TriggerAlertData> = None;
 
     // Start Register Transforms for stream
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
         stream_name,
@@ -132,7 +132,7 @@ async fn ingest_inner(
         // Start row based transform
 
         if !local_trans.is_empty() {
-            value = crate::service::ingestion::apply_stream_transform(
+            value = crate::service::ingestion::apply_stream_functions(
                 &local_trans,
                 value,
                 &stream_vrl_map,

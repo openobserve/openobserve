@@ -97,7 +97,7 @@ pub async fn ingest(
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_data_map = HashMap::new();
 
-    let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
     let mut stream_partition_keys_map: HashMap<String, (StreamSchemaChk, PartitioningDetails)> =
         HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -172,7 +172,7 @@ pub async fn ingest(
                 org_id,
                 &StreamType::Logs,
                 &stream_name,
-                &mut stream_transform_map,
+                &mut stream_functions_map,
                 &mut stream_vrl_map,
             )
             .await;
@@ -246,9 +246,9 @@ pub async fn ingest(
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
             // Start row based transform
-            if let Some(transforms) = stream_transform_map.get(&key) {
+            if let Some(transforms) = stream_functions_map.get(&key) {
                 let mut ret_value = value.clone();
-                ret_value = crate::service::ingestion::apply_stream_transform(
+                ret_value = crate::service::ingestion::apply_stream_functions(
                     transforms,
                     ret_value,
                     &stream_vrl_map,
@@ -477,7 +477,7 @@ pub async fn ingest(
         req_stats.response_time += time;
         req_stats.user_email = Some(user_email.to_string());
         // metric + data usage
-        let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+        let fns_length: usize = stream_functions_map.values().map(|v| v.len()).sum();
         report_request_usage_stats(
             req_stats,
             org_id,

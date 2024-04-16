@@ -137,7 +137,7 @@ pub async fn handle_grpc_request(
 
                 // Start Register Transforms for stream
                 let (mut local_trans, mut stream_vrl_map) =
-                    crate::service::ingestion::register_stream_transforms(
+                    crate::service::ingestion::register_stream_functions(
                         org_id,
                         &StreamType::Metrics,
                         metric_name,
@@ -258,7 +258,7 @@ pub async fn handle_grpc_request(
 
                         // Start Register Transforms for stream
                         (local_trans, stream_vrl_map) =
-                            crate::service::ingestion::register_stream_transforms(
+                            crate::service::ingestion::register_stream_functions(
                                 org_id,
                                 &StreamType::Metrics,
                                 local_metric_name,
@@ -267,7 +267,7 @@ pub async fn handle_grpc_request(
                     }
 
                     if !local_trans.is_empty() {
-                        rec = crate::service::ingestion::apply_stream_transform(
+                        rec = crate::service::ingestion::apply_stream_functions(
                             &local_trans,
                             rec,
                             &stream_vrl_map,

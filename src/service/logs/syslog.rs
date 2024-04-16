@@ -117,7 +117,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // End get stream alert
 
     // Start Register Transforms for stream
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
         stream_name,
@@ -131,7 +131,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level).unwrap();
 
     if !local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_transform(
+        value = crate::service::ingestion::apply_stream_functions(
             &local_trans,
             value,
             &stream_vrl_map,

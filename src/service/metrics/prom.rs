@@ -287,7 +287,7 @@ pub async fn remote_write(
 
             // Start Register Transforms for stream
             let (local_trans, stream_vrl_map) =
-                crate::service::ingestion::register_stream_transforms(
+                crate::service::ingestion::register_stream_functions(
                     org_id,
                     &StreamType::Metrics,
                     &metric_name,
@@ -299,7 +299,7 @@ pub async fn remote_write(
             let mut value: json::Value = json::to_value(&metric).unwrap();
 
             // Start row based transform
-            value = crate::service::ingestion::apply_stream_transform(
+            value = crate::service::ingestion::apply_stream_functions(
                 &local_trans,
                 value,
                 &stream_vrl_map,

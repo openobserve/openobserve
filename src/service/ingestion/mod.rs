@@ -119,17 +119,17 @@ pub async fn get_stream_functions<'a>(
     org_id: &str,
     stream_type: &StreamType,
     stream_name: &str,
-    stream_transform_map: &mut HashMap<String, Vec<StreamTransform>>,
+    stream_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
 ) {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    if stream_transform_map.contains_key(&key) {
+    if stream_functions_map.contains_key(&key) {
         return;
     }
     let mut _local_trans: Vec<StreamTransform> = vec![];
     (_local_trans, *stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(org_id, stream_type, stream_name);
-    stream_transform_map.insert(key, _local_trans);
+        crate::service::ingestion::register_stream_functions(org_id, stream_type, stream_name);
+    stream_functions_map.insert(key, _local_trans);
 }
 
 pub async fn get_stream_partition_keys(
@@ -223,7 +223,7 @@ pub fn get_wal_time_key(
     time_key
 }
 
-pub fn register_stream_transforms(
+pub fn register_stream_functions(
     org_id: &str,
     stream_type: &StreamType,
     stream_name: &str,
@@ -258,7 +258,7 @@ pub fn register_stream_transforms(
     (local_trans, stream_vrl_map)
 }
 
-pub fn apply_stream_transform(
+pub fn apply_stream_functions(
     local_trans: &[StreamTransform],
     mut value: Value,
     stream_vrl_map: &HashMap<String, VRLResultResolver>,
