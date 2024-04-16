@@ -65,7 +65,7 @@
 import { ref, defineComponent, toRef, watch } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
-import { useSelectAutoComplete2 } from "@/composables/useSelectAutoComplete2";
+import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -92,7 +92,7 @@ export default defineComponent({
           );
         console.log("optionName updated", optionName.value);
 
-        fieldsFilteredOptions.value = useSelectAutoComplete2(
+        fieldsFilteredOptions.value = useAutoCompleteForPromql(
           toRef(optionName),
           "name"
         ).filteredOptions;
@@ -100,7 +100,7 @@ export default defineComponent({
     );
 
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSelectAutoComplete2(toRef(optionName), "name");
+      useAutoCompleteForPromql(toRef(optionName), "name");
 
     console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
 

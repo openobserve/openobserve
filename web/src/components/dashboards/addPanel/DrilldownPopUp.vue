@@ -332,7 +332,7 @@ import {
 import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
-import { useSelectAutoComplete2 } from "@/composables/useSelectAutoComplete2";
+import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
 
 export default defineComponent({
   name: "DrilldownPopUp",
@@ -602,7 +602,7 @@ export default defineComponent({
       }
     };
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSelectAutoComplete2(toRef(options), "name");
+      useAutoCompleteForPromql(toRef(options), "name");
 
     console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
 
