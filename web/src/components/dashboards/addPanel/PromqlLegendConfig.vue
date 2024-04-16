@@ -45,6 +45,9 @@
     <div
       class="options-container"
       v-if="promqlMode && showOptions && fieldsFilteredOptions.length > 0"
+      :style="{
+        'background-color': store.state.theme === 'dark' ? '#2d2d2d' : 'white',
+      }"
     >
       <div
         v-for="(option, index) in fieldsFilteredOptions"
@@ -63,6 +66,7 @@ import { ref, defineComponent, toRef, watch } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete2 } from "@/composables/useSelectAutoComplete2";
+import { useStore } from "vuex";
 
 export default defineComponent({
   setup() {
@@ -70,7 +74,7 @@ export default defineComponent({
     const { t } = useI18n();
     const showOptions = ref(false);
     let hideOptionsTimeout: any;
-
+    const store = useStore();
     const optionName = ref(
       dashboardPanelData.meta.stream.selectedStreamFields.map(
         (item: any) => item?.name
@@ -114,7 +118,8 @@ export default defineComponent({
       console.log("inputValue", inputValue);
 
       const openingBraceIndex = inputValue.lastIndexOf("{");
-      const newValue = inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+      const newValue =
+        inputValue.slice(0, openingBraceIndex + 1) + option + "}";
       console.log("newValue", newValue);
 
       dashboardPanelData.data.queries[
@@ -133,6 +138,7 @@ export default defineComponent({
       selectOption,
       showOptions,
       hideOptionsWithDelay,
+      store,
     };
   },
 });
@@ -140,9 +146,17 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .options-container {
+  z-index: 10;
+  position: absolute;
+  left: 0;
+  right: 0;
   border: 1px solid #ccc;
   max-height: 100px;
   overflow-y: auto;
+}
+
+.relative {
+  position: relative;
 }
 
 .option {
