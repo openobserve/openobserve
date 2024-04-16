@@ -441,6 +441,7 @@ fn generate_used_fields_in_query(sql: Arc<Sql>) -> Vec<String> {
         .chain(sql.meta.order_by.iter().map(|(f, _)| f))
         .filter(|f| !alias_map.contains(f))
         .cloned()
+        .sorted()
         .dedup()
         .collect()
 }
