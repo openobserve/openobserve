@@ -796,8 +796,9 @@ const useLogs = () => {
 
               console.log(searchObj.data.stream);
               const listOfFields: any = [];
+              let streamField: any = {};
               for (const field of searchObj.data.stream.interestingFieldList) {
-                for (const streamField of searchObj.data.stream
+                for (streamField of searchObj.data.stream
                   .selectedStreamFields) {
                   if (
                     streamField?.name == field &&
@@ -2058,9 +2059,7 @@ const useLogs = () => {
                         );
 
                         let localFields: any = {};
-                        if (
-                          localInterestingFields.value[stream?.name] != null
-                        ) {
+                        if (localInterestingFields.value[row.name] != null) {
                           localFields = localInterestingFields.value;
                         }
 
@@ -2069,7 +2068,7 @@ const useLogs = () => {
                           ...searchObj.data.stream.selectedStreamFields[index],
                           isInterestingField:
                             Object.keys(localFields).length > 0 &&
-                            localFields.indexOf(stream?.name) > -1
+                            localFields.indexOf(row.name) > -1
                               ? true
                               : false,
                         };
