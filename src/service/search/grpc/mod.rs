@@ -392,20 +392,6 @@ fn generate_search_schema(
     Ok((Arc::new(schema), diff_fields))
 }
 
-// generate used fields in query
-fn generate_used_fields_in_query(sql: Arc<Sql>) -> Vec<String> {
-    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
-    sql.meta
-        .fields
-        .iter()
-        .chain(sql.meta.group_by.iter())
-        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
-        .filter(|f| !alias_map.contains(f))
-        .cloned()
-        .dedup()
-        .collect()
-}
-
 // generate parquet file search schema
 fn generate_select_start_search_schema(
     sql: Arc<Sql>,
@@ -430,7 +416,7 @@ fn generate_select_start_search_schema(
     }
     // add not exists field in group schema but used in sql
     let mut new_fields = Vec::new();
-    for field in sql.meta.fields.iter() {
+    for field in generate_used_fields_in_query(sql.clone()).iter() {
         if schema.field_with_name(field).is_err() {
             if let Some(field) = schema_latest_map.get(field) {
                 new_fields.push(Arc::new(field.as_ref().clone()));
@@ -443,4 +429,18 @@ fn generate_select_start_search_schema(
     }
 
     Ok((Arc::new(schema.clone()), diff_fields))
+}
+
+// generate used fields in query
+fn generate_used_fields_in_query(sql: Arc<Sql>) -> Vec<String> {
+    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
+    sql.meta
+        .fields
+        .iter()
+        .chain(sql.meta.group_by.iter())
+        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
+        .filter(|f| !alias_map.contains(f))
+        .cloned()
+        .dedup()
+        .collect()
 }
