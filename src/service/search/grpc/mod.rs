@@ -342,7 +342,6 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
 }
 
 // generate parquet file search schema
-// TODO: support select * ;
 fn generate_search_schema(
     sql: Arc<Sql>,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
