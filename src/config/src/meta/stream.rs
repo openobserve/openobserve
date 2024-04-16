@@ -537,9 +537,10 @@ impl From<&str> for StreamSettings {
             }
         }
 
-        let mut flatten_level = 0;
-        if let Some(v) = settings.get("flatten_level") {
-            flatten_level = v.as_i64().unwrap();
+        let flatten_level = if let Some(v) = settings.get("flatten_level") {
+            Some(v.as_i64().unwrap())
+        } else {
+            None
         };
 
         Self {
@@ -549,7 +550,7 @@ impl From<&str> for StreamSettings {
             bloom_filter_fields,
             data_retention,
             routing: Some(routing),
-            flatten_level: Some(flatten_level),
+            flatten_level,
             defined_schema_fields: Some(defined_schema_fields),
         }
     }

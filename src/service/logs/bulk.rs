@@ -193,22 +193,25 @@ pub async fn ingest(
             crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
             // End get stream alert
 
-            if !stream_partition_keys_map.contains_key(&stream_name) {
-                let stream_schema = stream_schema_exists(
-                    org_id,
-                    &stream_name,
-                    StreamType::Logs,
-                    &mut stream_schema_map,
-                )
-                .await;
-                let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                    org_id,
-                    &StreamType::Logs,
-                    &stream_name,
-                )
-                .await;
-                stream_partition_keys_map
-                    .insert(stream_name.clone(), (stream_schema, partition_det));
+            for stream in streams {
+                let local_stream_name = stream.stream_name.to_string();
+                if !stream_partition_keys_map.contains_key(&local_stream_name) {
+                    let stream_schema = stream_schema_exists(
+                        org_id,
+                        &local_stream_name,
+                        StreamType::Logs,
+                        &mut stream_schema_map,
+                    )
+                    .await;
+                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                        org_id,
+                        &StreamType::Logs,
+                        &local_stream_name,
+                    )
+                    .await;
+                    stream_partition_keys_map
+                        .insert(local_stream_name, (stream_schema, partition_det));
+                }
             }
 
             stream_data_map
