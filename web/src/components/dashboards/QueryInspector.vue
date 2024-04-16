@@ -50,7 +50,7 @@ export default defineComponent({
         store.state.timezone,
         "yyyy-MM-dd HH:mm:ss.SSS"
       );
-      const startTimeEntry = `${timestampOfStartTime} (${formattedStartTime})`;
+      const startTimeEntry = `${timestampOfStartTime} (${formattedStartTime} ${store.state.timezone})`;
 
       const timestampOfEndTime = query?.endTime;
       const formattedEndTime = timestampToTimezoneDate(
@@ -58,7 +58,7 @@ export default defineComponent({
         store.state.timezone,
         "yyyy-MM-dd HH:mm:ss.SSS"
       );
-      const endTimeEntry = `${timestampOfEndTime} (${formattedEndTime})`;
+      const endTimeEntry = `${timestampOfEndTime} (${formattedEndTime} ${store.state.timezone})`;
 
       const rows: any[] = [
         ["Original Query", query?.originalQuery],
