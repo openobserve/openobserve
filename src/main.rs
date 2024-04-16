@@ -54,7 +54,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER},
+    service::{db, metadata, search::SEARCH_SERVER, usage},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -85,8 +85,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(feature = "enterprise")]
-use openobserve::service::usage::flush_audit;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -235,7 +233,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush audit data
     #[cfg(feature = "enterprise")]
-    flush_audit().await;
+    usage::flush_audit().await;
+
+    // flush usage report
+    usage::flush_usage().await;
 
     // leave the cluster
     _ = cluster::leave().await;
