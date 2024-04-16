@@ -384,6 +384,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
 
   if (
     to.path.indexOf("/ingestion") == -1 &&
+    to.path.indexOf("/iam") == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
     store.state.organizationData.isDataIngested == false
