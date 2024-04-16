@@ -383,8 +383,15 @@ fn generate_search_schema(
 
     let mut schema = Schema::new(new_fields);
     // self add _timestamp if no exist
-    if schema.field_with_name("_timestamp").is_err() {
-        let field = Arc::new(Field::new("_timestamp", DataType::Int64, false));
+    if schema
+        .field_with_name(&CONFIG.common.column_timestamp)
+        .is_err()
+    {
+        let field = Arc::new(Field::new(
+            &CONFIG.common.column_timestamp,
+            DataType::Int64,
+            false,
+        ));
         schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
     }
 

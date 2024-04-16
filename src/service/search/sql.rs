@@ -450,6 +450,8 @@ impl Sql {
                 }
             }
         }
+        println!("\n\nfulltext: {:?}\n\n", fulltext);
+        println!("\n\nindexed_text: {:?}\n\n", indexed_text);
 
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
@@ -490,6 +492,8 @@ impl Sql {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+                // add full text field to meta fields
+                meta.fields.push(field.name().to_string());
             }
             if fulltext_search.is_empty() {
                 return Err(Error::ErrorCode(ErrorCodes::FullTextSearchFieldNotFound));
