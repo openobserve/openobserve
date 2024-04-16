@@ -44,6 +44,7 @@ export default defineComponent({
     const store = useStore();
     
     const getRows = (query: any) => {
+      
       const timestampOfStartTime = query?.startTime;
       const formattedStartTime = timestampToTimezoneDate(
         timestampOfStartTime / 1000,
