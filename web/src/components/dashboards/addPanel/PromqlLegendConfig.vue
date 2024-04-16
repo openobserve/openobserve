@@ -114,7 +114,7 @@ export default defineComponent({
       console.log("inputValue", inputValue);
 
       const openingBraceIndex = inputValue.lastIndexOf("{");
-      const newValue = inputValue.slice(0, openingBraceIndex + 1) + option;
+      const newValue = inputValue.slice(0, openingBraceIndex + 1) + option + "}";
       console.log("newValue", newValue);
 
       dashboardPanelData.data.queries[
