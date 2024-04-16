@@ -178,9 +178,7 @@ pub async fn get_folder(path: web::Path<(String, String)>) -> Result<HttpRespons
     ),
 )]
 #[delete("/{org_id}/folders/{folder_id}")]
-async fn delete_folder(
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
+async fn delete_folder(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, folder_id) = path.into_inner();
     folders::delete_folder(&org_id, &folder_id).await
 }
