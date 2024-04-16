@@ -15,6 +15,7 @@
 
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use config::utils::json;
 #[cfg(feature = "enterprise")]
 use config::CONFIG;
 use futures::future::{ready, Ready};
@@ -23,7 +24,11 @@ use futures::future::{ready, Ready};
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
-    meta::{authz::Authz, organization::DEFAULT_ORG, user::UserRole},
+    meta::{
+        authz::Authz,
+        organization::DEFAULT_ORG,
+        user::{AuthTokens, UserRole},
+    },
 };
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
@@ -300,8 +305,10 @@ impl FromRequest for AuthExtractor {
             )
         };
 
-        let auth_str = if let Some(cookie) = req.cookie("access_token") {
-            let access_token = cookie.value().to_string();
+        let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
+            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let access_token = auth_tokens.access_token;
+
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
@@ -411,8 +418,9 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let auth_str = if let Some(cookie) = req.cookie("access_token") {
-            let access_token = cookie.value().to_string();
+        let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
+            let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+            let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
