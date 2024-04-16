@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login />
+  <login v-if="user.email == ''" />
 </template>
 
 <script lang="ts">

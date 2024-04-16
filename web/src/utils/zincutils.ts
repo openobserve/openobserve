@@ -109,6 +109,7 @@ export const getUserInfo = (loginString: string) => {
               JSON.stringify(payload)
             );
             useLocalUserInfo(encodedSessionData);
+            decToken = payload;
           } catch (error) {
             // If parsing fails, it's not a valid JWT
             console.error("Invalid JWT token:", error);
