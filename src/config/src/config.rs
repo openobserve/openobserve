@@ -509,6 +509,8 @@ pub struct Common {
     pub bloom_filter_default_fields: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
+    #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
+    pub tracing_search_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "ZO_TRACING_HEADER_KEY", default = "Authorization")]
@@ -720,7 +722,7 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 200)]
+    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
     pub quick_mode_strategy: String, // first, last, both
@@ -1139,6 +1141,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Default scrape interval can not be set to lesser than 5s ."
         ));
+    }
+
+    if cfg.common.inverted_index_split_chars.is_empty() {
+        cfg.common.inverted_index_split_chars = " ;,".to_string();
     }
     Ok(())
 }

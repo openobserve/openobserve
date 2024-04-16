@@ -96,8 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- view panel dialog -->
-    <q-dialog v-model="showViewPanel" :no-route-dismiss="true">
-      <q-card style="min-width: 95vw; min-height: 90vh">
+    <q-dialog
+      v-model="showViewPanel"
+      :no-route-dismiss="true"
+      full-height
+      full-width
+    >
+      <q-card style="overflow: hidden">
         <ViewPanel
           :panelId="viewPanelId"
           :selectedDateForViewPanel="selectedDateForViewPanel"
