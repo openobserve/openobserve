@@ -223,15 +223,39 @@
                 dense
                 :data-test="`dashboard-drilldown-variable-name-${index}`"
               />
-              <q-input
-                v-model="variable.value"
-                placeholder="Value"
-                stack-label
-                outlined
-                filled
-                dense
-                :data-test="`dashboard-drilldown-variable-value-${index}`"
-              />
+              <div class="relative">
+                <q-input
+                  v-model="variable.value"
+                  placeholder="Value"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  :data-test="`dashboard-drilldown-variable-value-${index}`"
+                  @update:model-value="fieldsFilterFn"
+                  @focus="variable.showOptions = true"
+                  @blur="hideOptionsWithDelay(index)"
+                />
+                <div
+                  class="options-container"
+                  v-if="
+                    variable.showOptions && fieldsFilteredOptions.length > 0
+                  "
+                  :style="{
+                    'background-color':
+                      store.state.theme === 'dark' ? '#2d2d2d' : 'white',
+                  }"
+                >
+                  <div
+                    v-for="(option, index) in fieldsFilteredOptions"
+                    :key="index"
+                    class="option"
+                    @click="selectOption(variable, option)"
+                  >
+                    {{ option.label }}
+                  </div>
+                </div>
+              </div>
               <q-icon
                 class="q-mr-xs"
                 size="20px"
@@ -291,7 +315,7 @@
 </template>
 
 <script lang="ts">
-import { ref } from "vue";
+import { ref, toRef } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -308,6 +332,7 @@ import {
 import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
+import { useSelectAutoComplete2 } from "@/composables/useSelectAutoComplete2";
 
 export default defineComponent({
   name: "DrilldownPopUp",
@@ -329,6 +354,15 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
+    console.log("dashboardPanelData", dashboardPanelData);
+
+    let hideOptionsTimeout: any;
+    const getDefaultVariable = () => ({
+      name: "",
+      value: "",
+      showOptions: false, // Initialize showOptions for each variable
+    });
+
     const getDefaultDrilldownData = () => ({
       name: "",
       type: "byDashboard",
@@ -340,12 +374,7 @@ export default defineComponent({
         dashboard: "",
         tab: "",
         passAllVariables: true,
-        variables: [
-          {
-            name: "",
-            value: "",
-          },
-        ],
+        variables: [getDefaultVariable()],
       },
     });
     const drilldownData = ref(
@@ -542,6 +571,56 @@ export default defineComponent({
       drilldownData.value.type = type;
     };
 
+    //want label for dropdown in input and value for its input value
+    const options = () => {
+      if (dashboardPanelData.data.type == "sankey") {
+        return [
+          {
+            label: "Source",
+            value: "${edge.__source}",
+          },
+          {
+            label: "Target",
+            value: "${edge.__target}",
+          },
+          {
+            label: "Value",
+            value: "${edge.__value}",
+          },
+        ];
+      } else {
+        return [
+          {
+            label: "Series Name",
+            value: "${series.__name}",
+          },
+          {
+            label: "Series Value",
+            value: "${series.__value}",
+          },
+        ];
+      }
+    };
+    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
+      useSelectAutoComplete2(toRef(options), "name");
+
+    console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
+
+    const hideOptionsWithDelay = (index: any) => {
+      clearTimeout(hideOptionsTimeout);
+      hideOptionsTimeout = setTimeout(() => {
+        drilldownData.value.data.variables[index].showOptions = false;
+      }, 200);
+    };
+
+    const selectOption = (variable: any, option: any) => {
+      console.log("SelectOption", option.value);
+      variable.value = option.value;
+      console.log("showOptions", variable.showOptions);
+
+      variable.showOptions = false;
+    };
+
     return {
       t,
       outlinedDashboard,
@@ -556,6 +635,10 @@ export default defineComponent({
       saveDrilldown,
       isFormURLValid,
       changeTypeOfDrilldown,
+      fieldsFilterFn,
+      fieldsFilteredOptions,
+      selectOption,
+      hideOptionsWithDelay,
     };
   },
 });
@@ -584,5 +667,28 @@ export default defineComponent({
 
 :deep(.no-case .q-field__native > :first-child) {
   text-transform: none !important;
+}
+
+.options-container {
+  z-index: 10;
+  position: absolute;
+  left: 0;
+  right: 0;
+  border: 1px solid #ccc;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.relative {
+  position: relative;
+}
+
+.option {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.option:hover {
+  background-color: #f0f0f0b1;
 }
 </style>
