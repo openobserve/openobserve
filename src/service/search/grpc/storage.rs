@@ -36,7 +36,11 @@ use tracing::{info_span, Instrument};
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, sql::Sql},
+    search::{
+        datafusion::exec,
+        grpc::{generate_search_schema, generate_select_start_search_schema},
+        sql::Sql,
+    },
 };
 
 /// search in remote object storage
@@ -176,6 +180,7 @@ pub async fn search(
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
+    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
@@ -194,8 +199,12 @@ pub async fn search(
             work_group: Some(work_group.to_string()),
         };
 
-        let (schema, diff_fields) =
-            super::generate_search_schema(sql.clone(), &schema_latest_map, &schema)?;
+        // cacluate the diff between latest schema and group schema
+        let (schema, diff_fields) = if select_wildcard {
+            generate_select_start_search_schema(sql.clone(), &schema_latest_map, &schema)?
+        } else {
+            generate_search_schema(sql.clone(), &schema_latest_map, &schema)?
+        };
 
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
