@@ -115,7 +115,7 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row:
     }
 }
 
-pub async fn get_stream_transforms<'a>(
+pub async fn get_stream_functions<'a>(
     org_id: &str,
     stream_type: &StreamType,
     stream_name: &str,

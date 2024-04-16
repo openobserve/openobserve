@@ -167,9 +167,8 @@ pub async fn ingest(
             .await;
             // End get stream keys
 
-            // Start Register Transfoms for stream
-
-            crate::service::ingestion::get_stream_transforms(
+            // Start Register functions for stream
+            crate::service::ingestion::get_stream_functions(
                 org_id,
                 &StreamType::Logs,
                 &stream_name,
@@ -177,7 +176,7 @@ pub async fn ingest(
                 &mut stream_vrl_map,
             )
             .await;
-            // End Register Transfoms for index
+            // End Register functions for index
 
             // Start get stream alerts
             crate::service::ingestion::get_stream_alerts(
