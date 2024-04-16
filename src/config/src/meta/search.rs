@@ -379,6 +379,7 @@ impl MultiStreamRequest {
                     query_fn: self.query_fn.clone(),
                 },
                 aggs: self.aggs.clone(),
+                clusters: vec![],
                 encoding: self.encoding,
                 timeout: self.timeout,
             });
