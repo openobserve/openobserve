@@ -352,7 +352,8 @@ pub async fn logs_json_handler(
                 value = json::to_value(local_val)?;
 
                 // JSON Flattening
-                value = flatten::flatten(value).unwrap();
+                value =
+                    flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level).unwrap();
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_transform(

@@ -16,7 +16,10 @@
 use std::io::Error;
 
 use actix_web::{cookie, delete, get, http, post, put, web, HttpResponse};
-use config::{utils::base64, CONFIG};
+use config::{
+    utils::{base64, json},
+    CONFIG,
+};
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -24,8 +27,8 @@ use crate::{
         meta::{
             self,
             user::{
-                RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest,
-                UserRole,
+                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
+                UserRequest, UserRole,
             },
         },
         utils::auth::UserEmail,
@@ -238,24 +241,29 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
         }
     };
     if resp.status {
-        let token = format!(
+        let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
         );
-        let mut access_cookie = cookie::Cookie::new("access_token", token);
-        access_cookie.set_expires(
+        let tokens = json::to_string(&AuthTokens {
+            access_token,
+            refresh_token: "".to_string(),
+        })
+        .unwrap();
+        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+        auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
                 + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
         );
-        access_cookie.set_http_only(true);
-        access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
-        access_cookie.set_path("/");
+        auth_cookie.set_http_only(true);
+        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+        auth_cookie.set_path("/");
         if CONFIG.auth.cookie_same_site_lax {
-            access_cookie.set_same_site(cookie::SameSite::Lax)
+            auth_cookie.set_same_site(cookie::SameSite::Lax);
         } else {
-            access_cookie.set_same_site(cookie::SameSite::None)
-        };
-        Ok(HttpResponse::Ok().cookie(access_cookie).json(resp))
+            auth_cookie.set_same_site(cookie::SameSite::None);
+        }
+        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
     }

@@ -55,6 +55,8 @@ pub struct Request {
     #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
+    pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    #[serde(default)]
     pub timeout: i64,
 }
 
@@ -516,6 +518,7 @@ mod tests {
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),
+            clusters: vec![],
             timeout: 0,
         };
         req.aggs

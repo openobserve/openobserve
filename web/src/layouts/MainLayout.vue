@@ -312,6 +312,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
+  getLogoutURL,
 } from "../utils/zincutils";
 
 import {
@@ -406,12 +407,19 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      // if (config.isEnterprise == "true") {
-      invlidateLoginData();
-      // }
+      if (config.isEnterprise == "true") {
+        invlidateLoginData();
+      }
+
+      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
+
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
+
+      if(config.isCloud == "true") {
+        window.location.href = logoutURL;
+      }
       this.$router.push("/logout");
     },
     goToHome() {
@@ -995,8 +1003,10 @@ export default defineComponent({
         // this.setSelectedOrganization();
       }, 500);
     },
-    changeUserInfo() {
-      this.triggerRefreshToken();
+    changeUserInfo(newVal) {
+      if(JSON.stringify(newVal) != "{}") {
+        this.triggerRefreshToken();
+      }
     },
   },
 });

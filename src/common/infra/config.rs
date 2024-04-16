@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,7 @@
 
 use std::sync::Arc;
 
-use arrow_schema::Schema;
-use config::{RwAHashMap, RwAHashSet, RwHashMap};
+use config::{RwAHashMap, RwHashMap};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -31,7 +30,6 @@ use crate::{
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
         prom::ClusterLeader,
-        stream::StreamSettings,
         syslog::SyslogRoute,
         user::User,
     },
@@ -45,11 +43,6 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
-pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
-    Lazy::new(Default::default);
-pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
 pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
     Lazy::new(DashMap::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
@@ -86,7 +79,3 @@ pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 
 pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
-
-// SEARCHING_FILES for searching files, in use, should not move to s3
-pub static SEARCHING_FILES: Lazy<RwAHashSet<String>> =
-    Lazy::new(|| tokio::sync::RwLock::new(Default::default()));

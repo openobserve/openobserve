@@ -58,6 +58,7 @@ impl Context for Export {
             query,
             aggs: HashMap::new(),
             encoding: search::RequestEncoding::Empty,
+            clusters: vec![],
             timeout: 0,
         };
 

@@ -25,7 +25,10 @@ use config::{
     utils::str::find,
     CONFIG,
 };
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+};
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
@@ -34,6 +37,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     hashbrown::HashSet,
+    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    o2_enterprise::enterprise::search::TaskStatus,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
     tracing::{info_span, Instrument},
 };
@@ -41,7 +46,7 @@ use {
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
-    service::{format_partition_key, stream},
+    service::format_partition_key,
 };
 
 pub(crate) mod cluster;
@@ -63,7 +68,7 @@ pub async fn search(
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let trace_id = if trace_id.is_empty() {
-        if CONFIG.common.tracing_enabled {
+        if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
@@ -82,7 +87,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 trace_id.clone(),
-                o2_enterprise::enterprise::search::TaskStatus::new(
+                TaskStatus::new(
                     vec![],
                     true,
                     user_id,
@@ -96,19 +101,22 @@ pub async fn search(
             .await;
     }
 
+    #[cfg(feature = "enterprise")]
+    let req_clusters = req.clusters.clone();
+    #[cfg(feature = "enterprise")]
+    let local_cluster_search = !req_clusters.is_empty()
+        && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
+
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().trace_id = trace_id.clone();
     req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::User as i32;
+    req.stype = cluster_rpc::SearchType::Cluster as _;
     req.stream_type = stream_type.to_string();
 
     let res = {
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .super_cluster
-            .enabled
-        {
-            cluster::super_cluster::search(req).await
+        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
+            cluster::super_cluster::search(req, req_clusters).await
         } else {
             cluster::http::search(req).await
         }
@@ -151,9 +159,9 @@ pub async fn search_partition(
     };
     let meta = sql::Sql::new(&search_req).await?;
 
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let files = cluster::get_file_list(
         trace_id,
         &meta,

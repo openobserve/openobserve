@@ -22,7 +22,7 @@ use std::{
 
 use anyhow::Result;
 use config::{
-    meta::stream::StreamType,
+    meta::stream::{StreamPartition, StreamSettings, StreamType},
     utils::{
         json,
         schema::{infer_json_schema, infer_json_schema_from_map},
@@ -39,10 +39,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     common::meta::{
-        authz::Authz,
-        ingestion::StreamSchemaChk,
-        prom::METADATA_LABEL,
-        stream::{SchemaEvolution, StreamPartition},
+        authz::Authz, ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution,
     },
     service::db,
 };
@@ -72,7 +69,7 @@ pub async fn schema_evolution(
     inferred_schema: Arc<Schema>,
     min_ts: i64,
 ) {
-    let schema = db::schema::get(org_id, stream_name, stream_type)
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
 
@@ -202,7 +199,10 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
                             field.data_type()
                         )));
                     }
-                    allowed = is_widening_conversion(merged_field.data_type(), field.data_type());
+                    allowed = infra::schema::is_widening_conversion(
+                        merged_field.data_type(),
+                        field.data_type(),
+                    );
                     if allowed {
                         temp_field = Field::new(
                             merged_field.name(),
@@ -233,52 +233,6 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
     }
     let merged = Schema::new_with_metadata(merged_fields, merged_metadata);
     Ok(merged)
-}
-
-fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
-    let allowed_type = match from {
-        DataType::Boolean => vec![DataType::Utf8],
-        DataType::Int8 => vec![
-            DataType::Utf8,
-            DataType::Int16,
-            DataType::Int32,
-            DataType::Int64,
-            DataType::Float16,
-            DataType::Float32,
-            DataType::Float64,
-        ],
-        DataType::Int16 => vec![
-            DataType::Utf8,
-            DataType::Int32,
-            DataType::Int64,
-            DataType::Float16,
-            DataType::Float32,
-            DataType::Float64,
-        ],
-        DataType::Int32 => vec![
-            DataType::Utf8,
-            DataType::Int64,
-            DataType::UInt32,
-            DataType::UInt64,
-            DataType::Float32,
-            DataType::Float64,
-        ],
-        DataType::Int64 => vec![DataType::Utf8, DataType::UInt64, DataType::Float64],
-        DataType::UInt8 => vec![
-            DataType::Utf8,
-            DataType::UInt16,
-            DataType::UInt32,
-            DataType::UInt64,
-        ],
-        DataType::UInt16 => vec![DataType::Utf8, DataType::UInt32, DataType::UInt64],
-        DataType::UInt32 => vec![DataType::Utf8, DataType::UInt64],
-        DataType::UInt64 => vec![DataType::Utf8],
-        DataType::Float16 => vec![DataType::Utf8, DataType::Float32, DataType::Float64],
-        DataType::Float32 => vec![DataType::Utf8, DataType::Float64],
-        DataType::Float64 => vec![DataType::Utf8],
-        _ => vec![DataType::Utf8],
-    };
-    allowed_type.contains(to)
 }
 
 pub struct SchemaCache {
@@ -319,7 +273,7 @@ pub async fn check_for_schema(
     record_ts: i64,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
-        let schema = db::schema::get(org_id, stream_name, stream_type)
+        let schema = infra::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
         let fields_map = schema
@@ -421,12 +375,12 @@ pub async fn get_merged_schema(
     stream_type: StreamType,
     inferred_schema: &Schema,
 ) -> Option<(Vec<Field>, Schema)> {
-    let mut db_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
+    let mut db_schema = infra::schema::get_from_db(org_id, stream_name, stream_type)
         .await
         .unwrap();
 
     let (is_schema_changed, field_datatype_delta, merged_fields) =
-        get_merge_schema_changes(&db_schema, inferred_schema);
+        infra::schema::get_merge_schema_changes(&db_schema, inferred_schema);
 
     if !is_schema_changed {
         return None;
@@ -551,55 +505,6 @@ async fn handle_diff_schema(
     }))
 }
 
-fn get_merge_schema_changes(
-    schema: &Schema,
-    inferred_schema: &Schema,
-) -> (bool, Vec<Field>, Vec<Field>) {
-    let mut is_schema_changed = false;
-    let mut field_datatype_delta: Vec<_> = vec![];
-
-    let mut merged_fields = schema
-        .fields()
-        .iter()
-        .map(|f| f.as_ref().to_owned())
-        .collect::<Vec<_>>();
-    let mut merged_fields_chk = hashbrown::HashMap::with_capacity(merged_fields.len());
-    for (i, f) in merged_fields.iter().enumerate() {
-        merged_fields_chk.insert(f.name().to_string(), i);
-    }
-
-    for item in inferred_schema.fields.iter() {
-        let item_name = item.name();
-        let item_data_type = item.data_type();
-
-        match merged_fields_chk.get(item_name) {
-            None => {
-                is_schema_changed = true;
-                merged_fields.push((**item).clone());
-                merged_fields_chk.insert(item_name.to_string(), merged_fields.len() - 1);
-            }
-            Some(idx) => {
-                let existing_field = &merged_fields[*idx];
-                if existing_field.data_type() != item_data_type {
-                    if !CONFIG.common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.clone());
-                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
-                        is_schema_changed = true;
-                        field_datatype_delta.push((**item).clone());
-                        merged_fields[*idx] = (**item).clone();
-                    } else {
-                        let mut meta = existing_field.metadata().clone();
-                        meta.insert("zo_cast".to_owned(), true.to_string());
-                        field_datatype_delta.push(existing_field.clone().with_metadata(meta));
-                    }
-                }
-            }
-        }
-    }
-
-    (is_schema_changed, field_datatype_delta, merged_fields)
-}
-
 fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
@@ -617,7 +522,10 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 if existing_field.data_type() != item_data_type {
                     if !CONFIG.common.widening_schema_evolution {
                         field_datatype_delta.push(existing_field.as_ref().to_owned());
-                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
+                    } else if infra::schema::is_widening_conversion(
+                        existing_field.data_type(),
+                        item_data_type,
+                    ) {
                         is_schema_changed = true;
                         field_datatype_delta.push((**item).clone());
                     } else {
@@ -649,7 +557,7 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = db::schema::get(org_id, stream_name, stream_type)
+            let schema = infra::schema::get(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
             let fields_map = schema
@@ -700,7 +608,7 @@ pub async fn add_stream_schema(
     };
     metadata.insert("created_at".to_string(), min_ts.to_string());
     if stream_type == StreamType::Traces {
-        let settings = crate::common::meta::stream::StreamSettings {
+        let settings = StreamSettings {
             partition_keys: vec![StreamPartition::new("service_name")],
             partition_time_level: None,
             full_text_search_keys: vec![],
@@ -731,7 +639,7 @@ pub async fn set_schema_metadata(
     stream_type: StreamType,
     extra_metadata: &HashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
-    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let mut metadata = schema.metadata().clone();
     let mut updated = false;
     for (key, value) in extra_metadata {
@@ -772,11 +680,6 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
-
-    #[test]
-    fn test_is_widening_conversion() {
-        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
-    }
 
     #[test]
     fn test_try_merge() {

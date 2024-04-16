@@ -114,7 +114,7 @@ pub async fn usage_ingest(
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.into_iter() {
         // JSON Flattening
-        let mut value = flatten::flatten(item)?;
+        let mut value = flatten::flatten_with_level(item, CONFIG.limit.ingest_flatten_level)?;
 
         // get json object
         let mut local_val = match value.take() {
@@ -412,7 +412,7 @@ pub async fn handle_grpc_request(
                 };
 
                 // flattening
-                rec = flatten::flatten(rec)?;
+                rec = flatten::flatten_with_level(rec, CONFIG.limit.ingest_flatten_level)?;
 
                 if !local_trans.is_empty() {
                     rec = crate::service::ingestion::apply_stream_transform(

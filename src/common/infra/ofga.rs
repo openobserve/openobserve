@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,7 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::{
-        infra::config::{STREAM_SCHEMAS, USERS},
-        meta::organization::DEFAULT_ORG,
-        meta::user::UserRole,
-    },
+    crate::common::{infra::config::USERS, meta::organization::DEFAULT_ORG, meta::user::UserRole},
     crate::service::db,
     hashbrown::HashSet,
     infra::dist_lock,
@@ -53,7 +49,7 @@ pub async fn init() {
 
             if migrate_native_objects {
                 let mut tuples = vec![];
-                let r = STREAM_SCHEMAS.read().await;
+                let r = infra::schema::STREAM_SCHEMAS.read().await;
                 let mut orgs = HashSet::new();
                 for key in r.keys() {
                     if !key.contains('/') {
