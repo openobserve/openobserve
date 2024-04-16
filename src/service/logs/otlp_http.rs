@@ -160,9 +160,11 @@ pub async fn logs_json_handler(
 
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
+        &[StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: stream_name.to_owned().into(),
+            stream_type: StreamType::Logs,
+        }],
         &mut stream_alerts_map,
     )
     .await;

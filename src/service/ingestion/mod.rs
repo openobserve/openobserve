@@ -116,20 +116,26 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row:
 }
 
 pub async fn get_stream_functions<'a>(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
+    streams: &[StreamParams],
     stream_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
 ) {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    if stream_functions_map.contains_key(&key) {
-        return;
+    for stream in streams {
+        let key = format!(
+            "{}/{}/{}",
+            stream.org_id, stream.stream_type, stream.stream_name
+        );
+        if stream_functions_map.contains_key(&key) {
+            return;
+        }
+        let mut _local_trans: Vec<StreamTransform> = vec![];
+        (_local_trans, *stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+            &stream.org_id,
+            &stream.stream_type,
+            &stream.stream_name,
+        );
+        stream_functions_map.insert(key, _local_trans);
     }
-    let mut _local_trans: Vec<StreamTransform> = vec![];
-    (_local_trans, *stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(org_id, stream_type, stream_name);
-    stream_functions_map.insert(key, _local_trans);
 }
 
 pub async fn get_stream_partition_keys(
@@ -147,29 +153,32 @@ pub async fn get_stream_partition_keys(
 }
 
 pub async fn get_stream_alerts(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
+    streams: &[StreamParams],
     stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
 ) {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    if stream_alerts_map.contains_key(&key) {
-        return;
-    }
+    for stream in streams {
+        let key = format!(
+            "{}/{}/{}",
+            stream.org_id, stream.stream_type, stream.stream_name
+        );
+        if stream_alerts_map.contains_key(&key) {
+            return;
+        }
 
-    let alerts_cacher = STREAM_ALERTS.read().await;
-    let alerts_list = alerts_cacher.get(&key);
-    if alerts_list.is_none() {
-        return;
-    }
-    let alerts = alerts_list
-        .unwrap()
-        .iter()
-        .filter(|alert| alert.enabled && alert.is_real_time)
-        .cloned()
-        .collect::<Vec<_>>();
+        let alerts_cacher = STREAM_ALERTS.read().await;
+        let alerts_list = alerts_cacher.get(&key);
+        if alerts_list.is_none() {
+            return;
+        }
+        let alerts = alerts_list
+            .unwrap()
+            .iter()
+            .filter(|alert| alert.enabled && alert.is_real_time)
+            .cloned()
+            .collect::<Vec<_>>();
 
-    stream_alerts_map.insert(key, alerts);
+        stream_alerts_map.insert(key, alerts);
+    }
 }
 
 pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
@@ -476,18 +485,17 @@ pub async fn get_stream_routing(
 }
 
 pub async fn get_user_defined_schema(
-    stream_params: StreamParams,
+    streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, Vec<String>>,
 ) {
-    let stream_settings = infra::schema::get_settings(
-        &stream_params.org_id,
-        &stream_params.stream_name,
-        stream_params.stream_type,
-    )
-    .await
-    .unwrap_or_default();
-    if let Some(fields) = stream_settings.defined_schema_fields {
-        user_defined_schema_map.insert(stream_params.stream_name.to_string(), fields);
+    for stream in streams {
+        let stream_settings =
+            infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
+                .await
+                .unwrap_or_default();
+        if let Some(fields) = stream_settings.defined_schema_fields {
+            user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+        }
     }
 }
 

@@ -42,7 +42,7 @@ use crate::{
     common::meta::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
-        stream::SchemaRecords,
+        stream::{SchemaRecords, StreamParams},
         traces::{Event, Span, SpanRefType},
     },
     service::{
@@ -138,9 +138,11 @@ pub async fn handle_trace_request(
 
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
-        org_id,
-        &StreamType::Traces,
-        &traces_stream_name,
+        &[StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: traces_stream_name.to_owned().into(),
+            stream_type: StreamType::Traces,
+        }],
         &mut stream_alerts_map,
     )
     .await;

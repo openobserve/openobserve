@@ -143,18 +143,6 @@ pub async fn ingest(
                 continue; // skip
             }
 
-            crate::service::ingestion::get_user_defined_schema(
-                StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_owned().into(),
-                },
-                &mut user_defined_schema_map,
-            )
-            .await;
-
-            next_line_is_data = true;
-
             // Start get routing keys
             crate::service::ingestion::get_stream_routing(
                 StreamParams {
@@ -165,13 +153,36 @@ pub async fn ingest(
                 &mut stream_routing_map,
             )
             .await;
+
+            let mut streams = vec![StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_type: StreamType::Logs,
+                stream_name: stream_name.to_owned().into(),
+            }];
+
+            if let Some(routes) = stream_routing_map.get(&stream_name) {
+                for route in routes {
+                    streams.push(StreamParams {
+                        org_id: org_id.to_owned().into(),
+                        stream_type: StreamType::Logs,
+                        stream_name: route.destination.clone().into(),
+                    });
+                }
+            }
+
             // End get stream keys
+
+            crate::service::ingestion::get_user_defined_schema(
+                &streams,
+                &mut user_defined_schema_map,
+            )
+            .await;
+
+            next_line_is_data = true;
 
             // Start Register functions for stream
             crate::service::ingestion::get_stream_functions(
-                org_id,
-                &StreamType::Logs,
-                &stream_name,
+                &streams,
                 &mut stream_functions_map,
                 &mut stream_vrl_map,
             )
@@ -179,13 +190,7 @@ pub async fn ingest(
             // End Register functions for index
 
             // Start get stream alerts
-            crate::service::ingestion::get_stream_alerts(
-                org_id,
-                &StreamType::Logs,
-                &stream_name,
-                &mut stream_alerts_map,
-            )
-            .await;
+            crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
             // End get stream alert
 
             if !stream_partition_keys_map.contains_key(&stream_name) {

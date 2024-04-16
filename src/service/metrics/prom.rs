@@ -40,7 +40,12 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{alerts, functions::StreamTransform, prom::*, stream::SchemaRecords},
+        meta::{
+            alerts,
+            functions::StreamTransform,
+            prom::*,
+            stream::{SchemaRecords, StreamParams},
+        },
     },
     service::{
         db, format_stream_name,
@@ -275,9 +280,11 @@ pub async fn remote_write(
 
             // Start get stream alerts
             crate::service::ingestion::get_stream_alerts(
-                org_id,
-                &StreamType::Metrics,
-                &metric_name,
+                &[StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_name: metric_name.to_owned().into(),
+                    stream_type: StreamType::Metrics,
+                }],
                 &mut stream_alerts_map,
             )
             .await;
