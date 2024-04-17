@@ -134,14 +134,10 @@ pub async fn search(
             terms
                 .iter()
                 .max_by_key(|key| key.len())
-                .unwrap()
+                .unwrap_or(&String::new())
                 .to_string(),
         ];
-        let search_condition = terms
-            .iter()
-            .map(|x| format!("term LIKE '%{x}%'"))
-            .collect::<Vec<String>>()
-            .join(" or ");
+        let search_condition = format!("term LIKE '%{}%", terms[0]);
 
         let query = format!(
             "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
