@@ -102,7 +102,7 @@ pub async fn update_function(
         return Ok(HttpResponse::Ok().json(func));
     }
 
-    // UI mostly like in 1st version wont send streams, so we need to add them back
+    // UI mostly like in 1st version won't send streams, so we need to add them back
     // from existing function
     func.streams = existing_fn.streams;
 
@@ -256,7 +256,7 @@ pub async fn delete_stream_function(
                 )),
             )
         } else {
-            // cant be removed from watcher of function as stream name & type wont be
+            // can't be removed from watcher of function as stream name & type won't be
             // available , hence being removed here
             // let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
             // remove_stream_fn_from_cache(&key, fn_name);
