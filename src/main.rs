@@ -237,6 +237,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush usage report
     usage::flush_usage().await;
+    // flush triggers usage report
+    usage::flush_triggers_usage().await;
 
     // leave the cluster
     _ = cluster::leave().await;
