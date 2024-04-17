@@ -171,8 +171,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // init config
     config::init().await.expect("config init failed");
     // init infra
-    infra::init().await.expect("config init failed");
-    common_infra::init().await.expect("infra init failed");
+    infra::init().await.expect("infra init failed");
+    common_infra::init()
+        .await
+        .expect("common infra init failed");
 
     // check version upgrade
     let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
