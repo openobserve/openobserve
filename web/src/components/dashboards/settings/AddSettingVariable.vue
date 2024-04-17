@@ -831,7 +831,8 @@ export default defineComponent({
       console.log("================");
 
       console.log("SelectOption", option);
-      filter.value = option;
+      const newValue = "$" + option;
+      filter.value = newValue;
       showOptions.value = false;
     };
 
