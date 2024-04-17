@@ -921,7 +921,7 @@ async fn values_v1(
         timeout,
     };
 
-    // skip fields which arent part of the schema
+    // skip fields which aren't part of the schema
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let r = STREAM_SCHEMAS.read().await;
     let schema = if let Some(schema) = r.get(&key) {

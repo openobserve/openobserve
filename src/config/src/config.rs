@@ -1024,7 +1024,7 @@ pub fn init() -> Config {
         panic!("data path config error: {e}");
     }
 
-    // check memeory cache
+    // check memory cache
     if let Err(e) = check_memory_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
