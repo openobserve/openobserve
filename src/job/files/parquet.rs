@@ -412,7 +412,9 @@ async fn merge_files(
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
         if new_file_size > 0
-            && new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64
+            && ((new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64)
+                || (CONFIG.limit.quick_mode_num_fields > 0
+                    && latest_schema.fields().len() > CONFIG.limit.quick_mode_num_fields))
         {
             break;
         }
