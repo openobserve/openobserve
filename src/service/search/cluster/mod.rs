@@ -137,7 +137,7 @@ pub async fn search(
                 .unwrap_or(&String::new())
                 .to_string(),
         ];
-        let search_condition = format!("term LIKE '%{}%", terms[0]);
+        let search_condition = format!("term LIKE '%{}%'", terms[0]);
 
         let query = format!(
             "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
@@ -624,19 +624,11 @@ async fn merge_grpc_result(
         // handle aggs
         for agg in resp.aggs {
             // insert count
-            if agg.name == "_count" && is_ingester(&node.role) {
-                let value = batches.entry("agg_ingester_count".to_string()).or_default();
-                if !agg.hits.is_empty() {
-                    let buf = Cursor::new(agg.hits.clone());
-                    let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                    let batch = reader
-                        .into_iter()
-                        .map(std::result::Result::unwrap)
-                        .collect::<Vec<_>>();
-                    value.extend(batch);
-                }
-            }
-            let value = batches.entry(format!("agg_{}", agg.name)).or_default();
+            let value = if agg.name == "_count" && node.role.contains(&Role::Ingester) {
+                batches.entry("agg_ingester_count".to_string()).or_default()
+            } else {
+                batches.entry(format!("agg_{}", agg.name)).or_default()
+            };
             if !agg.hits.is_empty() {
                 let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
