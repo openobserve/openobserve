@@ -537,11 +537,7 @@ impl From<&str> for StreamSettings {
             }
         }
 
-        let flatten_level = if let Some(v) = settings.get("flatten_level") {
-            Some(v.as_i64().unwrap())
-        } else {
-            None
-        };
+        let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
 
         Self {
             partition_keys,

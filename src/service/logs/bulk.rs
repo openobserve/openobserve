@@ -195,7 +195,9 @@ pub async fn ingest(
 
             for stream in streams {
                 let local_stream_name = stream.stream_name.to_string();
-                if !stream_partition_keys_map.contains_key(&local_stream_name) {
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    stream_partition_keys_map.entry(local_stream_name.to_owned())
+                {
                     let stream_schema = stream_schema_exists(
                         org_id,
                         &local_stream_name,
@@ -209,8 +211,7 @@ pub async fn ingest(
                         &local_stream_name,
                     )
                     .await;
-                    stream_partition_keys_map
-                        .insert(local_stream_name, (stream_schema, partition_det));
+                    e.insert((stream_schema, partition_det));
                 }
             }
 
