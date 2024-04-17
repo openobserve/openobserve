@@ -383,7 +383,8 @@ async fn cache_parquet_files(
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
                     if !file_data::memory::exist(&file_name).await
-                        && !file_data::disk::exist(&file_name).await
+                        && (CONFIG.memory_cache.skip_disk_check
+                            || !file_data::disk::exist(&file_name).await)
                     {
                         file_data::memory::download(&trace_id, &file_name)
                             .await
