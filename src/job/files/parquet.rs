@@ -283,9 +283,9 @@ async fn move_files(
     );
 
     // get latest schema
-    let latest_schema = infra::schema::get(&org_id, &stream_name, stream_type)
-        .await
-        .map_err(|e| {
+    let latest_schema = match infra::schema::get(&org_id, &stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
             log::error!(
                 "[INGESTER:JOB:{thread_id}] Failed to get latest schema for stream [{}/{}/{}]: {}",
                 &org_id,
@@ -293,8 +293,13 @@ async fn move_files(
                 &stream_name,
                 e
             );
-            e
-        })?;
+            // need release all the files
+            for file in files_with_size.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Err(e);
+        }
+    };
 
     log::debug!(
         "[INGESTER:JOB:{thread_id}] start merging for partition: {}",

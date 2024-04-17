@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, utils::asynchronism::file::clean_empty_dirs, CONFIG, INSTANCE_ID};
+use config::{cluster, ider, CONFIG, INSTANCE_ID};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
@@ -187,12 +187,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if let Err(e) = std::fs::create_dir_all(&CONFIG.common.data_idx_dir) {
             log::error!("Failed to create wal dir: {}", e);
         }
-        // clean empty sub dirs
-        tokio::task::spawn(async move {
-            if let Err(e) = clean_empty_dirs(&CONFIG.common.data_wal_dir).await {
-                log::error!("clean_empty_dirs, err: {}", e);
-            }
-        });
     }
 
     tokio::task::spawn(async move { files::run().await });
