@@ -224,17 +224,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                       :options="['=', '!=']"
                     />
-                    <q-input
-                      v-model="filter.value"
-                      placeholder="Enter Value"
-                      dense
-                      filled
-                      debounce="1000"
-                      style="width: 125px"
-                      class=""
-                      data-test="dashboard-query-values-filter-value"
-                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                    />
+                    <div class="relative">
+                      <q-input
+                        v-model="filter.value"
+                        placeholder="Enter Value"
+                        dense
+                        filled
+                        debounce="1000"
+                        class=""
+                        data-test="dashboard-query-values-filter-value"
+                        :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                        @update:model-value="valueFilterFn"
+                        @focus="showOptions = true"
+                        @blur="hideOptionsWithDelay"
+                      />
+                      <div
+                        class="options-container"
+                        v-if="showOptions && valueFilteredOptions.length > 0"
+                        :style="{
+                          'background-color':
+                            store.state.theme === 'dark' ? '#2d2d2d' : 'white',
+                        }"
+                      >
+                        <div
+                          v-for="(option, index) in valueFilteredOptions"
+                          :key="index"
+                          class="option"
+                          @mousedown="selectOption(option, filter)"
+                        >
+                          {{ option }}
+                        </div>
+                      </div>
+                    </div>
                     <q-btn
                       size="sm"
                       padding="12px 5px"
@@ -396,6 +417,7 @@ import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -772,6 +794,54 @@ export default defineComponent({
       emit("close");
     };
 
+    const showOptions = ref(false);
+    let hideOptionsTimeout: any;
+
+    const dashboardVariablesList: any = ref([]);
+    onMounted(async () => {
+      getDashboardData();
+    });
+    const getDashboardData = async () => {
+      dashboardVariablesList.value =
+        JSON.parse(
+          JSON.stringify(
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder ?? "default"
+            )
+          )
+        )?.variables?.list ?? [];
+      console.log(dashboardVariablesList.value, "dashboardVariablesList.value");
+      const optionName = dashboardVariablesList.value
+        .map((it: any) => it.name)
+        .filter((it: any) => it !== variableData.name);
+      console.log(optionName, "optionName");
+      dashboardVariablesList.value = optionName;
+      console.log(
+        dashboardVariablesList.value,
+        "dashboardVariablesList.value====="
+      );
+    };
+    console.log(variableData, "variableData");
+    const { filterFn: valueFilterFn, filteredOptions: valueFilteredOptions } =
+      useAutoCompleteForPromql(toRef(dashboardVariablesList), "name");
+
+    const selectOption = (option: any, filter: any) => {
+      console.log("================");
+
+      console.log("SelectOption", option);
+      filter.value = option;
+      showOptions.value = false;
+    };
+
+    const hideOptionsWithDelay = (index: any) => {
+      clearTimeout(hideOptionsTimeout);
+      hideOptionsTimeout = setTimeout(() => {
+        showOptions.value = false;
+      }, 200);
+    };
+
     return {
       variableData,
       store,
@@ -797,6 +867,11 @@ export default defineComponent({
       removeFilter,
       filterUpdated,
       filterCycleError,
+      hideOptionsWithDelay,
+      selectOption,
+      showOptions,
+      valueFilterFn,
+      valueFilteredOptions,
     };
   },
 });
@@ -818,5 +893,29 @@ export default defineComponent({
 
 .theme-light .bg-highlight {
   background-color: #e7e6e6;
+}
+
+.options-container {
+  z-index: 10;
+  position: absolute;
+  left: 0;
+  right: 0;
+  border: 1px solid #ccc;
+  max-height: 100px;
+  overflow-y: auto;
+  top: 42px;
+}
+
+.relative {
+  position: relative;
+}
+
+.option {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.option:hover {
+  background-color: #f0f0f0b1;
 }
 </style>
