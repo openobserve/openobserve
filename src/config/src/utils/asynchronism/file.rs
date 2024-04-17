@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::Metadata, path::Path};
+use std::{fs::Metadata, path::Path, time::SystemTime};
 
 use async_walkdir::WalkDir;
 use futures::StreamExt;
@@ -45,7 +45,10 @@ pub async fn put_file_contents(
     file.write_all(contents).await
 }
 
-pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
+pub async fn clean_empty_dirs(
+    dir: &str,
+    last_updated: Option<SystemTime>,
+) -> Result<(), std::io::Error> {
     let mut dirs = Vec::new();
     let mut entries = WalkDir::new(dir);
     loop {
@@ -56,7 +59,18 @@ pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
                 }
                 if let Ok(f) = entry.file_type().await {
                     if f.is_dir() {
-                        dirs.push(entry.path().to_str().unwrap().to_string());
+                        match last_updated {
+                            None => {
+                                dirs.push(entry.path().to_str().unwrap().to_string());
+                            }
+                            Some(last_updated) => {
+                                if let Ok(meta) = entry.metadata().await {
+                                    if meta.modified().unwrap() < last_updated {
+                                        dirs.push(entry.path().to_str().unwrap().to_string());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

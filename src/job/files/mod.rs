@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, meta::stream::StreamType, FILE_EXT_PARQUET};
+use config::{cluster, ider, meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
+use tokio::time;
 
 pub mod broadcast;
 pub mod idx;
@@ -26,7 +27,29 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });
+    tokio::task::spawn(async move { clean_empty_dirs().await });
 
+    Ok(())
+}
+
+async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
+    let mut interval = time::interval(time::Duration::from_secs(3600));
+    loop {
+        if cluster::is_offline() {
+            break;
+        }
+        interval.tick().await;
+        let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        if let Err(e) = config::utils::asynchronism::file::clean_empty_dirs(
+            &CONFIG.common.data_wal_dir,
+            Some(last_updated),
+        )
+        .await
+        {
+            log::error!("clean_empty_dirs, err: {}", e);
+        }
+    }
+    log::info!("job::files::clean_empty_dirs is stopped");
     Ok(())
 }
 
