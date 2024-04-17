@@ -116,6 +116,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         return Ok(false);
     }
 
+    #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
     let (name, command) = app.subcommand().unwrap();
