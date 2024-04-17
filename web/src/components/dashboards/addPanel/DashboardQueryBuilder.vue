@@ -701,10 +701,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pa-md"
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
+              style="height: 33%"
             >
-              <div>
-                <div class="q-pa-xs">
-                  <div class="q-gutter-xs">
+              <div style="height: 100%">
+                <div class="q-pa-xs" style="height: 100%">
+                  <div class="q-gutter-xs" style="height: 100%">
                     <q-tabs
                       v-model="
                         dashboardPanelData.data.queries[
@@ -737,6 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.filter[index].type
                       "
                       animated
+                      style="height: 100%"
                     >
                       <q-tab-panel
                         data-test="dashboard-filter-condition-panel"
