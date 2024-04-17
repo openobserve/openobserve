@@ -1103,7 +1103,7 @@ pub async fn merge_parquet_files(
     let query_sql = if stream_type == StreamType::Index {
         // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
+            "SELECT term, file_name, min(_timestamp) as _timestamp, sum(_count) as _count, deleted FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) GROUP BY term, file_name, deleted ORDER BY {} DESC",
             CONFIG.common.column_timestamp
         )
     } else if CONFIG.limit.distinct_values_hourly
