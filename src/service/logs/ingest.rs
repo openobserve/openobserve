@@ -309,7 +309,7 @@ pub fn handle_timestamp(
     let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Cant parse timestamp")),
+            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
         },
         None => Utc::now().timestamp_micros(),
     };
