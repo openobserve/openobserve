@@ -1325,6 +1325,7 @@ export default defineComponent({
 
 .relative {
   position: relative;
+  width: 100%;
 }
 
 .option {
