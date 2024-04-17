@@ -109,7 +109,7 @@ pub(crate) async fn create_context(
         ));
     }
 
-    // calcuate scan size
+    // calculate scan size
     let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {

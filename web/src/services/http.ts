@@ -73,8 +73,11 @@ const http = ({ headers } = {} as any) => {
                 .get("/config/dex_refresh", {
                   //headers: { Authorization: `${refreshToken}` },
                 })
-                .then((res) => {
-                  return instance(error.config);
+               .then((res) => {           
+                   if (res.status === 200) {
+                      // Token refreshed successfully, retry the original request
+                      return instance.request(error.config);
+                    }         
                 })
                 .catch((refreshError) => {
                   instance.get("/config/logout", {}).then((res) => {

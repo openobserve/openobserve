@@ -229,7 +229,7 @@ pub async fn search_parquet(
                 diff_fields.insert(alias.to_string(), v.clone());
             }
         }
-        // add not exists field for wal infered schema
+        // add not exists field for wal inferred schema
         let mut new_fields = Vec::new();
         for field in sql.meta.fields.iter() {
             if schema.field_with_name(field).is_err() {
@@ -424,7 +424,7 @@ pub async fn search_memtable(
 
     let mut tasks = Vec::new();
     for (ver, (mut schema, mut record_batches)) in batch_groups.into_iter().enumerate() {
-        // calulate schema diff
+        // calculate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = schema.fields();
         for field in group_fields {
@@ -434,7 +434,7 @@ pub async fn search_memtable(
                 }
             }
         }
-        // add not exists field for wal infered schema
+        // add not exists field for wal inferred schema
         let mut new_fields = Vec::new();
         for field in sql.meta.fields.iter() {
             if schema.field_with_name(field).is_err() {

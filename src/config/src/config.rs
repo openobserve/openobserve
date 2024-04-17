@@ -602,7 +602,7 @@ pub struct Common {
     pub inverted_index_enabled: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = " ;,",
+        default = ".,;:|/#_ =-+*^&%$@!~`",
         help = "Characters which should be used as a delimiter to split the string."
     )]
     pub inverted_index_split_chars: String,

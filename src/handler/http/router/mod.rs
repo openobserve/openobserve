@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,16 +18,24 @@ use std::rc::Rc;
 use actix_cors::Cors;
 use actix_web::{
     body::MessageBody,
-    dev::{Service, ServiceResponse},
+    dev::{Service, ServiceRequest, ServiceResponse},
     http::header,
     web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::from_fn;
+use actix_web_lab::middleware::{from_fn, Next};
 use config::CONFIG;
 use futures::FutureExt;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+#[cfg(feature = "enterprise")]
+use {
+    crate::{common::meta::ingestion::INGESTION_EP, service::usage::audit},
+    actix_http::h1::Payload,
+    actix_web::{web::BytesMut, HttpMessage},
+    futures::StreamExt,
+    o2_enterprise::enterprise::common::{auditor::AuditMessage, infra::config::O2_CONFIG},
+};
 
 use super::{
     auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
@@ -67,6 +75,78 @@ fn get_cors() -> Rc<Cors> {
         .supports_credentials()
         .max_age(3600);
     Rc::new(cors)
+}
+
+#[cfg(feature = "enterprise")]
+async fn audit_middleware(
+    mut req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let method = req.method().to_string();
+    let prefix = format!("{}/api/", CONFIG.common.base_uri);
+    let path = req.path().strip_prefix(&prefix).unwrap().to_string();
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+    let path_len = path_columns.len();
+    if O2_CONFIG.common.audit_enabled
+        && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
+    {
+        let query_params = req.query_string().to_string();
+        let org_id = {
+            let org = path_columns[0];
+            if org.eq("organizations") {
+                "".to_string()
+            } else {
+                org.to_string()
+            }
+        };
+
+        let mut request_body = BytesMut::new();
+        let mut payload_stream = req.take_payload();
+        while let Some(chunk) = payload_stream.next().await {
+            request_body.extend_from_slice(&chunk.unwrap());
+        }
+        let user_email = req
+            .headers()
+            .get("user_id")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        // Put the payload back into the req
+        let (_, mut payload) = Payload::create(true);
+        payload.unread_data(request_body.clone().into());
+        req.set_payload(payload.into());
+
+        // Call the next service in the chain
+        let res = next.call(req).await?;
+
+        if res.response().error().is_none() {
+            let body = String::from_utf8(request_body.to_vec()).unwrap();
+            audit(AuditMessage {
+                user_email,
+                org_id,
+                method,
+                path,
+                body,
+                query_params,
+                response_code: res.response().status().as_u16(),
+                _timestamp: chrono::Utc::now().timestamp_micros(),
+            })
+            .await;
+        }
+        Ok(res)
+    } else {
+        next.call(req).await
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn audit_middleware(
+    req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    next.call(req).await
 }
 
 /// This is a very trivial proxy to overcome the cors errors while
@@ -210,6 +290,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 
     cfg.service(
         web::scope("/api")
+            .wrap(from_fn(audit_middleware))
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))

@@ -29,6 +29,8 @@ use config::{
     CONFIG, SIZE_IN_MB,
 };
 use hashbrown::HashMap;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::auditor;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use reqwest::Client;
@@ -188,6 +190,58 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     // release the write lock
     drop(usages);
 
+    ingest_usages(curr_usages).await
+}
+
+pub async fn publish_triggers_usage(trigger: TriggerData) {
+    let mut usages = TRIGGERS_USAGE_DATA.write().await;
+    usages.push(trigger);
+    if usages.len() < CONFIG.common.usage_batch_size {
+        return;
+    }
+
+    let curr_usages = std::mem::take(&mut *usages);
+    // release the write lock
+    drop(usages);
+
+    let mut json_triggers = vec![];
+    for trigger_data in &curr_usages {
+        json_triggers.push(json::to_value(trigger_data).unwrap());
+    }
+
+    // report trigger usage data
+    let req = cluster_rpc::UsageRequest {
+        stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
+        data: Some(cluster_rpc::UsageData::from(json_triggers)),
+    };
+    if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+        log::error!("Error in ingesting triggers usage data {:?}", e);
+        // on error in ingesting usage data, push back the data
+        let mut usages = TRIGGERS_USAGE_DATA.write().await;
+        let mut curr_usages = curr_usages.clone();
+        usages.append(&mut curr_usages);
+        drop(usages);
+    }
+}
+
+pub async fn flush_usage() {
+    if !CONFIG.common.usage_enabled {
+        return;
+    }
+
+    let mut usages = USAGE_DATA.write().await;
+    if usages.len() == 0 {
+        return;
+    }
+
+    let curr_usages = std::mem::take(&mut *usages);
+    // release the write lock
+    drop(usages);
+
+    ingest_usages(curr_usages).await
+}
+
+async fn ingest_usages(curr_usages: Vec<UsageData>) {
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
     for usage_data in &curr_usages {
         // Skip aggregation for usage_data with event "Search"
@@ -290,33 +344,19 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     }
 }
 
-pub async fn publish_triggers_usage(trigger: TriggerData) {
-    let mut usages = TRIGGERS_USAGE_DATA.write().await;
-    usages.push(trigger);
-    if usages.len() < CONFIG.common.usage_batch_size {
-        return;
-    }
+#[cfg(feature = "enterprise")]
+pub async fn audit(msg: auditor::AuditMessage) {
+    auditor::audit(msg, publish_audit).await;
+}
 
-    let curr_usages = std::mem::take(&mut *usages);
-    // release the write lock
-    drop(usages);
+#[cfg(feature = "enterprise")]
+pub async fn flush_audit() {
+    auditor::flush_audit(publish_audit).await;
+}
 
-    let mut json_triggers = vec![];
-    for trigger_data in &curr_usages {
-        json_triggers.push(json::to_value(trigger_data).unwrap());
-    }
-
-    // report trigger usage data
-    let req = cluster_rpc::UsageRequest {
-        stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
-        data: Some(cluster_rpc::UsageData::from(json_triggers)),
-    };
-    if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
-        log::error!("Error in ingesting triggers usage data {:?}", e);
-        // on error in ingesting usage data, push back the data
-        let mut usages = TRIGGERS_USAGE_DATA.write().await;
-        let mut curr_usages = curr_usages.clone();
-        usages.append(&mut curr_usages);
-        drop(usages);
-    }
+#[cfg(feature = "enterprise")]
+async fn publish_audit(
+    req: cluster_rpc::UsageRequest,
+) -> Result<cluster_rpc::UsageResponse, anyhow::Error> {
+    ingestion_service::ingest(&CONFIG.common.usage_org, req).await
 }

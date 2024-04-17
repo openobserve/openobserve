@@ -18,7 +18,7 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::infra::cluster;
 
-const QUERIER_ROUTES: [&str; 12] = [
+const QUERIER_ROUTES: [&str; 16] = [
     "/summary",
     "/schema",
     "/streams",
@@ -31,6 +31,10 @@ const QUERIER_ROUTES: [&str; 12] = [
     "/prometheus/api/v1/metadata",
     "/prometheus/api/v1/labels",
     "/prometheus/api/v1/label/",
+    "/config/dex_login",
+    "/config/logout",
+    "/config/redirect",
+    "/config/dex_refresh",
 ];
 
 const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
