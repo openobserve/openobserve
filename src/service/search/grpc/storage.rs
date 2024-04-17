@@ -40,6 +40,7 @@ use crate::service::{
         datafusion::exec,
         grpc::{generate_search_schema, generate_select_start_search_schema},
         sql::Sql,
+        RE_SELECT_WILDCARD,
     },
 };
 
@@ -180,7 +181,7 @@ pub async fn search(
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
