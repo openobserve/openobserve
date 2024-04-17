@@ -130,13 +130,11 @@ pub async fn search(
             })
             .collect::<HashSet<String>>();
 
-        let terms = vec![
-            terms
-                .iter()
-                .max_by_key(|key| key.len())
-                .unwrap_or(&String::new())
-                .to_string(),
-        ];
+        let terms = [terms
+            .iter()
+            .max_by_key(|key| key.len())
+            .unwrap_or(&String::new())
+            .to_string()];
         let search_condition = format!("term LIKE '%{}%'", terms[0]);
 
         let query = format!(
