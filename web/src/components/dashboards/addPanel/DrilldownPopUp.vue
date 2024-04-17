@@ -214,15 +214,39 @@
             :key="index"
           >
             <div style="display: flex; gap: 10px; margin-bottom: 10px">
-              <q-input
-                v-model="variable.name"
-                placeholder="Name"
-                stack-label
-                outlined
-                filled
-                dense
-                :data-test="`dashboard-drilldown-variable-name-${index}`"
-              />
+              <div class="relative">
+                <q-input
+                  v-model="variable.name"
+                  placeholder="Name"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  :data-test="`dashboard-drilldown-variable-name-${index}`"
+                  @update:model-value="nameFilterFn"
+                  @focus.prevent="variable.showNameOptions = true"
+                  @blur.prevent="hideNameOptionsWithDelay(index)"
+                />
+                <div
+                  class="options-container"
+                  v-if="
+                    variable.showNameOptions && nameFilteredOptions.length > 0
+                  "
+                  :style="{
+                    'background-color':
+                      store.state.theme === 'dark' ? '#2d2d2d' : 'white',
+                  }"
+                >
+                  <div
+                    v-for="(option, index) in nameFilteredOptions"
+                    :key="index"
+                    class="option"
+                    @mousedown="selectVariableOptionName(option, variable)"
+                  >
+                    {{ option.label }}
+                  </div>
+                </div>
+              </div>
               <div class="relative">
                 <q-input
                   v-model="variable.value"
@@ -233,8 +257,8 @@
                   dense
                   :data-test="`dashboard-drilldown-variable-value-${index}`"
                   @update:model-value="fieldsFilterFn"
-                  @focus="variable.showOptions = true"
-                  @blur="hideOptionsWithDelay(index)"
+                  @focus.prevent="variable.showOptions = true"
+                  @blur.prevent="hideOptionsWithDelay(index)"
                 />
                 <div
                   class="options-container"
@@ -250,7 +274,7 @@
                     v-for="(option, index) in fieldsFilteredOptions"
                     :key="index"
                     class="option"
-                    @click="selectOption(variable, option)"
+                    @mousedown="selectOption(variable, option)"
                   >
                     {{ option.label }}
                   </div>
@@ -315,7 +339,7 @@
 </template>
 
 <script lang="ts">
-import { ref, toRef } from "vue";
+import { reactive, ref, toRef } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -357,10 +381,12 @@ export default defineComponent({
     console.log("dashboardPanelData", dashboardPanelData);
 
     let hideOptionsTimeout: any;
+    let hideNameOptionsTimeout: any;
     const getDefaultVariable = () => ({
       name: "",
       value: "",
       showOptions: false, // Initialize showOptions for each variable
+      showNameOptions: false,
     });
 
     const getDefaultDrilldownData = () => ({
@@ -404,6 +430,8 @@ export default defineComponent({
       // get tab list
       await getDashboardList();
       await getTabList();
+
+      await variableNamesFn();
     });
 
     // on folder change, reset dashboard and tab values
@@ -416,6 +444,8 @@ export default defineComponent({
           drilldownData.value.data.dashboard =
             dashboardList?.value[0]?.value ?? "";
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
+
+          await variableNamesFn();
         }
       }
     );
@@ -428,6 +458,8 @@ export default defineComponent({
         if (newVal !== oldVal) {
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
+
+          await variableNamesFn();
         }
       }
     );
@@ -476,6 +508,7 @@ export default defineComponent({
           };
         }) ?? [];
     };
+    console.log("dashboardList", dashboardList);
 
     const getTabList = async () => {
       // get folder data
@@ -518,6 +551,8 @@ export default defineComponent({
           };
         }) ?? [];
     };
+
+    console.log("tabList", tabList);
 
     const isFormURLValid = computed(() => {
       // check if url is valid with protocol only(will check only protocol)
@@ -571,73 +606,113 @@ export default defineComponent({
       drilldownData.value.type = type;
     };
 
+    const options: any = reactive({
+      selectedValue: [],
+      selectedName: [],
+    });
     //want label for dropdown in input and value for its input value
-    const options = () => {
-      if (dashboardPanelData.data.type == "sankey") {
-        return [
-          {
-            label: "Edge Source",
-            value: "${edge.__source}",
-          },
-          {
-            label: "Edge Target",
-            value: "${edge.__target}",
-          },
-          {
-            label: "Edge Value",
-            value: "${edge.__value}",
-          },
-          {
-            label: "Node Name",
-            value: "${node.__name}",
-          },
-          {
-            label: "Node Value",
-            value: "${node.__value}",
-          },
+    const selectedValue = computed(() => {
+      let selectedValues: any = [];
+      if (dashboardPanelData.data.type === "sankey") {
+        selectedValues = [
+          { label: "Edge Source", value: "${edge.__source}" },
+          { label: "Edge Target", value: "${edge.__target}" },
+          { label: "Edge Value", value: "${edge.__value}" },
+          { label: "Node Name", value: "${node.__name}" },
+          { label: "Node Value", value: "${node.__value}" },
         ];
-      } else if (dashboardPanelData.data.type == "table") {
-        const options: any = [];
+      } else if (dashboardPanelData.data.type === "table") {
         dashboardPanelData.data.queries.forEach((query: any) => {
-          // take all field from x, y and z
-          const panelFields: any = [
+          const panelFields = [
             ...query.fields.x,
             ...query.fields.y,
             ...query.fields.z,
           ];
-          console.log("panelFields", panelFields);
-          panelFields.forEach((field: any) => {
-            // we have label and alias, use both in dynamic values
-            options.push({
+          panelFields.forEach((field) => {
+            selectedValues.push({
               label: field.label,
-              value: "${row.field[\""+field.label+"\"]}",
-            })
+              value: '${row.field["' + field.label + '"]}',
+            });
           });
-          console.log("fields", options);
         });
-        return options;
       } else {
-        return [
-          {
-            label: "Series Name",
-            value: "${series.__name}",
-          },
-          {
-            label: "Series Value",
-            value: "${series.__value}",
-          },
+        selectedValues = [
+          { label: "Series Name", value: "${series.__name}" },
+          { label: "Series Value", value: "${series.__value}" },
         ];
       }
-    };
-    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useAutoCompleteForPromql(toRef(options), "label");
+      return selectedValues;
+    });
 
+    // Assign selectedValue to options object
+    options.selectedValue = selectedValue;
+
+    const variableNamesFn = async () => {
+      console.log(
+        "called::::::::::::::::::::::::::::::::",
+        drilldownData.value.data
+      );
+
+      // get folder id
+      if (
+        !store.state.organizationData.folders ||
+        (Array.isArray(store.state.organizationData.folders) &&
+          store.state.organizationData.folders.length === 0)
+      ) {
+        await getFoldersList(store);
+      }
+      const folderId = store.state.organizationData.folders.find(
+        (folder: any) => folder.name == drilldownData.value.data.folder
+      )?.folderId;
+
+      if (!folderId) {
+        options.selectedName = [];
+        return;
+      }
+
+      // get dashboard id
+      const allDashboardData = await getAllDashboardsByFolderId(
+        store,
+        folderId
+      );
+      const dashboardData = allDashboardData.find(
+        (dashboard: any) =>
+          dashboard.title == drilldownData.value.data.dashboard
+      );
+
+      if (!dashboardData) {
+        options.selectedName = [];
+        return;
+      }
+      // console.log("dashboardData---", dashboardData);
+      const optionsList = dashboardData.variables.list.map((variable: any) => {
+        return { label: variable.name, value: variable.name };
+      });
+
+      options.selectedName = optionsList;
+    };
+
+    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
+      useAutoCompleteForPromql(toRef(options, "selectedValue"), "label");
+
+    let { filterFn: nameFilterFn, filteredOptions: nameFilteredOptions } =
+      useAutoCompleteForPromql(toRef(options, "selectedName"), "label");
+    console.log("nameFilteredOptions", nameFilteredOptions.value);
+    console.log("nameFilterFn", nameFilterFn);
     console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
+    console.log("fieldsFilterFn", fieldsFilterFn);
 
     const hideOptionsWithDelay = (index: any) => {
       clearTimeout(hideOptionsTimeout);
       hideOptionsTimeout = setTimeout(() => {
-        drilldownData.value.data.variables[index].showOptions = false;
+      drilldownData.value.data.variables[index].showOptions = false;
+      }, 200);
+    };
+
+    const hideNameOptionsWithDelay = (index: any) => {
+      clearTimeout(hideNameOptionsTimeout);
+      hideNameOptionsTimeout = setTimeout(() => {
+      drilldownData.value.data.variables[index].showNameOptions = false;
       }, 200);
     };
 
@@ -649,6 +724,25 @@ export default defineComponent({
       variable.showOptions = false;
     };
 
+    const selectVariableOptionName = (option: any, variable: any) => {
+      console.log("----------------------------------------");
+
+      console.log("selectVariableOptionName", option);
+      console.log("variable selectVariableOptionName", variable);
+
+      variable.name = option.value;
+      variable.showNameOptions = false;
+    };
+    watch(
+      () => options.selectedName,
+      () => {
+        console.log("selectedName", options.selectedName);
+
+        ({ filterFn: nameFilterFn, filteredOptions: nameFilteredOptions } =
+          useAutoCompleteForPromql(toRef(options, "selectedName"), "label"));
+      },
+      { deep: true }
+    );
     return {
       t,
       outlinedDashboard,
@@ -664,9 +758,15 @@ export default defineComponent({
       isFormURLValid,
       changeTypeOfDrilldown,
       fieldsFilterFn,
+      nameFilterFn,
+      nameFilteredOptions,
       fieldsFilteredOptions,
       selectOption,
       hideOptionsWithDelay,
+      hideNameOptionsWithDelay,
+      selectVariableOptionName,
+      options,
+      variableNamesFn,
     };
   },
 });
