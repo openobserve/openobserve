@@ -895,15 +895,12 @@ export default defineComponent({
     });
 
     const index = ref(0); 
-    console.log("dashboardPanelData.data.queries", dashboardPanelData);
 
     const fields = computed(() => {
       return dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.filter[index.value];
     });
-
-    console.log(fields, "fields");
 
     return {
       t,

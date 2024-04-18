@@ -80,7 +80,6 @@ export default defineComponent({
         (item: any) => item?.name
       )
     );
-    console.log("optionName", optionName.value);
 
     // Watch for changes in the selectedStreamFields and update the optionName
     watch(
@@ -90,7 +89,6 @@ export default defineComponent({
           dashboardPanelData.meta.stream.selectedStreamFields.map(
             (item: any) => item?.name
           );
-        console.log("optionName updated", optionName.value);
 
         fieldsFilteredOptions.value = useAutoCompleteForPromql(
           toRef(optionName),
@@ -101,8 +99,6 @@ export default defineComponent({
 
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useAutoCompleteForPromql(toRef(optionName), "name");
-
-    console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
 
     const hideOptionsWithDelay = () => {
       hideOptionsTimeout = setTimeout(() => {
@@ -115,12 +111,10 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.promql_legend;
-      console.log("inputValue", inputValue);
 
       const openingBraceIndex = inputValue.lastIndexOf("{");
       const newValue =
         inputValue.slice(0, openingBraceIndex + 1) + option + "}";
-      console.log("newValue", newValue);
 
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex

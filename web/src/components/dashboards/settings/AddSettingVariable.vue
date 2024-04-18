@@ -812,25 +812,15 @@ export default defineComponent({
             )
           )
         )?.variables?.list ?? [];
-      console.log(dashboardVariablesList.value, "dashboardVariablesList.value");
       const optionName = dashboardVariablesList.value
         .map((it: any) => it.name)
         .filter((it: any) => it !== variableData.name);
-      console.log(optionName, "optionName");
       dashboardVariablesList.value = optionName;
-      console.log(
-        dashboardVariablesList.value,
-        "dashboardVariablesList.value====="
-      );
     };
-    console.log(variableData, "variableData");
     const { filterFn: valueFilterFn, filteredOptions: valueFilteredOptions } =
       useAutoCompleteForPromql(toRef(dashboardVariablesList), "name");
 
     const selectOption = (option: any, filter: any) => {
-      console.log("================");
-
-      console.log("SelectOption", option);
       const newValue = "$" + option;
       filter.value = newValue;
       showOptions.value = false;

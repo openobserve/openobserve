@@ -378,7 +378,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
-    console.log("dashboardPanelData", dashboardPanelData);
 
     let hideOptionsTimeout: any;
     let hideNameOptionsTimeout: any;
@@ -508,7 +507,6 @@ export default defineComponent({
           };
         }) ?? [];
     };
-    console.log("dashboardList", dashboardList);
 
     const getTabList = async () => {
       // get folder data
@@ -551,8 +549,6 @@ export default defineComponent({
           };
         }) ?? [];
     };
-
-    console.log("tabList", tabList);
 
     const isFormURLValid = computed(() => {
       // check if url is valid with protocol only(will check only protocol)
@@ -648,11 +644,6 @@ export default defineComponent({
     options.selectedValue = selectedValue;
 
     const variableNamesFn = async () => {
-      console.log(
-        "called::::::::::::::::::::::::::::::::",
-        drilldownData.value.data
-      );
-
       // get folder id
       if (
         !store.state.organizationData.folders ||
@@ -684,7 +675,6 @@ export default defineComponent({
         options.selectedName = [];
         return;
       }
-      // console.log("dashboardData---", dashboardData);
       const optionsList = dashboardData.variables.list.map((variable: any) => {
         return { label: variable.name, value: variable.name };
       });
@@ -697,10 +687,6 @@ export default defineComponent({
 
     let { filterFn: nameFilterFn, filteredOptions: nameFilteredOptions } =
       useAutoCompleteForPromql(toRef(options, "selectedName"), "label");
-    console.log("nameFilteredOptions", nameFilteredOptions.value);
-    console.log("nameFilterFn", nameFilterFn);
-    console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
-    console.log("fieldsFilterFn", fieldsFilterFn);
 
     const hideOptionsWithDelay = (index: any) => {
       clearTimeout(hideOptionsTimeout);
@@ -717,26 +703,17 @@ export default defineComponent({
     };
 
     const selectOption = (variable: any, option: any) => {
-      console.log("SelectOption", option.value);
       variable.value = option.value;
-      console.log("showOptions", variable.showOptions);
-
       variable.showOptions = false;
     };
 
     const selectVariableOptionName = (option: any, variable: any) => {
-      console.log("----------------------------------------");
-
-      console.log("selectVariableOptionName", option);
-      console.log("variable selectVariableOptionName", variable);
-
       variable.name = option.value;
       variable.showNameOptions = false;
     };
     watch(
       () => options.selectedName,
       () => {
-        console.log("selectedName", options.selectedName);
 
         ({ filterFn: nameFilterFn, filteredOptions: nameFilteredOptions } =
           useAutoCompleteForPromql(toRef(options, "selectedName"), "label"));
