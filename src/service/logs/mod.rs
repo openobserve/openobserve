@@ -460,7 +460,10 @@ pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: 
 
     if !non_schema_map.is_empty() {
         let non_schema_json = serde_json::to_string(&non_schema_map).unwrap_or_default();
-        original_map.insert("_non_schema".to_string(), Value::String(non_schema_json));
+        original_map.insert(
+            CONFIG.common.all_fields_name.to_string(),
+            Value::String(non_schema_json),
+        );
     }
 }
 
