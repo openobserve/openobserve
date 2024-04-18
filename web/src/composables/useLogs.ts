@@ -2341,17 +2341,22 @@ const useLogs = () => {
         query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
       }
 
+      let streamName: string = "";
+      if(searchObj.data.stream.selectedStream.length>1) {
+        streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(","));
+      } else {
+        streamName = searchObj.data.stream.selectedStream[0];
+      }
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
-          index:
-            b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
-            "",
+          index: streamName,
           key: obj.key,
           size: obj.size,
           query_context: sqlContext,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,
+          is_multistream: searchObj.data.stream.selectedStream.length>1 ? true: false,
         })
         .then((res) => {
           searchObj.loading = false;
