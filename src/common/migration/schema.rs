@@ -16,7 +16,10 @@
 use chrono::Utc;
 use config::utils::json;
 use datafusion::arrow::datatypes::Schema;
-use infra::db::{self as infra_db, NO_NEED_WATCH};
+use infra::{
+    db::{self as infra_db, NO_NEED_WATCH},
+    dist_lock, scheduler,
+};
 
 const SCHEMA_MIGRATION_KEY: &str = "/migration/schema_versions/status";
 
@@ -48,7 +51,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         std::result::Result::Ok(false) => {
             log::info!("[Schema:Migration]: Schema migration already done");
-            infra::dist_lock::unlock(&locker).await?;
+            dist_lock::unlock(&locker).await?;
             return Ok(());
         }
         Err(err) => {
@@ -56,36 +59,63 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 "[Schema:Migration]: Error checking schema migration status: {}",
                 err
             );
-            infra::dist_lock::unlock(&locker).await?;
+            dist_lock::unlock(&locker).await?;
             return Err(err);
         }
     };
 
+    // upgrade meta
+    if let Err(e) = upgrade_meta().await {
+        dist_lock::unlock(&locker).await?;
+        return Err(e);
+    }
+
+    // upgrade triggers
+    if let Err(e) = upgrade_trigger().await {
+        dist_lock::unlock(&locker).await?;
+        return Err(e);
+    }
+
+    // set migration status
+    let db = infra_db::get_db().await;
+    if let Err(e) = db
+        .put(
+            SCHEMA_MIGRATION_KEY,
+            Utc::now().timestamp_micros().to_string().into(),
+            NO_NEED_WATCH,
+            None,
+        )
+        .await
+    {
+        // unlock the lock
+        dist_lock::unlock(&locker).await?;
+        return Err(e.into());
+    }
+
+    // unlock the lock
+    dist_lock::unlock(&locker).await?;
+
+    Ok(())
+}
+
+async fn upgrade_meta() -> Result<(), anyhow::Error> {
     let default_end_dt = "0".to_string();
     let cc = infra_db::get_coordinator().await;
     if let Err(e) = cc.add_start_dt_column().await {
-        infra::dist_lock::unlock(&locker).await?;
         return Err(e.into());
     }
 
     let db = infra_db::get_db().await;
     if let Err(e) = db.add_start_dt_column().await {
-        infra::dist_lock::unlock(&locker).await?;
         return Err(e.into());
     }
 
-    log::info!("[Schema:Migration]: Inside migrating schemas");
+    log::info!("[Schema:Migration]: Migrating schemas");
     let db_key = "/schema/".to_string();
     log::info!("[Schema:Migration]: Listing all schemas");
-    let data = match db.list(&db_key).await {
-        Ok(v) => v,
-        Err(e) => {
-            infra::dist_lock::unlock(&locker).await?;
-            return Err(e.into());
-        }
-    };
+    let data = db.list(&db_key).await?;
     for (key, val) in data {
-        println!("[Schema:Migration]: Start migrating schema: {}", key);
+        log::info!("[Schema:Migration]: Start migrating schema: {}", key);
         let schemas: Vec<Schema> = json::from_slice(&val).unwrap();
         let versions_count = schemas.len();
         let mut prev_end_dt: i64 = 0;
@@ -120,31 +150,56 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 )
                 .await
             {
-                infra::dist_lock::unlock(&locker).await?;
                 return Err(e.into());
             }
         }
-        println!(
+        log::info!(
             "[Schema:Migration]: Done creating row per version of schema: {}",
             key
         );
         if let Err(e) = db.delete(&key, false, infra_db::NEED_WATCH, Some(0)).await {
-            infra::dist_lock::unlock(&locker).await?;
             return Err(e.into());
         }
-        println!("[Schema:Migration]: Done migrating schema: {}", key);
+        log::info!("[Schema:Migration]: Done migrating schema: {}", key);
     }
 
-    // unlock the lock
-    infra::dist_lock::unlock(&locker).await?;
+    Ok(())
+}
 
-    db.put(
-        SCHEMA_MIGRATION_KEY,
-        Utc::now().timestamp_micros().to_string().into(),
-        NO_NEED_WATCH,
-        None,
-    )
-    .await?;
+async fn upgrade_trigger() -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    log::info!("[Trigger:Migration]: Migrating triggers");
+    let db_key_prefix = "/trigger/".to_string();
+    log::info!("[Trigger:Migration]: Listing all triggers");
+    let data = db.list(&db_key_prefix).await?;
+    for (key, val) in data {
+        let db_key = key;
+        let key = db_key.strip_prefix(&db_key_prefix).unwrap();
+        log::info!("[Trigger:Migration]: Start migrating trigger: {}", key);
+        let (org_id, module_key) = match key.split_once('/') {
+            Some(columns) => columns,
+            None => {
+                // Corrupted data, delete the trigger
+                _ = db.delete(&db_key, false, infra_db::NEED_WATCH, None).await;
+                continue;
+            }
+        };
+        let data: json::Value = json::from_slice(&val).unwrap();
+        let data = data.as_object().unwrap();
+        scheduler::push(scheduler::Trigger {
+            org: org_id.to_string(),
+            module: scheduler::TriggerModule::Alert,
+            module_key: module_key.to_string(),
+            next_run_at: data.get("next_run_at").unwrap().as_i64().unwrap(),
+            is_realtime: data.get("is_realtime").unwrap().as_bool().unwrap(),
+            is_silenced: data.get("is_silenced").unwrap().as_bool().unwrap(),
+            status: scheduler::TriggerStatus::Waiting,
+            ..Default::default()
+        })
+        .await?;
+        log::info!("[Schema:Migration]: Done migrating trigger: {}", key);
+    }
+
     Ok(())
 }
 
