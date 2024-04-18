@@ -1,0 +1,131 @@
+<template>
+  <div class="relative">
+    <q-input
+      v-model="inputValue"
+      @update:model-value="onModelValueChanged"
+      dense
+      filled
+      :label="label"
+      style="width: 100%; margin-top: 5px"
+      @focus="showOptions = true"
+      @blur="hideOptions"
+      v-bind="$attrs"
+    />
+    <div
+      class="options-container"
+      v-if="showOptions && fieldsFilteredOptions.length > 0"
+      :style="{
+        'background-color': store.state.theme === 'dark' ? '#2d2d2d' : 'white',
+      }"
+    >
+      <div
+        v-for="(option, index) in fieldsFilteredOptions"
+        :key="index"
+        class="option"
+        @mousedown="selectOption(option)"
+      >
+        {{ option.label }}
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, toRef, defineComponent, watch } from "vue";
+import { useAutoCompleteForPromql2 } from "@/composables/useAutoCompleteForPromql";
+import { useStore } from "vuex";
+
+export default defineComponent({
+  name: "CommonAutoComplete2",
+  props: {
+    modelValue: {
+      type: String
+    },
+    label: {
+      type: String
+    },
+    items: {
+      // always expected to be in [ { label: "", value: ""}] format, search in label, and replace the value
+      type: Array
+    }, 
+    searchRegex: {
+      type: String
+    },
+    valueReplaceFn: {
+      // special treatment needed to any value replacing function, then this can be used
+      type: Function, 
+      default: (selectedValue) => selectedValue
+    }, 
+  },
+  emits: ["update:modelValue"],
+  setup(props, { emit }) {
+    const store = useStore();
+    const showOptions = ref(false);
+
+    // this is used to sync with modelvalue and q-input's v-model
+    const inputValue = ref(props.modelValue);
+
+    watch(() => props.modelValue, () => {
+      inputValue.value = props.modelValue;
+    });
+
+    // when q-input's model value updated, update the model value which will be synced back to input value
+    const onModelValueChanged = (value) => {
+      emit("update:modelValue", value);
+      fieldsFilterFn(value)
+    }
+
+    // apply filter on label
+    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
+      useAutoCompleteForPromql2(toRef(props.items), "label", props.searchRegex);
+
+    const hideOptions = () => {
+        showOptions.value = false;
+    };
+
+    // when any item is selected, replace it with the value and hide the options
+    const selectOption = (option) => {
+      emit("update:modelValue", props.valueReplaceFn(option?.value));
+      showOptions.value = false;
+    };
+
+    return {
+      showOptions,
+      fieldsFilterFn,
+      fieldsFilteredOptions,
+      hideOptions,
+      selectOption,
+      store,
+      onModelValueChanged,
+      inputValue
+    };
+  },
+});
+</script>
+
+<style scoped>
+.options-container {
+  z-index: 10;
+  position: absolute;
+  left: 0;
+  right: 0;
+  border: 1px solid #ccc;
+  max-height: 100px;
+  overflow-y: auto;
+  top: 42px;
+}
+
+.relative {
+  position: relative;
+  width: 100%;
+}
+
+.option {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.option:hover {
+  background-color: #f0f0f0b1;
+}
+</style>

@@ -761,7 +761,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <CommonAutoComplete
+                          <!-- <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 fields?.operator
@@ -769,7 +769,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :field="fields"
                             :index="index"
-                          ></CommonAutoComplete>
+                          ></CommonAutoComplete> -->
+                          <CommonAutoComplete2
+                            v-if="
+                              !['Is Null', 'Is Not Null'].includes(
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields?.filter[index]?.operator
+                              )
+                            "
+                            :label="t('common.value')"
+                            v-model="dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.filter[index].value"
+                            :items="dashboardVariablesFilterItems"
+                            searchRegex="(?:^|[^$])\$?(\w+)"
+                            :rules="[(val: any) => val?.length > 0 || 'Required']"
+                          ></CommonAutoComplete2>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -898,6 +914,7 @@ import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -907,8 +924,10 @@ export default defineComponent({
     HistogramIntervalDropDown,
     DashboardSankeyChartBuilder,
     CommonAutoComplete,
+    CommonAutoComplete2
   },
-  setup() {
+  props: ["dashboardData"],
+  setup(props) {
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
@@ -1312,6 +1331,10 @@ export default defineComponent({
       ].fields.filter[index.value];
     });
 
+    const dashboardVariablesFilterItems = computed(() => (props.dashboardData?.variables?.list ?? []).map(
+        (it:any) => ({ label: it.name, value:  "'" + "$" + it.name + "'"})
+      ))
+
     return {
       showXAxis,
       t,
@@ -1360,6 +1383,7 @@ export default defineComponent({
       onDragEnd,
       fields,
       index,
+      dashboardVariablesFilterItems
     };
   },
 });
