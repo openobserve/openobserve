@@ -1726,24 +1726,25 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
+      // reset stream object
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
       searchObj.data.stream.expandGroupRows = [];
+
       const localInterestingFields: any = useLocalInterestingFields();
-      let environmentInterestingFields = [];
       const schemaInterestingFields: any = {};
+      const multiStreamObj: any = [];
+
+      let environmentInterestingFields = [];
       let ftsKeys: any = new Set();
       let schemaFields: any = new Set();
-      const multiStreamObj: any = [];
+
       if (searchObj.data.streamResults.list.length > 0) {
         const queryResult: {
           name: string;
           type: string;
         }[] = [];
-        const tempFieldsName: string[] = [];
-        const ignoreFields = [store.state.zoConfig.timestamp_column];
         const timestampField = store.state.zoConfig.timestamp_column;
-
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
           .split(",");
@@ -1827,8 +1828,6 @@ const useLogs = () => {
           ...new Set(searchObj.data.stream.interestingFieldList),
         ];
 
-        const streamSchemas = await getMultiStreams(multiStreamObj);
-
         // for multistream we are grouping the schema in the form of array
         // there will be one "common" group and stream specific groups on logs page
         // another variable to maintain expand/collapse feature
@@ -1863,12 +1862,14 @@ const useLogs = () => {
             stream.schema.forEach((schema: any) => {
               const otherStreams = searchObj.data.streamResults.list.filter(
                 (otherStream: { schema: any[]; name: any }) =>
+                  // {if(selectedStreamValues.includes(otherStream.name)) {
                   otherStream.schema?.some(
                     (otherSchema: { name: any }) =>
                       otherSchema.name === schema.name &&
                       otherStream.name !== stream.name &&
                       selectedStreamValues.includes(otherStream.name)
                   )
+                  // }}
               );
 
               if (otherStreams.length > 0) {
@@ -1923,11 +1924,6 @@ const useLogs = () => {
             });
           }
         }
-
-        // // queryResult.forEach((field: any) => {
-        // for (const field of queryResult) {
-        //   tempFieldsName.push(field.name);
-        // }
 
         if (
           searchObj.data.queryResults.hasOwnProperty("hits") &&
