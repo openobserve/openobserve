@@ -336,7 +336,7 @@ impl VisitorMut for AddGroupByOrderBy {
             if !query.order_by.is_empty() {
                 expr_list.extend(query.order_by.iter().map(|e| &e.expr));
             }
-            for expr in expr_list.into_iter().dedup() {
+            for expr in expr_list.into_iter().sorted().dedup() {
                 let expr_name = trim_quotes(expr.to_string());
                 if !select_exprs.contains(&expr_name) {
                     select
@@ -452,6 +452,7 @@ mod tests {
             "SELECT * FROM default where a = b",
             "SELECT a, b, c FROM default",
             "SELECT avg(resource_duration / 1000000) AS y_axis_1, SPLIT_PART(resource_url, '?', 1) AS x_axis_1 FROM tbl WHERE (_timestamp >= 1710404419324000 AND _timestamp < 1710490819324000) AND (resource_duration >= 0) GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+            "SELECT kubernetes_namespace_name, count(*) FROM default GROUP BY kubernetes_namespace_name, stream order by kubernetes_namespace_name, stream ",
         ];
 
         let excepts = [
@@ -466,6 +467,7 @@ mod tests {
             "SELECT * FROM default WHERE a = b",
             "SELECT a, b, c FROM default",
             "SELECT avg(resource_duration / 1000000) AS y_axis_1, SPLIT_PART(resource_url, '?', 1) AS x_axis_1 FROM tbl WHERE (_timestamp >= 1710404419324000 AND _timestamp < 1710490819324000) AND (resource_duration >= 0) GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+            "SELECT kubernetes_namespace_name, count(*), stream FROM default GROUP BY kubernetes_namespace_name, stream ORDER BY kubernetes_namespace_name, stream",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = add_group_by_order_by_field_to_select(sql).unwrap();
