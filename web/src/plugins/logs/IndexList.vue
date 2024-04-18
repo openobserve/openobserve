@@ -992,6 +992,15 @@ $streamSelectorHeight: 44px;
   }
 }
 
+.q-field--auto-height.q-field--dense .q-field__control,
+.q-field--auto-height.q-field--dense .q-field__native,
+.q-field--auto-height.q-field--dense .q-field__native span {
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  max-height: 40px !important;
+}
+
 .index-menu {
   width: 100%;
 
