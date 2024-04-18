@@ -559,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <CommonAutoComplete
+                          <!-- <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 fields?.operator
@@ -567,7 +567,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             :field="fields"
                             :index="index"
-                          ></CommonAutoComplete>
+                          ></CommonAutoComplete> -->
+                          <CommonAutoComplete2
+                            v-if="
+                              !['Is Null', 'Is Not Null'].includes(
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields?.filter[index]?.operator
+                              )
+                            "
+                            :label="t('common.value')"
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.filter[index].value
+                            "
+                            :items="dashboardVariablesFilterItems"
+                            searchRegex="(?:^|[^$])\$?(\w+)"
+                            :rules="[(val: any) => val?.length > 0 || 'Required']"
+                          ></CommonAutoComplete2>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -691,11 +709,13 @@ import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
-  components: { SortByBtnGrp, CommonAutoComplete },
-  setup() {
+  components: { SortByBtnGrp, CommonAutoComplete, CommonAutoComplete2 },
+  props: ["dashboardData"],
+  setup(props) {
     const { t } = useI18n();
     const $q = useQuasar();
     const expansionItems = reactive({
@@ -893,13 +913,12 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
-    const index = ref(0);
-
-    const fields = computed(() => {
-      return dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter[index.value];
-    });
+    const dashboardVariablesFilterItems = computed(() =>
+      (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
+        label: it.name,
+        value: "'" + "$" + it.name + "'",
+      }))
+    );
 
     return {
       t,
@@ -926,8 +945,7 @@ export default defineComponent({
       promqlMode,
       valueLabel,
       onFieldDragStart,
-      fields,
-      index,
+      dashboardVariablesFilterItems,
       options: [
         "=",
         "<>",

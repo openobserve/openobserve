@@ -779,9 +779,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                             :label="t('common.value')"
-                            v-model="dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.filter[index].value"
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.filter[index].value
+                            "
                             :items="dashboardVariablesFilterItems"
                             searchRegex="(?:^|[^$])\$?(\w+)"
                             :rules="[(val: any) => val?.length > 0 || 'Required']"
@@ -899,8 +901,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div></div>
     </div>
   </div>
-  <DashboardMapQueryBuilder />
-  <DashboardSankeyChartBuilder />
+  <DashboardMapQueryBuilder :dashboardData="dashboardData" />
+  <DashboardSankeyChartBuilder :dashboardData="dashboardData" />
 </template>
 
 <script lang="ts">
@@ -924,7 +926,7 @@ export default defineComponent({
     HistogramIntervalDropDown,
     DashboardSankeyChartBuilder,
     CommonAutoComplete,
-    CommonAutoComplete2
+    CommonAutoComplete2,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -1323,17 +1325,12 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const index = ref(0);
-
-    const fields = computed(() => {
-      return dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter[index.value];
-    });
-
-    const dashboardVariablesFilterItems = computed(() => (props.dashboardData?.variables?.list ?? []).map(
-        (it:any) => ({ label: it.name, value:  "'" + "$" + it.name + "'"})
-      ))
+    const dashboardVariablesFilterItems = computed(() =>
+      (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
+        label: it.name,
+        value: "'" + "$" + it.name + "'",
+      }))
+    );
 
     return {
       showXAxis,
@@ -1381,9 +1378,7 @@ export default defineComponent({
       onFieldDragStart,
       getHistoramIntervalField,
       onDragEnd,
-      fields,
-      index,
-      dashboardVariablesFilterItems
+      dashboardVariablesFilterItems,
     };
   },
 });
