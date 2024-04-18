@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pa-md"
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
-              style="height: 33%;"
+              style="height: 33%"
             >
               <div style="height: 100%">
                 <div class="q-pa-xs" style="height: 100%">
@@ -559,52 +559,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <div class="relative">
-                            <q-input
-                              dense
-                              filled
-                              v-if="
-                                !['Is Null', 'Is Not Null'].includes(
-                                  dashboardPanelData.data.queries[
-                                    dashboardPanelData.layout.currentQueryIndex
-                                  ].fields?.filter[index]?.operator
-                                )
-                              "
-                              v-model="
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.filter[index].value
-                              "
-                              data-test="dashboard-filter-condition-input"
-                              :label="t('common.value')"
-                              style="width: 100%; margin-top: 5px"
-                              :rules="[(val) => val?.length > 0 || 'Required']"
-                              @update:model-value="fieldsFilterFn"
-                              @focus="showOptions = true"
-                              @blur="hideOptionsWithDelay"
-                            />
-                            <div
-                              class="options-container"
-                              v-if="
-                                showOptions && fieldsFilteredOptions.length > 0
-                              "
-                              :style="{
-                                'background-color':
-                                  store.state.theme === 'dark'
-                                    ? '#2d2d2d'
-                                    : 'white',
-                              }"
-                            >
-                              <div
-                                v-for="(option, index) in fieldsFilteredOptions"
-                                :key="index"
-                                class="option"
-                                @click="selectOption(option, filteredItem)"
-                              >
-                                {{ option }}
-                              </div>
-                            </div>
-                          </div>
+                          <CommonAutoComplete
+                            :field="fields"
+                            :index="index"
+                          ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -721,28 +679,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  reactive,
-  watch,
-  computed,
-  toRef,
-  onMounted,
-} from "vue";
+import { defineComponent, ref, reactive, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
-import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
-import { getDashboard } from "../../../utils/commons";
-import { useRoute } from "vue-router";
-import { useStore } from "vuex";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
-  components: { SortByBtnGrp },
+  components: { SortByBtnGrp, CommonAutoComplete },
   setup() {
     const { t } = useI18n();
     const $q = useQuasar();
@@ -752,59 +699,6 @@ export default defineComponent({
       weight: true,
       filter: false,
     });
-
-    const store = useStore();
-    const showOptions = ref(false);
-    let hideOptionsTimeout: any;
-    const route = useRoute();
-    const dashboardVariablesList: any = ref([]);
-    onMounted(async () => {
-      getDashboardData();
-    });
-    const getDashboardData = async () => {
-      dashboardVariablesList.value =
-        JSON.parse(
-          JSON.stringify(
-            await getDashboard(
-              store,
-              route.query.dashboard,
-              route.query.folder ?? "default"
-            )
-          )
-        )?.variables?.list ?? [];
-      console.log(dashboardVariablesList.value, "dashboardVariablesList.value");
-      const optionName = dashboardVariablesList.value.map((it: any) => it.name);
-      console.log(optionName, "optionName");
-      dashboardVariablesList.value = optionName;
-      console.log(
-        dashboardVariablesList.value,
-        "dashboardVariablesList.value====="
-      );
-    };
-    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useAutoCompleteForPromql(toRef(dashboardVariablesList), "name");
-    console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
-
-    const hideOptionsWithDelay = () => {
-      clearTimeout(hideOptionsTimeout);
-      hideOptionsTimeout = setTimeout(() => {
-        showOptions.value = false;
-      }, 200);
-    };
-
-    const selectOption = (option: any, filteredItem: any) => {
-      console.log("option", option);
-
-      const newValue = "'" + "$" + option + "'";
-      console.log("New value:", newValue);
-
-      filteredItem.value = newValue;
-
-      console.log("Value after update:", filteredItem.value);
-
-      showOptions.value = false;
-    };
-
     const {
       dashboardPanelData,
       addLatitude,
@@ -1003,6 +897,17 @@ export default defineComponent({
       return commonBtnLabel(weightField);
     });
 
+    const index = ref(0);
+    console.log("dashboardPanelData.data.queries", dashboardPanelData);
+
+    const fields = computed(() => {
+      return dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.filter[index.value];
+    });
+
+    console.log(fields, "fields");
+
     return {
       t,
       dashboardPanelData,
@@ -1029,12 +934,8 @@ export default defineComponent({
       promqlMode,
       weightLabel,
       onFieldDragStart,
-      fieldsFilterFn,
-      fieldsFilteredOptions,
-      selectOption,
-      showOptions,
-      hideOptionsWithDelay,
-      store,
+      fields,
+      index,
       options: [
         "=",
         "<>",
@@ -1324,30 +1225,5 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
-}
-
-.options-container {
-  z-index: 10;
-  position: absolute;
-  left: 0;
-  right: 0;
-  border: 1px solid #ccc;
-  max-height: 100px;
-  overflow-y: auto;
-  top: 42px;
-}
-
-.relative {
-  position: relative;
-  width: 100%;
-}
-
-.option {
-  padding: 8px;
-  cursor: pointer;
-}
-
-.option:hover {
-  background-color: #f0f0f0b1;
 }
 </style>

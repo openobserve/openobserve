@@ -761,52 +761,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <div class="relative">
-                            <q-input
-                              dense
-                              filled
-                              v-if="
-                                !['Is Null', 'Is Not Null'].includes(
-                                  dashboardPanelData.data.queries[
-                                    dashboardPanelData.layout.currentQueryIndex
-                                  ].fields?.filter[index]?.operator
-                                )
-                              "
-                              v-model="
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.filter[index].value
-                              "
-                              data-test="dashboard-filter-condition-input"
-                              :label="t('common.value')"
-                              style="width: 100%; margin-top: 5px"
-                              :rules="[(val) => val?.length > 0 || 'Required']"
-                              @update:model-value="fieldsFilterFn"
-                              @focus="showOptions = true"
-                              @blur="hideOptionsWithDelay"
-                            />
-                            <div
-                              class="options-container"
-                              v-if="
-                                showOptions && fieldsFilteredOptions.length > 0
-                              "
-                              :style="{
-                                'background-color':
-                                  store.state.theme === 'dark'
-                                    ? '#2d2d2d'
-                                    : 'white',
-                              }"
-                            >
-                              <div
-                                v-for="(option, index) in fieldsFilteredOptions"
-                                :key="index"
-                                class="option"
-                                @click="selectOption(option, filteredItem)"
-                              >
-                                {{ option }}
-                              </div>
-                            </div>
-                          </div>
+                          <CommonAutoComplete
+                            :field="fields"
+                            :index="index"
+                          ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -931,8 +889,6 @@ import {
   reactive,
   watch,
   computed,
-  toRef,
-  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -942,10 +898,7 @@ import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { useQuasar } from "quasar";
-import { getDashboard } from "../../../utils/commons";
-import { useRoute } from "vue-router";
-import { useStore } from "vuex";
-import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -954,6 +907,7 @@ export default defineComponent({
     SortByBtnGrp,
     HistogramIntervalDropDown,
     DashboardSankeyChartBuilder,
+    CommonAutoComplete,
   },
   setup() {
     const showXAxis = ref(true);
@@ -968,57 +922,6 @@ export default defineComponent({
       config: true,
       filter: false,
     });
-    const store = useStore();
-    const showOptions = ref(false);
-    let hideOptionsTimeout: any;
-    const route = useRoute();
-    const dashboardVariablesList: any = ref([]);
-    onMounted(async () => {
-      getDashboardData();
-    });
-    const getDashboardData = async () => {
-      dashboardVariablesList.value =
-        JSON.parse(
-          JSON.stringify(
-            await getDashboard(
-              store,
-              route.query.dashboard,
-              route.query.folder ?? "default"
-            )
-          )
-        )?.variables?.list ?? [];
-      console.log(dashboardVariablesList.value, "dashboardVariablesList.value");
-      const optionName = dashboardVariablesList.value.map((it: any) => it.name);
-      console.log(optionName, "optionName");
-      dashboardVariablesList.value = optionName;
-      console.log(
-        dashboardVariablesList.value,
-        "dashboardVariablesList.value====="
-      );
-    };
-    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useAutoCompleteForPromql(toRef(dashboardVariablesList), "name");
-    console.log("fieldsFilteredOptions", fieldsFilteredOptions.value);
-
-    const hideOptionsWithDelay = () => {
-      clearTimeout(hideOptionsTimeout);
-      hideOptionsTimeout = setTimeout(() => {
-        showOptions.value = false;
-      }, 200);
-    };
-
-    const selectOption = (option: any, filteredItem: any) => {
-      console.log("option", option);
-
-      const newValue = "'" + "$" + option + "'";
-      console.log("New value:", newValue);
-
-      filteredItem.value = newValue;
-
-      console.log("Value after update:", filteredItem.value);
-
-      showOptions.value = false;
-    };
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -1402,6 +1305,17 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
+    const index = ref(0); 
+    console.log("dashboardPanelData.data.queries", dashboardPanelData);
+
+    const fields = computed(() => {
+      return dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.filter[index.value];
+    });
+
+    console.log(fields, "fields");
+
     return {
       showXAxis,
       t,
@@ -1448,12 +1362,8 @@ export default defineComponent({
       onFieldDragStart,
       getHistoramIntervalField,
       onDragEnd,
-      fieldsFilterFn,
-      fieldsFilteredOptions,
-      selectOption,
-      showOptions,
-      hideOptionsWithDelay,
-      store,
+      fields,
+      index,
     };
   },
 });
@@ -1732,30 +1642,5 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
-}
-
-.options-container {
-  z-index: 10;
-  position: absolute;
-  left: 0;
-  right: 0;
-  border: 1px solid #ccc;
-  max-height: 100px;
-  overflow-y: auto;
-  top: 42px;
-}
-
-.relative {
-  position: relative;
-  width: 100%;
-}
-
-.option {
-  padding: 8px;
-  cursor: pointer;
-}
-
-.option:hover {
-  background-color: #f0f0f0b1;
 }
 </style>
