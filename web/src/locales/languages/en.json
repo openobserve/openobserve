@@ -429,7 +429,8 @@
     "subnetMessage": "Enter multiple subnets separated by commas",
     "internal": "This Cluster",
     "external": "Default",
-    "internalLabel": "Note: Use this option, if collector is installed in same cluster as O2"
+    "internalLabel": "Note: Use this option, if collector is installed in same cluster as O2",
+    "redirectionIngestionMsg": "Note: In order to access pages other than the IAM, data ingestion must be initiated within the current organization."
   },
   "syslog": {
     "stream": "Stream",

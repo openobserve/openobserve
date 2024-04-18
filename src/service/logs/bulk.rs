@@ -49,7 +49,9 @@ use crate::{
         db,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
+        schema::{
+            get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists, SchemaCache,
+        },
         usage::report_request_usage_stats,
     },
 };
@@ -502,7 +504,7 @@ async fn process_record(
                     rec.as_object().unwrap()
                 })
                 .collect();
-        let _ = crate::service::schema::check_for_schema(
+        if let Err(e) = crate::service::schema::check_for_schema(
             &stream.org_id,
             &stream.stream_name,
             StreamType::Logs,
@@ -510,7 +512,20 @@ async fn process_record(
             records.clone(),
             timestamp,
         )
-        .await?;
+        .await
+        {
+            if e.to_string() == get_invalid_schema_start_dt().to_string() {
+                log::error!(
+                    "Invalid schema start_dt detected for stream: {}, start_dt: {}",
+                    stream.stream_name,
+                    timestamp
+                );
+                // discard records
+                continue;
+            } else {
+                return Err(e);
+            }
+        }
 
         // get schema
         let rec_schema = stream_schema_map

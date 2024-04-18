@@ -246,14 +246,8 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("HTTP server stopped");
 
-    // flush audit data
-    #[cfg(feature = "enterprise")]
-    usage::flush_audit().await;
-
-    // flush usage report
-    usage::flush_usage().await;
-    // flush triggers usage report
-    usage::flush_triggers_usage().await;
+    // flush useage report
+    usage::flush().await;
 
     // leave the cluster
     _ = cluster::leave().await;

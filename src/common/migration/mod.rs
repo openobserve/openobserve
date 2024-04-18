@@ -19,7 +19,6 @@ pub mod dashboards;
 pub mod file_list;
 pub mod meta;
 pub mod schema;
-pub mod triggers;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
     let old_ver = Version::from(old_ver).unwrap();
@@ -43,12 +42,6 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     let v093 = Version::from("v0.9.3").unwrap();
     if old_ver < v093 {
         upgrade_092_093().await?;
-        return Ok(());
-    }
-
-    let v0100 = Version::from("v0.10.0").unwrap();
-    if old_ver < v0100 {
-        upgrade_093_0100().await?;
     }
 
     Ok(())
@@ -68,11 +61,5 @@ async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     // migration schema
     schema::run().await?;
 
-    Ok(())
-}
-
-async fn upgrade_093_0100() -> Result<(), anyhow::Error> {
-    // migration trigger
-    triggers::run().await?;
     Ok(())
 }
