@@ -406,10 +406,9 @@ pub async fn search_memtable(
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     let mut tasks = Vec::new();
-    for (ver, (schema, mut record_batches)) in batch_groups.into_iter().enumerate() {
+    for (ver, (mut schema, mut record_batches)) in batch_groups.into_iter().enumerate() {
         let sql = sql.clone();
         let session = config::meta::search::Session {
             id: format!("{trace_id}-mem-{ver}"),
@@ -422,15 +421,40 @@ pub async fn search_memtable(
             work_group: Some(work_group.to_string()),
         };
 
-        // cacluate the diff between latest schema and group schema
-        let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(sql.clone(), &schema_latest_map, &schema)?
-        } else {
-            generate_search_schema(sql.clone(), &schema_latest_map, &schema)?
-        };
-
-        for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(&schema, batch);
+        // calculate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = schema.fields();
+        for field in group_fields {
+            if let Some(f) = schema_latest_map.get(field.name()) {
+                if f.data_type() != field.data_type() {
+                    diff_fields.insert(field.name().clone(), f.data_type().clone());
+                }
+            }
+        }
+        // add not exists field for wal inferred schema
+        let mut new_fields = Vec::new();
+        for field in sql.meta.fields.iter() {
+            if schema.field_with_name(field).is_err() {
+                if let Some(field) = schema_latest_map.get(field) {
+                    new_fields.push(Arc::new(field.as_ref().clone()));
+                }
+            }
+        }
+        for field in schema_latest.fields() {
+            if schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            schema = Arc::new(Schema::try_merge(vec![
+                schema.as_ref().clone(),
+                new_schema,
+            ])?);
+            // fix recordbatch
+            for batch in record_batches.iter_mut() {
+                *batch = adapt_batch(&schema, batch);
+            }
         }
 
         let datafusion_span = info_span!(
