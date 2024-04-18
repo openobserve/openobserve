@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         map-options
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
+        :title="searchObj.data.stream.selectedStream.join(',')"
       >
         <template #no-option>
           <q-item>
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`log-search-index-list-stream-toggle-${opt.label}`"
                 :model-value="selected"
                 size="20px"
-                @update:model-value="toggleOption(opt)"
+                @update:model-value="toggleOption(opt.value)"
               />
             </q-item-section>
           </q-item>
@@ -993,6 +994,14 @@ $streamSelectorHeight: 44px;
 
 .index-menu {
   width: 100%;
+
+  .q-field--auto-height.q-field--dense .q-field__control,
+  .q-field--auto-height.q-field--dense .q-field__native {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    max-height: 40px;
+  }
 
   .q-field {
     &__control {

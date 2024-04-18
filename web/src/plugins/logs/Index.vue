@@ -561,13 +561,15 @@ export default defineComponent({
 
           // Parse the query and check if it is valid
           // It should have one column and one table
-
           const hasSelect =
-            currentQuery.toLowerCase() === "select" ||
-            currentQuery.toLowerCase().indexOf("select ") == 0;
+            currentQuery != "" && (currentQuery.toLowerCase() === "select" ||
+            currentQuery.toLowerCase().indexOf("select ") == 0);
 
           if (!hasSelect) {
-            currentQuery = currentQuery.split("|");
+            if(currentQuery != "") {
+              currentQuery = currentQuery.split("|");
+            }
+
             if (currentQuery.length > 1) {
               selectFields = "," + currentQuery[0].trim();
               if (currentQuery[1].trim() != "") {

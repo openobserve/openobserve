@@ -2360,6 +2360,7 @@ const useLogs = () => {
     try {
       searchObj.loading = true;
       searchObj.data.errorCode = 0;
+      const sqlContext: any = [];
       let query_context: any = "";
       const query = searchObj.data.query;
       if (searchObj.meta.sqlMode == true) {
@@ -2395,23 +2396,48 @@ const useLogs = () => {
         } else {
           whereClause = "";
         }
-        query_context =
-          `SELECT [FIELD_LIST]${queryFunctions} FROM "` +
-          searchObj.data.stream.selectedStream.join(",") +
-          `" `;
+        query_context = `SELECT [FIELD_LIST]${queryFunctions} FROM "[INDEX_NAME]" `;
 
-        if (
-          searchObj.data.stream.interestingFieldList.length > 0 &&
-          searchObj.meta.quickMode
-        ) {
-          query_context = query_context.replace(
-            "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(",")
-          );
-        } else {
+        if (!searchObj.meta.quickMode) {
           query_context = query_context.replace("[FIELD_LIST]", "*");
         }
-        query_context = b64EncodeUnicode(query_context);
+
+        console.log(
+          "searchObj.data.stream.missingStreamMultiStreamFilter:",
+          searchObj.data.stream.missingStreamMultiStreamFilter,
+          searchObj.data.stream.selectedStream
+        );
+        // const preSQLQuery = req.query.sql;
+        const streamsData: any = searchObj.data.stream.selectedStream.filter(
+          (streams: any) =>
+            !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+              streams
+            )
+        );
+
+        let finalQuery: string = "";
+        streamsData.forEach((item: any) => {
+          finalQuery = query_context.replace("[INDEX_NAME]", item);
+
+          const listOfFields: any = [];
+          let streamField: any = {};
+          for (const field of searchObj.data.stream.interestingFieldList) {
+            for (streamField of searchObj.data.stream.selectedStreamFields) {
+              if (
+                streamField?.name == field &&
+                streamField?.streams.indexOf(item) > -1
+              ) {
+                listOfFields.push(field);
+              }
+            }
+          }
+
+          finalQuery = finalQuery.replace(
+            "[FIELD_LIST]",
+            listOfFields.join(",")
+          );
+          sqlContext.push(b64EncodeUnicode(finalQuery));
+        });
       }
 
       let query_fn: any = "";
@@ -2428,7 +2454,7 @@ const useLogs = () => {
           index: searchObj.data.stream.selectedStream.join(","),
           key: obj.key,
           size: obj.size,
-          query_context: query_context,
+          query_context: sqlContext,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,
         })
