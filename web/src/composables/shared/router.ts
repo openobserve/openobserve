@@ -57,7 +57,7 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
-
+const StreamRouting = () => import("@/components/functions/StreamRouting.vue");
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
@@ -232,6 +232,14 @@ const useRoutes = () => {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "stream-routings",
+          name: "streamRouting",
+          component: StreamRouting,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

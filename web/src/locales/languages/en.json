@@ -415,7 +415,8 @@
     "selectFunction": "Select Function",
     "appendData": "Append data to existing Enrichment Table",
     "deleteAssociatedFunction": "Delete Associated Function",
-    "streamPipeline": "Stream Pipelines"
+    "streamPipeline": "Stream Pipelines",
+    "streamRouting": "Stream Routing"
   },
   "confirmDialog": {
     "cancel": "Cancel",
