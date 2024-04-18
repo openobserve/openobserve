@@ -440,11 +440,6 @@ pub async fn search_memtable(
                 }
             }
         }
-        for field in schema_latest.fields() {
-            if schema.field_with_name(field.name()).is_err() {
-                new_fields.push(field.clone());
-            }
-        }
         if !new_fields.is_empty() {
             let new_schema = Schema::new(new_fields);
             schema = Arc::new(Schema::try_merge(vec![
