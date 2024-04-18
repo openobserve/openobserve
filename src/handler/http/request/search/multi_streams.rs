@@ -521,26 +521,25 @@ pub async fn around_multi(
         .get("query_fn")
         .and_then(|v| base64::decode_url(v).ok());
 
-    let streams = stream_names.split(',').collect::<Vec<&str>>();
-    log::info!("streams inside around multi: {:#?}", &streams);
-    let mut around_sqls = streams
+    let mut around_sqls = stream_names
+        .split(',')
+        .collect::<Vec<&str>>()
         .iter()
         .map(|name| format!("SELECT * FROM \"{}\" ", name))
         .collect::<Vec<String>>();
-    match query.get("sql") {
-        Some(v) => {
-            let sqls = v.split(',').collect::<Vec<&str>>();
-            for (i, sql) in sqls.into_iter().enumerate() {
-                uses_fn = functions::get_all_transform_keys(&org_id)
-                    .await
-                    .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                if uses_fn {
-                    around_sqls[i] = sql.to_string();
+    if let Some(v) = query.get("sql") {
+        let sqls = v.split(',').collect::<Vec<&str>>();
+        for (i, sql) in sqls.into_iter().enumerate() {
+            uses_fn = functions::get_all_transform_keys(&org_id)
+                .await
+                .iter()
+                .any(|fn_name| v.contains(&format!("{}(", fn_name)));
+            if uses_fn {
+                if let Ok(sql) = base64::decode_url(&sql) {
+                    around_sqls[i] = sql;
                 }
             }
         }
-        _ => {}
     }
 
     let around_size = query
