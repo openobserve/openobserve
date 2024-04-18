@@ -56,6 +56,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t(`ingestion.resetTokenBtnLabel`)"
         @click="showUpdateDialogFn"
       />
+      <span
+        class="text-subtitle bg-warning float-right q-mt-xs q-pa-sm text-bold"
+        style="margin-right: 14%"
+        v-if="
+          store.state.zoConfig.hasOwnProperty(
+            'restricted_routes_on_empty_data'
+          ) &&
+          store.state.zoConfig.restricted_routes_on_empty_data == true &&
+          store.state.organizationData.isDataIngested == false
+        "
+      >
+        {{ t('ingestion.redirectionIngestionMsg') }}
+      </span>
       <ConfirmDialog
         title="Reset Token"
         message="Are you sure you want to update token for this organization?"
@@ -71,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="confirmRUMUpdate"
       />
     </div>
-    <q-tabs v-model="ingestTabType" horizontal align="left">
+    <q-tabs v-model="ingestTabType" horizontal
+align="left">
       <q-route-tab
         default
         name="recommended"

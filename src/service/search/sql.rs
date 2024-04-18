@@ -467,6 +467,9 @@ impl Sql {
                 }
                 indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
 
+                // add full text field to meta fields
+                meta.fields.push(field.name().to_string());
+
                 fts_terms.insert(item.1.clone());
             }
             if indexed_search.is_empty() {
@@ -490,6 +493,8 @@ impl Sql {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+                // add full text field to meta fields
+                meta.fields.push(field.name().to_string());
             }
             if fulltext_search.is_empty() {
                 return Err(Error::ErrorCode(ErrorCodes::FullTextSearchFieldNotFound));

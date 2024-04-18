@@ -57,7 +57,7 @@ use regex::Regex;
 use super::{storage::file_list, transform_udf::get_all_transform};
 use crate::{
     common::meta::functions::VRLResultResolver,
-    service::search::{datafusion::rewrite, sql::Sql},
+    service::search::{datafusion::rewrite, sql::Sql, RE_SELECT_WILDCARD},
 };
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
@@ -72,7 +72,7 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
 
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
+    Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
 });
 static RE_FIELD_FN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
@@ -92,7 +92,7 @@ pub async fn sql(
 
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
-    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
@@ -260,7 +260,7 @@ async fn exec_query(
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
 
-    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
@@ -316,10 +316,7 @@ async fn exec_query(
     };
 
     let mut query = query;
-    if RE_COUNT_DISTINCT
-        .captures(query.to_lowercase().as_str())
-        .is_some()
-    {
+    if RE_COUNT_DISTINCT.is_match(query.as_str()) {
         query = rewrite::rewrite_count_distinct_sql(&query, true)?;
     } else {
         query = rewrite::add_group_by_order_by_field_to_select(&query)?;
@@ -578,7 +575,7 @@ pub async fn merge(
         );
     }
 
-    let select_wildcard = sql.to_lowercase().starts_with("select * ");
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql);
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
@@ -603,11 +600,7 @@ pub async fn merge(
         }
     };
 
-    if !is_final_phase
-        && RE_COUNT_DISTINCT
-            .captures(sql.to_lowercase().as_str())
-            .is_some()
-    {
+    if !is_final_phase && RE_COUNT_DISTINCT.is_match(sql) {
         query_sql = rewrite::rewrite_count_distinct_sql(sql, false)?;
     }
 
@@ -693,10 +686,7 @@ fn merge_write_recordbatch(batches: &[RecordBatch], work_dir: &Directory) -> Res
 
 fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Result<String> {
     // special case for count distinct
-    if RE_COUNT_DISTINCT
-        .captures(sql.to_lowercase().as_str())
-        .is_some()
-    {
+    if RE_COUNT_DISTINCT.is_match(sql) {
         let sql = rewrite::rewrite_count_distinct_merge_sql(sql)?;
         return Ok(sql);
     }
@@ -939,7 +929,7 @@ pub async fn convert_parquet_file(
         CONFIG.common.column_timestamp
     );
 
-    let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
@@ -1133,7 +1123,7 @@ pub async fn merge_parquet_files(
         )
     };
 
-    let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields
