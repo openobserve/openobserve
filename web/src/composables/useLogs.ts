@@ -2352,9 +2352,7 @@ const useLogs = () => {
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
-          index:
-            b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
-            "",
+          index: streamName,
           key: obj.key,
           size: obj.size,
           query_context: sqlContext,
