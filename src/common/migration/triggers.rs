@@ -90,27 +90,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             org: columns.0.to_string(),
             module: scheduler::TriggerModule::Alert,
             module_key: columns.1.to_string(),
-            next_run_at: data
-                .get("next_run_at")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap_or(0),
-            is_realtime: data
-                .get("is_realtime")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .parse::<bool>()
-                .unwrap_or(false),
-            is_silenced: data
-                .get("is_silenced")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .parse::<bool>()
-                .unwrap_or(false),
+            next_run_at: data.get("next_run_at").unwrap().as_i64().unwrap(),
+            is_realtime: data.get("is_realtime").unwrap().as_bool().unwrap(),
+            is_silenced: data.get("is_silenced").unwrap().as_bool().unwrap(),
             status: scheduler::TriggerStatus::Waiting,
             ..Default::default()
         })
