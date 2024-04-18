@@ -564,8 +564,10 @@ pub async fn around_multi(
             .num_microseconds()
             .unwrap();
 
-    let mut multi_resp = config::meta::search::Response::default();
-    multi_resp.size = around_size;
+    let mut multi_resp = config::meta::search::Response {
+        size: around_size,
+        ..Default::default()
+    };
 
     let user_id = in_req
         .headers()
