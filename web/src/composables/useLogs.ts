@@ -2342,8 +2342,10 @@ const useLogs = () => {
       }
 
       let streamName: string = "";
-      if(searchObj.data.stream.selectedStream.length>1) {
-        streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(","));
+      if (searchObj.data.stream.selectedStream.length > 1) {
+        streamName =
+          b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
+          "";
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
       }
@@ -2356,7 +2358,8 @@ const useLogs = () => {
           query_context: sqlContext,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,
-          is_multistream: searchObj.data.stream.selectedStream.length>1 ? true: false,
+          is_multistream:
+            searchObj.data.stream.selectedStream.length > 1 ? true : false,
         })
         .then((res) => {
           searchObj.loading = false;
