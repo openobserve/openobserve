@@ -1862,14 +1862,12 @@ const useLogs = () => {
             stream.schema.forEach((schema: any) => {
               const otherStreams = searchObj.data.streamResults.list.filter(
                 (otherStream: { schema: any[]; name: any }) =>
-                  // {if(selectedStreamValues.includes(otherStream.name)) {
+                  selectedStreamValues.includes(otherStream.name) &&
+                  otherStream.name !== stream.name &&
                   otherStream.schema?.some(
                     (otherSchema: { name: any }) =>
-                      otherSchema.name === schema.name &&
-                      otherStream.name !== stream.name &&
-                      selectedStreamValues.includes(otherStream.name)
+                      otherSchema.name === schema.name
                   )
-                  // }}
               );
 
               if (otherStreams.length > 0) {
