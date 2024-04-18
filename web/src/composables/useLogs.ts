@@ -1868,7 +1868,6 @@ const useLogs = () => {
                     (otherSchema: { name: any }) =>
                       otherSchema.name === schema.name
                   )
-                  // }}
               );
 
               if (otherStreams.length > 0) {
