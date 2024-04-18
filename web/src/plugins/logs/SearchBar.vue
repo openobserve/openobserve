@@ -1054,10 +1054,7 @@ export default defineComponent({
           parsedSQL?.from[0].table !==
             searchObj.data.stream.selectedStream[0].value
         ) {
-          searchObj.data.stream.selectedStream = {
-            label: parsedSQL.from[0].table,
-            value: parsedSQL.from[0].table,
-          };
+          searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
           searchObj.data.stream.selectedStreamFields = [];
           onStreamChange(value);
         }
@@ -1710,7 +1707,7 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              searchObj.data.stream.selectedStream = selectedStreams;
+              searchObj.data.stream.selectedStream.push(selectedStreams);
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
@@ -1752,7 +1749,7 @@ export default defineComponent({
               );
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
-              searchObj.data.stream.selectedStream = selectedStreams;
+              searchObj.data.stream.selectedStream = [selectedStreams];
               // searchObj.value = mergeDeep(searchObj, extractedObj);
 
               // await nextTick();
