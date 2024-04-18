@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                       :options="['=', '!=']"
                     />
-                    <div class="relative">
+                    <!-- <div class="relative">
                       <q-input
                         v-model="filter.value"
                         placeholder="Enter Value"
@@ -255,7 +255,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ option }}
                         </div>
                       </div>
-                    </div>
+                    </div> -->
+                    <CommonAutoComplete2
+                      :label="t('common.value')"
+                      v-model="filter.value"
+                      :items="dashboardVariablesFilterItems"
+                      searchRegex="(?:^|[^$])\$?(\w+)"
+                      :rules="[(val: any) => val?.length > 0 || 'Required']"
+                      :debounce="1000"
+                    ></CommonAutoComplete2>
                     <q-btn
                       size="sm"
                       padding="12px 5px"
@@ -399,7 +407,7 @@ import {
   toRef,
   toRaw,
   type Ref,
-onUnmounted,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
@@ -419,11 +427,12 @@ import {
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
+import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
 
 export default defineComponent({
   name: "AddSettingVariable",
-  props: ["variableName"],
-  components: { DashboardHeader },
+  props: ["variableName", "dashboardVariablesList"],
+  components: { DashboardHeader, CommonAutoComplete2 },
   emits: ["close", "save"],
   setup(props, { emit }) {
     const $q = useQuasar();
@@ -795,49 +804,14 @@ export default defineComponent({
       emit("close");
     };
 
-    const showOptions = ref(false);
-    let hideOptionsTimeout: any;
-
-    const dashboardVariablesList: any = ref([]);
-    onMounted(async () => {
-      getDashboardData();
-    });
-    const getDashboardData = async () => {
-      dashboardVariablesList.value =
-        JSON.parse(
-          JSON.stringify(
-            await getDashboard(
-              store,
-              route.query.dashboard,
-              route.query.folder ?? "default"
-            )
-          )
-        )?.variables?.list ?? [];
-      const optionName = dashboardVariablesList.value
-        .map((it: any) => it.name)
-        .filter((it: any) => it !== variableData.name);
-      dashboardVariablesList.value = optionName;
-    };
-    const { filterFn: valueFilterFn, filteredOptions: valueFilteredOptions } =
-      useAutoCompleteForPromql(toRef(dashboardVariablesList), "name");
-
-    const selectOption = (option: any, filter: any) => {
-      const newValue = "$" + option;
-      filter.value = newValue;
-      showOptions.value = false;
-    };
-
-    const hideOptionsWithDelay = (index: any) => {
-      clearTimeout(hideOptionsTimeout);
-      hideOptionsTimeout = setTimeout(() => {
-        showOptions.value = false;
-      }, 200);
-    };
-
-    onUnmounted(() => {
-      clearTimeout(hideOptionsTimeout);
-    });
-    
+    const dashboardVariablesFilterItems = computed(() =>
+      props.dashboardVariablesList
+        .map((it: any) => ({
+          label: it.name,
+          value: "'" + "$" + it.name + "'",
+        }))
+        .filter((it: any) => it.label !== variableData.name)
+    );
     return {
       variableData,
       store,
@@ -863,11 +837,7 @@ export default defineComponent({
       removeFilter,
       filterUpdated,
       filterCycleError,
-      hideOptionsWithDelay,
-      selectOption,
-      showOptions,
-      valueFilterFn,
-      valueFilteredOptions,
+      dashboardVariablesFilterItems,
     };
   },
 });
