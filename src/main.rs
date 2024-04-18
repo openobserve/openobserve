@@ -92,7 +92,13 @@ use tracing_subscriber::{
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "tokio-console")]
-    console_subscriber::init();
+    console_subscriber::ConsoleLayer::builder()
+        .retention(Duration::from_secs(CONFIG.tokio_console.retention))
+        .server_addr((
+            &CONFIG.tokio_console.server_addr,
+            CONFIG.tokio_console.server_port,
+        ))
+        .init();
 
     // let tokio steal the thread
     let rt_handle = tokio::runtime::Handle::current();
