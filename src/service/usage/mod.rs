@@ -207,7 +207,18 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
     ingest_trigger_usages(curr_usages).await
 }
 
-pub async fn flush_usage() {
+pub async fn flush() {
+    // flush audit data
+    #[cfg(feature = "enterprise")]
+    flush_audit().await;
+
+    // flush usage report
+    flush_usage().await;
+    // flush triggers usage report
+    flush_triggers_usage().await;
+}
+
+async fn flush_usage() {
     if !CONFIG.common.usage_enabled {
         return;
     }
@@ -224,7 +235,7 @@ pub async fn flush_usage() {
     ingest_usages(curr_usages).await
 }
 
-pub async fn flush_triggers_usage() {
+async fn flush_triggers_usage() {
     if !CONFIG.common.usage_enabled {
         return;
     }

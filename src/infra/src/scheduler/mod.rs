@@ -54,6 +54,7 @@ pub trait Scheduler: Sync + Send + 'static {
         alert_timeout: i64,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>>;
+    async fn list(&self) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self, interval: u64);
     async fn watch_timeout(&self, interval: u64);
     async fn len_module(&self, module: TriggerModule) -> usize;

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::Utc;
-use infra::db as infra_db;
+use infra::{db as infra_db, scheduler as infra_scheduler};
 
 const ITEM_PREFIXES: [&str; 13] = [
     "/user",
@@ -33,20 +33,26 @@ const ITEM_PREFIXES: [&str; 13] = [
 ];
 
 pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
+    migrate_meta(from, to).await?;
+    migrate_scheduler(from, to).await?;
+    Ok(())
+}
+
+async fn migrate_meta(from: &str, to: &str) -> Result<(), anyhow::Error> {
     println!("load meta from {}", from);
     let src: Box<dyn infra_db::Db> = match from.to_lowercase().as_str().trim() {
         "sqlite" => Box::<infra_db::sqlite::SqliteDb>::default(),
         "etcd" => Box::<infra_db::etcd::Etcd>::default(),
         "mysql" => Box::<infra_db::mysql::MysqlDb>::default(),
         "postgres" | "postgresql" => Box::<infra_db::postgres::PostgresDb>::default(),
-        _ => panic!("invalid source"),
+        _ => panic!("invalid meta source"),
     };
     let dest: Box<dyn infra_db::Db> = match to.to_lowercase().as_str().trim() {
         "sqlite" => Box::<infra_db::sqlite::SqliteDb>::default(),
         "etcd" => Box::<infra_db::etcd::Etcd>::default(),
         "mysql" => Box::<infra_db::mysql::MysqlDb>::default(),
         "postgres" | "postgresql" => Box::<infra_db::postgres::PostgresDb>::default(),
-        _ => panic!("invalid destination"),
+        _ => panic!("invalid meta destination"),
     };
     dest.create_table().await?;
 
@@ -83,6 +89,37 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
             time.elapsed().as_secs()
         );
     }
+
+    Ok(())
+}
+
+async fn migrate_scheduler(from: &str, to: &str) -> Result<(), anyhow::Error> {
+    let time = std::time::Instant::now();
+    println!("load scheduler from {}", from);
+    let src: Box<dyn infra_scheduler::Scheduler> = match from.to_lowercase().as_str().trim() {
+        "sqlite" => Box::<infra_scheduler::sqlite::SqliteScheduler>::default(),
+        "mysql" => Box::<infra_scheduler::mysql::MySqlScheduler>::default(),
+        "postgres" | "postgresql" => Box::<infra_scheduler::postgres::PostgresScheduler>::default(),
+        _ => return Ok(()),
+    };
+    let dest: Box<dyn infra_scheduler::Scheduler> = match to.to_lowercase().as_str().trim() {
+        "sqlite" => Box::<infra_scheduler::sqlite::SqliteScheduler>::default(),
+        "mysql" => Box::<infra_scheduler::mysql::MySqlScheduler>::default(),
+        "postgres" | "postgresql" => Box::<infra_scheduler::postgres::PostgresScheduler>::default(),
+        _ => panic!("invalid scheduler destination"),
+    };
+    src.create_table().await?;
+    dest.create_table().await?;
+    dest.create_table_index().await?;
+
+    let items = src.list().await?;
+    for item in items.iter() {
+        dest.push(item.to_owned()).await?;
+    }
+    println!(
+        "migrated scheduler from source, took {} secs",
+        time.elapsed().as_secs()
+    );
 
     Ok(())
 }
