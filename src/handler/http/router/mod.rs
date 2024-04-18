@@ -442,7 +442,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(users::list_roles)
             .service(clusters::list_clusters)
             .service(search::multi_streams::search_multi)
-            .service(search::multi_streams::_search_partition_multi),
+            .service(search::multi_streams::_search_partition_multi)
+            .service(search::multi_streams::around_multi),
     );
 }
 
