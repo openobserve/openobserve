@@ -1862,14 +1862,12 @@ const useLogs = () => {
             stream.schema.forEach((schema: any) => {
               const otherStreams = searchObj.data.streamResults.list.filter(
                 (otherStream: { schema: any[]; name: any }) =>
-                  // {if(selectedStreamValues.includes(otherStream.name)) {
+                  selectedStreamValues.includes(otherStream.name) &&
+                  otherStream.name !== stream.name &&
                   otherStream.schema?.some(
                     (otherSchema: { name: any }) =>
-                      otherSchema.name === schema.name &&
-                      otherStream.name !== stream.name &&
-                      selectedStreamValues.includes(otherStream.name)
+                      otherSchema.name === schema.name
                   )
-                  // }}
               );
 
               if (otherStreams.length > 0) {
@@ -2346,7 +2344,9 @@ const useLogs = () => {
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
-          index: searchObj.data.stream.selectedStream.join(","),
+          index: b64EncodeUnicode(
+            searchObj.data.stream.selectedStream.join(",")
+          ),
           key: obj.key,
           size: obj.size,
           query_context: sqlContext,
