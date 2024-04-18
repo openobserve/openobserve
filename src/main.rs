@@ -92,20 +92,19 @@ use tracing_subscriber::{
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "tokio-console")]
-    let socket_addr: SocketAddr = format!(
-        "{}:{}",
-        CONFIG.tokio_console.tokio_console_server_addr,
-        CONFIG.tokio_console.tokio_console_server_port
-    )
-    .as_str()
-    .parse()?;
-
-    #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
             CONFIG.tokio_console.tokio_console_retention,
         ))
-        .server_addr(socket_addr)
+        .server_addr(
+            format!(
+                "{}:{}",
+                CONFIG.tokio_console.tokio_console_server_addr,
+                CONFIG.tokio_console.tokio_console_server_port
+            )
+            .as_str()
+            .parse::<SocketAddr>()?,
+        )
         .init();
 
     // let tokio steal the thread
