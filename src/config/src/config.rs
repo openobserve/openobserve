@@ -309,14 +309,15 @@ pub struct Config {
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
 }
+
 #[derive(EnvConfig)]
 pub struct TokioConsole {
-    #[env_config(name = "ZO_SERVER_ADDR", default = "0.0.0.0")]
-    pub server_addr: bool,
-    #[env_config(name = "ZO_SERVER_PORT", default = 6699)]
-    pub server_port: u16,
-    #[env_config(name = "ZO_RETENTION", default = 60)]
-    pub retention: u64,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_ADDR", default = "0.0.0.0")]
+    pub tokio_console_server_addr: String,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_PORT", default = 6699)]
+    pub tokio_console_server_port: u16,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_RETENTION", default = 60)]
+    pub tokio_console_retention: u64,
 }
 
 #[derive(EnvConfig)]

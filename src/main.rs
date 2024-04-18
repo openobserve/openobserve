@@ -95,8 +95,8 @@ async fn main() -> Result<(), anyhow::Error> {
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(CONFIG.tokio_console.retention))
         .server_addr((
-            &CONFIG.tokio_console.server_addr,
-            CONFIG.tokio_console.server_port,
+            &CONFIG.tokio_console.tokio_console_server_addr,
+            CONFIG.tokio_console.tokio_console_server_port,
         ))
         .init();
 
