@@ -93,9 +93,9 @@ use tracing_subscriber::{
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
-        .retention(Duration::from_secs(CONFIG.tokio_console.retention))
+        .retention(Duration::from_secs(CONFIG.tokio_console.tokio_console_retention))
         .server_addr((
-            &CONFIG.tokio_console.tokio_console_server_addr,
+            CONFIG.tokio_console.tokio_console_server_addr.as_str(),
             CONFIG.tokio_console.tokio_console_server_port,
         ))
         .init();
