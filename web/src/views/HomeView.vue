@@ -50,8 +50,7 @@ bordered class="my-card">
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps
-color="primary" flat
+          <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -72,12 +71,11 @@ bordered class="my-card">
         </q-card-section>
         <q-separator />
         <q-card-actions align="center">
-          <q-btn no-caps
-color="primary" flat
+          <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
               exact
-              :to="{ name: 'functions' }"
+              :to="{ name: 'pipeline' }"
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
@@ -94,8 +92,7 @@ bordered class="my-card">
         </q-card-section>
         <q-separator />
         <q-card-actions align="center">
-          <q-btn no-caps
-color="primary" flat
+          <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
               exact

@@ -15,10 +15,10 @@ const MainLayoutOpenSourceMixin = {
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
-        title: t("menu.function"),
+        title: t("menu.pipeline"),
         iconComponent: markRaw(FunctionIcon),
-        link: "/functions",
-        name: "functions",
+        link: "/pipeline",
+        name: "pipeline",
       });
 
       return linksList.value;
