@@ -27,7 +27,10 @@ use config::{
 };
 use infra::schema::unwrap_partition_time_level;
 
-use super::ingestion::{get_string_value, TriggerAlertData};
+use super::{
+    ingestion::{get_string_value, TriggerAlertData},
+    schema::get_invalid_schema_start_dt,
+};
 use crate::{
     common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
     service::{
@@ -266,7 +269,7 @@ async fn add_valid_record(
         .unwrap();
 
     // check schema
-    let (schema_evolution, _) = check_for_schema(
+    let (schema_evolution, _) = match check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -274,7 +277,22 @@ async fn add_valid_record(
         vec![&record_val],
         timestamp,
     )
-    .await?;
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            if e.to_string() == get_invalid_schema_start_dt().to_string() {
+                log::error!(
+                    "Invalid schema start_dt detected for stream: {}, start_dt: {}",
+                    stream_meta.stream_name,
+                    timestamp
+                );
+                return Ok(None);
+            } else {
+                return Err(e);
+            }
+        }
+    };
 
     // get schema
     let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
