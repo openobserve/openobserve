@@ -433,6 +433,49 @@ export default defineComponent({
         });
     };
 
+    const getFieldIndices = (property, settings) => {
+      const fieldIndices = [];
+      if (
+        (settings.full_text_search_keys.length > 0 &&
+          settings.full_text_search_keys.includes(property.name)) ||
+        (settings.full_text_search_keys.length == 0 &&
+          store.state.zoConfig.default_fts_keys.includes(property.name))
+      ) {
+        fieldIndices.push("fullTextSearchKey");
+      }
+
+      if (
+        settings.bloom_filter_fields.length > 0 &&
+        settings.bloom_filter_fields.includes(property.name)
+      ) {
+        fieldIndices.push("bloomFilterKey");
+      }
+
+      property["delete"] = false;
+
+      if (
+        settings.partition_keys &&
+        Object.values(settings.partition_keys).some(
+          (v) => !v.disabled && v.field === property.name
+        )
+      ) {
+        const [level, partition] = Object.entries(settings.partition_keys).find(
+          ([, partition]) => partition["field"] === property.name
+        );
+
+        property.level = level;
+
+        if (partition.types === "value") fieldIndices.push("keyPartition");
+
+        if (partition.types?.hash)
+          fieldIndices.push(`hashPartition_${partition.types.hash}`);
+      }
+
+      property.index_type = [...fieldIndices];
+
+      return fieldIndices;
+    };
+
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
       if (!streamResponse.schema?.length) {
@@ -481,47 +524,11 @@ export default defineComponent({
         return;
       }
 
-      const fieldIndices = [];
+      let fieldIndices = [];
       for (var property of streamResponse.schema) {
         schemaMapping.add(property.name);
 
-        if (
-          (streamResponse.settings.full_text_search_keys.length > 0 &&
-            streamResponse.settings.full_text_search_keys.includes(
-              property.name
-            )) ||
-          (streamResponse.settings.full_text_search_keys.length == 0 &&
-            store.state.zoConfig.default_fts_keys.includes(property.name))
-        ) {
-          fieldIndices.push("fullTextSearchKey");
-        }
-
-        if (
-          streamResponse.settings.bloom_filter_fields.length > 0 &&
-          streamResponse.settings.bloom_filter_fields.includes(property.name)
-        ) {
-          fieldIndices.push("bloomFilterKey");
-        }
-
-        property["delete"] = false;
-
-        if (
-          streamResponse.settings.partition_keys &&
-          Object.values(streamResponse.settings.partition_keys).some(
-            (v) => !v.disabled && v.field === property.name
-          )
-        ) {
-          const [level, partition] = Object.entries(
-            streamResponse.settings.partition_keys
-          ).find(([, partition]) => partition["field"] === property.name);
-
-          property.level = level;
-
-          if (partition.types === "value") fieldIndices.push("keyPartition");
-
-          if (partition.types?.hash)
-            fieldIndices.push(`hashPartition_${partition.types.hash}`);
-        }
+        fieldIndices = getFieldIndices(property, streamResponse.settings);
 
         property.index_type = [...fieldIndices];
 
@@ -535,43 +542,8 @@ export default defineComponent({
             delete: false,
             index_type: [],
           };
-          if (
-            (streamResponse.settings.full_text_search_keys.length > 0 &&
-              streamResponse.settings.full_text_search_keys.includes(
-                property.name
-              )) ||
-            (streamResponse.settings.full_text_search_keys.length == 0 &&
-              store.state.zoConfig.default_fts_keys.includes(property.name))
-          ) {
-            fieldIndices.push("fullTextSearchKey");
-          }
 
-          if (
-            streamResponse.settings.bloom_filter_fields.length > 0 &&
-            streamResponse.settings.bloom_filter_fields.includes(property.name)
-          ) {
-            fieldIndices.push("bloomFilterKey");
-          }
-
-          property["delete"] = false;
-
-          if (
-            streamResponse.settings.partition_keys &&
-            Object.values(streamResponse.settings.partition_keys).some(
-              (v) => !v.disabled && v.field === property.name
-            )
-          ) {
-            const [level, partition] = Object.entries(
-              streamResponse.settings.partition_keys
-            ).find(([, partition]) => partition["field"] === property.name);
-
-            property.level = level;
-
-            if (partition.types === "value") fieldIndices.push("keyPartition");
-
-            if (partition.types?.hash)
-              fieldIndices.push(`hashPartition_${partition.types.hash}`);
-          }
+          fieldIndices = getFieldIndices(property, streamResponse.settings);
 
           property.index_type = [...fieldIndices];
 
