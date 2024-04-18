@@ -379,7 +379,8 @@
     "addField": "Add Field"
   },
   "pipeline": {
-    "header": "Pipeline"
+    "header": "Pipeline",
+    "create": "Create Pipeline"
   },
   "function": {
     "header": "Functions",

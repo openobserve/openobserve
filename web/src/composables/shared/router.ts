@@ -58,6 +58,9 @@ const ErrorsDashboard = () =>
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
 const StreamRouting = () => import("@/components/functions/StreamRouting.vue");
+const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
+const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
+
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
@@ -240,6 +243,22 @@ const useRoutes = () => {
           path: "stream-routings",
           name: "streamRouting",
           component: StreamRouting,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "pipelines",
+          name: "pipelines",
+          component: PipelinesList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "edit/pipeline",
+          name: "pipelineEditor",
+          component: PipelineEditor,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

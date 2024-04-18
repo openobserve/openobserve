@@ -25,6 +25,7 @@
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.1.1",
     "@joakimono/echarts-extension-leaflet": "^1.0.1",
+    "@joint/core": "^4.0.2",
     "@openobserve/browser-logs": "^0.2.10",
     "@openobserve/browser-rum": "^0.2.10",
     "@openobserve/rrweb-player": "^0.1.1",

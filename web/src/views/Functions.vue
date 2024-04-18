@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-route-tab
               data-test="stream-pipelines-tab"
-              name="streamFunctions"
+              name="streamPipelines"
               :to="{
-                name: 'streamFunctions',
+                name: 'pipelines',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
