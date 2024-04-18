@@ -708,12 +708,12 @@ async fn prepare_index_record_batches_v1(
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
     for column in local.fields().iter() {
-        // 1500 columns --> 100 columns of inverted index
-        let index_df = ctx.table("_tbl_raw_data").await?;
-
         if column.data_type() != &DataType::Utf8 {
             continue;
         }
+
+        // 1500 columns --> 100 columns of inverted index
+        let index_df = ctx.table("_tbl_raw_data").await?;
 
         let column_name = column.name();
         let split_chars = &CONFIG.common.inverted_index_split_chars;
