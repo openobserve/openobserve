@@ -43,11 +43,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     let v093 = Version::from("v0.9.3").unwrap();
     if old_ver < v093 {
         upgrade_092_093().await?;
-        return Ok(());
     }
 
     let v0100 = Version::from("v0.10.0").unwrap();
-    if old_ver < v0100 {
+    if old_ver < v0100 && new_ver > v093 {
         upgrade_093_0100().await?;
     }
 
