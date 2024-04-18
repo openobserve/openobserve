@@ -45,7 +45,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
-    scheduler::init(
+    scheduler::init_background_jobs(
         CONFIG.limit.scheduler_clean_interval,
         CONFIG.limit.scheduler_watch_interval,
     )
