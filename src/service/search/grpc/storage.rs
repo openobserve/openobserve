@@ -202,9 +202,9 @@ pub async fn search(
 
         // cacluate the diff between latest schema and group schema
         let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(sql.clone(), &schema_latest_map, &schema)?
+            generate_select_start_search_schema(&sql, &schema_latest_map, &schema)?
         } else {
-            generate_search_schema(sql.clone(), &schema_latest_map, &schema)?
+            generate_search_schema(&sql, &schema_latest_map, &schema)?
         };
 
         let datafusion_span = info_span!(
