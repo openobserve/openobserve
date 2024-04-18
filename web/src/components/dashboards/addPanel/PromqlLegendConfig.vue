@@ -53,7 +53,7 @@
         v-for="(option, index) in fieldsFilteredOptions"
         :key="index"
         class="option"
-        @click="selectOption(option)"
+        @mousedown="selectOption(option)"
       >
         {{ option }}
       </div>
@@ -62,7 +62,7 @@
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, toRef, watch } from "vue";
+import { ref, defineComponent, toRef, watch, onUnmounted } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
@@ -101,11 +101,16 @@ export default defineComponent({
       useAutoCompleteForPromql(toRef(optionName), "name");
 
     const hideOptionsWithDelay = () => {
+      clearTimeout(hideOptionsTimeout);
       hideOptionsTimeout = setTimeout(() => {
         showOptions.value = false;
       }, 200);
     };
 
+    onUnmounted(() => {
+      clearTimeout(hideOptionsTimeout);
+    });
+    
     const selectOption = (option: any) => {
       const inputValue =
         dashboardPanelData.data.queries[

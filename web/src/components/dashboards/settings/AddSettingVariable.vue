@@ -399,6 +399,7 @@ import {
   toRef,
   toRaw,
   type Ref,
+onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
@@ -833,6 +834,10 @@ export default defineComponent({
       }, 200);
     };
 
+    onUnmounted(() => {
+      clearTimeout(hideOptionsTimeout);
+    });
+    
     return {
       variableData,
       store,

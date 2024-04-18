@@ -353,7 +353,7 @@ import {
   getAllDashboardsByFolderId,
   getFoldersList,
 } from "../../../utils/commons";
-import { onMounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
@@ -386,6 +386,10 @@ export default defineComponent({
       value: "",
       showOptions: false, // Initialize showOptions for each variable
       showNameOptions: false,
+    });
+
+    onUnmounted(() => {
+      clearTimeout(hideOptionsTimeout);
     });
 
     const getDefaultDrilldownData = () => ({

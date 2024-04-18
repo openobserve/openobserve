@@ -560,6 +560,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :rules="[(val) => !!val || 'Required']"
                           />
                           <CommonAutoComplete
+                            v-if="
+                              !['Is Null', 'Is Not Null'].includes(
+                                fields?.operator
+                              )
+                            "
                             :field="fields"
                             :index="index"
                           ></CommonAutoComplete>

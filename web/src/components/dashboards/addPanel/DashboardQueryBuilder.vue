@@ -762,6 +762,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :rules="[(val) => !!val || 'Required']"
                           />
                           <CommonAutoComplete
+                            v-if="
+                              !['Is Null', 'Is Not Null'].includes(
+                                fields?.operator
+                              )
+                            "
                             :field="fields"
                             :index="index"
                           ></CommonAutoComplete>
@@ -883,13 +888,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  reactive,
-  watch,
-  computed,
-} from "vue";
+import { defineComponent, ref, reactive, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -1305,7 +1304,7 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const index = ref(0); 
+    const index = ref(0);
 
     const fields = computed(() => {
       return dashboardPanelData.data.queries[

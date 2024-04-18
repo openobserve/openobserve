@@ -3,7 +3,6 @@
     <q-input
       dense
       filled
-      v-if="!['Is Null', 'Is Not Null'].includes(field?.operator)"
       v-model="field.value"
       :label="t('common.value')"
       style="width: 100%; margin-top: 5px"
@@ -23,7 +22,7 @@
         v-for="(option, index) in fieldsFilteredOptions"
         :key="index"
         class="option"
-        @click="selectOption(option, field)"
+        @mousedown="selectOption(option, field)"
       >
         {{ option }}
       </div>
@@ -32,7 +31,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, toRef, defineComponent } from "vue";
+import { ref, onMounted, onUnmounted, toRef, defineComponent } from "vue";
 import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
 import { useStore } from "vuex";
 import { getDashboard } from "../../../utils/commons";
@@ -84,6 +83,10 @@ export default defineComponent({
       field.value = newValue;
       showOptions.value = false;
     };
+
+    onUnmounted(() => {
+      clearTimeout(hideOptionsTimeout);
+    });
 
     return {
       showOptions,
