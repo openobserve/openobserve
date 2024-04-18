@@ -262,7 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :items="dashboardVariablesFilterItems"
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
-                      :debounce="1000"
+                      debounce="1000"
+                      style="margin-top: none !important; width: auto !important"
                     ></CommonAutoComplete2>
                     <q-btn
                       size="sm"
