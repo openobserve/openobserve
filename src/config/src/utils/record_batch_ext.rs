@@ -78,7 +78,10 @@ pub fn convert_json_to_record_batch(
             if res.is_none() && v.is_null() {
                 continue;
             }
-            let (data_type, builder) = res.unwrap();
+            let (data_type, builder) = res.ok_or(ArrowError::SchemaError(format!(
+                "Cannot find key {} in cchema {:?}",
+                k, schema
+            )))?;
             match data_type {
                 DataType::Utf8 => {
                     let b = builder
