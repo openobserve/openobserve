@@ -23,6 +23,7 @@ pub mod kv;
 pub mod logs;
 pub mod metrics;
 pub mod organization;
+pub mod pipelines;
 pub mod prom;
 pub mod rum;
 pub mod search;
@@ -31,7 +32,6 @@ pub mod stream;
 pub mod syslog;
 pub mod traces;
 pub mod users;
-pub mod pipeline;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

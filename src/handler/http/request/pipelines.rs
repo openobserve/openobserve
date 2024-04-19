@@ -36,14 +36,29 @@ use crate::common::{meta, meta::pipelines::PipeLine, utils::http::get_stream_typ
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/pipelines")]
+#[post("/{org_id}/streams/{stream_name}/pipelines")]
 pub async fn save_pipeline(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     pipeline: web::Json<PipeLine>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    let (org_id, stream_name) = path.into_inner();
     let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_string();
+    pipeline.stream_name = stream_name;
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+    pipeline.stream_type = stream_type;
     crate::service::pipelines::save_pipeline(org_id, pipeline).await
 }
 
@@ -112,10 +127,20 @@ async fn list_pipelines(
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/pipelines/{name}")]
-async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    crate::service::pipelines::delete_pipeline(org_id, name).await
+#[delete("/{org_id}/streams/{stream_name}/pipelines/{name}")]
+async fn delete_pipeline(
+    path: web::Path<(String, String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name, name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(crate::common::meta::http::HttpResponse::bad_request(e));
+        }
+    };
+    crate::service::pipelines::delete_pipeline(&org_id, stream_type, &stream_name, &name).await
 }
 
 /// UpdatePipeline
@@ -136,15 +161,24 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/pipelines/{name}")]
+#[put("/{org_id}/streams/{stream_name}/pipelines/{name}")]
 pub async fn update_pipeline(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, String, String)>,
     pipeline: web::Json<PipeLine>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+    let (org_id, stream_name, name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(crate::common::meta::http::HttpResponse::bad_request(e));
+        }
+    };
     let name = name.trim();
     let mut pipeline = pipeline.into_inner();
-    pipeline.name = pipeline.name.trim().to_string();
-
+    pipeline.name = name.to_string();
+    pipeline.stream_name = stream_name;
+    pipeline.stream_type = stream_type;
     crate::service::pipelines::update_pipeline(&org_id, name, pipeline).await
 }
