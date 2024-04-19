@@ -15,18 +15,18 @@
 
 use std::sync::Arc;
 
-use config::{meta::stream::StreamType, utils::json, CONFIG};
+use config::{utils::json, CONFIG};
 
 use crate::{
-    common::{infra::config::STREAM_PIPELINES, meta::pipelines::PipeLine},
+    common::{
+        infra::config::STREAM_PIPELINES,
+        meta::pipelines::{PipeLine, PipeLineList},
+    },
     service::db,
 };
 
 pub async fn set(org_id: &str, name: &str, pipeline: &PipeLine) -> Result<(), anyhow::Error> {
-    let key = format!(
-        "/pipeline/{org_id}/{}/{}/{name}",
-        pipeline.stream_type, pipeline.stream_name
-    );
+    let key = format!("/pipeline/{org_id}/{name}");
     match db::put(
         &key,
         json::to_vec(pipeline).unwrap().into(),
@@ -45,26 +45,13 @@ pub async fn set(org_id: &str, name: &str, pipeline: &PipeLine) -> Result<(), an
     Ok(())
 }
 
-pub async fn get(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<PipeLine, anyhow::Error> {
-    let val = db::get(&format!(
-        "/pipeline/{org_id}/{stream_type}/{stream_name}/{name}"
-    ))
-    .await?;
+pub async fn get(org_id: &str, name: &str) -> Result<PipeLine, anyhow::Error> {
+    let val = db::get(&format!("/pipeline/{org_id}/{name}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
-pub async fn delete(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<(), anyhow::Error> {
-    let key = format!("/pipeline/{org_id}/{stream_type}/{stream_name}/{name}");
+pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
+    let key = format!("/pipeline/{org_id}/{name}");
     match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
@@ -118,20 +105,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
-                let key = format!(
-                    "{org_id}/{}/{}",
-                    item_value.stream_type, item_value.stream_name
-                );
-                STREAM_PIPELINES.insert(key.to_owned(), item_value);
+
+                STREAM_PIPELINES.insert(item_key.to_owned(), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let removal_key = match item_key.rfind('/') {
-                    Some(index) => &item_key[0..index],
-                    None => item_key,
-                };
-
-                STREAM_PIPELINES.remove(removal_key);
+                STREAM_PIPELINES.remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -145,10 +124,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: PipeLine = json::from_slice(&item_value).unwrap();
-        let org_id = &item_key[0..item_key.find('/').unwrap()];
-        let key = format!("{org_id}/{}/{}", json_val.stream_type, json_val.stream_name);
 
-        STREAM_PIPELINES.insert(key.to_string(), json_val);
+        STREAM_PIPELINES.insert(item_key.to_string(), json_val);
     }
 
     log::info!("Pipelines Cached");
