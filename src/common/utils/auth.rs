@@ -239,7 +239,11 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS.get("streams").unwrap().key,
                     path_columns[1]
                 )
-            } else if method.eq("PUT") || method.eq("DELETE") {
+            } else if method.eq("PUT")
+                || method.eq("DELETE")
+                || path_columns[1].starts_with("reports")
+                || path_columns[1].starts_with("savedviews")
+            {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
