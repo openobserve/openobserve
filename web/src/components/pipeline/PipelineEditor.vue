@@ -1,10 +1,15 @@
 <template>
   <div ref="placeholder" class="diagram-container"></div>
+  <iframe
+    src="http://localhost:8000/red/"
+    style="width: 100%; height: 800px"
+  ></iframe>
 </template>
 
 <script setup>
 import { onMounted, ref } from "vue";
 import * as joint from "@joint/core";
+import PipelineEditorDemo from "./PipelineEditorDemo.vue";
 
 const placeholder = ref(null);
 let graph, paper;
@@ -51,10 +56,6 @@ function setupDiagram() {
 
   rectLinker.addTo(graph);
 
-  const customElement = new CustomElement();
-
-  customElement.addTo(graph);
-
   const rect2 = new joint.shapes.standard.Rectangle({
     position: { x: 300, y: 30 },
     size: { width: 100, height: 40 },
@@ -82,10 +83,10 @@ function setupDiagram() {
         connector: { name: "rounded" },
         attrs: { line: { stroke: "blue", "stroke-width": 2 } },
       });
-      currentLink.addTo(graph);
     } else {
       // Finish connection
       currentLink.target(model);
+      currentLink.addTo(graph);
       currentLink = null; // Reset for next connection
     }
   });
