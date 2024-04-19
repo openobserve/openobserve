@@ -1,6 +1,8 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div data-test="alert-conditions-text" class="text-bold">Fields *</div>
+    <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
+      Fields *
+    </div>
     <template v-if="!fields.length">
       <q-btn
         data-test="add-stream-add-field-btn"
@@ -42,6 +44,7 @@
           />
         </div>
         <!-- <div
+          v-if="visibleInputs.type"
           data-test="alert-conditions-operator-select"
           class="q-ml-none o2-input"
         >
@@ -62,6 +65,7 @@
           />
         </div> -->
         <div
+          v-if="visibleInputs.index_type"
           data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
@@ -75,7 +79,7 @@
             multiple
             :max-values="2"
             map-options
-            :option-disable="(_option) => disableOptions(field, _option)"
+            :option-disable="(_option: any) => disableOptions(field, _option)"
             emit-value
             clearable
             stack-label
@@ -137,6 +141,18 @@ defineProps({
     type: Array,
     default: () => [],
     required: true,
+  },
+  showHeader: {
+    type: Boolean,
+    default: true,
+  },
+  visibleInputs: {
+    type: Object,
+    default: () => ({
+      name: true,
+      type: true,
+      index_type: true,
+    }),
   },
 });
 
