@@ -812,7 +812,7 @@ const useLogs = () => {
 
               finalQuery = finalQuery.replace(
                 "[FIELD_LIST]",
-                listOfFields.join(",")
+                `'${item}' as _stream_name,` + listOfFields.join(",")
               );
 
               req.query.sql.push(finalQuery);
@@ -2327,7 +2327,7 @@ const useLogs = () => {
 
           finalQuery = finalQuery.replace(
             "[FIELD_LIST]",
-            listOfFields.join(",")
+            `'${item}' as _stream_name,` + listOfFields.join(",")
           );
           sqlContext.push(b64EncodeUnicode(finalQuery));
         });
