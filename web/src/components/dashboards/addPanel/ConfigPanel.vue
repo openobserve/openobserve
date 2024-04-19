@@ -497,7 +497,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
-      <PromqlLegendConfig v-if="promqlMode"></PromqlLegendConfig>
+      <CommonAutoComplete2
+        v-if="promqlMode"
+        :label="t('common.legend')"
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.promql_legend
+        "
+        :items="dashboardSelectfieldPromQlList"
+        searchRegex="/{([^{}]*)$/"
+        color="input-border"
+        bg-color="input-bg"
+        class="showLabelOnTop"
+        stack-label
+        outlined
+        label-slot
+        style="top: none !important; margin-top: none !important; padding-top: 0 !important; width: auto !important"
+        :value-replace-fn="selectPromQlNameOption"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.legendLabel") }}
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-promql-legend-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+              >
+                {{ t("dashboard.overrideMessage") }}
+              </q-tooltip>
+            </div>
+          </div>
+        </template>
+      </CommonAutoComplete2>
 
       <div class="space"></div>
 
@@ -698,10 +737,12 @@ import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import PromqlLegendConfig from "./PromqlLegendConfig.vue";
+import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
 
 export default defineComponent({
-  components: { Drilldown, PromqlLegendConfig },
-  setup() {
+  components: { Drilldown, PromqlLegendConfig, CommonAutoComplete2 },
+  props: ["dashboardPanelData"],
+  setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
 
@@ -876,7 +917,30 @@ export default defineComponent({
         field[value] = key;
       }
     };
-    
+
+    const selectPromQlNameOption = (option: any) => {
+      const inputValue =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.promql_legend;
+
+      const openingBraceIndex = inputValue.lastIndexOf("{");
+      const newValue =
+        inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+      return newValue;
+    };
+
+    const dashboardSelectfieldPromQlList = computed(() =>
+      props.dashboardPanelData.meta.stream.selectedStreamFields.map(
+        (it: any) => {
+          return {
+            label: it.name,
+            value: it.name,
+          };
+        }
+      )
+    );
+
     return {
       t,
       dashboardPanelData,
@@ -890,6 +954,8 @@ export default defineComponent({
       setUnit,
       handleBlur,
       legendWidthValue,
+      dashboardSelectfieldPromQlList,
+      selectPromQlNameOption,
     };
   },
 });

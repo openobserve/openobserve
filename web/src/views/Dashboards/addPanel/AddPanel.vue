@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel />
+                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
                 </PanelSidebar>
               </div>
             </div>

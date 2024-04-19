@@ -10,7 +10,11 @@
       @focus="showOptions = true"
       @blur="hideOptions"
       v-bind="$attrs"
-    />
+    >
+      <template v-slot:label>
+        <slot name="label"></slot>
+      </template>
+    </q-input>
     <div
       class="options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
