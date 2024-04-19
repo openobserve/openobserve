@@ -29,6 +29,7 @@ use crate::{
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
+        pipelines::PipeLine,
         prom::ClusterLeader,
         syslog::SyslogRoute,
         user::User,
@@ -85,3 +86,4 @@ pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+pub static STREAM_PIPELINES: Lazy<RwHashMap<String, PipeLine>> = Lazy::new(DashMap::default);

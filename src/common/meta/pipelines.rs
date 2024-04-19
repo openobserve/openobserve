@@ -13,18 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
-use arrow_schema::Field;
-use config::{
-    meta::stream::{StreamSettings, StreamStats, StreamType},
-    utils::json,
-};
-use datafusion::arrow::datatypes::Schema;
+use config::meta::stream::{RoutingCondition, StreamType};
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use super::prom::Metadata;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct PipeLine {
@@ -34,4 +26,9 @@ pub struct PipeLine {
     pub stream_type: StreamType,
     #[serde(skip_serializing_if = "Option::None")]
     pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipeLineList {
+    pub list: Vec<PipeLine>,
 }
