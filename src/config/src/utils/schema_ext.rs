@@ -28,6 +28,7 @@ pub trait SchemaExt {
     fn cloned_from(&self, schema: &Schema) -> Schema;
     fn hash_key(&self) -> String;
     fn size(&self) -> usize;
+    fn simple_fields(&self) -> Vec<(String, String)>;
 }
 
 impl SchemaExt for Schema {
@@ -69,5 +70,12 @@ impl SchemaExt for Schema {
             size += key.len() + val.len();
         }
         size
+    }
+
+    fn simple_fields(&self) -> Vec<(String, String)> {
+        self.fields
+            .iter()
+            .map(|x| (x.name().to_string(), x.data_type().to_string()))
+            .collect()
     }
 }
