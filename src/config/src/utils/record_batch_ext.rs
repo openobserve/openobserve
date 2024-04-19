@@ -46,7 +46,7 @@ pub fn convert_json_to_record_batch(
     schema: &Arc<Schema>,
     data: &[Arc<serde_json::Value>],
 ) -> Result<RecordBatch, ArrowError> {
-    // collect all keys that use in this record batch
+    // collect all keys from the json data
     let mut keys = HashSet::new();
     for record in data.iter() {
         for (k, _) in record.as_object().unwrap() {
@@ -54,6 +54,7 @@ pub fn convert_json_to_record_batch(
         }
     }
 
+    // create builders for each key
     let mut builders: FxIndexMap<&String, (&DataType, Box<dyn ArrayBuilder>)> = schema
         .fields()
         .iter()
@@ -66,6 +67,7 @@ pub fn convert_json_to_record_batch(
         })
         .collect();
 
+    // fill builders with data
     for record in data.iter() {
         let mut record_keys = HashSet::new();
         for (k, v) in record.as_object().unwrap() {
