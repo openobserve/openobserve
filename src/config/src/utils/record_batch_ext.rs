@@ -70,7 +70,13 @@ pub fn convert_json_to_record_batch(
         let mut record_keys = HashSet::new();
         for (k, v) in record.as_object().unwrap() {
             record_keys.insert(k);
-            let (data_type, builder) = builders.get_mut(k).unwrap();
+            let res = builders.get_mut(k);
+            // where the value is null, the key maybe not exists in the schema
+            // so we skip it
+            if res.is_none() && v.is_null() {
+                continue;
+            }
+            let (data_type, builder) = res.unwrap();
             match data_type {
                 DataType::Utf8 => {
                     let b = builder
