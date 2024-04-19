@@ -660,6 +660,9 @@ pub struct Limit {
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
+    // over this limit will skip merging on ingester
+    #[env_config(name = "ZO_FILE_MOVE_FIELDS_LIMIT", default = 2000)]
+    pub file_move_fields_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
