@@ -481,7 +481,7 @@ export default defineComponent({
                 break;
               }
             } catch (err: any) {
-              // some error occured
+              // some error occurred
               // set value as empty string
               currentVariable.value = null;
               // set options as empty array

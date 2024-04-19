@@ -136,7 +136,7 @@ pub async fn search(
                         file.meta.min_ts,
                         file.meta.max_ts
                     );
-                    // HACK: use the latest verion if not found in schema versions
+                    // HACK: use the latest version if not found in schema versions
                     schema_latest_id
                 }
             };
