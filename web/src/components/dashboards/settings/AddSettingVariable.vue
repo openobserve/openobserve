@@ -224,47 +224,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                       :options="['=', '!=']"
                     />
-                    <!-- <div class="relative">
-                      <q-input
-                        v-model="filter.value"
-                        placeholder="Enter Value"
-                        dense
-                        filled
-                        debounce="1000"
-                        class=""
-                        data-test="dashboard-query-values-filter-value"
-                        :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                        @update:model-value="valueFilterFn"
-                        @focus="showOptions = true"
-                        @blur="hideOptionsWithDelay"
-                      />
-                      <div
-                        class="options-container"
-                        v-if="showOptions && valueFilteredOptions.length > 0"
-                        :style="{
-                          'background-color':
-                            store.state.theme === 'dark' ? '#2d2d2d' : 'white',
-                        }"
-                      >
-                        <div
-                          v-for="(option, index) in valueFilteredOptions"
-                          :key="index"
-                          class="option"
-                          @mousedown="selectOption(option, filter)"
-                        >
-                          {{ option }}
-                        </div>
-                      </div>
-                    </div> -->
-                    <CommonAutoComplete2
+                    <CommonAutoComplete
                       :label="t('common.value')"
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
-                      style="margin-top: none !important; width: auto !important"
-                    ></CommonAutoComplete2>
+                      style="
+                        margin-top: none !important;
+                        width: auto !important;
+                      "
+                    ></CommonAutoComplete>
                     <q-btn
                       size="sm"
                       padding="12px 5px"
@@ -427,13 +398,12 @@ import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
-import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList"],
-  components: { DashboardHeader, CommonAutoComplete2 },
+  components: { DashboardHeader, CommonAutoComplete },
   emits: ["close", "save"],
   setup(props, { emit }) {
     const $q = useQuasar();
@@ -809,7 +779,7 @@ export default defineComponent({
       props.dashboardVariablesList
         .map((it: any) => ({
           label: it.name,
-          value: "$" + it.name ,
+          value: "$" + it.name,
         }))
         .filter((it: any) => it.label !== variableData.name)
     );

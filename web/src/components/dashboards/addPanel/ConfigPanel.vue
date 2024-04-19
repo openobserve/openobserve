@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
-      <CommonAutoComplete2
+      <CommonAutoComplete
         v-if="promqlMode"
         :label="t('common.legend')"
         v-model="
@@ -513,7 +513,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stack-label
         outlined
         label-slot
-        style="top: none !important; margin-top: none !important; padding-top: 0 !important; width: auto !important"
+        style="
+          top: none !important;
+          margin-top: none !important;
+          padding-top: 0 !important;
+          width: auto !important;
+        "
         :value-replace-fn="selectPromQlNameOption"
       >
         <template v-slot:label>
@@ -536,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </CommonAutoComplete2>
+      </CommonAutoComplete>
 
       <div class="space"></div>
 
@@ -736,11 +741,10 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
-import PromqlLegendConfig from "./PromqlLegendConfig.vue";
-import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
-  components: { Drilldown, PromqlLegendConfig, CommonAutoComplete2 },
+  components: { Drilldown, CommonAutoComplete },
   props: ["dashboardPanelData"],
   setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();

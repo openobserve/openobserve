@@ -559,16 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <!-- <CommonAutoComplete
-                            v-if="
-                              !['Is Null', 'Is Not Null'].includes(
-                                fields?.operator
-                              )
-                            "
-                            :field="fields"
-                            :index="index"
-                          ></CommonAutoComplete> -->
-                          <CommonAutoComplete2
+                          <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 dashboardPanelData.data.queries[
@@ -585,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :items="dashboardVariablesFilterItems"
                             searchRegex="(?:^|[^$])\$?(\w+)"
                             :rules="[(val: any) => val?.length > 0 || 'Required']"
-                          ></CommonAutoComplete2>
+                          ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -709,11 +700,10 @@ import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
-  components: { SortByBtnGrp, CommonAutoComplete, CommonAutoComplete2 },
+  components: { SortByBtnGrp, CommonAutoComplete },
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

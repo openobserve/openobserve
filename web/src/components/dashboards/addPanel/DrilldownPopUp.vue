@@ -214,86 +214,22 @@
             :key="index"
           >
             <div style="display: flex; gap: 10px; margin-bottom: 10px">
-              <!-- <div class="relative">
-                <q-input
-                  v-model="variable.name"
-                  placeholder="Name"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  :data-test="`dashboard-drilldown-variable-name-${index}`"
-                  @update:model-value="nameFilterFn"
-                  @focus.prevent="variable.showNameOptions = true"
-                  @blur.prevent="hideNameOptionsWithDelay(index)"
-                />
-                <div
-                  class="options-container"
-                  v-if="
-                    variable.showNameOptions && nameFilteredOptions.length > 0
-                  "
-                  :style="{
-                    'background-color':
-                      store.state.theme === 'dark' ? '#2d2d2d' : 'white',
-                  }"
-                >
-                  <div
-                    v-for="(option, index) in nameFilteredOptions"
-                    :key="index"
-                    class="option"
-                    @mousedown="selectVariableOptionName(option, variable)"
-                  >
-                    {{ option.label }}
-                  </div>
-                </div>
-              </div> -->
-              <CommonAutoComplete2
+              
+              <CommonAutoComplete
                 placeholder="Name"
                 v-model="variable.name"
                 searchRegex=".*"
                 :items="variableNamesFn"
                 style="width: auto !important"
-              ></CommonAutoComplete2>
-              <CommonAutoComplete2
+              ></CommonAutoComplete>
+              <CommonAutoComplete
                 placeholder="Value"
                 searchRegex=".*"
                 v-model="variable.value"
                 :items="options.selectedValue"
                 style="width: auto !important"
-              ></CommonAutoComplete2>
-              <!-- <div class="relative">
-                <q-input
-                  v-model="variable.value"
-                  placeholder="Value"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  :data-test="`dashboard-drilldown-variable-value-${index}`"
-                  @update:model-value="fieldsFilterFn"
-                  @focus.prevent="variable.showOptions = true"
-                  @blur.prevent="hideOptionsWithDelay(index)"
-                />
-                <div
-                  class="options-container"
-                  v-if="
-                    variable.showOptions && fieldsFilteredOptions.length > 0
-                  "
-                  :style="{
-                    'background-color':
-                      store.state.theme === 'dark' ? '#2d2d2d' : 'white',
-                  }"
-                >
-                  <div
-                    v-for="(option, index) in fieldsFilteredOptions"
-                    :key="index"
-                    class="option"
-                    @mousedown="selectOption(variable, option)"
-                  >
-                    {{ option.label }}
-                  </div>
-                </div>
-              </div> -->
+              ></CommonAutoComplete>
+              
               <q-icon
                 class="q-mr-xs"
                 size="20px"
@@ -370,14 +306,13 @@ import {
 import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
-import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
-import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
     DrilldownUserGuide,
-    CommonAutoComplete2,
+    CommonAutoComplete,
   },
   props: {
     isEditMode: {
@@ -395,18 +330,10 @@ export default defineComponent({
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
 
-    // let hideOptionsTimeout: any;
-    // let hideNameOptionsTimeout: any;
     const getDefaultVariable = () => ({
       name: "",
       value: "",
-      // showOptions: false, // Initialize showOptions for each variable
-      // showNameOptions: false,
     });
-
-    // onUnmounted(() => {
-    //   clearTimeout(hideOptionsTimeout);
-    // });
 
     const getDefaultDrilldownData = () => ({
       name: "",
@@ -449,8 +376,6 @@ export default defineComponent({
       // get tab list
       await getDashboardList();
       await getTabList();
-
-      // await variableNamesFn();
     });
 
     // on folder change, reset dashboard and tab values
@@ -463,8 +388,6 @@ export default defineComponent({
           drilldownData.value.data.dashboard =
             dashboardList?.value[0]?.value ?? "";
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
-
-          // await variableNamesFn();
         }
       }
     );
@@ -477,8 +400,6 @@ export default defineComponent({
         if (newVal !== oldVal) {
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
-
-          // await variableNamesFn();
         }
       }
     );
@@ -664,105 +585,46 @@ export default defineComponent({
     // Assign selectedValue to options object
     options.selectedValue = selectedValue;
 
-    // const variableNamesFn = async () => {
-    //   // get folder id
-    //   if (
-    //     !store.state.organizationData.folders ||
-    //     (Array.isArray(store.state.organizationData.folders) &&
-    //       store.state.organizationData.folders.length === 0)
-    //   ) {
-    //     await getFoldersList(store);
-    //   }
-    //   const folderId = store.state.organizationData.folders.find(
-    //     (folder: any) => folder.name == drilldownData.value.data.folder
-    //   )?.folderId;
-
-    //   if (!folderId) {
-    //     while (options.selectedName.length > 0) {
-    //       options.selectedName.pop();
-    //     }
-    //     return;
-    //   }
-
-    //   // get dashboard id
-    //   const allDashboardData = await getAllDashboardsByFolderId(
-    //     store,
-    //     folderId
-    //   );
-    //   const dashboardData = allDashboardData.find(
-    //     (dashboard: any) =>
-    //       dashboard.title == drilldownData.value.data.dashboard
-    //   );
-
-    //   if (!dashboardData) {
-    //     while (options.selectedName.length > 0) {
-    //       options.selectedName.pop();
-    //     }
-    //     return;
-    //   }
-    //   const optionsList = dashboardData.variables.list.map((variable: any) => {
-    //     return { label: variable.name, value: variable.name };
-    //   });
-
-    //   while (options.selectedName.length > 0) {
-    //     options.selectedName.pop();
-    //   }
-    //   optionsList.forEach((option: any) => {
-    //     options.selectedName.push(option);
-    //   });
-    // };
-
+    
     const variableNamesFn = ref([]);
 
-    watch(
-      drilldownData.value, 
-      async (newData) => {
-        console.log("drilldownData", newData.data);
+    watch(drilldownData.value, async (newData) => {
+      console.log("drilldownData", newData.data);
 
-        if (newData.data.folder && newData.data.dashboard) {
-          const folder = store.state.organizationData.folders.find(
-            (folder: any) => folder.name === newData.data.folder
+      if (newData.data.folder && newData.data.dashboard) {
+        const folder = store.state.organizationData.folders.find(
+          (folder: any) => folder.name === newData.data.folder
+        );
+        console.log("folder---", folder);
+
+        const allDashboardData = await getAllDashboardsByFolderId(
+          store,
+          folder.folderId
+        );
+        const dashboardData = allDashboardData.find(
+          (dashboard: any) => dashboard.title === newData.data.dashboard
+        );
+
+        if (dashboardData) {
+          const optionsList = dashboardData.variables.list.map(
+            (variable: any) => ({
+              label: variable.name,
+              value: variable.name,
+            })
           );
-          console.log("folder---", folder);
-
-          const allDashboardData = await getAllDashboardsByFolderId(
-            store,
-            folder.folderId
-          );
-          const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title === newData.data.dashboard
-          );
-
-          if (dashboardData) {
-            const optionsList = dashboardData.variables.list.map(
-              (variable: any) => ({
-                label: variable.name,
-                value: variable.name,
-              })
-            );
-            console.log("optionsList", optionsList);
-            variableNamesFn.value = optionsList;
-          } else {
-            console.log("dashboardData not found");
-
-            variableNamesFn.value = [];
-          }
+          console.log("optionsList", optionsList);
+          variableNamesFn.value = optionsList;
         } else {
-          console.log("folder or dashboard not found");
-          
+          console.log("dashboardData not found");
+
           variableNamesFn.value = [];
         }
+      } else {
+        console.log("folder or dashboard not found");
+
+        variableNamesFn.value = [];
       }
-    );
-
-    // const variableNamesComputed = computed(() => variableNamesFn.value);
-    // console.log("variableNamesComputed", variableNamesComputed.value);
-
-    // watch(variableNamesComputed, (newData) => {
-    //   options.selectedName = newData;
-    //   console.log("variableNamesComputed", newData);
-    //   console.log("options.selectedName", options.selectedName);
-    // });
+    });
 
     return {
       t,
@@ -778,14 +640,6 @@ export default defineComponent({
       saveDrilldown,
       isFormURLValid,
       changeTypeOfDrilldown,
-      // fieldsFilterFn,
-      // nameFilterFn,
-      // nameFilteredOptions,
-      // fieldsFilteredOptions,
-      // selectOption,
-      // hideOptionsWithDelay,
-      // hideNameOptionsWithDelay,
-      // selectVariableOptionName,
       options,
       variableNamesFn,
     };

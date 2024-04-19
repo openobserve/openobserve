@@ -1,16 +1,20 @@
 <template>
   <div class="relative">
     <q-input
+      v-model="inputValue"
+      @update:model-value="onModelValueChanged"
       dense
       filled
-      v-model="field.value"
-      :label="t('common.value')"
+      :label="label"
       style="width: 100%; margin-top: 5px"
-      :rules="[(val) => val?.length > 0 || 'Required']"
-      @update:model-value="fieldsFilterFn"
       @focus="showOptions = true"
-      @blur="hideOptionsWithDelay"
-    />
+      @blur="hideOptions"
+      v-bind="$attrs"
+    >
+      <template v-slot:label>
+        <slot name="label"></slot>
+      </template>
+    </q-input>
     <div
       class="options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
@@ -22,80 +26,85 @@
         v-for="(option, index) in fieldsFilteredOptions"
         :key="index"
         class="option"
-        @mousedown="selectOption(option, field)"
+        @mousedown="selectOption(option)"
       >
-        {{ option }}
+        {{ option.label }}
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, toRef, defineComponent } from "vue";
-import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
+import { ref, toRef, defineComponent, watch } from "vue";
+import { useSearchInputUsingRegex2 } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
-import { getDashboard } from "../../../utils/commons";
-import { useRoute } from "vue-router";
-import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "CommonAutoComplete",
   props: {
-    field: Object,
-    index: Number,
+    modelValue: {
+      type: String,
+    },
+    label: {
+      type: String,
+    },
+    items: {
+      // always expected to be in [ { label: "", value: ""}] format, search in label, and replace the value
+      type: Array,
+    },
+    searchRegex: {
+      type: String,
+    },
+    valueReplaceFn: {
+      // special treatment needed to any value replacing function, then this can be used
+      type: Function,
+      default: (selectedValue) => selectedValue,
+    },
   },
-  setup(props) {
+  emits: ["update:modelValue"],
+  setup(props, { emit }) {
     const store = useStore();
     const showOptions = ref(false);
-    const { t } = useI18n();
-    let hideOptionsTimeout;
 
-    const route = useRoute();
-    const dashboardVariablesList = ref([]);
+    // this is used to sync with modelvalue and q-input's v-model
+    const inputValue = ref(props.modelValue);
 
-    onMounted(async () => {
-      await getDashboardData();
-    });
+    watch(
+      () => props.modelValue,
+      () => {
+        inputValue.value = props.modelValue;
+      }
+    );
 
-    const getDashboardData = async () => {
-      const data = await getDashboard(
-        store,
-        route.query.dashboard,
-        route.query.folder ?? "default"
-      );
-      dashboardVariablesList.value = (data?.variables?.list ?? []).map(
-        (it) => it.name
-      );
+    // when q-input's model value updated, update the model value which will be synced back to input value
+    const onModelValueChanged = (value) => {
+      emit("update:modelValue", value);
+      fieldsFilterFn(value);
     };
 
+    // apply filter on label
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useAutoCompleteForPromql(toRef(dashboardVariablesList), "name");
+      useSearchInputUsingRegex2(toRef(props.items), "label", props.searchRegex);
 
-    const hideOptionsWithDelay = () => {
-      clearTimeout(hideOptionsTimeout);
-      hideOptionsTimeout = setTimeout(() => {
-        showOptions.value = false;
-      }, 200);
-    };
-
-    const selectOption = (option, field) => {
-      const newValue = "'" + "$" + option + "'";
-      field.value = newValue;
+    const hideOptions = () => {
       showOptions.value = false;
     };
 
-    onUnmounted(() => {
-      clearTimeout(hideOptionsTimeout);
-    });
+    // when any item is selected, replace it with the value and hide the options
+    const selectOption = (option) => {
+      emit("update:modelValue", props.valueReplaceFn(option?.value));
+      showOptions.value = false;
+    };
 
     return {
       showOptions,
       fieldsFilterFn,
       fieldsFilteredOptions,
-      hideOptionsWithDelay,
+      hideOptions,
       selectOption,
       store,
-      t
+      onModelValueChanged,
+      inputValue,
     };
   },
 });
