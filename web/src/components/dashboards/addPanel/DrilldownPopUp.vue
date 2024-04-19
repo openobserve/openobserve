@@ -214,7 +214,7 @@
             :key="index"
           >
             <div style="display: flex; gap: 10px; margin-bottom: 10px">
-              <div class="relative">
+              <!-- <div class="relative">
                 <q-input
                   v-model="variable.name"
                   placeholder="Name"
@@ -246,8 +246,22 @@
                     {{ option.label }}
                   </div>
                 </div>
-              </div>
-              <div class="relative">
+              </div> -->
+              <CommonAutoComplete2
+                placeholder="Name"
+                v-model="variable.name"
+                searchRegex=".*"
+                :items="variableNamesFn"
+                style="width: auto !important"
+              ></CommonAutoComplete2>
+              <CommonAutoComplete2
+                placeholder="Value"
+                searchRegex=".*"
+                v-model="variable.value"
+                :items="options.selectedValue"
+                style="width: auto !important"
+              ></CommonAutoComplete2>
+              <!-- <div class="relative">
                 <q-input
                   v-model="variable.value"
                   placeholder="Value"
@@ -279,7 +293,7 @@
                     {{ option.label }}
                   </div>
                 </div>
-              </div>
+              </div> -->
               <q-icon
                 class="q-mr-xs"
                 size="20px"
@@ -357,11 +371,13 @@ import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import { useAutoCompleteForPromql } from "@/composables/useAutoCompleteForPromql";
+import CommonAutoComplete2 from "@/components/dashboards/addPanel/CommonAutoComplete2.vue";
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
     DrilldownUserGuide,
+    CommonAutoComplete2,
   },
   props: {
     isEditMode: {
@@ -379,18 +395,18 @@ export default defineComponent({
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
 
-    let hideOptionsTimeout: any;
-    let hideNameOptionsTimeout: any;
+    // let hideOptionsTimeout: any;
+    // let hideNameOptionsTimeout: any;
     const getDefaultVariable = () => ({
       name: "",
       value: "",
-      showOptions: false, // Initialize showOptions for each variable
-      showNameOptions: false,
+      // showOptions: false, // Initialize showOptions for each variable
+      // showNameOptions: false,
     });
 
-    onUnmounted(() => {
-      clearTimeout(hideOptionsTimeout);
-    });
+    // onUnmounted(() => {
+    //   clearTimeout(hideOptionsTimeout);
+    // });
 
     const getDefaultDrilldownData = () => ({
       name: "",
@@ -434,7 +450,7 @@ export default defineComponent({
       await getDashboardList();
       await getTabList();
 
-      await variableNamesFn();
+      // await variableNamesFn();
     });
 
     // on folder change, reset dashboard and tab values
@@ -448,7 +464,7 @@ export default defineComponent({
             dashboardList?.value[0]?.value ?? "";
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
 
-          await variableNamesFn();
+          // await variableNamesFn();
         }
       }
     );
@@ -462,7 +478,7 @@ export default defineComponent({
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
 
-          await variableNamesFn();
+          // await variableNamesFn();
         }
       }
     );
@@ -610,6 +626,7 @@ export default defineComponent({
       selectedValue: [],
       selectedName: [],
     });
+
     //want label for dropdown in input and value for its input value
     const selectedValue = computed(() => {
       let selectedValues: any = [];
@@ -647,83 +664,106 @@ export default defineComponent({
     // Assign selectedValue to options object
     options.selectedValue = selectedValue;
 
-    const variableNamesFn = async () => {
-      // get folder id
-      if (
-        !store.state.organizationData.folders ||
-        (Array.isArray(store.state.organizationData.folders) &&
-          store.state.organizationData.folders.length === 0)
-      ) {
-        await getFoldersList(store);
-      }
-      const folderId = store.state.organizationData.folders.find(
-        (folder: any) => folder.name == drilldownData.value.data.folder
-      )?.folderId;
+    // const variableNamesFn = async () => {
+    //   // get folder id
+    //   if (
+    //     !store.state.organizationData.folders ||
+    //     (Array.isArray(store.state.organizationData.folders) &&
+    //       store.state.organizationData.folders.length === 0)
+    //   ) {
+    //     await getFoldersList(store);
+    //   }
+    //   const folderId = store.state.organizationData.folders.find(
+    //     (folder: any) => folder.name == drilldownData.value.data.folder
+    //   )?.folderId;
 
-      if (!folderId) {
-        options.selectedName = [];
-        return;
-      }
+    //   if (!folderId) {
+    //     while (options.selectedName.length > 0) {
+    //       options.selectedName.pop();
+    //     }
+    //     return;
+    //   }
 
-      // get dashboard id
-      const allDashboardData = await getAllDashboardsByFolderId(
-        store,
-        folderId
-      );
-      const dashboardData = allDashboardData.find(
-        (dashboard: any) =>
-          dashboard.title == drilldownData.value.data.dashboard
-      );
+    //   // get dashboard id
+    //   const allDashboardData = await getAllDashboardsByFolderId(
+    //     store,
+    //     folderId
+    //   );
+    //   const dashboardData = allDashboardData.find(
+    //     (dashboard: any) =>
+    //       dashboard.title == drilldownData.value.data.dashboard
+    //   );
 
-      if (!dashboardData) {
-        options.selectedName = [];
-        return;
-      }
-      const optionsList = dashboardData.variables.list.map((variable: any) => {
-        return { label: variable.name, value: variable.name };
-      });
+    //   if (!dashboardData) {
+    //     while (options.selectedName.length > 0) {
+    //       options.selectedName.pop();
+    //     }
+    //     return;
+    //   }
+    //   const optionsList = dashboardData.variables.list.map((variable: any) => {
+    //     return { label: variable.name, value: variable.name };
+    //   });
 
-      options.selectedName = optionsList;
-    };
+    //   while (options.selectedName.length > 0) {
+    //     options.selectedName.pop();
+    //   }
+    //   optionsList.forEach((option: any) => {
+    //     options.selectedName.push(option);
+    //   });
+    // };
 
-    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useAutoCompleteForPromql(toRef(options, "selectedValue"), "label");
+    const variableNamesFn = ref([]);
 
-    let { filterFn: nameFilterFn, filteredOptions: nameFilteredOptions } =
-      useAutoCompleteForPromql(toRef(options, "selectedName"), "label");
-
-    const hideOptionsWithDelay = (index: any) => {
-      clearTimeout(hideOptionsTimeout);
-      hideOptionsTimeout = setTimeout(() => {
-      drilldownData.value.data.variables[index].showOptions = false;
-      }, 200);
-    };
-
-    const hideNameOptionsWithDelay = (index: any) => {
-      clearTimeout(hideNameOptionsTimeout);
-      hideNameOptionsTimeout = setTimeout(() => {
-      drilldownData.value.data.variables[index].showNameOptions = false;
-      }, 200);
-    };
-
-    const selectOption = (variable: any, option: any) => {
-      variable.value = option.value;
-      variable.showOptions = false;
-    };
-
-    const selectVariableOptionName = (option: any, variable: any) => {
-      variable.name = option.value;
-      variable.showNameOptions = false;
-    };
     watch(
-      () => options.selectedName,
-      () => {
+      drilldownData.value, 
+      async (newData) => {
+        console.log("drilldownData", newData.data);
 
-        ({ filterFn: nameFilterFn, filteredOptions: nameFilteredOptions } =
-          useAutoCompleteForPromql(toRef(options, "selectedName"), "label"));
-      },
-      { deep: true }
+        if (newData.data.folder && newData.data.dashboard) {
+          const folder = store.state.organizationData.folders.find(
+            (folder: any) => folder.name === newData.data.folder
+          );
+          console.log("folder---", folder);
+
+          const allDashboardData = await getAllDashboardsByFolderId(
+            store,
+            folder.folderId
+          );
+          const dashboardData = allDashboardData.find(
+            (dashboard: any) => dashboard.title === newData.data.dashboard
+          );
+
+          if (dashboardData) {
+            const optionsList = dashboardData.variables.list.map(
+              (variable: any) => ({
+                label: variable.name,
+                value: variable.name,
+              })
+            );
+            console.log("optionsList", optionsList);
+            variableNamesFn.value = optionsList;
+          } else {
+            console.log("dashboardData not found");
+
+            variableNamesFn.value = [];
+          }
+        } else {
+          console.log("folder or dashboard not found");
+          
+          variableNamesFn.value = [];
+        }
+      }
     );
+
+    // const variableNamesComputed = computed(() => variableNamesFn.value);
+    // console.log("variableNamesComputed", variableNamesComputed.value);
+
+    // watch(variableNamesComputed, (newData) => {
+    //   options.selectedName = newData;
+    //   console.log("variableNamesComputed", newData);
+    //   console.log("options.selectedName", options.selectedName);
+    // });
+
     return {
       t,
       outlinedDashboard,
@@ -738,14 +778,14 @@ export default defineComponent({
       saveDrilldown,
       isFormURLValid,
       changeTypeOfDrilldown,
-      fieldsFilterFn,
-      nameFilterFn,
-      nameFilteredOptions,
-      fieldsFilteredOptions,
-      selectOption,
-      hideOptionsWithDelay,
-      hideNameOptionsWithDelay,
-      selectVariableOptionName,
+      // fieldsFilterFn,
+      // nameFilterFn,
+      // nameFilteredOptions,
+      // fieldsFilteredOptions,
+      // selectOption,
+      // hideOptionsWithDelay,
+      // hideNameOptionsWithDelay,
+      // selectVariableOptionName,
       options,
       variableNamesFn,
     };

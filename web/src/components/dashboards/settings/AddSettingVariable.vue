@@ -809,7 +809,7 @@ export default defineComponent({
       props.dashboardVariablesList
         .map((it: any) => ({
           label: it.name,
-          value: "'" + "$" + it.name + "'",
+          value: "$" + it.name ,
         }))
         .filter((it: any) => it.label !== variableData.name)
     );
