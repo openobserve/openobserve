@@ -45,8 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No data available.
         </div>
-        <div v-else
-class="indexDetailsContainer" style="height: 100vh">
+        <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div class="title" data-test="schema-stream-title-text">
             {{ indexData.name }}
           </div>
@@ -115,6 +114,30 @@ class="indexDetailsContainer" style="height: 100vh">
                 period is {{ store.state.zoConfig.data_retention_days }} days
               </div>
             </div>
+          </template>
+
+          <template v-if="indexData.defined_schema_fields.length">
+            <q-separator
+              id="schema-add-fields-section"
+              class="q-mt-lg q-mb-lg"
+            />
+            <div
+              data-test="schema-add-fields-title"
+              class="q-pr-sm text-bold q-mb-sm"
+            >
+              Add Fields
+            </div>
+            <StreamFieldsInputs
+              :fields="newSchemaFields"
+              :showHeader="false"
+              :visibleInputs="{
+                name: true,
+                type: false,
+                index_type: false,
+              }"
+              @add="addSchemaField"
+              @remove="removeSchemaField"
+            />
           </template>
           <q-separator class="q-mt-lg q-mb-lg" />
 
@@ -185,8 +208,7 @@ class="indexDetailsContainer" style="height: 100vh">
                 <q-td>{{ props.row.type }}</q-td>
               </template>
               <template v-slot:body-cell-index_type="props">
-                <q-td
-                  data-test="schema-stream-index-select"
+                <q-td data-test="schema-stream-index-select"
                   ><q-select
                     v-if="
                       props.row.name !== store.state.zoConfig.timestamp_column
@@ -211,7 +233,7 @@ class="indexDetailsContainer" style="height: 100vh">
                     outlined
                     filled
                     dense
-                    style="width: 300px;"
+                    style="width: 300px"
                     @update:model-value="markFormDirty(props.row.name, 'fts')"
                   />
                 </q-td>
@@ -231,6 +253,18 @@ class="indexDetailsContainer" style="height: 100vh">
                         no-caps
                         @click="confirmQueryModeChangeDialog = true"
                       />
+
+                      <q-btn
+                        v-if="indexData.defined_schema_fields.length"
+                        data-test="schema-add-field-button"
+                        class="q-my-sm no-border text-bold q-ml-md"
+                        :label="t('logStream.addField')"
+                        padding="sm md"
+                        color="secondary"
+                        no-caps
+                        @click="scrollToAddFields"
+                      />
+
                       <q-btn
                         v-bind:disable="!formDirtyFlag"
                         data-test="schema-update-settings-button"
@@ -283,6 +317,8 @@ import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
+import { useRouter } from "vue-router";
+import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 
 const defaultValue: any = () => {
   return {
@@ -304,6 +340,7 @@ export default defineComponent({
   },
   components: {
     ConfirmDialog,
+    StreamFieldsInputs,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -319,6 +356,8 @@ export default defineComponent({
     const loadingState = ref(true);
     const rowsPerPage = ref(250);
     const filterField = ref("");
+    const router = useRouter();
+    const newSchemaFields = ref([]);
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
@@ -394,6 +433,126 @@ export default defineComponent({
         });
     };
 
+    const getFieldIndices = (property, settings) => {
+      const fieldIndices = [];
+      if (
+        (settings.full_text_search_keys.length > 0 &&
+          settings.full_text_search_keys.includes(property.name)) ||
+        (settings.full_text_search_keys.length == 0 &&
+          store.state.zoConfig.default_fts_keys.includes(property.name))
+      ) {
+        fieldIndices.push("fullTextSearchKey");
+      }
+
+      if (
+        settings.bloom_filter_fields.length > 0 &&
+        settings.bloom_filter_fields.includes(property.name)
+      ) {
+        fieldIndices.push("bloomFilterKey");
+      }
+
+      property["delete"] = false;
+
+      if (
+        settings.partition_keys &&
+        Object.values(settings.partition_keys).some(
+          (v) => !v.disabled && v.field === property.name
+        )
+      ) {
+        const [level, partition] = Object.entries(settings.partition_keys).find(
+          ([, partition]) => partition["field"] === property.name
+        );
+
+        property.level = level;
+
+        if (partition.types === "value") fieldIndices.push("keyPartition");
+
+        if (partition.types?.hash)
+          fieldIndices.push(`hashPartition_${partition.types.hash}`);
+      }
+
+      property.index_type = [...fieldIndices];
+
+      return fieldIndices;
+    };
+
+    const setSchema = (streamResponse) => {
+      const schemaMapping = new Set([]);
+      if (!streamResponse.schema?.length) {
+        streamResponse.schema = [];
+        streamResponse.settings.defined_schema_fields.forEach((field) => {
+          streamResponse.schema.push({
+            name: field,
+            delete: false,
+            index_type: [],
+          });
+        });
+      }
+
+      if (
+        streamResponse.settings.full_text_search_keys.length == 0 &&
+        (showFullTextSearchColumn.value || showPartitionColumn.value)
+      ) {
+        indexData.value.defaultFts = true;
+      } else {
+        indexData.value.defaultFts = false;
+      }
+
+      indexData.value.schema = streamResponse.schema || [];
+      indexData.value.stats = JSON.parse(JSON.stringify(streamResponse.stats));
+
+      indexData.value.stats.doc_time_max = date.formatDate(
+        parseInt(streamResponse.stats.doc_time_max) / 1000,
+        "YYYY-MM-DDTHH:mm:ss:SSZ"
+      );
+      indexData.value.stats.doc_time_min = date.formatDate(
+        parseInt(streamResponse.stats.doc_time_min) / 1000,
+        "YYYY-MM-DDTHH:mm:ss:SSZ"
+      );
+
+      indexData.value.defined_schema_fields =
+        streamResponse.settings.defined_schema_fields || [];
+
+      if (showDataRetention.value)
+        dataRetentionDays.value =
+          streamResponse.settings.data_retention ||
+          store.state.zoConfig.data_retention_days;
+
+      if (!streamResponse.schema) {
+        loadingState.value = false;
+        dismiss();
+        return;
+      }
+
+      let fieldIndices = [];
+      for (var property of streamResponse.schema) {
+        schemaMapping.add(property.name);
+
+        fieldIndices = getFieldIndices(property, streamResponse.settings);
+
+        property.index_type = [...fieldIndices];
+
+        fieldIndices.length = 0;
+      }
+
+      indexData.value.defined_schema_fields.forEach((field) => {
+        if (!schemaMapping.has(field)) {
+          const property = {
+            name: field,
+            delete: false,
+            index_type: [],
+          };
+
+          fieldIndices = getFieldIndices(property, streamResponse.settings);
+
+          property.index_type = [...fieldIndices];
+
+          fieldIndices.length = 0;
+          indexData.value.schema.push(property);
+        }
+      });
+    };
+
     const getSchema = async () => {
       const dismiss = q.notify({
         spinner: true,
@@ -402,88 +561,7 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
-          if (
-            streamResponse.settings.full_text_search_keys.length == 0 &&
-            (showFullTextSearchColumn.value || showPartitionColumn.value)
-          ) {
-            indexData.value.defaultFts = true;
-          } else {
-            indexData.value.defaultFts = false;
-          }
-
-          indexData.value.schema = streamResponse.schema || [];
-          indexData.value.stats = JSON.parse(
-            JSON.stringify(streamResponse.stats)
-          );
-
-          indexData.value.stats.doc_time_max = date.formatDate(
-            parseInt(streamResponse.stats.doc_time_max) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
-          indexData.value.stats.doc_time_min = date.formatDate(
-            parseInt(streamResponse.stats.doc_time_min) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
-
-          if (showDataRetention.value)
-            dataRetentionDays.value =
-              streamResponse.settings.data_retention ||
-              store.state.zoConfig.data_retention_days;
-
-          if (!streamResponse.schema) {
-            loadingState.value = false;
-            dismiss();
-            return;
-          }
-
-          const fieldIndices = [];
-          for (var property of streamResponse.schema) {
-            if (
-              (streamResponse.settings.full_text_search_keys.length > 0 &&
-                streamResponse.settings.full_text_search_keys.includes(
-                  property.name
-                )) ||
-              (streamResponse.settings.full_text_search_keys.length == 0 &&
-                store.state.zoConfig.default_fts_keys.includes(property.name))
-            ) {
-              fieldIndices.push("fullTextSearchKey");
-            }
-
-            if (
-              streamResponse.settings.bloom_filter_fields.length > 0 &&
-              streamResponse.settings.bloom_filter_fields.includes(
-                property.name
-              )
-            ) {
-              fieldIndices.push("bloomFilterKey");
-            }
-
-            property["delete"] = false;
-
-            if (
-              streamResponse.settings.partition_keys &&
-              Object.values(streamResponse.settings.partition_keys).some(
-                (v) => !v.disabled && v.field === property.name
-              )
-            ) {
-              const [level, partition] = Object.entries(
-                streamResponse.settings.partition_keys
-              ).find(([, partition]) => partition["field"] === property.name);
-
-              property.level = level;
-
-              if (partition.types === "value")
-                fieldIndices.push("keyPartition");
-
-              if (partition.types?.hash)
-                fieldIndices.push(`hashPartition_${partition.types.hash}`);
-            }
-
-            property.index_type = [...fieldIndices];
-
-            fieldIndices.length = 0;
-          }
-
+          setSchema(streamResponse);
           loadingState.value = false;
           dismiss();
         })
@@ -498,6 +576,7 @@ export default defineComponent({
         partition_keys: [],
         full_text_search_keys: [],
         bloom_filter_fields: [],
+        defined_schema_fields: [...indexData.value.defined_schema_fields],
       };
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
@@ -513,6 +592,17 @@ export default defineComponent({
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
+
+      settings.defined_schema_fields.push(
+        ...newSchemaFields.value.map((field) => {
+          field.name = field.name
+            .trim()
+            .toLowerCase()
+            .replace(/ /g, "_")
+            .replace(/-/g, "_");
+          return field.name;
+        })
+      );
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -568,6 +658,9 @@ export default defineComponent({
       }
 
       loadingState.value = true;
+
+      newSchemaFields.value = [];
+
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
@@ -576,19 +669,20 @@ export default defineComponent({
           settings
         )
         .then(async (res) => {
-          loadingState.value = false;
-          q.notify({
-            color: "positive",
-            message: "Stream settings updated successfully.",
-            timeout: 2000,
-          });
-
           await getStream(
             indexData.value.name,
             indexData.value.stream_type,
             true,
             true
-          );
+          ).then((streamResponse) => {
+            setSchema(streamResponse);
+            loadingState.value = false;
+            q.notify({
+              color: "positive",
+              message: "Stream settings updated successfully.",
+              timeout: 2000,
+            });
+          });
 
           segment.track("Button Click", {
             button: "Update Settings",
@@ -693,6 +787,26 @@ export default defineComponent({
       },
     ];
 
+    const addSchemaField = () => {
+      newSchemaFields.value.push({
+        name: "",
+        type: "",
+        index_type: [],
+      });
+      formDirtyFlag.value = true;
+    };
+
+    const removeSchemaField = (field: any, index: number) => {
+      newSchemaFields.value.splice(index, 1);
+    };
+
+    const scrollToAddFields = () => {
+      const el = document.getElementById("schema-add-fields-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+
     return {
       t,
       q,
@@ -722,6 +836,10 @@ export default defineComponent({
       rowsPerPage,
       filterField,
       columns,
+      addSchemaField,
+      removeSchemaField,
+      newSchemaFields,
+      scrollToAddFields,
     };
   },
   created() {

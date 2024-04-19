@@ -168,7 +168,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     // ingester total
     let ingester_total = match result.aggs.get("ingester_count") {
         Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => result.hits.len(),
+        None => 0,
     };
     result.aggs.remove("ingester_count");
 

@@ -21,6 +21,7 @@ use config::{
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
+    utils::schema_ext::SchemaExt,
     CONFIG,
 };
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
@@ -136,7 +137,7 @@ pub async fn search(
                         file.meta.min_ts,
                         file.meta.max_ts
                     );
-                    // HACK: use the latest verion if not found in schema versions
+                    // HACK: use the latest version if not found in schema versions
                     schema_latest_id
                 }
             };
@@ -185,9 +186,13 @@ pub async fn search(
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
-        let schema = schema_versions[ver]
-            .clone()
-            .with_metadata(std::collections::HashMap::new());
+        let schema = schema_versions[ver].clone();
+        let schema_dt = schema
+            .metadata()
+            .get("start_dt")
+            .cloned()
+            .unwrap_or_default();
+        let schema = schema.with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
         let session = config::meta::search::Session {
             id: format!("{trace_id}-{ver}"),
@@ -238,13 +243,29 @@ pub async fn search(
                 tokio::select! {
                     ret = exec::sql(
                         &session,
-                        schema,
+                        schema.clone(),
                         &diff_fields,
                         &sql,
                         &files,
                         None,
                         FileType::PARQUET,
-                    ) => ret,
+                    ) => {
+                        match ret {
+                            Ok(ret) => Ok(ret),
+                            Err(err) => {
+                                log::error!("[trace_id {}] search->storage: datafusion execute error: {}", session.id, err);
+                                if err.to_string().contains("Invalid comparison operation") {
+                                    // print the session_id, schema, sql, files
+                                    let schema_version = format!("{}/{}/{}/{}", &sql.org_id, &stream_type, &sql.stream_name, schema_dt);
+                                    let schema_fiels = schema.as_ref().simple_fields();
+                                    let files = files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>();
+                                    log::error!("[trace_id {}] search->storage: schema and parquet mismatch, version: {}, schema: {:?}, files: {:?}", 
+                                        session.id, schema_version, schema_fiels, files);
+                                }
+                                Err(err)
+                            }
+                        }
+                    },
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[trace_id {}] search->storage: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
@@ -289,7 +310,6 @@ pub async fn search(
                 }
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] datafusion execute error: {}", err);
                 return Err(err.into());
             }
         };

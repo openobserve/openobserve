@@ -42,7 +42,7 @@ use crate::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-        stream::SchemaRecords,
+        stream::{SchemaRecords, StreamParams},
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
@@ -209,9 +209,11 @@ pub async fn metrics_json_handler(
 
                     // Start get stream alerts
                     crate::service::ingestion::get_stream_alerts(
-                        org_id,
-                        &StreamType::Metrics,
-                        metric_name,
+                        &[StreamParams {
+                            org_id: org_id.to_owned().into(),
+                            stream_name: metric_name.to_owned().into(),
+                            stream_type: StreamType::Metrics,
+                        }],
                         &mut stream_alerts_map,
                     )
                     .await;
@@ -219,7 +221,7 @@ pub async fn metrics_json_handler(
 
                     // Start Register Transforms for stream
                     let (mut local_trans, mut stream_vrl_map) =
-                        crate::service::ingestion::register_stream_transforms(
+                        crate::service::ingestion::register_stream_functions(
                             org_id,
                             &StreamType::Metrics,
                             metric_name,
@@ -349,9 +351,11 @@ pub async fn metrics_json_handler(
 
                             // Start get stream alerts
                             crate::service::ingestion::get_stream_alerts(
-                                org_id,
-                                &StreamType::Metrics,
-                                local_metric_name,
+                                &[StreamParams {
+                                    org_id: org_id.to_owned().into(),
+                                    stream_name: local_metric_name.to_owned().into(),
+                                    stream_type: StreamType::Metrics,
+                                }],
                                 &mut stream_alerts_map,
                             )
                             .await;
@@ -359,7 +363,7 @@ pub async fn metrics_json_handler(
 
                             // Start Register Transforms for stream
                             (local_trans, stream_vrl_map) =
-                                crate::service::ingestion::register_stream_transforms(
+                                crate::service::ingestion::register_stream_functions(
                                     org_id,
                                     &StreamType::Metrics,
                                     local_metric_name,
@@ -368,7 +372,7 @@ pub async fn metrics_json_handler(
                         }
 
                         if !local_trans.is_empty() {
-                            rec = crate::service::ingestion::apply_stream_transform(
+                            rec = crate::service::ingestion::apply_stream_functions(
                                 &local_trans,
                                 rec,
                                 &stream_vrl_map,
