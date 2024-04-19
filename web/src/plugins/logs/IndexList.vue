@@ -908,16 +908,32 @@ export default defineComponent({
             if ((stream as { name: string }).name == field.name) {
               searchObj.data.stream.interestingFieldList.push(field.name);
               const localInterestingFields: any = useLocalInterestingFields();
-              let localFields: any = {};
-              if (localInterestingFields.value != null) {
-                localFields = localInterestingFields.value;
+
+              let listOfFields: any = [];
+              let streamField: any = {};
+
+              for (const field of searchObj.data.stream.interestingFieldList) {
+                for (streamField of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if (
+                    streamField?.name == field &&
+                    streamField?.streams.indexOf(field) > -1
+                  ) {
+                    listOfFields.push(field);
+                  }
+                }
               }
-              localFields[
+              console.log("listOfFields:---", listOfFields)
+              let localStreamFields: any = {};
+              if (localInterestingFields.value != null) {
+                localStreamFields = localInterestingFields.value;
+              }
+              localStreamFields[
                 searchObj.organizationIdetifier +
                   "_" +
                   searchObj.data.stream.selectedStream[0].value
-              ] = searchObj.data.stream.interestingFieldList;
-              useLocalInterestingFields(localFields);
+              ] = listOfFields;
+              useLocalInterestingFields(localStreamFields);
             }
           }
         }
