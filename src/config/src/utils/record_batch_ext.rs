@@ -173,21 +173,3 @@ pub fn convert_json_to_record_batch(
 
     RecordBatch::try_new(schema.clone(), cols)
 }
-
-// adapt batch to schema
-pub fn adapt_batch(schema: &Schema, batch: &RecordBatch) -> Result<RecordBatch, ArrowError> {
-    let batch_schema = &*batch.schema();
-    let batch_cols = batch.columns().to_vec();
-
-    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
-    for field in schema.fields() {
-        if let Some((batch_idx, _)) = batch_schema.column_with_name(field.name().as_str()) {
-            cols.push(Arc::clone(&batch_cols[batch_idx]));
-        } else {
-            cols.push(new_null_array(field.data_type(), batch.num_rows()))
-        }
-    }
-
-    let merged_schema = Arc::new(schema.clone());
-    RecordBatch::try_new(merged_schema, cols)
-}
