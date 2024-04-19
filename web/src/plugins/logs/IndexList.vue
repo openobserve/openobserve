@@ -876,7 +876,6 @@ export default defineComponent({
       field: any,
       isInterestingField: boolean
     ) => {
-      console.log(field);
       // if (
       //   field.name == "_timestamp" &&
       //   isInterestingField &&
@@ -918,7 +917,7 @@ export default defineComponent({
                   }
                 }
               }
-              console.log("listOfFields:---", listOfFields);
+
               let localStreamFields: any = {};
               if (localInterestingFields.value != null) {
                 localStreamFields = localInterestingFields.value;
@@ -957,7 +956,7 @@ export default defineComponent({
                   }
                 }
               }
-              console.log("listOfFields:---", listOfFields);
+
               let localStreamFields: any = {};
               if (localInterestingFields.value != null) {
                 localStreamFields = localInterestingFields.value;
