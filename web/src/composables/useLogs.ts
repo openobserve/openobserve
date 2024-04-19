@@ -578,19 +578,19 @@ const useLogs = () => {
         },
       };
 
-      // if (
-      //   searchObj.data.stream.interestingFieldList.length > 0 &&
-      //   searchObj.meta.quickMode
-      // ) {
-      //   if (searchObj.data.stream.selectedStream.length == 1) {
-      //     req.query.sql = req.query.sql.replace(
-      //       "[FIELD_LIST]",
-      //       searchObj.data.stream.interestingFieldList.join(",")
-      //     );
-      //   }
-      // } else {
-      //   req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
-      // }
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
+        if (searchObj.data.stream.selectedStream.length == 1) {
+          req.query.sql = req.query.sql.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(",")
+          );
+        }
+      } else {
+        req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
+      }
 
       const timestamps: any =
         searchObj.data.datetime.type === "relative"

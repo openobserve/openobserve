@@ -400,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <div
                                 :title="value.count.toString()"
                                 class="ellipsis text-right q-pr-sm"
+                                style="display: contents"
                                 :style="
                                   searchObj.data.stream.selectedStream.length ==
                                   props.row.streams.length
@@ -897,6 +898,39 @@ export default defineComponent({
         if (index > -1) {
           // only splice array when item is found
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
+
+          for (const stream of searchObj.data.stream.selectedStreamFields) {
+            if ((stream as { name: string }).name == field.name) {
+              searchObj.data.stream.interestingFieldList.push(field.name);
+              const localInterestingFields: any = useLocalInterestingFields();
+
+              let listOfFields: any = [];
+              let streamField: any = {};
+
+              for (const field of searchObj.data.stream.interestingFieldList) {
+                for (streamField of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if (
+                    streamField?.name == field &&
+                    streamField?.streams.indexOf(field) > -1
+                  ) {
+                    listOfFields.push(field);
+                  }
+                }
+              }
+              console.log("listOfFields:---", listOfFields);
+              let localStreamFields: any = {};
+              if (localInterestingFields.value != null) {
+                localStreamFields = localInterestingFields.value;
+              }
+              localStreamFields[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream[0].value
+              ] = listOfFields;
+              useLocalInterestingFields(localStreamFields);
+            }
+          }
         }
       } else {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
@@ -923,7 +957,7 @@ export default defineComponent({
                   }
                 }
               }
-              console.log("listOfFields:---", listOfFields)
+              console.log("listOfFields:---", listOfFields);
               let localStreamFields: any = {};
               if (localInterestingFields.value != null) {
                 localStreamFields = localInterestingFields.value;
@@ -1020,7 +1054,7 @@ $streamSelectorHeight: 44px;
 .index-menu {
   width: 100%;
 
-  div {
+  > div {
     width: 100%;
   }
 
