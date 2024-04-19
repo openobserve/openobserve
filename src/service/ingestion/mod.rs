@@ -38,7 +38,9 @@ use vrl::{
 use super::usage::publish_triggers_usage;
 use crate::{
     common::{
-        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS},
+        infra::config::{
+            REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
+        },
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
@@ -488,16 +490,16 @@ pub async fn get_stream_routing(
     stream_params: StreamParams,
     stream_routing_map: &mut HashMap<String, Vec<Routing>>,
 ) {
-    let stream_settings = infra::schema::get_settings(
-        &stream_params.org_id,
-        &stream_params.stream_name,
-        stream_params.stream_type,
-    )
-    .await
-    .unwrap_or_default();
-    let res: Vec<Routing> = stream_settings
+    let pipeline = STREAM_PIPELINES
+        .get(&format!(
+            "{}/{}/{}",
+            &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
+        ))
+        .unwrap();
+    let res: Vec<Routing> = pipeline
         .routing
-        .unwrap_or_default()
+        .as_ref()
+        .unwrap()
         .iter()
         .map(|(k, v)| Routing {
             destination: format_stream_name(k),
