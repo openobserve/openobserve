@@ -117,14 +117,12 @@ pub async fn list_pipelines(
                     .unwrap()
                     .contains(&format!("pipeline:{}", org_id))
             {
-                let fn_list = if let Some(val) = STREAM_FUNCTIONS.get(&format!(
-                    "{}/{}/{}",
-                    org_id, &pipeline.stream_type, &pipeline.stream_name
-                )) {
-                    Some(val.value().clone())
-                } else {
-                    None
-                };
+                let fn_list = STREAM_FUNCTIONS
+                    .get(&format!(
+                        "{}/{}/{}",
+                        org_id, &pipeline.stream_type, &pipeline.stream_name
+                    ))
+                    .map(|val| val.value().clone());
                 result.push(pipeline.into_response(fn_list));
             }
         }
