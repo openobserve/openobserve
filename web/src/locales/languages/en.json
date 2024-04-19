@@ -371,7 +371,8 @@
     "dataRetention": "Data Retention (in days)",
     "indexing": "Indexing",
     "createStream": "Create Stream",
-    "indexType": "Index Type"
+    "indexType": "Index Type",
+    "addField": "Add Field"
   },
   "function": {
     "header": "Functions",

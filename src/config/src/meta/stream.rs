@@ -27,6 +27,7 @@ use crate::{
     utils::{
         hash::{gxhash, Sum64},
         json,
+        json::{Map, Value},
     },
     CONFIG,
 };
@@ -410,6 +411,12 @@ pub struct StreamSettings {
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
     pub data_retention: i64,
+    #[serde(skip_serializing_if = "Option::None")]
+    pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+    #[serde(skip_serializing_if = "Option::None")]
+    pub flatten_level: Option<i64>,
+    #[serde(skip_serializing_if = "Option::None")]
+    pub defined_schema_fields: Option<Vec<String>>,
 }
 
 impl Serialize for StreamSettings {
@@ -430,6 +437,30 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
+        match self.routing.as_ref() {
+            Some(routing) => {
+                state.serialize_field("routing", routing)?;
+            }
+            None => {
+                state.skip_field("routing")?;
+            }
+        }
+        match self.defined_schema_fields.as_ref() {
+            Some(defined_schema_fields) => {
+                state.serialize_field("defined_schema_fields", defined_schema_fields)?;
+            }
+            None => {
+                state.skip_field("defined_schema_fields")?;
+            }
+        }
+        match self.flatten_level.as_ref() {
+            Some(flatten_level) => {
+                state.serialize_field("flatten_level", flatten_level)?;
+            }
+            None => {
+                state.skip_field("flatten_level")?;
+            }
+        }
         state.end()
     }
 }
@@ -485,12 +516,41 @@ impl From<&str> for StreamSettings {
             data_retention = v.as_i64().unwrap();
         };
 
+        let mut defined_schema_fields: Option<Vec<String>> = None;
+        if let Some(value) = settings.get("defined_schema_fields") {
+            defined_schema_fields = Some(
+                value
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_str().unwrap().to_string())
+                    .collect(),
+            );
+        }
+
+        let mut routing: HashMap<String, Vec<RoutingCondition>> = HashMap::new();
+        let routes = settings.get("routing");
+        if let Some(value) = routes {
+            let v: Vec<_> = value.as_object().unwrap().iter().collect();
+            for item in v {
+                routing.insert(
+                    item.0.to_string(),
+                    json::from_value(item.1.clone()).unwrap(),
+                );
+            }
+        }
+
+        let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
+
         Self {
             partition_keys,
             partition_time_level,
             full_text_search_keys,
             bloom_filter_fields,
             data_retention,
+            routing: Some(routing),
+            flatten_level,
+            defined_schema_fields,
         }
     }
 }
@@ -559,6 +619,127 @@ impl Display for StreamPartitionType {
 pub struct PartitioningDetails {
     pub partition_keys: Vec<StreamPartition>,
     pub partition_time_level: Option<PartitionTimeLevel>,
+}
+
+pub struct Routing {
+    pub destination: String,
+    pub routing: Vec<RoutingCondition>,
+}
+
+// Code Duplicated from alerts
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct RoutingCondition {
+    pub column: String,
+    pub operator: Operator,
+    #[schema(value_type = Object)]
+    pub value: Value,
+    #[serde(default)]
+    pub ignore_case: bool,
+}
+// Code Duplicated from alerts
+impl RoutingCondition {
+    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        let val = match row.get(&self.column) {
+            Some(val) => val,
+            None => {
+                return false;
+            }
+        };
+        match val {
+            Value::String(v) => {
+                let val = v.as_str();
+                let con_val = self.value.as_str().unwrap_or_default();
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    Operator::GreaterThan => val > con_val,
+                    Operator::GreaterThanEquals => val >= con_val,
+                    Operator::LessThan => val < con_val,
+                    Operator::LessThanEquals => val <= con_val,
+                    Operator::Contains => val.contains(con_val),
+                    Operator::NotContains => !val.contains(con_val),
+                }
+            }
+            Value::Number(_) => {
+                let val = val.as_f64().unwrap_or_default();
+                let con_val = if self.value.is_number() {
+                    self.value.as_f64().unwrap_or_default()
+                } else {
+                    self.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default()
+                };
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    Operator::GreaterThan => val > con_val,
+                    Operator::GreaterThanEquals => val >= con_val,
+                    Operator::LessThan => val < con_val,
+                    Operator::LessThanEquals => val <= con_val,
+                    _ => false,
+                }
+            }
+            Value::Bool(v) => {
+                let val = v.to_owned();
+                let con_val = if self.value.is_boolean() {
+                    self.value.as_bool().unwrap_or_default()
+                } else {
+                    self.value
+                        .as_str()
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default()
+                };
+                match self.operator {
+                    Operator::EqualTo => val == con_val,
+                    Operator::NotEqualTo => val != con_val,
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum Operator {
+    #[serde(rename = "=")]
+    EqualTo,
+    #[serde(rename = "!=")]
+    NotEqualTo,
+    #[serde(rename = ">")]
+    GreaterThan,
+    #[serde(rename = ">=")]
+    GreaterThanEquals,
+    #[serde(rename = "<")]
+    LessThan,
+    #[serde(rename = "<=")]
+    LessThanEquals,
+    Contains,
+    NotContains,
+}
+
+impl Default for Operator {
+    fn default() -> Self {
+        Self::EqualTo
+    }
+}
+
+impl std::fmt::Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operator::EqualTo => write!(f, "="),
+            Operator::NotEqualTo => write!(f, "!="),
+            Operator::GreaterThan => write!(f, ">"),
+            Operator::GreaterThanEquals => write!(f, ">="),
+            Operator::LessThan => write!(f, "<"),
+            Operator::LessThanEquals => write!(f, "<="),
+            Operator::Contains => write!(f, "contains"),
+            Operator::NotContains => write!(f, "not contains"),
+        }
+    }
 }
 
 #[cfg(test)]

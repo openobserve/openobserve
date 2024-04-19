@@ -447,6 +447,26 @@ struct StreamMeta<'a> {
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
+pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &[String]) {
+    let mut non_schema_map = HashMap::new();
+
+    for (key, value) in original_map.iter() {
+        if !defined_schema_keys.contains(key) {
+            non_schema_map.insert(key.clone(), get_string_value(value));
+        }
+    }
+
+    original_map.retain(|key, _| defined_schema_keys.contains(key));
+
+    if !non_schema_map.is_empty() {
+        let non_schema_json = serde_json::to_string(&non_schema_map).unwrap_or_default();
+        original_map.insert(
+            CONFIG.common.all_fields_name.to_string(),
+            Value::String(non_schema_json),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
