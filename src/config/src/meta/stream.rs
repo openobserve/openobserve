@@ -516,13 +516,16 @@ impl From<&str> for StreamSettings {
             data_retention = v.as_i64().unwrap();
         };
 
-        let mut defined_schema_fields = Vec::new();
-        let fields = settings.get("defined_schema_fields");
-        if let Some(value) = fields {
-            let v: Vec<_> = value.as_array().unwrap().iter().collect();
-            for item in v {
-                defined_schema_fields.push(item.as_str().unwrap().to_string())
-            }
+        let mut defined_schema_fields: Option<Vec<String>> = None;
+        if let Some(value) = settings.get("defined_schema_fields") {
+            defined_schema_fields = Some(
+                value
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| item.as_str().unwrap().to_string())
+                    .collect(),
+            );
         }
 
         let mut routing: HashMap<String, Vec<RoutingCondition>> = HashMap::new();
@@ -547,7 +550,7 @@ impl From<&str> for StreamSettings {
             data_retention,
             routing: Some(routing),
             flatten_level,
-            defined_schema_fields: Some(defined_schema_fields),
+            defined_schema_fields,
         }
     }
 }
