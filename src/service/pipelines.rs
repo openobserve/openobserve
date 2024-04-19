@@ -22,41 +22,40 @@ use actix_web::{
 use config::meta::stream::StreamType;
 
 use super::db;
-use crate::{
-    common::{
-        meta::{
-            authz::Authz,
-            http::HttpResponse as MetaHttpResponse,
-            pipelines::{PipeLine, PipeLineList},
-        },
-        utils::auth::{remove_ownership, set_ownership},
+use crate::common::{
+    infra::config::STREAM_FUNCTIONS,
+    meta::{
+        http::HttpResponse as MetaHttpResponse,
+        pipelines::{PipeLine, PipeLineList},
     },
-    handler::http::request::pipeline,
 };
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn save_pipeline(org_id: String, mut pipeline: PipeLine) -> Result<HttpResponse, Error> {
-    if let Some(_existing_pipeline) = check_existing_pipeline(&org_id, &pipeline.name).await {
+pub async fn save_pipeline(org_id: String, pipeline: PipeLine) -> Result<HttpResponse, Error> {
+    if let Some(_existing_pipeline) = check_existing_pipeline(
+        &org_id,
+        pipeline.stream_type,
+        &pipeline.stream_name,
+        &pipeline.name,
+    )
+    .await
+    {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
             "Pipeline already exits".to_string(),
         )))
+    } else if let Err(error) = db::pipelines::set(&org_id, &pipeline.name, &pipeline).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        );
     } else {
-        if let Err(error) = db::pipelines::set(&org_id, &pipeline.name, &pipeline).await {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    error.to_string(),
-                )),
-            );
-        } else {
-            set_ownership(&org_id, "pipeline", Authz::new(&pipeline.name)).await;
-
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Pipeline saved successfully".to_string(),
-            )))
-        }
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline saved successfully".to_string(),
+        )))
     }
 }
 
@@ -64,9 +63,16 @@ pub async fn save_pipeline(org_id: String, mut pipeline: PipeLine) -> Result<Htt
 pub async fn update_pipeline(
     org_id: &str,
     pipeline_name: &str,
-    mut pipeline: PipeLine,
+    pipeline: PipeLine,
 ) -> Result<HttpResponse, Error> {
-    let existing_pipeline = match check_existing_pipeline(org_id, pipeline_name).await {
+    let existing_pipeline = match check_existing_pipeline(
+        org_id,
+        pipeline.stream_type,
+        &pipeline.stream_name,
+        pipeline_name,
+    )
+    .await
+    {
         Some(pipeline) => pipeline,
         None => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -75,7 +81,7 @@ pub async fn update_pipeline(
             )));
         }
     };
-    if pipeline == existing_pipeline {
+    if pipeline.eq(&existing_pipeline) {
         return Ok(HttpResponse::Ok().json(pipeline));
     }
 
@@ -111,7 +117,15 @@ pub async fn list_pipelines(
                     .unwrap()
                     .contains(&format!("pipeline:{}", org_id))
             {
-                result.push(pipeline);
+                let fn_list = if let Some(val) = STREAM_FUNCTIONS.get(&format!(
+                    "{}/{}/{}",
+                    org_id, &pipeline.stream_type, &pipeline.stream_name
+                )) {
+                    Some(val.value().clone())
+                } else {
+                    None
+                };
+                result.push(pipeline.into_response(fn_list));
             }
         }
 
@@ -122,12 +136,17 @@ pub async fn list_pipelines(
 }
 
 #[tracing::instrument]
-pub async fn delete_pipeline(org_id: String, pipeline_name: String) -> Result<HttpResponse, Error> {
-    let result = db::pipelines::delete(&org_id, &pipeline_name).await;
+pub async fn delete_pipeline(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    pipeline_name: &str,
+) -> Result<HttpResponse, Error> {
+    let result = db::pipelines::delete(org_id, stream_type, stream_name, pipeline_name).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
-            "User deleted".to_string(),
+            "Pipeline deleted".to_string(),
         ))),
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
@@ -136,8 +155,13 @@ pub async fn delete_pipeline(org_id: String, pipeline_name: String) -> Result<Ht
     }
 }
 
-async fn check_existing_pipeline(org_id: &str, pipeline: &str) -> Option<PipeLine> {
-    match db::pipelines::get(org_id, pipeline).await {
+async fn check_existing_pipeline(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Option<PipeLine> {
+    match db::pipelines::get(org_id, stream_type, stream_name, name).await {
         Ok(pipeline) => Some(pipeline),
         Err(_) => None,
     }
