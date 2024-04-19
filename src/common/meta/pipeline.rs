@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,26 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
-pub mod authz;
-pub mod clusters;
-pub mod dashboards;
-pub mod enrichment_table;
-pub mod functions;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod pipelines;
-pub mod prom;
-pub mod rum;
-pub mod search;
-pub mod status;
-pub mod stream;
-pub mod syslog;
-pub mod traces;
-pub mod users;
-pub mod pipeline;
+use std::sync::Arc;
 
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+use arrow_schema::Field;
+use config::{
+    meta::stream::{StreamSettings, StreamStats, StreamType},
+    utils::json,
+};
+use datafusion::arrow::datatypes::Schema;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use super::prom::Metadata;
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipeLine {
+    pub name: String,
+    pub description: String,
+    pub stream_name: String,
+    pub stream_type: StreamType,
+    #[serde(skip_serializing_if = "Option::None")]
+    pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+}
