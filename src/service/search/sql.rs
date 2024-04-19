@@ -1000,6 +1000,7 @@ mod tests {
             query_context: None,
             uses_zo_fn: false,
             query_fn: None,
+            skip_wal: false,
         };
 
         let req: config::meta::search::Request = config::meta::search::Request {
@@ -1109,6 +1110,7 @@ mod tests {
                 query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
+                skip_wal: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
@@ -1230,6 +1232,7 @@ mod tests {
                 query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
+                skip_wal: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
