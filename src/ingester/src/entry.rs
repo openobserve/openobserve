@@ -18,10 +18,16 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{array::Int64Array, json::ReaderBuilder, record_batch::RecordBatch};
-use arrow_schema::Schema;
+use arrow::{
+    array::{
+        make_builder, ArrayBuilder, BooleanBuilder, Float64Builder, Int64Array, Int64Builder,
+        StringBuilder,
+    },
+    record_batch::RecordBatch,
+};
+use arrow_schema::{DataType, Schema};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::{utils::record_batch_ext::RecordBatchExt, CONFIG};
+use config::{utils::record_batch_ext::RecordBatchExt, FxIndexMap, CONFIG};
 use snafu::ResultExt;
 
 use crate::errors::*;
@@ -88,18 +94,63 @@ impl Entry {
     }
 
     pub fn into_batch(&self, schema: Arc<Schema>) -> Result<Option<Arc<RecordBatchEntry>>> {
-        let mut decoder = ReaderBuilder::new(schema)
-            .with_batch_size(self.data.len())
-            .build_decoder()
-            .context(CreateArrowJsonEncoderSnafu)?;
-        decoder
-            .serialize(&self.data)
-            .context(ArrowJsonEncodeSnafu)?;
-        let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
-        Ok(batch.map(|b| {
-            let arrow_size = b.size();
-            RecordBatchEntry::new(b, self.data_size, arrow_size)
-        }))
+        let mut builders: FxIndexMap<&String, (&DataType, Box<dyn ArrayBuilder>)> = schema
+            .fields()
+            .iter()
+            .map(|f| {
+                (
+                    f.name(),
+                    (f.data_type(), make_builder(f.data_type(), self.data.len())),
+                )
+            })
+            .collect();
+
+        for record in self.data.iter() {
+            for (k, v) in record.as_object().unwrap() {
+                let (data_type, builder) = builders.get_mut(k).unwrap();
+                match data_type {
+                    DataType::Int64 => {
+                        let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        b.append_value(v.as_i64().unwrap());
+                    }
+                    DataType::Utf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap();
+                        b.append_value(v.as_str().unwrap());
+                    }
+                    DataType::Boolean => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap();
+                        b.append_value(v.as_bool().unwrap());
+                    }
+                    DataType::Float64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        b.append_value(v.as_f64().unwrap());
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+        }
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            builders.iter_mut().map(|(_, (_, v))| v.finish()).collect(),
+        )
+        .context(ArrowJsonEncodeSnafu)?;
+
+        let arrow_size = batch.size();
+        Ok(Some(RecordBatchEntry::new(
+            batch,
+            self.data_size,
+            arrow_size,
+        )))
     }
 }
 
