@@ -77,32 +77,52 @@ pub fn convert_json_to_record_batch(
                         .as_any_mut()
                         .downcast_mut::<StringBuilder>()
                         .unwrap();
-                    b.append_value(v.as_str().unwrap());
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(v.as_str().unwrap());
+                    }
                 }
                 DataType::Int64 => {
                     let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
-                    b.append_value(v.as_i64().unwrap());
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(v.as_i64().unwrap());
+                    }
                 }
                 DataType::UInt64 => {
                     let b = builder
                         .as_any_mut()
                         .downcast_mut::<UInt64Builder>()
                         .unwrap();
-                    b.append_value(v.as_u64().unwrap());
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(v.as_u64().unwrap());
+                    }
                 }
                 DataType::Float64 => {
                     let b = builder
                         .as_any_mut()
                         .downcast_mut::<Float64Builder>()
                         .unwrap();
-                    b.append_value(v.as_f64().unwrap());
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(v.as_f64().unwrap());
+                    }
                 }
                 DataType::Boolean => {
                     let b = builder
                         .as_any_mut()
                         .downcast_mut::<BooleanBuilder>()
                         .unwrap();
-                    b.append_value(v.as_bool().unwrap());
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(v.as_bool().unwrap());
+                    }
                 }
                 DataType::Null => {
                     let b = builder.as_any_mut().downcast_mut::<NullBuilder>().unwrap();
