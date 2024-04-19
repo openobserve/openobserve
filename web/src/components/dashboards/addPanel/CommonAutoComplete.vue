@@ -36,7 +36,7 @@
 
 <script>
 import { ref, toRef, defineComponent, watch } from "vue";
-import { useSearchInputUsingRegex2 } from "@/composables/useSearchInputUsingRegex";
+import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -84,7 +84,7 @@ export default defineComponent({
 
     // apply filter on label
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSearchInputUsingRegex2(toRef(props.items), "label", props.searchRegex);
+      useSearchInputUsingRegex(toRef(props.items), "label", props.searchRegex);
 
     const hideOptions = () => {
       showOptions.value = false;

@@ -330,11 +330,6 @@ export default defineComponent({
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
 
-    const getDefaultVariable = () => ({
-      name: "",
-      value: "",
-    });
-
     const getDefaultDrilldownData = () => ({
       name: "",
       type: "byDashboard",
@@ -346,7 +341,12 @@ export default defineComponent({
         dashboard: "",
         tab: "",
         passAllVariables: true,
-        variables: [getDefaultVariable()],
+        variables: [
+          {
+            name: "",
+            value: "",
+          },
+        ],
       },
     });
     const drilldownData = ref(
@@ -589,13 +589,11 @@ export default defineComponent({
     const variableNamesFn = ref([]);
 
     watch(drilldownData.value, async (newData) => {
-      console.log("drilldownData", newData.data);
 
       if (newData.data.folder && newData.data.dashboard) {
         const folder = store.state.organizationData.folders.find(
           (folder: any) => folder.name === newData.data.folder
         );
-        console.log("folder---", folder);
 
         const allDashboardData = await getAllDashboardsByFolderId(
           store,
@@ -612,15 +610,12 @@ export default defineComponent({
               value: variable.name,
             })
           );
-          console.log("optionsList", optionsList);
           variableNamesFn.value = optionsList;
         } else {
-          console.log("dashboardData not found");
 
           variableNamesFn.value = [];
         }
       } else {
-        console.log("folder or dashboard not found");
 
         variableNamesFn.value = [];
       }
@@ -670,28 +665,5 @@ export default defineComponent({
 
 :deep(.no-case .q-field__native > :first-child) {
   text-transform: none !important;
-}
-
-.options-container {
-  z-index: 10;
-  position: absolute;
-  left: 0;
-  right: 0;
-  border: 1px solid #ccc;
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-.relative {
-  position: relative;
-}
-
-.option {
-  padding: 8px;
-  cursor: pointer;
-}
-
-.option:hover {
-  background-color: #f0f0f0b1;
 }
 </style>

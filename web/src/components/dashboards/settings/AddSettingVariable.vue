@@ -831,28 +831,4 @@ export default defineComponent({
 .theme-light .bg-highlight {
   background-color: #e7e6e6;
 }
-
-.options-container {
-  z-index: 10;
-  position: absolute;
-  left: 0;
-  right: 0;
-  border: 1px solid #ccc;
-  max-height: 100px;
-  overflow-y: auto;
-  top: 42px;
-}
-
-.relative {
-  position: relative;
-}
-
-.option {
-  padding: 8px;
-  cursor: pointer;
-}
-
-.option:hover {
-  background-color: #f0f0f0b1;
-}
 </style>
