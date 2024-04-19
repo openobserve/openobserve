@@ -30,6 +30,7 @@ message SearchQuery {
     string   query_context = 11;
     bool        uses_zo_fn = 12;
     string        query_fn = 13;
+    bool          skip_wal = 14;
 }
 
 // Search request

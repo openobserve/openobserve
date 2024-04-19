@@ -289,7 +289,10 @@ pub async fn search(
                 }
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] datafusion execute error: {}", err);
+                log::error!(
+                    "[trace_id {trace_id}] search->storage: datafusion execute error: {}",
+                    err
+                );
                 return Err(err.into());
             }
         };

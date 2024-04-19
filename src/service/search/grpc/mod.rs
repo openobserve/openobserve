@@ -73,6 +73,7 @@ pub async fn search(
     );
 
     // search in WAL parquet
+    let skip_wal = req.query.as_ref().unwrap().skip_wal;
     let work_group1 = work_group.clone();
     let trace_id1 = trace_id.clone();
     let sql1 = sql.clone();
@@ -85,7 +86,7 @@ pub async fn search(
     );
     let task1 = tokio::task::spawn(
         async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
                 wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
@@ -107,7 +108,7 @@ pub async fn search(
     );
     let task2 = tokio::task::spawn(
         async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
                 wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
