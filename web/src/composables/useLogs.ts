@@ -781,7 +781,6 @@ const useLogs = () => {
             }
           }
 
-          console.log(req.query.sql);
           const preSQLQuery = req.query.sql;
           req.query.sql = [];
 
@@ -794,7 +793,6 @@ const useLogs = () => {
                 item
               );
 
-              console.log(searchObj.data.stream);
               const listOfFields: any = [];
               let streamField: any = {};
               for (const field of searchObj.data.stream.interestingFieldList) {
@@ -808,7 +806,6 @@ const useLogs = () => {
                   }
                 }
               }
-              console.log(JSON.stringify(listOfFields));
 
               finalQuery = finalQuery.replace(
                 "[FIELD_LIST]",
@@ -2005,7 +2002,6 @@ const useLogs = () => {
           }
         }
 
-        console.log("step1:", finalArray);
         delete finalArray.common;
         // Object.keys(finalArray).forEach((stream: any) => {
         for (const stream of Object.keys(finalArray)) {
@@ -2033,8 +2029,6 @@ const useLogs = () => {
         }
 
         let fields: any = {};
-        console.log("schemaInterestingFields:", schemaInterestingFields);
-        console.log("localInterestingFields:", localInterestingFields);
         for (const stream of searchObj.data.streamResults.list) {
           if (
             selectedStreamValues.includes(stream.name) &&
@@ -2042,7 +2036,6 @@ const useLogs = () => {
           ) {
             let index = -1;
 
-            console.log(searchObj.data.stream.selectedStreamFields);
             fields = {};
             for (const row of queryResult) {
               // let keys = deepKeys(row);
@@ -2068,7 +2061,6 @@ const useLogs = () => {
                           localFields = localInterestingFields.value;
                         }
 
-                        console.log(Object.keys(localFields).length);
                         searchObj.data.stream.selectedStreamFields[index] = {
                           ...searchObj.data.stream.selectedStreamFields[index],
                           isInterestingField:
@@ -2295,11 +2287,6 @@ const useLogs = () => {
           query_context = query_context.replace("[FIELD_LIST]", "*");
         }
 
-        console.log(
-          "searchObj.data.stream.missingStreamMultiStreamFilter:",
-          searchObj.data.stream.missingStreamMultiStreamFilter,
-          searchObj.data.stream.selectedStream
-        );
         // const preSQLQuery = req.query.sql;
         const streamsData: any = searchObj.data.stream.selectedStream.filter(
           (streams: any) =>
