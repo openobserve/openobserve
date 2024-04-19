@@ -17,14 +17,19 @@ export const useSearchInputUsingRegex = (
       return;
     }
 
-    const regex = new RegExp(searchRegex);
+    const regex = new RegExp(searchRegex, "g");
+    console.log("regex", regex);
+    
 
     const match = regex.exec(val);
     if (!match) {
       filteredOptions.value = [];
     }
-
+    console.log("match", match);
+    
     const needle = match?.[1]?.toLowerCase();
+    console.log("needle", needle);
+    
 
     filteredOptions.value = options.value?.filter((option: any) => {
       const value =
