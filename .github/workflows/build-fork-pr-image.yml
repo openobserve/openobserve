@@ -46,7 +46,7 @@ jobs:
         - name: Set GIT_TAG env
           run: |
             git fetch -f --tags
-            echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+            echo "GIT_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)" >> $GITHUB_ENV
             echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
        
         - name: Setup Rust Toolchain
