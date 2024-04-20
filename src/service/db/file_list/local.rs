@@ -62,7 +62,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
         file.write(write_buf.as_ref()).await;
     }
 
-    // notifiy other nodes
+    // notify other nodes
     if !CONFIG.common.meta_store_external || CONFIG.memory_cache.cache_latest_files {
         let mut q = BROADCAST_QUEUE.write().await;
         q.push(file_data);

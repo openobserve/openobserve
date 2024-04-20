@@ -172,7 +172,7 @@ pub async fn search_parquet(
                         file.meta.min_ts,
                         file.meta.max_ts
                     );
-                    // HACK: use the latest verion if not found in schema versions
+                    // HACK: use the latest version if not found in schema versions
                     schema_latest_id
                 }
             };
@@ -319,7 +319,10 @@ pub async fn search_parquet(
             Err(err) => {
                 // release all files
                 wal::release_files(&lock_files).await;
-                log::error!("[trace_id {trace_id}] datafusion execute error: {}", err);
+                log::error!(
+                    "[trace_id {trace_id}] wal->parquet->search: datafusion execute error: {}",
+                    err
+                );
                 return Err(err.into());
             }
         };
@@ -515,7 +518,10 @@ pub async fn search_memtable(
                 }
             }
             Err(err) => {
-                log::error!("datafusion execute error: {}", err);
+                log::error!(
+                    "[trace_id {trace_id}] wal->mem->search: datafusion execute error: {}",
+                    err
+                );
                 return Err(err.into());
             }
         };

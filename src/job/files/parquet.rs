@@ -413,8 +413,8 @@ async fn merge_files(
     for file in files_with_size.iter() {
         if new_file_size > 0
             && ((new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64)
-                || (CONFIG.limit.quick_mode_num_fields > 0
-                    && latest_schema.fields().len() > CONFIG.limit.quick_mode_num_fields))
+                || (CONFIG.limit.file_move_fields_limit > 0
+                    && latest_schema.fields().len() > CONFIG.limit.file_move_fields_limit))
         {
             break;
         }
@@ -708,12 +708,12 @@ async fn prepare_index_record_batches_v1(
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
     for column in local.fields().iter() {
-        // 1500 columns --> 100 columns of inverted index
-        let index_df = ctx.table("_tbl_raw_data").await?;
-
         if column.data_type() != &DataType::Utf8 {
             continue;
         }
+
+        // 1500 columns --> 100 columns of inverted index
+        let index_df = ctx.table("_tbl_raw_data").await?;
 
         let column_name = column.name();
         let split_chars = &CONFIG.common.inverted_index_split_chars;

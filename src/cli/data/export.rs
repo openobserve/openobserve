@@ -52,6 +52,7 @@ impl Context for Export {
             query_context: None,
             uses_zo_fn: false,
             query_fn: None,
+            skip_wal: false,
         };
 
         let req = search::Request {

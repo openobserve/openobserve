@@ -405,7 +405,7 @@ async fn generate_report(
     // If the span element is not rendered yet, capture whatever is loaded till now
     if let Err(e) = wait_for_panel_data_load(&page).await {
         log::error!(
-            "[REPORT] error occured while finding the span element for dashboard {dashboard_id}:{e}"
+            "[REPORT] error occurred while finding the span element for dashboard {dashboard_id}:{e}"
         );
     } else {
         log::info!("[REPORT] all panel data loaded for report dashboard: {dashboard_id}");

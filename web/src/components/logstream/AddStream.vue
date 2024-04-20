@@ -235,10 +235,12 @@ const getStreamPayload = () => {
     full_text_search_keys: any[];
     bloom_filter_fields: any[];
     data_retention?: number;
+    defined_schema_fields: any[];
   } = {
     partition_keys: [],
     full_text_search_keys: [],
     bloom_filter_fields: [],
+    defined_schema_fields: [],
   };
 
   if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
@@ -256,6 +258,12 @@ const getStreamPayload = () => {
   }
 
   fields.value.forEach((field) => {
+    field.name = field.name
+      .trim()
+      .toLowerCase()
+      .replace(/ /g, "_")
+      .replace(/-/g, "_");
+
     field.index_type?.forEach((index: string) => {
       if (index === "fullTextSearchKey") {
         settings.full_text_search_keys.push(field.name);
@@ -282,6 +290,7 @@ const getStreamPayload = () => {
         settings.bloom_filter_fields.push(field.name);
       }
     });
+    settings.defined_schema_fields.push(field.name);
   });
 
   return settings;
