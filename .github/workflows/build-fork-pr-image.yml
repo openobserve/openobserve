@@ -33,12 +33,15 @@ jobs:
             sudo rm -rf "$AGENT_TOOLSDIRECTORY"
   
         - name: Clone the current repo
-          uses: actions/checkout@v4
+          uses: actions/checkout@v3
           with:
-            repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
-            ref: ${{ github.event.client_payload.pull_request.head.ref || github.ref }}
-            fetch-depth: 0
-            fetch-tags: true
+            ref: 'refs/pull/${{ github.event.client_payload.pull_request.number }}/merge'
+          # uses: actions/checkout@v4
+          # with:
+          #   repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          #   ref: ${{ github.event.client_payload.pull_request.head.ref || github.ref }}
+          #   fetch-depth: 0
+          #   fetch-tags: true
 
         - name: Set GIT_TAG env
           run: |
