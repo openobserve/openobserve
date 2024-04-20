@@ -360,15 +360,12 @@ fn generate_search_schema(
             (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
 
             // When both group_field and latest_field are Some, compare their data types
-            (Some(group_field), Some(latest_field))
-                if group_field.data_type() != latest_field.data_type() =>
-            {
-                new_fields.push(Arc::new(latest_field.clone()));
-                diff_fields.insert(field.to_string(), latest_field.data_type().clone());
+            (Some(group_field), Some(latest_field)) => {
+                if group_field.data_type() != latest_field.data_type() {
+                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
+                }
+                new_fields.push(Arc::new(group_field.clone()));
             }
-
-            // When both group_field and latest_field are Some, and their data types are the same
-            (Some(group_field), Some(_)) => new_fields.push(Arc::new(group_field.clone())),
 
             // should we return error
             _ => {}

@@ -327,7 +327,8 @@ pub async fn merge(
                     let (is_schema_changed, field_datatype_delta, merged_fields) =
                         get_merge_schema_changes(latest_schema, &inferred_schema);
                     if !is_schema_changed {
-                        tx.send(Some((latest_schema.clone(), field_datatype_delta))).unwrap();
+                        tx.send(Some((latest_schema.clone(), field_datatype_delta)))
+                            .unwrap();
                         return Ok(None); // no change, return
                     }
                     let metadata = latest_schema.metadata().clone();
