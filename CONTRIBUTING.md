@@ -7,7 +7,6 @@
 OpenObserve uses Rust & embdeds sled db (For server) & VueJS (For Web UI)
 
 You must have follwing installed:
-
 1. Git
 2. Rust & Cargo 1.70+
 3. nodejs v14+ and npm v6+
