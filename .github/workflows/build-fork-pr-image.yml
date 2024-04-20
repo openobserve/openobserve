@@ -10,7 +10,7 @@ env:
 
 jobs:
     build_pr_image_on_fork:
-      name: build_pr_image_on_fork
+      name: build_pr_image
       permissions:
         id-token: write
         contents: read
@@ -128,7 +128,7 @@ jobs:
                 ref
               });
               console.log(checks)
-              
+
               const check = checks.check_runs.filter(c => c.name === process.env.job);
     
               const { data: result } = await github.rest.checks.update({
