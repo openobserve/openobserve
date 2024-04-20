@@ -21,13 +21,13 @@ jobs:
     # purpose that they app is being used for.
     - name: Generate token
       id: generate_token
-      uses: tibdex/github-app-token@v1
+      uses: tibdex/github-app-token@v2
       with:
         app_id: ${{ secrets.APP_ID }}
         private_key: ${{ secrets.PRIVATE_KEY }}
 
     - name: Slash Command Dispatch
-      uses: peter-evans/slash-command-dispatch@v3
+      uses: peter-evans/slash-command-dispatch@v4
       env:
         TOKEN: ${{ steps.generate_token.outputs.token }}
       with:
