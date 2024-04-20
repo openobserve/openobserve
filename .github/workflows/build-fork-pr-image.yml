@@ -106,7 +106,7 @@ jobs:
             push: true
             cache-from: type=gha
             cache-to: type=gha,mode=max
-        - uses: actions/github-script@v6
+        - uses: actions/github-script@v7
           id: update-check-run
           if: ${{ always() }}
           env:
@@ -127,7 +127,8 @@ jobs:
                 ...context.repo,
                 ref
               });
-    
+              console.log(checks)
+              
               const check = checks.check_runs.filter(c => c.name === process.env.job);
     
               const { data: result } = await github.rest.checks.update({
