@@ -787,16 +787,30 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
             }
         }
         SqlExpr::Function(f) => {
-            return match f.args.first() {
-                Some(FunctionArg::Named {
-                    name: _name,
-                    arg: FunctionArgExpr::Expr(expr),
-                }) => get_field_name_from_expr(expr),
-                Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(expr))) => {
-                    get_field_name_from_expr(expr)
+            let mut fields = Vec::with_capacity(f.args.len());
+            for arg in f.args.iter() {
+                match arg {
+                    FunctionArg::Named {
+                        name: _name,
+                        arg: FunctionArgExpr::Expr(expr),
+                    } => {
+                        if let Some(v) = get_field_name_from_expr(expr) {
+                            fields.extend(v);
+                        }
+                    }
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) => {
+                        if let Some(v) = get_field_name_from_expr(expr) {
+                            fields.extend(v);
+                        }
+                    }
+                    _ => {}
                 }
-                _ => None,
-            };
+            }
+            if fields.is_empty() {
+                None
+            } else {
+                Some(fields)
+            }
         }
         SqlExpr::Nested(expr) => get_field_name_from_expr(expr),
         _ => None,
@@ -937,6 +951,9 @@ mod tests {
                 "select a, (a + b) as d FROM tbl where c=1",
                 vec!["a", "b", "c"],
             ),
+            ("select a, COALESCE(b, c) FROM tbl", vec!["a", "b", "c"]),
+            ("select a, COALESCE(b, 'c') FROM tbl", vec!["a", "b"]),
+            ("select a, COALESCE(b, \"c\") FROM tbl", vec!["a", "b", "c"]),
         ];
         for (sql, fields) in samples {
             let actual = Sql::new(sql).unwrap().fields;
