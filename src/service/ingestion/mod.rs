@@ -128,12 +128,16 @@ pub async fn get_stream_functions<'a>(
         if stream_functions_map.contains_key(&key) {
             return;
         }
-        let mut _local_trans: Vec<StreamTransform> = vec![];
-        (_local_trans, *stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-            &stream.org_id,
-            &stream.stream_type,
-            &stream.stream_name,
-        );
+        //   let mut _local_trans: Vec<StreamTransform> = vec![];
+        // let local_stream_vrl_map;
+        let (_local_trans, local_stream_vrl_map) =
+            crate::service::ingestion::register_stream_functions(
+                &stream.org_id,
+                &stream.stream_type,
+                &stream.stream_name,
+            );
+        stream_vrl_map.extend(local_stream_vrl_map);
+
         stream_functions_map.insert(key, _local_trans);
     }
 }
