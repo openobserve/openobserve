@@ -431,13 +431,14 @@ fn generate_select_start_search_schema(
 fn generate_used_fields_in_query(sql: &Arc<Sql>) -> Vec<String> {
     let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
 
+    // note field name maybe equal to alias name
     let mut used_fields: FxIndexSet<_> = sql
         .meta
-        .fields
+        .group_by
         .iter()
-        .chain(&sql.meta.group_by)
         .chain(sql.meta.order_by.iter().map(|(f, _)| f))
         .filter(|f| !alias_map.contains(*f))
+        .chain(&sql.meta.fields)
         .cloned()
         .collect();
 
