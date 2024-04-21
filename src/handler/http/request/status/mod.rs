@@ -118,7 +118,7 @@ struct Rum {
 #[get("/healthz")]
 pub async fn healthz() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(HealthzResponse {
-        status: "ok".to_string(),
+        status: "ok-from-fork".to_string(),
     }))
 }
 
