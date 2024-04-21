@@ -209,7 +209,7 @@ mod tests {
     use crate::{
         common::meta::stream::SchemaRecords,
         service::{
-            ingestion, metadata,
+            ingestion,
             metadata::{
                 trace_list_index::{TraceListIndex, TraceListItem, STREAM_NAME},
                 Metadata, MetadataItem,
@@ -230,12 +230,12 @@ mod tests {
     async fn test_trace_list_index_write_file() {
         let t = TraceListIndex::new();
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
-        let item = metadata::MetadataItem::TraceListIndexer(TraceListItem {
+        let item = TraceListItem {
             stream_name: "default".to_string(),
             service_name: "oojaeger".to_string(),
             trace_id: "b09e986672880927996155acd4ef113c".to_string(),
             _timestamp: 1711267573271714542,
-        });
+        };
         let schema_key = "9d384d5af30d1657";
         let timestamp = chrono::Utc::now().timestamp_micros();
         let mut data = json::to_value(item).unwrap();
