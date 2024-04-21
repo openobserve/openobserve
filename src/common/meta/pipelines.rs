@@ -32,6 +32,8 @@ pub struct PipeLine {
     pub stream_type: StreamType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 impl PipeLine {
@@ -43,6 +45,7 @@ impl PipeLine {
             stream_type: self.stream_type,
             routing: self.routing,
             functions,
+            meta: self.meta,
         }
     }
 }
@@ -60,6 +63,8 @@ pub struct PipeLineResponse {
     pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub functions: Option<StreamFunctionsList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<HashMap<String, Value>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
