@@ -15,7 +15,10 @@
 
 use std::collections::HashMap;
 
-use config::meta::stream::{RoutingCondition, StreamType};
+use config::{
+    meta::stream::{RoutingCondition, StreamType},
+    utils::json::Value,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
