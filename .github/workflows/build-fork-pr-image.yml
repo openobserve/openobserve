@@ -48,7 +48,7 @@ jobs:
           run: |
             git fetch -f --tags
             echo "GIT_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)" >> $GITHUB_ENV
-            echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+            echo "GIT_HASH=${{github.event.client_payload.slash_command.args.named.sha}}" >> $GITHUB_ENV
       
         - name: Setup Rust Toolchain
           uses: dtolnay/rust-toolchain@master
