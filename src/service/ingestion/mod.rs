@@ -494,24 +494,23 @@ pub async fn get_stream_routing(
     stream_params: StreamParams,
     stream_routing_map: &mut HashMap<String, Vec<Routing>>,
 ) {
-    let pipeline = STREAM_PIPELINES
-        .get(&format!(
-            "{}/{}/{}",
-            &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
-        ))
-        .unwrap();
-    let res: Vec<Routing> = pipeline
-        .routing
-        .as_ref()
-        .unwrap()
-        .iter()
-        .map(|(k, v)| Routing {
-            destination: format_stream_name(k),
-            routing: v.clone(),
-        })
-        .collect();
+    if let Some(pipeline) = STREAM_PIPELINES.get(&format!(
+        "{}/{}/{}",
+        &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
+    )) {
+        let res: Vec<Routing> = pipeline
+            .routing
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| Routing {
+                destination: k.to_string(),
+                routing: v.clone(),
+            })
+            .collect();
 
-    stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+        stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+    }
 }
 
 pub async fn get_user_defined_schema(
