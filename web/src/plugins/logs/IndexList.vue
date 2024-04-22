@@ -23,11 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
-        :label="
-          searchObj.data.stream.selectedStream.label
-            ? ''
-            : t('search.selectIndex')
-        "
         :options="streamOptions"
         data-cy="index-dropdown"
         input-debounce="0"
@@ -36,14 +31,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         dense
         use-input
-        hide-selected
         fill-input
+        multiple
+        emit-value
+        map-options
         @filter="filterStreamFn"
-        @update:model-value="onStreamChange('')"
+        @update:model-value="handleMultiStreamSelection"
+        :title="searchObj.data.stream.selectedStream.join(',')"
       >
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
+          </q-item>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item style="cursor: pointer">
+            <q-item-section @click="handleSingleStreamSelect(opt)">
+              <q-item-label v-html="opt.label" />
+            </q-item-section>
+            <q-item-section side v-if="streamOptions.length > 1">
+              <q-toggle
+                :data-test="`log-search-index-list-stream-toggle-${opt.label}`"
+                :model-value="selected"
+                size="20px"
+                @update:model-value="toggleOption(opt.value)"
+              />
+            </q-item-section>
           </q-item>
         </template>
       </q-select>
@@ -51,12 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="index-table q-mt-xs">
       <q-table
         data-test="log-search-index-list-fields-table"
-        v-model="searchObj.data.stream.selectedFields"
+        v-model="sortedStreamFields"
         :visible-columns="['name']"
         :rows="searchObj.data.stream.selectedStreamFields"
-        :row-key="
-          (row) => searchObj.data.stream.selectedStream.label + row.name
-        "
+        :row-key="(row) => searchObj.data.stream.selectedStream[0] + row.name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
         :pagination="{ rowsPerPage }"
@@ -72,7 +83,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <template #body-cell-name="props">
-          <q-tr :props="props">
+          <q-tr
+            :props="props"
+            v-if="props.row.label"
+            @click="
+              searchObj.data.stream.expandGroupRows[props.row.group] =
+                !searchObj.data.stream.expandGroupRows[props.row.group]
+            "
+            class="cursor-pointer text-bold"
+          >
+            <q-td
+              class="field_list bg-grey-3"
+              style="line-height: 28px; padding-left: 10px"
+            >
+              {{ props.row.name }}
+              <q-icon
+                :name="
+                  searchObj.data.stream.expandGroupRows[props.row.group]
+                    ? 'expand_less'
+                    : 'expand_more'
+                "
+                size="25px"
+                class="float-right"
+              ></q-icon>
+            </q-td>
+          </q-tr>
+          <q-tr
+            :props="props"
+            v-else
+            v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
+          >
             <q-td
               :props="props"
               class="field_list"
@@ -124,7 +164,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="field_overlay">
                   <q-btn
-                    v-if="props.row.isSchemaField"
+                    v-if="
+                      props.row.isSchemaField &&
+                      searchObj.data.stream.selectedStream.length ==
+                        props.row.streams.length
+                    "
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
@@ -234,7 +278,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="field_overlay">
                       <q-btn
-                        v-if="props.row.isSchemaField"
+                        v-if="
+                          props.row.isSchemaField &&
+                          searchObj.data.stream.selectedStream.length ==
+                            props.row.streams.length
+                        "
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
@@ -313,7 +361,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="q-pl-md q-py-xs text-subtitle2"
                       >
-                        No values found
+                        {{
+                          fieldValues[props.row.name]?.errMsg ||
+                          "No values found"
+                        }}
                       </div>
                       <div
                         v-for="value in fieldValues[props.row.name]?.values ||
@@ -328,24 +379,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <div
                               class="flex row wrap justify-between"
-                              style="width: calc(100% - 42px)"
+                              :style="
+                                searchObj.data.stream.selectedStream.length ==
+                                props.row.streams.length
+                                  ? 'width: calc(100% - 42px)'
+                                  : 'width: calc(100% - 0px)'
+                              "
                             >
                               <div
                                 :title="value.key"
                                 class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
+                                :style="
+                                  searchObj.data.stream.selectedStream.length ==
+                                  props.row.streams.length
+                                    ? 'width: calc(100% - 50px)'
+                                    : ''
+                                "
                               >
                                 {{ value.key }}
                               </div>
                               <div
-                                :title="value.count"
+                                :title="value.count.toString()"
                                 class="ellipsis text-right q-pr-sm"
-                                style="width: 50px"
+                                style="display: contents"
+                                :style="
+                                  searchObj.data.stream.selectedStream.length ==
+                                  props.row.streams.length
+                                    ? 'width: 50px'
+                                    : ''
+                                "
                               >
-                                {{ value.count }}
+                                {{ formatLargeNumber(value.count) }}
                               </div>
                             </div>
                             <div
+                              v-if="
+                                searchObj.data.stream.selectedStream.length ==
+                                props.row.streams.length
+                              "
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'
@@ -461,6 +532,18 @@ export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: { EqualIcon, NotEqualIcon },
   emits: ["setInterestingFieldInSQLQuery"],
+  methods: {
+    handleMultiStreamSelection() {
+      if (this.searchObj.meta.sqlMode) {
+        this.searchObj.meta.sqlMode = false;
+      }
+      this.onStreamChange("");
+    },
+    handleSingleStreamSelect(opt: any) {
+      this.searchObj.data.stream.selectedStream = [opt.value];
+      this.onStreamChange("");
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -472,12 +555,14 @@ export default defineComponent({
       handleQueryData,
       onStreamChange,
       filterHitsColumns,
+      validateFilterForMultiStream,
     } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
-        values: { key: string; count: string }[];
+        values: { key: string; count: number }[];
+        errMsg?: string;
       };
     }> = ref({});
     const parser = new Parser();
@@ -544,7 +629,7 @@ export default defineComponent({
 
     const openFilterCreator = (
       event: any,
-      { name, ftsKey, isSchemaField }: any
+      { name, ftsKey, isSchemaField, streams }: any
     ) => {
       if (ftsKey) {
         event.stopPropagation();
@@ -560,9 +645,8 @@ export default defineComponent({
           : cloneDeep(searchObj.data.datetime);
 
       if (searchObj.data.stream.streamType === "enrichment_tables") {
-        const stream = searchObj.data.streamResults.list.find(
-          (stream: any) =>
-            stream.name === searchObj.data.stream.selectedStream.value
+        const stream = searchObj.data.streamResults.list.find((stream: any) =>
+          searchObj.data.stream.selectedStream.includes(stream.name)
         );
         if (stream.stats) {
           timestamps = {
@@ -588,15 +672,19 @@ export default defineComponent({
       fieldValues.value[name] = {
         isLoading: true,
         values: [],
+        errMsg: "",
       };
       try {
         let query_context = "";
         let query = searchObj.data.query;
+        let whereClause = "";
+        searchObj.data.filterErrMsg = "";
+        searchObj.data.missingStreamMessage = "";
+        searchObj.data.stream.missingStreamMultiStreamFilter = [];
         if (searchObj.meta.sqlMode && query.trim().length) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          query_context =
-            b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')) || "";
+          query_context = parser.sqlify(parsedSQL).replace(/`/g, '"') || "";
         } else if (query.trim().length) {
           let parseQuery = query.split("|");
           let queryFunctions = "";
@@ -608,10 +696,7 @@ export default defineComponent({
             whereClause = parseQuery[0].trim();
           }
 
-          query_context =
-            `SELECT *${queryFunctions} FROM "` +
-            searchObj.data.stream.selectedStream.value +
-            `" [WHERE_CLAUSE]`;
+          query_context = `SELECT *${queryFunctions} FROM [INDEX_NAME] [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
             whereClause = whereClause
@@ -644,7 +729,7 @@ export default defineComponent({
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
           }
-          query_context = b64EncodeUnicode(query_context) || "";
+          // query_context = b64EncodeUnicode(query_context) || "";
         }
 
         let query_fn = "";
@@ -654,35 +739,114 @@ export default defineComponent({
         ) {
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
-        streamService
-          .fieldValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.value,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-            fields: [name],
-            size: 10,
-            query_context: query_context,
-            query_fn: query_fn,
-            type: searchObj.data.stream.streamType,
-          })
-          .then((res: any) => {
-            if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
-                .find((field: any) => field.field === name)
-                .values.map((value: any) => {
-                  return {
-                    key: value.zo_sql_key?.toString()
-                      ? value.zo_sql_key
-                      : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
-                });
-            }
-          })
-          .finally(() => {
+        // streamService
+        //   .fieldValues({
+        //     org_identifier: store.state.selectedOrganization.identifier,
+        //     stream_name: searchObj.data.stream.selectedStream.value,
+        //     start_time: startISOTimestamp,
+        //     end_time: endISOTimestamp,
+        //     fields: [name],
+        //     size: 10,
+        //     query_context: query_context,
+        //     query_fn: query_fn,
+        //     type: searchObj.data.stream.streamType,
+        //   })
+        //   .then((res: any) => {
+        //     if (res.data.hits.length) {
+        //       fieldValues.value[name]["values"] = res.data.hits
+        //         .find((field: any) => field.field === name)
+        //         .values.map((value: any) => {
+        //           return {
+        //             key: value.zo_sql_key?.toString()
+        //               ? value.zo_sql_key
+        //               : "null",
+        //             count: formatLargeNumber(value.zo_sql_num),
+        //           };
+        //         });
+        //     }
+        //   })
+        //   .finally(() => {
+        //     fieldValues.value[name]["isLoading"] = false;
+        //   });
+        fieldValues.value[name] = {
+          isLoading: true,
+          values: [],
+          errMsg: "",
+        };
+        if (whereClause.trim() != "") {
+          // validateFilterForMultiStream function called to get missingStreamMultiStreamFilter
+          const validationFlag = validateFilterForMultiStream();
+          if (!validationFlag) {
             fieldValues.value[name]["isLoading"] = false;
-          });
+            fieldValues.value[name]["errMsg"] =
+              "Filter is not valid for selected streams.";
+            return;
+          }
+          if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
+            streams = searchObj.data.stream.selectedStream.filter(
+              (streams: any) =>
+                !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+                  streams
+                )
+            );
+          }
+        }
+        let countTotal = streams.length;
+        streams.forEach(async (selectedStream: string) => {
+          await streamService
+            .fieldValues({
+              org_identifier: store.state.selectedOrganization.identifier,
+              stream_name: selectedStream,
+              start_time: startISOTimestamp,
+              end_time: endISOTimestamp,
+              fields: [name],
+              size: 10,
+              query_context:
+                b64EncodeUnicode(
+                  query_context.replace("[INDEX_NAME]", selectedStream)
+                ) || "",
+              query_fn: query_fn,
+              type: searchObj.data.stream.streamType,
+            })
+            .then((res: any) => {
+              countTotal--;
+              if (res.data.hits.length) {
+                res.data.hits.forEach((item: any) => {
+                  item.values.forEach((subItem: any) => {
+                    if (fieldValues.value[name]["values"].length) {
+                      let index = fieldValues.value[name]["values"].findIndex(
+                        (value: any) => value.key == subItem.zo_sql_key
+                      );
+                      if (index != -1) {
+                        fieldValues.value[name]["values"][index].count =
+                          parseInt(subItem.zo_sql_num) +
+                          fieldValues.value[name]["values"][index].count;
+                      } else {
+                        fieldValues.value[name]["values"].push({
+                          key: subItem.zo_sql_key,
+                          count: subItem.zo_sql_num,
+                        });
+                      }
+                    } else {
+                      fieldValues.value[name]["values"].push({
+                        key: subItem.zo_sql_key,
+                        count: subItem.zo_sql_num,
+                      });
+                    }
+                  });
+                });
+                if (fieldValues.value[name]["values"].length > 10) {
+                  fieldValues.value[name]["values"].sort(
+                    (a, b) => b.count - a.count
+                  ); // Sort the array based on count in descending order
+                  fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
+                }
+              }
+            })
+            .finally(() => {
+              if (countTotal == 0) fieldValues.value[name]["isLoading"] = false;
+            });
+        });
       } catch (err) {
         console.log(err);
         $q.notify({
@@ -720,6 +884,39 @@ export default defineComponent({
         if (index > -1) {
           // only splice array when item is found
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
+
+          for (const stream of searchObj.data.stream.selectedStreamFields) {
+            if ((stream as { name: string }).name == field.name) {
+              searchObj.data.stream.interestingFieldList.push(field.name);
+              const localInterestingFields: any = useLocalInterestingFields();
+
+              let listOfFields: any = [];
+              let streamField: any = {};
+
+              for (const field of searchObj.data.stream.interestingFieldList) {
+                for (streamField of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if (
+                    streamField?.name == field &&
+                    streamField?.streams.indexOf(field) > -1
+                  ) {
+                    listOfFields.push(field);
+                  }
+                }
+              }
+
+              let localStreamFields: any = {};
+              if (localInterestingFields.value != null) {
+                localStreamFields = localInterestingFields.value;
+              }
+              localStreamFields[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream[0].value
+              ] = listOfFields;
+              useLocalInterestingFields(localStreamFields);
+            }
+          }
         }
       } else {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
@@ -729,6 +926,33 @@ export default defineComponent({
           for (const stream of searchObj.data.stream.selectedStreamFields) {
             if ((stream as { name: string }).name == field.name) {
               searchObj.data.stream.interestingFieldList.push(field.name);
+              const localInterestingFields: any = useLocalInterestingFields();
+
+              let listOfFields: any = [];
+              let streamField: any = {};
+
+              for (const field of searchObj.data.stream.interestingFieldList) {
+                for (streamField of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if (
+                    streamField?.name == field &&
+                    streamField?.streams.indexOf(field) > -1
+                  ) {
+                    listOfFields.push(field);
+                  }
+                }
+              }
+
+              let localStreamFields: any = {};
+              if (localInterestingFields.value != null) {
+                localStreamFields = localInterestingFields.value;
+              }
+              localStreamFields[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream[0].value
+              ] = listOfFields;
+              useLocalInterestingFields(localStreamFields);
             }
           }
         }
@@ -738,17 +962,22 @@ export default defineComponent({
 
       const localInterestingFields: any = useLocalInterestingFields();
       let localFields: any = {};
-      if (localInterestingFields.value != null) {
-        localFields = localInterestingFields.value;
-        localFields[
-          searchObj.organizationIdetifier +
-            "_" +
-            searchObj.data.stream.selectedStream.value
-        ] = searchObj.data.stream.interestingFieldList;
-        useLocalInterestingFields(localFields);
+      for (const stream of field.streams) {
+        if (localInterestingFields.value != null) {
+          localFields = localInterestingFields.value;
+        }
+        localFields[searchObj.organizationIdetifier + "_" + stream] =
+          searchObj.data.stream.interestingFieldList;
       }
+      useLocalInterestingFields(localFields);
 
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+    };
+
+    const sortedStreamFields = () => {
+      return searchObj.data.stream.selectedStreamFields.sort(
+        (a: any, b: any) => a.group - b.group
+      );
     };
 
     return {
@@ -773,6 +1002,8 @@ export default defineComponent({
       onStreamChange,
       addToInterestingFieldList,
       rowsPerPage,
+      formatLargeNumber,
+      sortedStreamFields,
     };
   },
 });
@@ -790,8 +1021,21 @@ $streamSelectorHeight: 44px;
   }
 }
 
+.q-field--auto-height.q-field--dense .q-field__control,
+.q-field--auto-height.q-field--dense .q-field__native,
+.q-field--auto-height.q-field--dense .q-field__native span {
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  max-height: 40px !important;
+}
+
 .index-menu {
   width: 100%;
+
+  > div {
+    width: 100%;
+  }
 
   .q-field {
     &__control {
@@ -1056,5 +1300,16 @@ $streamSelectorHeight: 44px;
       }
     }
   }
+}
+</style>
+
+<style lang="scss">
+.q-field--auto-height.q-field--dense .q-select,
+.q-field--auto-height.q-field--dense .q-field__native,
+.q-field--auto-height.q-field--dense .q-field__native span {
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  max-height: 40px !important;
 }
 </style>
