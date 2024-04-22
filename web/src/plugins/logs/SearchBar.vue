@@ -1098,7 +1098,8 @@ export default defineComponent({
           parsedSQL != undefined &&
           parsedSQL.hasOwnProperty("from") &&
           parsedSQL?.from.length > 0 &&
-          parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
+          parsedSQL?.from[0].table !==
+            searchObj.data.stream.selectedStream[0].value
         ) {
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
           searchObj.data.stream.selectedStreamFields = [];
@@ -1144,7 +1145,7 @@ export default defineComponent({
                   localFields[
                     searchObj.organizationIdetifier +
                       "_" +
-                      searchObj.data.stream.selectedStream[0]
+                      searchObj.data.stream.selectedStream[0].value
                   ] = searchObj.data.stream.interestingFieldList;
                   useLocalInterestingFields(localFields);
                 }
@@ -1760,7 +1761,7 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              searchObj.data.stream.selectedStream.push(...selectedStreams);
+              searchObj.data.stream.selectedStream.push(selectedStreams);
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
