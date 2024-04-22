@@ -425,8 +425,6 @@ const useLogs = () => {
       typeof searchObj.data.stream.selectedStream == "object" &&
       searchObj.data.stream.selectedStream.hasOwnProperty("value")
     ) {
-      query["stream"] = searchObj.data.stream.selectedStream.value;
-    } else {
       query["stream"] = searchObj.data.stream.selectedStream.join(",");
     }
 
@@ -2248,7 +2246,7 @@ const useLogs = () => {
                 ? fieldToStreamsMap[row.name]
                 : [],
               isInterestingField:
-                searchObj.data.stream.interestingFieldList.includes(row.name)
+                searchObj.data.stream.interestingFieldList.includes(group.name)
                   ? true
                   : false,
             });
