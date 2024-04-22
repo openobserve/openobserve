@@ -1099,8 +1099,7 @@ export default defineComponent({
           parsedSQL != undefined &&
           parsedSQL.hasOwnProperty("from") &&
           parsedSQL?.from.length > 0 &&
-          parsedSQL?.from[0].table !==
-            searchObj.data.stream.selectedStream[0].value
+          parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
         ) {
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
           searchObj.data.stream.selectedStreamFields = [];
@@ -1148,7 +1147,7 @@ export default defineComponent({
                   localFields[
                     searchObj.organizationIdetifier +
                       "_" +
-                      searchObj.data.stream.selectedStream[0].value
+                      searchObj.data.stream.selectedStream[0]
                   ] = searchObj.data.stream.interestingFieldList;
                 }
               }
