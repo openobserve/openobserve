@@ -724,8 +724,8 @@ export default defineComponent({
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream[0],
-            `"${searchObj.data.stream.selectedStream[0]}"`
+            searchObj.data.stream.selectedStream[0].value,
+            `"${searchObj.data.stream.selectedStream[0].value}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
