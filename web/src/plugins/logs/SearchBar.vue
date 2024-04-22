@@ -1718,6 +1718,7 @@ export default defineComponent({
               } else {
                 searchObj.meta["regions"] = [];
               }
+              searchObj.data.stream.selectedStream = [];
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
                 searchObj.data.stream.functions;
@@ -1759,7 +1760,7 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              searchObj.data.stream.selectedStream.push(selectedStreams);
+              searchObj.data.stream.selectedStream.push(...selectedStreams);
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
@@ -1782,9 +1783,19 @@ export default defineComponent({
 
               let selectedStreams = [];
               if (typeof extractedObj.data.stream.selectedStream == "object") {
-                selectedStreams.push(
-                  extractedObj.data.stream.selectedStream.value
-                );
+                if (
+                  extractedObj.data.stream.selectedStream.hasOwnProperty(
+                    "value"
+                  )
+                ) {
+                  selectedStreams.push(
+                    extractedObj.data.stream.selectedStream.value
+                  );
+                } else {
+                  selectedStreams.push(
+                    ...extractedObj.data.stream.selectedStream
+                  );
+                }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
               }
