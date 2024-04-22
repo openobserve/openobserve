@@ -307,6 +307,17 @@ pub struct Config {
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
+    pub tokio_console: TokioConsole,
+}
+
+#[derive(EnvConfig)]
+pub struct TokioConsole {
+    #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_ADDR", default = "0.0.0.0")]
+    pub tokio_console_server_addr: String,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_PORT", default = 6699)]
+    pub tokio_console_server_port: u16,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_RETENTION", default = 60)]
+    pub tokio_console_retention: u64,
 }
 
 #[derive(EnvConfig)]

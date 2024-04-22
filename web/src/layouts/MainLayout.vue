@@ -180,7 +180,8 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated
+no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"
@@ -417,7 +418,7 @@ export default defineComponent({
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 
-      if(config.isCloud == "true") {
+      if (config.isCloud == "true") {
         window.location.href = logoutURL;
       }
       this.$router.push("/logout");
@@ -897,7 +898,12 @@ export default defineComponent({
         .catch((error) => console.log(error));
     };
 
-    getConfig();
+    if (
+      !store.state.zoConfig.hasOwnProperty("version") ||
+      store.state.zoConfig.version == ""
+    ) {
+      getConfig();
+    }
 
     if (config.isCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);
@@ -1004,7 +1010,7 @@ export default defineComponent({
       }, 500);
     },
     changeUserInfo(newVal) {
-      if(JSON.stringify(newVal) != "{}") {
+      if (JSON.stringify(newVal) != "{}") {
         this.triggerRefreshToken();
       }
     },
