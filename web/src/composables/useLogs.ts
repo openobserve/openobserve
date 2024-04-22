@@ -553,7 +553,7 @@ const useLogs = () => {
     return searchObj.data.filterErrMsg === "" ? true : false;
   };
 
-  async function buildSearch() {
+  function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
       searchObj.data.filterErrMsg = "";
@@ -2131,7 +2131,7 @@ const useLogs = () => {
                 ? fieldToStreamsMap[row.name]
                 : [],
               isInterestingField:
-                searchObj.data.stream.interestingFieldList.includes(row.name)
+                searchObj.data.stream.interestingFieldList.includes(group.name)
                   ? true
                   : false,
             });
