@@ -542,6 +542,11 @@ export default defineComponent({
           let whereClause = "";
           let currentQuery = searchObj.data.query;
 
+          const hasSelect =
+            currentQuery != "" &&
+            (currentQuery.toLowerCase() === "select" ||
+              currentQuery.toLowerCase().indexOf("select ") == 0);
+
           //check if user try to applied saved views in which sql mode is enabled.
           if (currentQuery.indexOf("SELECT") >= 0) {
             return;
@@ -565,16 +570,7 @@ export default defineComponent({
 
           // Parse the query and check if it is valid
           // It should have one column and one table
-          const hasSelect =
-            currentQuery != "" &&
-            (currentQuery.toLowerCase() === "select" ||
-              currentQuery.toLowerCase().indexOf("select ") == 0);
-
           if (!hasSelect) {
-            if (currentQuery != "") {
-              currentQuery = currentQuery.split("|");
-            }
-
             if (currentQuery.length > 1) {
               selectFields = "," + currentQuery[0].trim();
               if (currentQuery[1].trim() != "") {
