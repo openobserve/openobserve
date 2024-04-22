@@ -360,15 +360,12 @@ fn generate_search_schema(
             (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
 
             // When both group_field and latest_field are Some, compare their data types
-            (Some(group_field), Some(latest_field))
-                if group_field.data_type() != latest_field.data_type() =>
-            {
-                new_fields.push(Arc::new(latest_field.clone()));
-                diff_fields.insert(field.to_string(), latest_field.data_type().clone());
+            (Some(group_field), Some(latest_field)) => {
+                if group_field.data_type() != latest_field.data_type() {
+                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
+                }
+                new_fields.push(Arc::new(group_field.clone()));
             }
-
-            // When both group_field and latest_field are Some, and their data types are the same
-            (Some(group_field), Some(_)) => new_fields.push(Arc::new(group_field.clone())),
 
             // should we return error
             _ => {}
@@ -434,13 +431,14 @@ fn generate_select_start_search_schema(
 fn generate_used_fields_in_query(sql: &Arc<Sql>) -> Vec<String> {
     let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
 
+    // note field name maybe equal to alias name
     let mut used_fields: FxIndexSet<_> = sql
         .meta
-        .fields
+        .group_by
         .iter()
-        .chain(&sql.meta.group_by)
         .chain(sql.meta.order_by.iter().map(|(f, _)| f))
         .filter(|f| !alias_map.contains(*f))
+        .chain(&sql.meta.fields)
         .cloned()
         .collect();
 
