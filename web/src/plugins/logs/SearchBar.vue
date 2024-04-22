@@ -1778,7 +1778,7 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              searchObj.data.stream.selectedStream.push(selectedStreams);
+              searchObj.data.stream.selectedStream.push(...selectedStreams);
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
