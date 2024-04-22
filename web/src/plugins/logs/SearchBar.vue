@@ -1088,23 +1088,25 @@ export default defineComponent({
               col != "*"
             ) {
               // searchObj.data.stream.interestingFieldList.push(col);
+              const localInterestingFields: any = useLocalInterestingFields();
+              let localFields: any = {};
+              if (localInterestingFields.value != null) {
+                localFields = localInterestingFields.value;
+              }
               for (const stream of searchObj.data.stream.selectedStreamFields) {
-                if (stream.name == col) {
+                if (
+                  stream.name == col &&
+                  !searchObj.data.stream.interestingFieldList.includes(col)
+                ) {
                   searchObj.data.stream.interestingFieldList.push(col);
-                  const localInterestingFields: any =
-                    useLocalInterestingFields();
-                  let localFields: any = {};
-                  if (localInterestingFields.value != null) {
-                    localFields = localInterestingFields.value;
-                  }
                   localFields[
                     searchObj.organizationIdetifier +
                       "_" +
                       searchObj.data.stream.selectedStream[0]
                   ] = searchObj.data.stream.interestingFieldList;
-                  useLocalInterestingFields(localFields);
                 }
               }
+              useLocalInterestingFields(localFields);
             }
           }
 
@@ -1685,6 +1687,7 @@ export default defineComponent({
               delete extractedObj.data.stream.selectedStream;
               delete searchObj.data.stream.selectedStream;
               delete searchObj.data.queryResults.aggs;
+              delete searchObj.data.stream.interestingFieldList;
               searchObj.data.stream.selectedStream = [];
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
