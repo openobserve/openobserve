@@ -103,7 +103,7 @@ const defaultObject = {
       : false,
     histogramDirtyFlag: false,
     sqlMode: false,
-    quickMode: false,
+    quickMode: true,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
@@ -1415,7 +1415,9 @@ const useLogs = () => {
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Something went wrong." + e);
+      showErrorNotification(
+        notificationMsg.value || "Something went wrong." + e
+      );
       notificationMsg.value = "";
     }
   };
@@ -1936,6 +1938,7 @@ const useLogs = () => {
               ]);
             }
 
+            searchObj.data.stream.selectedStreamFields.push(...queryResult);
             // extract full text keys from the stream settings
             ftsKeys = new Set([...stream.settings.full_text_search_keys]);
 
@@ -2157,7 +2160,6 @@ const useLogs = () => {
 
         streamFieldNames = Array.from([
           ...new Set([
-            ...streamFieldNames,
             ...searchObj.data.stream.selectedStreamFields.map(
               (item: any) => item.name
             ),
@@ -2253,22 +2255,25 @@ const useLogs = () => {
           } else {
             index = streamFieldNames.indexOf(row.name);
             if (index > -1) {
-              (searchObj.data.stream.selectedStreamFields[index].ftsKey =
-                ftsKeys?.has(row.name)),
-                (searchObj.data.stream.selectedStreamFields[
-                  index
-                ].isSchemaField = schemaFields.has(row.name)),
-                (searchObj.data.stream.selectedStreamFields[index].showValues =
-                  row.name !== timestampField),
-                (searchObj.data.stream.selectedStreamFields[
-                  index
-                ].isInterestingField =
-                  searchObj.data.stream.interestingFieldList.includes(row.name)
-                    ? true
-                    : false);
+              if (ftsKeys.length) {
+                searchObj.data.stream.selectedStreamFields[index].ftsKey =
+                  ftsKeys.has(row.name);
+              }
+
+              searchObj.data.stream.selectedStreamFields[index].isSchemaField =
+                schemaFields.includes(row.name);
+              searchObj.data.stream.selectedStreamFields[index].showValues =
+                row.name !== timestampField;
+              searchObj.data.stream.selectedStreamFields[
+                index
+              ].isInterestingField =
+                searchObj.data.stream.interestingFieldList.includes(row.name)
+                  ? true
+                  : false;
             }
           }
         }
+
         useLocalInterestingFields(localInterestingFields.value);
       }
     } catch (e: any) {
