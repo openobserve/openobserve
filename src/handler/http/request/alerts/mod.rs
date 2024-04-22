@@ -50,22 +50,14 @@ pub mod templates;
 pub async fn save_alert(
     path: web::Path<(String, String)>,
     alert: web::Json<Alert>,
-    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
 
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
 
-    match alerts::save(&org_id, stream_type, &stream_name, "", alert, true).await {
+    match alerts::save(&org_id, &stream_name, "", alert, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -94,23 +86,15 @@ pub async fn save_alert(
 pub async fn update_alert(
     path: web::Path<(String, String, String)>,
     alert: web::Json<Alert>,
-    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
 
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
 
     let name = name.trim();
-    match alerts::save(&org_id, stream_type, &stream_name, name, alert, false).await {
+    match alerts::save(&org_id, &stream_name, name, alert, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
