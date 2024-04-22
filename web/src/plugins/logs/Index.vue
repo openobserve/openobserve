@@ -553,7 +553,7 @@ export default defineComponent({
             if (currentQuery != "") {
               currentQuery = currentQuery.split("|");
             }
-
+            
             if (currentQuery.length > 1) {
               selectFields = "," + currentQuery[0].trim();
               if (currentQuery[1].trim() != "") {
