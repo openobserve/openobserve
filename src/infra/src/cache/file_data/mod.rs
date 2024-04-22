@@ -18,8 +18,8 @@ pub mod memory;
 
 use std::collections::VecDeque;
 
+use config::utils::lru_cache::LruCache;
 use hashbrown::HashSet;
-use hashlink::lru_cache::LruCache;
 
 const INITIAL_CACHE_SIZE: usize = 128;
 
@@ -73,7 +73,7 @@ impl CacheStrategy {
         }
     }
 
-    fn contains_key(&mut self, key: &str) -> bool {
+    fn contains_key(&self, key: &str) -> bool {
         match self {
             CacheStrategy::Lru(cache) => cache.contains_key(key),
             CacheStrategy::Fifo((_, set)) => set.contains(key),
