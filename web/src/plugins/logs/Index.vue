@@ -247,7 +247,7 @@ import useLogs from "@/composables/useLogs";
 import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser/build/mysql";
 
-import { b64DecodeUnicode } from "@/utils/zincutils";
+import { b64DecodeUnicode, useLocalInterestingFields } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
@@ -562,11 +562,12 @@ export default defineComponent({
           // Parse the query and check if it is valid
           // It should have one column and one table
           const hasSelect =
-            currentQuery != "" && (currentQuery.toLowerCase() === "select" ||
-            currentQuery.toLowerCase().indexOf("select ") == 0);
+            currentQuery != "" &&
+            (currentQuery.toLowerCase() === "select" ||
+              currentQuery.toLowerCase().indexOf("select ") == 0);
 
           if (!hasSelect) {
-            if(currentQuery != "") {
+            if (currentQuery != "") {
               currentQuery = currentQuery.split("|");
             }
 
@@ -739,8 +740,8 @@ export default defineComponent({
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream[0].value,
-            `"${searchObj.data.stream.selectedStream[0].value}"`
+            searchObj.data.stream.selectedStream[0],
+            `"${searchObj.data.stream.selectedStream[0]}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
