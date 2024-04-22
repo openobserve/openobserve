@@ -676,7 +676,7 @@ async fn merge_grpc_result(
             let err = format!(
                 "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
             );
-            log::error!(err);
+            log::error!("{}", err);
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
         }
 
