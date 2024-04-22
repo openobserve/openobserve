@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           vertical
         >
           <q-route-tab
-            exact
             default
             name="queryManagement"
             :to="'/settings/query_management'"
@@ -44,8 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isMetaOrg"
           />
           <q-route-tab
-            exact
-            default
             name="general"
             :to="'/settings/general'"
             :icon="outlinedSettings"
@@ -89,38 +86,38 @@ export default defineComponent({
     const settingsTab = ref("general");
     const { isMetaOrg } = useIsMetaOrg();
 
-    onBeforeMount(() => {
-      if (router.currentRoute.value.name == "settings" && isMetaOrg.value && config.isEnterprise == "true") {
-        settingsTab.value = "queryManagement";
-        router.push({ path: "/settings/query_management" });
-      } else {
-        settingsTab.value = "general";
-        router.push({ path: "/settings/general" });
+    const handleSettingsRouting = () => {
+      if (router.currentRoute.value.name === "settings") {
+        if (isMetaOrg.value && config.isEnterprise === "true") {
+          settingsTab.value = "queryManagement";
+          router.push({
+            path: "/settings/query_management",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        } else {
+          settingsTab.value = "general";
+          router.push({
+            path: "/settings/general",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        }
       }
+    };
+
+    onBeforeMount(() => {
+      handleSettingsRouting();
     });
 
-    // render general settings component
     onActivated(() => {
-      if (isMetaOrg.value && config.isEnterprise == "true") {
-        settingsTab.value = "queryManagement";
-        router.push({ path: "/settings/query_management" });
-      } else {
-        settingsTab.value = "general";
-        router.push({ path: "/settings/general" });
-      }
+      handleSettingsRouting();
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "settings") {
-        settingsTab.value = "general";
-        router.push({
-          name: "general",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
+      handleSettingsRouting();
     });
 
     return {
