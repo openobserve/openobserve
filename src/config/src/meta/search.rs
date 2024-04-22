@@ -356,6 +356,8 @@ pub struct MultiStreamRequest {
     pub uses_zo_fn: bool,
     #[serde(default)]
     pub query_fn: Option<String>,
+    #[serde(default)]
+    pub skip_wal: bool,
 }
 
 impl MultiStreamRequest {
@@ -377,6 +379,7 @@ impl MultiStreamRequest {
                     query_context: self.query_context.clone(),
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn: self.query_fn.clone(),
+                    skip_wal: self.skip_wal,
                 },
                 aggs: self.aggs.clone(),
                 clusters: vec![],
