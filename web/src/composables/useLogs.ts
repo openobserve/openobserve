@@ -425,6 +425,8 @@ const useLogs = () => {
       typeof searchObj.data.stream.selectedStream == "object" &&
       searchObj.data.stream.selectedStream.hasOwnProperty("value")
     ) {
+      query["stream"] = searchObj.data.stream.selectedStream.value;
+    } else {
       query["stream"] = searchObj.data.stream.selectedStream.join(",");
     }
 
@@ -2769,10 +2771,9 @@ const useLogs = () => {
         label: queryParams.stream,
       };
     } else if (queryParams.stream) {
-      searchObj.data.stream.selectedStream = {
-        value: queryParams.stream,
-        label: queryParams.stream,
-      };
+      searchObj.data.stream.selectedStream.push(
+        ...queryParams.stream.split(",")
+      );
     }
 
     if (queryParams.show_histogram) {
