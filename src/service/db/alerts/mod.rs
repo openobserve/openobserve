@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use config::{meta::stream::StreamType, utils::json};
-use infra::scheduler;
 
 use crate::{
     common::{infra::config::STREAM_ALERTS, meta::alerts::Alert},
@@ -63,7 +62,7 @@ pub async fn set(
     .await
     {
         Ok(_) => {
-            let trigger = scheduler::Trigger {
+            let trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
                 module_key: schedule_key,
                 next_run_at: chrono::Utc::now().timestamp_micros(),
@@ -72,7 +71,7 @@ pub async fn set(
                 ..Default::default()
             };
             if create {
-                match scheduler::push(trigger).await {
+                match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
                         log::error!("Failed to save trigger: {}", e);
@@ -80,7 +79,7 @@ pub async fn set(
                     }
                 }
             } else {
-                match scheduler::update_trigger(trigger).await {
+                match db::scheduler::update_trigger(trigger).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
                         log::error!("Failed to update trigger: {}", e);
@@ -103,7 +102,9 @@ pub async fn delete(
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
     match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {
-            match scheduler::delete(org_id, scheduler::TriggerModule::Alert, &schedule_key).await {
+            match db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &schedule_key)
+                .await
+            {
                 Ok(_) => Ok(()),
                 Err(e) => {
                     log::error!("Failed to delete trigger: {}", e);
