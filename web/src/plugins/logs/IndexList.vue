@@ -912,7 +912,7 @@ export default defineComponent({
               localStreamFields[
                 searchObj.organizationIdetifier +
                   "_" +
-                  searchObj.data.stream.selectedStream[0]
+                  searchObj.data.stream.selectedStream[0].value
               ] = listOfFields;
               useLocalInterestingFields(localStreamFields);
             }
@@ -950,7 +950,7 @@ export default defineComponent({
               localStreamFields[
                 searchObj.organizationIdetifier +
                   "_" +
-                  searchObj.data.stream.selectedStream[0]
+                  searchObj.data.stream.selectedStream[0].value
               ] = listOfFields;
               useLocalInterestingFields(localStreamFields);
             }

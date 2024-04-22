@@ -547,26 +547,10 @@ export default defineComponent({
           if (currentQuery.indexOf("SELECT") >= 0) {
             return;
           }
-          currentQuery = currentQuery.split("|");
-          if (currentQuery.length > 1) {
-            selectFields = "," + currentQuery[0].trim();
-            if (currentQuery[1].trim() != "") {
-              whereClause = "WHERE " + currentQuery[1].trim();
-            }
-          } else if (currentQuery[0].trim() != "") {
-            if (currentQuery[0].trim() != "") {
-              whereClause = "WHERE " + currentQuery[0].trim();
-            }
-          }
-          searchObj.data.query =
-            `SELECT [FIELD_LIST]${selectFields} FROM "` +
-            searchObj.data.stream.selectedStream.join(",") +
-            `" ` +
-            whereClause;
-
           // Parse the query and check if it is valid
           // It should have one column and one table
           if (!hasSelect) {
+            currentQuery = currentQuery.split("|");
             if (currentQuery.length > 1) {
               selectFields = "," + currentQuery[0].trim();
               if (currentQuery[1].trim() != "") {
@@ -736,8 +720,8 @@ export default defineComponent({
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream[0],
-            `"${searchObj.data.stream.selectedStream[0]}"`
+            searchObj.data.stream.selectedStream[0].value,
+            `"${searchObj.data.stream.selectedStream[0].value}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
