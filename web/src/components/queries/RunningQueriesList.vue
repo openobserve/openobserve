@@ -386,6 +386,8 @@ export default defineComponent({
     const rowsQuery = computed(function () {
       const rows = toRaw(queries.value) ?? [];
 
+      rows.sort((a: any, b: any) => b.created_at - a.created_at);
+
       return rows.map((row: any, index) => {
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
