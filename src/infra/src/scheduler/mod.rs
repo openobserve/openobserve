@@ -16,6 +16,7 @@
 use async_trait::async_trait;
 use config::{meta::meta_store::MetaStore, CONFIG};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
 
@@ -63,7 +64,7 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn clear(&self) -> Result<()>;
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
+#[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
 #[repr(i32)]
 pub enum TriggerStatus {
     #[default]
@@ -72,7 +73,7 @@ pub enum TriggerStatus {
     Completed,
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
+#[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
 #[repr(i32)]
 pub enum TriggerModule {
     Report,
@@ -85,7 +86,7 @@ pub struct TriggerId {
     pub id: i64,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Default)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Trigger {
     pub org: String,
     pub module: TriggerModule,
