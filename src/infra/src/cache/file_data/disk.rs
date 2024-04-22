@@ -64,7 +64,7 @@ impl FileData {
         }
     }
 
-    async fn exist(&mut self, file: &str) -> bool {
+    async fn exist(&self, file: &str) -> bool {
         self.data.contains_key(file)
     }
 
@@ -218,7 +218,7 @@ pub async fn exist(file: &str) -> bool {
     if !CONFIG.disk_cache.enabled {
         return false;
     }
-    let mut files = FILES.write().await;
+    let files = FILES.read().await;
     files.exist(file).await
 }
 

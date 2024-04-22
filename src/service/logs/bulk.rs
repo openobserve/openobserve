@@ -372,7 +372,7 @@ pub async fn ingest(
             // this is for schema inference at stream level , which avoids locks in case schema
             // changes are frequent within request
             if CONFIG.common.infer_schema_per_request {
-                let _ = add_record(
+                if let Err(e) = add_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.clone(),
@@ -383,7 +383,20 @@ pub async fn ingest(
                     buf,
                     local_val,
                 )
-                .await;
+                .await
+                {
+                    bulk_res.errors = true;
+                    add_record_status(
+                        stream_name.clone(),
+                        doc_id.clone(),
+                        action.clone(),
+                        Some(value),
+                        &mut bulk_res,
+                        Some(TS_PARSE_FAILED.to_string()),
+                        Some(e.to_string()),
+                    );
+                    continue;
+                }
             } else {
                 let local_trigger = match super::add_valid_record(
                     &StreamMeta {

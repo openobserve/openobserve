@@ -159,7 +159,7 @@ impl ObjectStore for Tmpfs {
         // log::info!("list: {:?}", prefix);
         let mut values = Vec::new();
         let key = prefix.unwrap().to_string();
-        let objects = tmpfs::list(&key, "all").unwrap();
+        let objects = tmpfs::list(&key, "all").unwrap_or_default();
         for file in objects {
             values.push(Ok(ObjectMeta {
                 location: file.location.into(),
