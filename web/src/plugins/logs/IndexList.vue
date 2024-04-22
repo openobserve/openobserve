@@ -592,11 +592,16 @@ export default defineComponent({
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
+      var includedFields: any = [];
       if (terms != "") {
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) &&
+            includedFields.indexOf(rows[i]["name"]) == -1
+          ) {
             filtered.push(rows[i]);
+            includedFields.push(rows[i]["name"]);
           }
         }
       }
@@ -942,6 +947,8 @@ export default defineComponent({
           useLocalInterestingFields(localStreamFields);
         }
       }
+
+      emit("setInterestingFieldInSQLQuery", field, isInterestingField);
     };
 
     const sortedStreamFields = () => {
