@@ -120,7 +120,7 @@ describe("Logs testcases", () => {
     applyQueryButton()
     cy.wait(2000);
     cy.get('[data-cy="index-field-search-input"]').type("code");
-
+    cy.wait(2000);
     cy.get('[data-test="log-search-expand-code-field-btn"]').click();
     cy.wait(2000);
     cy.get('[data-test="logs-search-subfield-add-code-200"]').click({
