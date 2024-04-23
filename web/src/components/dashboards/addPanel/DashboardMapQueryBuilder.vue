@@ -500,9 +500,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
-              <div>
-                <div class="q-pa-xs">
-                  <div class="q-gutter-xs">
+              <div style="height: 100%">
+                <div class="q-pa-xs" style="height: 100%">
+                  <div class="q-gutter-xs" style="height: 100%">
                     <q-tabs
                       v-model="
                         dashboardPanelData.data.queries[
@@ -535,6 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.filter[index].type
                       "
                       animated
+                      style="height: 100%"
                     >
                       <q-tab-panel
                         data-test="dashboard-filter-condition-panel"
@@ -542,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="condition"
                         class="q-pa-none"
                       >
-                        <div class="flex justify-between">
+                        <div class="flex column" style="height: 220px;">
                           <q-select
                             dense
                             filled
@@ -557,9 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <q-input
-                            dense
-                            filled
+                          <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 dashboardPanelData.data.queries[
@@ -567,16 +566,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ].fields?.filter[index]?.operator
                               )
                             "
+                            :label="t('common.value')"
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
                               ].fields.filter[index].value
                             "
-                            data-test="dashboard-filter-condition-input"
-                            :label="t('common.value')"
-                            style="width: 100%; margin-top: 5px"
-                            :rules="[(val) => val?.length > 0 || 'Required']"
-                          />
+                            :items="dashboardVariablesFilterItems"
+                            searchRegex="(?:^|[^$])\$?(\w+)"
+                            :rules="[(val: any) => val?.length > 0 || 'Required']"
+                          ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -699,11 +698,13 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
-  components: { SortByBtnGrp },
-  setup() {
+  components: { SortByBtnGrp, CommonAutoComplete },
+  props: ["dashboardData"],
+  setup(props) {
     const { t } = useI18n();
     const $q = useQuasar();
     const expansionItems = reactive({
@@ -712,7 +713,6 @@ export default defineComponent({
       weight: true,
       filter: false,
     });
-
     const {
       dashboardPanelData,
       addLatitude,
@@ -911,6 +911,13 @@ export default defineComponent({
       return commonBtnLabel(weightField);
     });
 
+    const dashboardVariablesFilterItems = computed(() =>
+      (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
+        label: it.name,
+        value: "'" + "$" + it.name + "'",
+      }))
+    );
+
     return {
       t,
       dashboardPanelData,
@@ -937,6 +944,7 @@ export default defineComponent({
       promqlMode,
       weightLabel,
       onFieldDragStart,
+      dashboardVariablesFilterItems,
       options: [
         "=",
         "<>",

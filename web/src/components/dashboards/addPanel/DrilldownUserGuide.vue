@@ -42,10 +42,10 @@
     <p>You can reference a variable with the following format:</p>
     <ul>
       <li>
-        <span class="bg-highlight">${var-variable_name}</span>
+        <span class="bg-highlight">${variable_name}</span>
         <br />
         (For Example, if your variable name is "test", you can use
-        <span class="bg-highlight">${var-test}</span>)
+        <span class="bg-highlight">${test}</span>)
       </li>
     </ul>
 
