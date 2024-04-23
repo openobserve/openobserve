@@ -213,23 +213,28 @@
             v-for="(variable, index) in drilldownData.data.variables"
             :key="index"
           >
-            <div style="display: flex; gap: 10px; margin-bottom: 10px" :key="variableNamesFn?.toString()">
-              
+            <div
+              style="display: flex; gap: 10px; margin-bottom: 10px"
+              :key="variableNamesFn?.toString()"
+            >
               <CommonAutoComplete
                 placeholder="Name"
                 v-model="variable.name"
                 searchRegex="(.*)"
                 :items="variableNamesFn"
-                style="width: auto !important"
+                style="width: auto !important; padding-top: 3px !important"
               ></CommonAutoComplete>
               <CommonAutoComplete
                 placeholder="Value"
                 searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
-                style="width: auto !important"
+                style="
+                  width: auto !important;
+                  padding-top: 3px !important;
+                "
               ></CommonAutoComplete>
-              
+
               <q-icon
                 class="q-mr-xs"
                 size="20px"
@@ -585,11 +590,9 @@ export default defineComponent({
     // Assign selectedValue to options object
     options.selectedValue = selectedValue;
 
-    
     const variableNamesFn = ref([]);
 
     watch(drilldownData.value, async (newData) => {
-
       if (newData.data.folder && newData.data.dashboard) {
         const folder = store.state.organizationData.folders.find(
           (folder: any) => folder.name === newData.data.folder
@@ -612,11 +615,9 @@ export default defineComponent({
           );
           variableNamesFn.value = optionsList;
         } else {
-
           variableNamesFn.value = [];
         }
       } else {
-
         variableNamesFn.value = [];
       }
     });
