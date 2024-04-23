@@ -499,7 +499,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pa-md"
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
-              style="height: 33%"
             >
               <div style="height: 100%">
                 <div class="q-pa-xs" style="height: 100%">
@@ -544,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="condition"
                         class="q-pa-none"
                       >
-                        <div class="flex justify-between">
+                        <div class="flex column" style="height: 220px;">
                           <q-select
                             dense
                             filled

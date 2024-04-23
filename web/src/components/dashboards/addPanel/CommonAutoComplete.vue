@@ -1,12 +1,12 @@
 <template>
-  <div class="relative">
+  <div class="relative" style="margin-top: 5px;">
     <q-input
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
       dense
       filled
       :label="label"
-      style="width: 100%; margin-top: 5px"
+      style="width: 100%;"
       @focus="showOptions = true"
       @blur="hideOptions"
       v-bind="$attrs"
