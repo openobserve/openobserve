@@ -148,7 +148,7 @@ pub async fn list_functions(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("function:{}", org_id))
+                    .contains(&format!("function:_all_{}", org_id))
             {
                 result.push(function);
             }
