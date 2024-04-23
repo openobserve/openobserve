@@ -219,7 +219,7 @@ pub struct KFHRecordRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct KinesisFHData {
+pub struct KinesisFHLogData {
     pub log_events: Vec<KinesisFHLogEvent>,
     pub log_group: String,
     pub log_stream: String,
@@ -233,6 +233,28 @@ pub struct KinesisFHLogEvent {
     pub message: json::Value,
     pub id: String,
     pub timestamp: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KinesisFHMetricData {
+    pub metric_stream_name: String,
+    pub account_id: String,
+    pub region: String,
+    pub namespace: String,
+    pub metric_name: String,
+    pub dimensions: String,
+    pub timestamp: i64,
+    pub value: KinesisFHMetricValue,
+    pub unit: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KinesisFHMetricValue {
+    pub count: f32,
+    pub sum: f32,
+    pub max: f32,
+    pub min: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

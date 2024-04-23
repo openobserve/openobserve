@@ -36,8 +36,8 @@ use crate::{
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
-            IngestionRequest, IngestionResponse, KinesisFHData, KinesisFHIngestionResponse,
-            StreamStatus,
+            IngestionRequest, IngestionResponse, KinesisFHIngestionResponse, KinesisFHLogData,
+            KinesisFHMetricData, StreamStatus,
         },
         stream::{SchemaRecords, StreamParams},
     },
@@ -411,7 +411,7 @@ impl<'a> IngestionData<'a> {
                             let mut value;
                             // let mut timestamp;
                             if record_type.eq(&AWSRecordType::Cloudwatch) {
-                                let kfh_data: KinesisFHData =
+                                let kfh_data: KinesisFHLogData =
                                     json::from_str(&decompressed_data).unwrap();
 
                                 for event in kfh_data.log_events.iter() {
