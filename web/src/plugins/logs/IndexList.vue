@@ -887,77 +887,67 @@ export default defineComponent({
         if (index > -1) {
           // only splice array when item is found
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
+          field.isInteresting = !isInterestingField;
 
-          for (const stream of searchObj.data.stream.selectedStreamFields) {
-            if ((stream as { name: string }).name == field.name) {
-              searchObj.data.stream.interestingFieldList.push(field.name);
-              const localInterestingFields: any = useLocalInterestingFields();
+          const localInterestingFields: any = useLocalInterestingFields();
 
-              let listOfFields: any = [];
-              let streamField: any = {};
+          let listOfFields: any = [];
+          let streamField: any = {};
 
-              for (const field of searchObj.data.stream.interestingFieldList) {
-                for (streamField of searchObj.data.stream
-                  .selectedStreamFields) {
-                  if (
-                    streamField?.name == field &&
-                    streamField?.streams.indexOf(field) > -1
-                  ) {
-                    listOfFields.push(field);
-                  }
+          let localStreamFields: any = {};
+          if (localInterestingFields.value != null) {
+            localStreamFields = localInterestingFields.value;
+          }
+          let fieldStreamAssociation: any = {};
+          for (streamField of searchObj.data.stream.selectedStreamFields) {
+            fieldStreamAssociation[streamField?.name] = streamField?.streams;
+          }
+          for (const field of searchObj.data.stream.interestingFieldList) {
+            if (fieldStreamAssociation[field].length > 0) {
+              for (const selectedStream of fieldStreamAssociation[field]) {
+                if (selectedStream != undefined) {
+                  localStreamFields[
+                    searchObj.organizationIdetifier + "_" + selectedStream
+                  ] = listOfFields;
                 }
               }
-
-              let localStreamFields: any = {};
-              if (localInterestingFields.value != null) {
-                localStreamFields = localInterestingFields.value;
-              }
-              localStreamFields[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream[0]
-              ] = listOfFields;
-              useLocalInterestingFields(localStreamFields);
             }
           }
+          
+          useLocalInterestingFields(localStreamFields);
         }
       } else {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
         );
         if (index == -1 && field.name != "*") {
-          for (const stream of searchObj.data.stream.selectedStreamFields) {
-            if ((stream as { name: string }).name == field.name) {
-              searchObj.data.stream.interestingFieldList.push(field.name);
-              const localInterestingFields: any = useLocalInterestingFields();
+          searchObj.data.stream.interestingFieldList.push(field.name);
+          const localInterestingFields: any = useLocalInterestingFields();
 
-              let listOfFields: any = [];
-              let streamField: any = {};
+          let listOfFields: any = [];
+          let streamField: any = {};
 
-              for (const field of searchObj.data.stream.interestingFieldList) {
-                for (streamField of searchObj.data.stream
-                  .selectedStreamFields) {
-                  if (
-                    streamField?.name == field &&
-                    streamField?.streams.indexOf(field) > -1
-                  ) {
-                    listOfFields.push(field);
-                  }
+          let localStreamFields: any = {};
+          if (localInterestingFields.value != null) {
+            localStreamFields = localInterestingFields.value;
+          }
+          let fieldStreamAssociation: any = {};
+          for (streamField of searchObj.data.stream.selectedStreamFields) {
+            fieldStreamAssociation[streamField?.name] = streamField?.streams;
+          }
+          for (const field of searchObj.data.stream.interestingFieldList) {
+            if (fieldStreamAssociation[field].length > 0) {
+              for (const selectedStream of fieldStreamAssociation[field]) {
+                if (selectedStream != undefined) {
+                  localStreamFields[
+                    searchObj.organizationIdetifier + "_" + selectedStream
+                  ] = listOfFields;
                 }
               }
-
-              let localStreamFields: any = {};
-              if (localInterestingFields.value != null) {
-                localStreamFields = localInterestingFields.value;
-              }
-              localStreamFields[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream[0]
-              ] = listOfFields;
-              useLocalInterestingFields(localStreamFields);
             }
           }
+
+          useLocalInterestingFields(localStreamFields);
         }
       }
 
