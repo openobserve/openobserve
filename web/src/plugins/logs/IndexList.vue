@@ -944,28 +944,6 @@ export default defineComponent({
           }
 
           useLocalInterestingFields(localStreamFields);
-        }
-      }
-
-      field.isInterestingField = !isInterestingField;
-
-      const localInterestingFields: any = useLocalInterestingFields();
-      let localFields: any = {};
-      for (const stream of field.streams) {
-        if (localInterestingFields.value != null) {
-          localFields = localInterestingFields.value;
-        }
-        localFields[searchObj.organizationIdetifier + "_" + stream] =
-          searchObj.data.stream.interestingFieldList;
-      }
-      useLocalInterestingFields(localFields);
-
-      emit("setInterestingFieldInSQLQuery", field, isInterestingField);
-    };
-
-    const sortedStreamFields = () => {
-      return searchObj.data.stream.selectedStreamFields.sort(
-        (a: any, b: any) => a.group - b.group
       );
     };
 
