@@ -225,7 +225,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="['=', '!=']"
                     />
                     <CommonAutoComplete
-                      :label="t('common.value')"
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
                       searchRegex="(?:^|[^$])\$?(\w+)"
@@ -235,6 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-top: none !important;
                         width: auto !important;
                       "
+                      placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <q-btn
                       size="sm"

@@ -11,9 +11,9 @@
       @blur="hideOptions"
       v-bind="$attrs"
     >
-      <template v-slot:label>
-        <slot name="label"></slot>
-      </template>
+    <template v-if="hasSlot('label')" v-slot:label>
+      <slot name="label"></slot>
+    </template>
     </q-input>
     <div
       class="options-container"
@@ -38,6 +38,7 @@
 import { ref, toRef, defineComponent, watch } from "vue";
 import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
+import { useSlots } from "vue";
 
 export default defineComponent({
   name: "CommonAutoComplete",
@@ -96,6 +97,11 @@ export default defineComponent({
       showOptions.value = false;
     };
 
+    const slots = useSlots();
+    const hasSlot = (name) => {
+      return !!slots[name];
+    };
+
     return {
       showOptions,
       fieldsFilterFn,
@@ -105,6 +111,7 @@ export default defineComponent({
       store,
       onModelValueChanged,
       inputValue,
+      hasSlot
     };
   },
 });
