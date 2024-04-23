@@ -190,7 +190,7 @@ impl FileData {
 
         let h = gxhash::new().sum32(file);
         let index = h % (self.multi_dir.len() as u32);
-        format!("{}/", self.multi_dir.get(index as usize).unwrap()).to_string()
+        format!("{}/", self.multi_dir.get(index as usize).unwrap())
     }
 
     fn size(&self) -> (usize, usize) {
