@@ -57,11 +57,7 @@ async fn get_bucket_by_key<'a>(
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
-        num_replicas: if prefix == SUPER_CLUSTER_PREFIX {
-            CONFIG.nats.replicas * 2
-        } else {
-            CONFIG.nats.replicas
-        },
+        num_replicas: CONFIG.nats.replicas,
         history: 3,
         ..Default::default()
     };
