@@ -213,18 +213,18 @@
             v-for="(variable, index) in drilldownData.data.variables"
             :key="index"
           >
-            <div style="display: flex; gap: 10px; margin-bottom: 10px">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px" :key="variableNamesFn?.toString()">
               
               <CommonAutoComplete
                 placeholder="Name"
                 v-model="variable.name"
-                searchRegex=".*"
+                searchRegex="(.*)"
                 :items="variableNamesFn"
                 style="width: auto !important"
               ></CommonAutoComplete>
               <CommonAutoComplete
                 placeholder="Value"
-                searchRegex=".*"
+                searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
                 style="width: auto !important"
