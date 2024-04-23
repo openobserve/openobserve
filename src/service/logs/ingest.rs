@@ -376,7 +376,7 @@ impl<'a> IngestionData<'a> {
                 let request_id = &request.message.message_id;
                 let req_timestamp = &request.message.publish_time;
                 match decode_and_decompress(data) {
-                    Ok((decompressed_data, _)) => {
+                    Ok(decompressed_data) => {
                         let value: json::Value = json::from_str(&decompressed_data).unwrap();
                         IngestionDataIter::GCP(vec![value].into_iter(), None)
                     }
@@ -407,77 +407,83 @@ impl<'a> IngestionData<'a> {
                                 }),
                             );
                         }
-                        Ok((decompressed_data, record_type)) => {
+                        Ok(decompressed_data) => {
                             let mut value;
-                            // let mut timestamp;
-                            if record_type.eq(&AWSRecordType::Cloudwatch) {
-                                let kfh_data: KinesisFHLogData =
-                                    json::from_str(&decompressed_data).unwrap();
 
-                                for event in kfh_data.log_events.iter() {
-                                    value = json::to_value(event).unwrap();
-                                    let local_val = value.as_object_mut().unwrap();
+                            match json::from_str(&decompressed_data) {
+                                Ok(AWSRecordType::KinesisFHLogs(kfh_log_data)) => {
+                                    for event in kfh_log_data.log_events.iter() {
+                                        value = json::to_value(event).unwrap();
+                                        let local_val = value.as_object_mut().unwrap();
 
-                                    local_val.insert(
-                                        "requestId".to_owned(),
-                                        request.request_id.clone().into(),
-                                    );
-                                    local_val.insert(
-                                        "messageType".to_owned(),
-                                        kfh_data.message_type.clone().into(),
-                                    );
-                                    local_val
-                                        .insert("owner".to_owned(), kfh_data.owner.clone().into());
-                                    local_val.insert(
-                                        "logGroup".to_owned(),
-                                        kfh_data.log_group.clone().into(),
-                                    );
-                                    local_val.insert(
-                                        "logStream".to_owned(),
-                                        kfh_data.log_stream.clone().into(),
-                                    );
-                                    local_val.insert(
-                                        "subscriptionFilters".to_owned(),
-                                        kfh_data.subscription_filters.clone().into(),
-                                    );
+                                        local_val.insert(
+                                            "requestId".to_owned(),
+                                            request.request_id.clone().into(),
+                                        );
+                                        local_val.insert(
+                                            "messageType".to_owned(),
+                                            kfh_log_data.message_type.clone().into(),
+                                        );
+                                        local_val.insert(
+                                            "owner".to_owned(),
+                                            kfh_log_data.owner.clone().into(),
+                                        );
+                                        local_val.insert(
+                                            "logGroup".to_owned(),
+                                            kfh_log_data.log_group.clone().into(),
+                                        );
+                                        local_val.insert(
+                                            "logStream".to_owned(),
+                                            kfh_log_data.log_stream.clone().into(),
+                                        );
+                                        local_val.insert(
+                                            "subscriptionFilters".to_owned(),
+                                            kfh_log_data.subscription_filters.clone().into(),
+                                        );
 
-                                    let local_msg = event.message.as_str().unwrap();
+                                        let local_msg = event.message.as_str().unwrap();
 
-                                    if local_msg.starts_with('{') && local_msg.ends_with('}') {
-                                        let result: Result<json::Value, json::Error> =
-                                            json::from_str(local_msg);
+                                        if local_msg.starts_with('{') && local_msg.ends_with('}') {
+                                            let result: Result<json::Value, json::Error> =
+                                                json::from_str(local_msg);
 
-                                        match result {
-                                            Err(_e) => {
-                                                local_val.insert(
-                                                    "message".to_owned(),
-                                                    event.message.clone(),
-                                                );
+                                            match result {
+                                                Err(_e) => {
+                                                    local_val.insert(
+                                                        "message".to_owned(),
+                                                        event.message.clone(),
+                                                    );
+                                                }
+                                                Ok(message_val) => {
+                                                    local_val.insert(
+                                                        "message".to_owned(),
+                                                        message_val.clone(),
+                                                    );
+                                                }
                                             }
-                                            Ok(message_val) => {
-                                                local_val.insert(
-                                                    "message".to_owned(),
-                                                    message_val.clone(),
-                                                );
-                                            }
+                                        } else {
+                                            local_val
+                                                .insert("message".to_owned(), local_msg.into());
                                         }
-                                    } else {
-                                        local_val.insert("message".to_owned(), local_msg.into());
+
+                                        local_val.insert(
+                                            CONFIG.common.column_timestamp.clone(),
+                                            event.timestamp.into(),
+                                        );
+
+                                        value = local_val.clone().into();
+                                        events.push(value);
                                     }
-
-                                    local_val.insert(
-                                        CONFIG.common.column_timestamp.clone(),
-                                        event.timestamp.into(),
-                                    );
-
-                                    value = local_val.clone().into();
-
+                                }
+                                Ok(AWSRecordType::KinesisFHMetrics(kfh_metric_data)) => {
+                                    value = json::from_str(&decompressed_data).unwrap();
                                     events.push(value);
                                 }
-                            } else {
-                                value = json::from_str(&decompressed_data).unwrap();
-                                events.push(value);
-                            };
+                                _ => {
+                                    value = json::from_str(&decompressed_data).unwrap();
+                                    events.push(value);
+                                }
+                            }
                         }
                     }
                 }
@@ -487,15 +493,13 @@ impl<'a> IngestionData<'a> {
     }
 }
 
-pub fn decode_and_decompress(
-    encoded_data: &str,
-) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
+pub fn decode_and_decompress(encoded_data: &str) -> Result<String, Box<dyn std::error::Error>> {
     let decoded_data = config::utils::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(&decoded_data[..]);
     let mut decompressed_data = String::new();
     match gz.read_to_string(&mut decompressed_data) {
-        Ok(_) => Ok((decompressed_data, AWSRecordType::Cloudwatch)),
-        Err(_) => Ok((String::from_utf8(decoded_data)?, AWSRecordType::JSON)),
+        Ok(_) => Ok(decompressed_data),
+        Err(_) => Ok(String::from_utf8(decoded_data)?),
     }
 }
 
@@ -509,7 +513,7 @@ mod tests {
         let expected = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1680683189085,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}";
         let result =
             decode_and_decompress(encoded_data).expect("Failed to decode and decompress data");
-        assert_eq!(result.0, expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -517,7 +521,7 @@ mod tests {
         let encoded_data = "eyJtZXNzYWdlIjoiMiAwNTg2OTQ4NTY0NzYgZW5pLTAzYzBmNWJhNzlhNjZlZjE3IDEwLjMuMTY2LjcxIDEwLjMuMTQxLjIwOSA0NDMgMzg2MzQgNiAxMDMgNDI5MjYgMTY4MDgzODU1NiAxNjgwODM4NTc4IEFDQ0VQVCBPSyJ9Cg==";
         let expected = "{\"message\":\"2 058694856476 eni-03c0f5ba79a66ef17 10.3.166.71 10.3.141.209 443 38634 6 103 42926 1680838556 1680838578 ACCEPT OK\"}\n";
         let result = decode_and_decompress(encoded_data).expect("Failed to decode data");
-        assert_eq!(result.0, expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
