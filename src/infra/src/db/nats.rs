@@ -39,6 +39,8 @@ use crate::{
     errors::*,
 };
 
+const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
+
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
 pub async fn get_nats_client() -> &'static Client {
@@ -55,7 +57,11 @@ async fn get_bucket_by_key<'a>(
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
-        num_replicas: CONFIG.nats.replicas,
+        num_replicas: if prefix == SUPER_CLUSTER_PREFIX {
+            CONFIG.nats.replicas * 2
+        } else {
+            CONFIG.nats.replicas
+        },
         history: 3,
         ..Default::default()
     };
@@ -83,7 +89,7 @@ impl NatsDb {
     }
 
     pub fn super_cluster() -> Self {
-        Self::new("super_cluster_kv_")
+        Self::new(SUPER_CLUSTER_PREFIX)
     }
 
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
