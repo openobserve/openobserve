@@ -19,22 +19,22 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use crate::common::infra::cluster;
 
 const QUERIER_ROUTES: [&str; 16] = [
+    "/config",
     "/summary",
+    "/organizations",
+    "/settings",
     "/schema",
     "/streams",
     "/_search",
     "/_around",
     "/_values",
+    "/functions?page_num=",
     "/prometheus/api/v1/series",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query",
     "/prometheus/api/v1/metadata",
     "/prometheus/api/v1/labels",
     "/prometheus/api/v1/label/",
-    "/config/dex_login",
-    "/config/logout",
-    "/config/redirect",
-    "/config/dex_refresh",
 ];
 
 const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
@@ -144,14 +144,12 @@ async fn dispatch(
 ) -> actix_web::Result<HttpResponse, Error> {
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
-
-    // send query
     let new_url = get_url(path).await;
-
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
     }
 
+    // send query
     let resp = client
         .request_from(new_url.value.clone(), req.head())
         .send_stream(payload)

@@ -55,7 +55,6 @@ pub mod templates;
 
 pub async fn save(
     org_id: &str,
-    stream_type: StreamType,
     stream_name: &str,
     name: &str,
     mut alert: Alert,
@@ -65,7 +64,7 @@ pub async fn save(
         alert.name = name.trim().to_string();
     }
     alert.org_id = org_id.to_string();
-    alert.stream_type = stream_type;
+    let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
@@ -1270,14 +1269,13 @@ mod tests {
     #[tokio::test]
     async fn test_alert_create() {
         let org_id = "default";
-        let stream_type = StreamType::Logs;
         let stream_name = "default";
         let alert_name = "abc/alert";
         let alert = Alert {
             name: alert_name.to_string(),
             ..Default::default()
         };
-        let ret = save(org_id, stream_type, stream_name, alert_name, alert, true).await;
+        let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
     }

@@ -207,7 +207,9 @@ impl Search for Searcher {
 
         // remove task
         #[cfg(feature = "enterprise")]
-        self.remove(&trace_id).await;
+        if !self.is_leader(&trace_id).await {
+            self.remove(&trace_id).await;
+        }
 
         match result {
             Ok(res) => {
