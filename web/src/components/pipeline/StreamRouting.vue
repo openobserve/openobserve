@@ -1,17 +1,12 @@
 <template>
-  <div data-test="add-stream-routing-section" class="bg-white full-height">
-    <div class="q-py-sm q-px-md flex justify-between items-center">
-      <div class="stream-routing-title">Stream Routing</div>
-      <q-icon
-        data-test="stream-routing-close-dialog-btn"
-        name="cancel"
-        class="cursor-pointer"
-        size="20px"
-        @click="emits('cancel:hideform')"
-      />
-    </div>
+  <div
+    data-test="add-stream-routing-section"
+    class="full-width full-height bg-white"
+  >
+    <div class="stream-routing-title q-pb-sm q-pl-md">Add Stream Routing</div>
     <q-separator />
-    <div class="stream-routing-container q-px-md q-pt-md">
+
+    <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <div
         data-test="stream-routing-name-input"
         class="o2-input"
@@ -100,6 +95,8 @@
         @field:remove="removeField"
       />
 
+      <NodeLinks :tree="[]" />
+
       <div
         class="flex justify-start q-mt-lg q-py-sm full-width"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
@@ -140,6 +137,7 @@ import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import NodeLinks from "./NodeLinks.vue";
 
 interface RouteCondition {
   column: string;
@@ -157,8 +155,6 @@ interface StreamRoute {
 }
 
 const { t } = useI18n();
-
-const emits = defineEmits(["cancel:hideform"]);
 
 const isUpdating = ref(false);
 
@@ -306,7 +302,8 @@ const saveRouting = () => {};
 
 <style scoped>
 .stream-routing-title {
-  font-size: 18px;
+  font-size: 20px;
+  padding-top: 16px;
 }
 .stream-routing-container {
   width: fit-content;

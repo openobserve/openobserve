@@ -1,49 +1,30 @@
 <template>
-  <div data-test="add-stream-routing-section" class="bg-white full-height">
-    <div class="q-py-sm q-px-md flex justify-between items-center">
-      <div class="stream-routing-title">Stream Routing</div>
-      <q-icon
-        data-test="stream-routing-close-dialog-btn"
-        name="cancel"
-        class="cursor-pointer"
-        size="20px"
-        @click="emits('cancel:hideform')"
-      />
-    </div>
+  <div
+    data-test="add-stream-routing-section"
+    class="full-width bg-white full-height"
+  >
+    <div class="stream-routing-title q-pb-sm q-pl-md">Associate Function</div>
     <q-separator />
-    <div class="stream-routing-container q-px-md q-pt-md">
+    <div class="stream-routing-container full-width q-px-md q-pt-md">
+      <q-toggle
+        class="q-mb-sm"
+        label="Create new function"
+        v-model="createNewFunction"
+      />
       <div
-        data-test="stream-routing-name-input"
-        class="o2-input"
-        style="padding-top: 12px"
+        v-if="!createNewFunction"
+        class="flex justify-start items-center full-width"
+        style="padding-top: 0px"
       >
-        <q-input
-          v-model="streamRoute.destinationStreamName"
-          :label="t('alerts.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
-          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-          tabindex="0"
-          style="width: 480px"
-        />
-      </div>
-      <div class="flex justify-start items-center" style="padding-top: 0px">
         <div
           data-test="add-alert-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm"
+          class="alert-stream-type o2-input q-mr-sm full-width"
           style="padding-top: 0"
         >
           <q-select
-            v-model="streamRoute.sourceStreamType"
-            :options="streamTypes"
-            :label="t('alerts.streamType') + ' *'"
+            v-model="selectedFunction"
+            :options="filteredFunctions"
+            :label="t('function.selectFunction') + ' *'"
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
@@ -59,46 +40,17 @@
             style="min-width: 220px"
           />
         </div>
-        <div
-          data-test="add-alert-stream-select"
-          class="o2-input"
-          style="padding-top: 0"
-        >
-          <q-select
-            v-model="streamRoute.sourceStreamName"
-            :options="filteredStreams"
-            :label="t('alerts.stream_name') + ' *'"
-            :loading="isFetchingStreams"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            filled
-            stack-label
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @filter="filterStreams"
-            @update:model-value="
-              updateStreamFields(streamRoute.sourceStreamName)
-            "
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 250px !important; width: 250px !important"
-          />
-        </div>
       </div>
 
-      <real-time-alert
-        :columns="filteredColumns"
-        :conditions="streamRoute.conditions"
-        @field:add="addField"
-        @field:remove="removeField"
-      />
+      <div v-if="createNewFunction" class="pipeline-add-function">
+        <AddFunction
+          ref="addFunctionRef"
+          @update:list="onFunctionCreation"
+          @cancel:hideform="cancelFunctionCreation"
+        />
+      </div>
+
+      <NodeLinks :tree="[]" />
 
       <div
         class="flex justify-start q-mt-lg q-py-sm full-width"
@@ -120,7 +72,7 @@
           color="secondary"
           padding="sm xl"
           no-caps
-          @click="saveRouting"
+          @click="saveFunction"
         />
       </div>
     </div>
@@ -134,12 +86,15 @@
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref } from "vue";
+import { ref, type Ref, defineEmits, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import AddFunction from "../functions/AddFunction.vue";
+import NodeLinks from "./NodeLinks.vue";
+import functionsService from "@/services/jstransform";
 
 interface RouteCondition {
   column: string;
@@ -156,27 +111,37 @@ interface StreamRoute {
   conditions: RouteCondition[];
 }
 
+const emit = defineEmits(["update:node", "cancel:hideform"]);
+
 const { t } = useI18n();
 
-const emits = defineEmits(["cancel:hideform"]);
+const addFunctionRef: any = ref(null);
 
 const isUpdating = ref(false);
 
-const filteredColumns: any = ref([]);
+const selectedFunction = ref("");
 
-const isFetchingStreams = ref(false);
+const filteredFunctions = ref([]);
 
-const filteredStreams = ref([]);
+const createNewFunction = ref(false);
 
 const router = useRouter();
 
 const store = useStore();
+
+const nodes = {};
+
+const links = {};
 
 const dialog = ref({
   show: false,
   title: "",
   message: "",
   okCallback: () => {},
+});
+
+onBeforeMount(() => {
+  getFunctions();
 });
 
 const getDefaultStreamRoute = () => {
@@ -263,21 +228,6 @@ const updateStreamFields = async (stream_name: any) => {
   // onInputUpdate("stream_name", stream_name);
 };
 
-const addField = () => {
-  streamRoute.value.conditions.push({
-    column: "",
-    operator: "=",
-    value: "",
-    id: getUUID(),
-  });
-};
-
-const removeField = (field: any) => {
-  streamRoute.value.conditions = streamRoute.value.conditions.filter(
-    (_field: any) => _field.id !== field.id
-  );
-};
-
 const goToRoutings = () => {
   router.replace({
     name: "reports",
@@ -301,16 +251,69 @@ const openCancelDialog = () => {
   dialog.value.okCallback = goToRoutings;
 };
 
-const saveRouting = () => {};
+const saveFunction = () => {
+  if (createNewFunction.value) {
+    addFunctionRef.value.onSubmit();
+  } else {
+    emit("update:node", { name: selectedFunction.value });
+  }
+};
+
+const onFunctionCreation = (_function: any) => {
+  // Assing newly created function to the block
+  emit("update:node", _function);
+};
+
+const cancelFunctionCreation = () => {
+  emit("cancel:hideform");
+};
+
+const getFunctions = () => {
+  functionsService
+    .list(
+      1,
+      100000,
+      "name",
+      false,
+      "",
+      store.state.selectedOrganization.identifier
+    )
+    .then((res) => {
+      filteredFunctions.value = res.data.list.map((func: any) => func.name);
+    });
+};
 </script>
 
 <style scoped>
 .stream-routing-title {
-  font-size: 18px;
+  font-size: 20px;
+  padding-top: 16px;
 }
 .stream-routing-container {
-  width: fit-content;
   border-radius: 8px;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
+}
+</style>
+
+<style lang="scss">
+.pipeline-add-function {
+  .add-function-header,
+  .q-separator {
+    display: none;
+  }
+
+  .add-function-actions {
+    display: none;
+  }
+
+  .add-function-name-input {
+    width: 100%;
+    margin-left: 0px !important;
+
+    label {
+      width: 100%;
+      padding-left: 0;
+    }
+  }
 }
 </style>

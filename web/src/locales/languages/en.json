@@ -380,7 +380,9 @@
   },
   "pipeline": {
     "header": "Pipeline",
-    "create": "Create Pipeline"
+    "create": "Create Pipeline",
+    "SelectParentNode": "Select Parent Node",
+    "SelectChildNode": "Select Child Node"
   },
   "function": {
     "header": "Functions",

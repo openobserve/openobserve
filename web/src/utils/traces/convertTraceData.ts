@@ -67,10 +67,10 @@ export const convertTraceData = (props: any, timezone: string) => {
       tooltip: {
         show: false,
       },
-      itemSize:0,
-      itemGap:0,
+      itemSize: 0,
+      itemGap: 0,
       // it is used to hide toolbox buttons
-      bottom:"100%",
+      bottom: "100%",
       feature: {
         dataZoom: {
           show: true,
@@ -198,4 +198,4 @@ const formatDate = (date: any) => {
   const seconds = String(date.getSeconds()).padStart(2, "0");
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
+};

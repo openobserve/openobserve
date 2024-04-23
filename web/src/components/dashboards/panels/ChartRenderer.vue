@@ -105,7 +105,7 @@ import {
   DataZoomComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
-import { CanvasRenderer } from "echarts/renderers";
+import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import type {
   BarSeriesOption,
   LineSeriesOption,
@@ -174,11 +174,20 @@ echarts.use([
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
+  SVGRenderer,
 ]);
 
 export default defineComponent({
   name: "ChartRenderer",
-  emits: ["updated:chart", "click", "updated:dataZoom", "error"],
+  emits: [
+    "updated:chart",
+    "click",
+    "updated:dataZoom",
+    "error",
+    "mouseover",
+    "mousemove",
+    "mouseout",
+  ],
   props: {
     data: {
       required: true,
@@ -284,8 +293,14 @@ export default defineComponent({
     };
 
     const chartInitialSetUp = () => {
-      chart?.on("mousemove", mouseHoverEffectFn);
-      chart?.on("mouseout", mouseOutEffectFn);
+      chart?.on("mousemove", (params: any) => {
+        emit("mousemove", params);
+        mouseHoverEffectFn(params);
+      });
+      chart?.on("mouseout", (params: any) => {
+        emit("mouseout", params);
+        mouseOutEffectFn();
+      });
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
         hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
@@ -343,6 +358,11 @@ export default defineComponent({
       chart?.on("click", function (params: any) {
         emit("click", params);
       });
+
+      chart?.on("mouseover", function (params: any) {
+        emit("mouseover", params);
+      });
+
       window.addEventListener("resize", windowResizeEventCallback);
 
       // we need that toolbox datazoom button initally selected
@@ -351,6 +371,11 @@ export default defineComponent({
         key: "dataZoomSelect",
         dataZoomSelectActive: true,
       });
+
+      console.log(
+        "chart box",
+        chart?.getModel()?.getSeriesByIndex(0)?.getBoxLayout()
+      );
     };
 
     // dispatch tooltip action for all charts
@@ -429,7 +454,7 @@ export default defineComponent({
       (newTheme) => {
         const theme = newTheme === "dark" ? "dark" : "light";
         chart?.dispose();
-        chart = echarts.init(chartRef.value, theme);
+        chart = echarts.init(chartRef.value, theme, { renderer: "svg" });
         const options = props.data.options || {};
 
         // change color and background color of tooltip
@@ -463,7 +488,7 @@ export default defineComponent({
         await nextTick();
         const theme = store.state.theme === "dark" ? "dark" : "light";
         if (chartRef.value) {
-          chart = echarts.init(chartRef.value, theme);
+          chart = echarts.init(chartRef.value, theme, { renderer: "svg" });
         }
         chart?.setOption(props?.data?.options || {}, true);
         chartInitialSetUp();
