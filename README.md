@@ -172,7 +172,7 @@ In order to generate the SBOM, you can use the following commands:
 Install cyclonedx-npm:
 
 ````bash
-npm install -g cyclonedx-npm
+npm install --global @cyclonedx/cyclonedx-npm
 ````
 
 Generate the SBOM:
