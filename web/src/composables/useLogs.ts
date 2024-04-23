@@ -2880,6 +2880,7 @@ const useLogs = () => {
     fieldValues,
     extractFields,
     getQueryData,
+    extractFields,
     searchAroundData,
     updateGridColumns,
     refreshData,
