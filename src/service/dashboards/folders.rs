@@ -111,7 +111,7 @@ pub async fn list_folders(
     if let Ok(folders) = db::dashboards::folders::list(org_id).await {
         let filtered = match permitted_folders {
             Some(permitted_folders) => {
-                if permitted_folders.contains(&format!("{}:{}", "dfolder", org_id)) {
+                if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
                     folders
                 } else {
                     folders

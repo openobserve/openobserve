@@ -203,7 +203,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("alert:{}", org_id))
+                        .contains(&format!("alert:_all_{}", org_id))
                 {
                     result.push(alert);
                 }
