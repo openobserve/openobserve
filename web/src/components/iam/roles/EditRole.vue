@@ -325,6 +325,7 @@ import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import alertService from "@/services/alerts";
+import reportService from "@/services/reports";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
@@ -1246,6 +1247,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     dfolder: getFolders,
     dashboard: getDashboards,
     metadata: getMetadataStreams,
+    report: getReports,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1318,7 +1320,13 @@ const getSavedViews = async () => {
   const savedViews = await savedviewsService.get(
     store.state.selectedOrganization.identifier
   );
-  updateResourceEntities("savedviews", ["name"], [...savedViews.data.views]);
+  updateResourceEntities(
+    "savedviews",
+    ["view_id"],
+    [...savedViews.data.views],
+    false,
+    "view_name"
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1487,6 +1495,18 @@ const getStreamsTypes = async () => {
   });
 
   return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getReports = async () => {
+  const reports = await reportService.list(
+    store.state.selectedOrganization.identifier
+  );
+
+  updateResourceEntities("report", ["name"], [...reports.data]);
+
+  return new Promise((resolve) => {
     resolve(true);
   });
 };

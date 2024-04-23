@@ -147,7 +147,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("destination:{}", org_id))
+                        .contains(&format!("destination:_all_{}", org_id))
                 {
                     result.push(dest);
                 }
