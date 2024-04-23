@@ -272,6 +272,16 @@ RETURNING *;"#;
         Ok(jobs)
     }
 
+    async fn list_module(&self, module: TriggerModule) -> Result<Vec<Trigger>> {
+        let client = CLIENT_RO.clone();
+        let query = r#"SELECT * FROM scheduled_jobs WHERE module = $1 ORDER BY id;"#;
+        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
+            .bind(module)
+            .fetch_all(&client)
+            .await?;
+        Ok(jobs)
+    }
+
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
     async fn clean_complete(&self, interval: u64) {

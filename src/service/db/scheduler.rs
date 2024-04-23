@@ -124,6 +124,12 @@ pub async fn len() -> usize {
     infra_scheduler::len().await
 }
 
+/// List the jobs for the given module
+#[inline]
+pub async fn list_module(module: TriggerModule) -> Result<Vec<Trigger>> {
+    infra_scheduler::list_module(module).await
+}
+
 #[inline]
 pub async fn is_empty() -> bool {
     infra_scheduler::is_empty().await

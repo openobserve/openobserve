@@ -56,6 +56,7 @@ pub trait Scheduler: Sync + Send + 'static {
         report_timeout: i64,
     ) -> Result<Vec<Trigger>>;
     async fn list(&self) -> Result<Vec<Trigger>>;
+    async fn list_module(&self, module: TriggerModule) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self, interval: u64);
     async fn watch_timeout(&self, interval: u64);
     async fn len_module(&self, module: TriggerModule) -> usize;
@@ -211,6 +212,12 @@ pub async fn len_module(module: TriggerModule) -> usize {
 #[inline]
 pub async fn len() -> usize {
     CLIENT.len().await
+}
+
+/// List the jobs for the given module
+#[inline]
+pub async fn list_module(module: TriggerModule) -> Result<Vec<Trigger>> {
+    CLIENT.list_module(module).await
 }
 
 #[inline]
