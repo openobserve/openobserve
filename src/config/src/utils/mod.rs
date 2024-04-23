@@ -20,6 +20,7 @@ pub mod file;
 pub mod flatten;
 pub mod hash;
 pub mod json;
+pub mod lru_cache;
 pub mod parquet;
 pub mod rand;
 pub mod record_batch_ext;

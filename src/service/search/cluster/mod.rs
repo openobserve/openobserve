@@ -673,12 +673,11 @@ async fn merge_grpc_result(
             .await
             .is_err()
         {
-            log::info!(
+            let err = format!(
                 "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
             );
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
-            ))));
+            log::error!("{}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
         }
 
         let merge_batch;

@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::scheduler;
 
 use crate::{
     common::{infra::config::DASHBOARD_REPORTS, meta::dashboards::reports::Report},
@@ -39,15 +38,15 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
 pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyhow::Error> {
     match set_without_updating_trigger(org_id, report).await {
         Ok(schedule_key) => {
-            let trigger = scheduler::Trigger {
+            let trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
-                module: scheduler::TriggerModule::Report,
+                module: db::scheduler::TriggerModule::Report,
                 module_key: schedule_key,
                 next_run_at: report.start,
                 ..Default::default()
             };
             if create {
-                match scheduler::push(trigger).await {
+                match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
                         log::error!("Failed to save trigger: {}", e);
@@ -55,7 +54,7 @@ pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyh
                     }
                 }
             } else {
-                match scheduler::update_trigger(trigger).await {
+                match db::scheduler::update_trigger(trigger).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
                         log::error!("Failed to update trigger: {}", e);
@@ -90,13 +89,15 @@ pub async fn set_without_updating_trigger(
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/reports/{org_id}/{name}");
     match db::delete(&key, false, db::NEED_WATCH, None).await {
-        Ok(_) => match scheduler::delete(org_id, scheduler::TriggerModule::Report, name).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                log::error!("Failed to delete trigger: {}", e);
-                Ok(())
+        Ok(_) => {
+            match db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, name).await {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    log::error!("Failed to delete trigger: {}", e);
+                    Ok(())
+                }
             }
-        },
+        }
         Err(e) => Err(anyhow::anyhow!("Error deleting report: {}", e)),
     }
 }
