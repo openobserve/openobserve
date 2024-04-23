@@ -944,6 +944,7 @@ export default defineComponent({
       onStreamChange,
       moveItemsToTop,
       validateFilterForMultiStream,
+      extractFields,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -1645,6 +1646,9 @@ export default defineComponent({
               // }
               // ----- Here we are explicitly handling stream change for multistream -----
               let selectedStreams = [];
+              const streamValues = searchObj.data.stream.streamLists.map(
+                (item) => item.value
+              );
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
@@ -1662,11 +1666,25 @@ export default defineComponent({
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
               }
+
+              const streamNotExist = selectedStreams.filter(
+                (stream_str) => !streamValues.includes(stream_str)
+              );
+
+              if (streamNotExist.length > 0) {
+                let errMsg = t("search.streamNotExist").replace(
+                  "[STREAM_NAME]",
+                  streamNotExist
+                );
+                throw new Error(errMsg);
+                return;
+              }
               // extractedObj.data.stream.selectedStream = [];
               // extractedObj.data.stream.selectedStream = selectedStreams;
               delete extractedObj.data.stream.streamLists;
               delete extractedObj.data.stream.selectedStream;
               delete searchObj.data.stream.selectedStream;
+              delete searchObj.data.queryResults.aggs;
               searchObj.data.stream.selectedStream = [];
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
@@ -1751,6 +1769,7 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
+              delete searchObj.data.queryResults.aggs;
 
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
@@ -1763,6 +1782,22 @@ export default defineComponent({
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
               // searchObj.value = mergeDeep(searchObj, extractedObj);
+
+              const streamValues = searchObj.data.stream.streamLists.map(
+                (item) => item.value
+              );
+              const streamNotExist = selectedStreams.filter(
+                (stream_str) => !streamValues.includes(stream_str)
+              );
+
+              if (streamNotExist.length > 0) {
+                let errMsg = t("search.streamNotExist").replace(
+                  "[STREAM_NAME]",
+                  streamNotExist
+                );
+                throw new Error(errMsg);
+                return;
+              }
 
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -1804,6 +1839,7 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loading = true;
+                await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
                 updateUrlQueryParams();
@@ -1831,10 +1867,10 @@ export default defineComponent({
         .catch((err) => {
           store.dispatch("setSavedViewFlag", false);
           $q.notify({
-            message: `Error while applying saved view.`,
+            message: err.message || `Error while applying saved view.`,
             color: "negative",
             position: "bottom",
-            timeout: 1000,
+            timeout: 3000,
           });
           console.log(err);
         });

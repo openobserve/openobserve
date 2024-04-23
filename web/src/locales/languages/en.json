@@ -109,8 +109,7 @@
     "histogramErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search Saved View",
-    "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist.",
-    "noFieldFound": "No fields found for selected stream"
+    "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist."
   },
   "menu": {
     "home": "Home",

@@ -200,7 +200,7 @@ color="primary" size="md" />
                 <div
                   v-else
                   data-test="logs-search-search-result"
-                  class="full-height"
+                  class="full-height search-result-container"
                 >
                   <search-result
                     ref="searchResultRef"
@@ -1015,6 +1015,11 @@ $navbarHeight: 64px;
       top: 5px;
       font-size: 12px !important;
     }
+  }
+
+  .search-result-container {
+    position: fixed;
+    width: 100%;
   }
 }
 </style>
