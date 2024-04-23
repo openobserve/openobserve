@@ -18,8 +18,8 @@ export const useSearchInputUsingRegex = (
     }
 
     const regex = new RegExp(searchRegex, "gi");
-    let matchesArray = [];
-    let match;
+    let matchesArray: any[] = [];
+    let match: any;
     while ((match = regex.exec(val)) !== null) {
       let needle: any = null;
       for (let i = 1; i < match.length; i++) {
