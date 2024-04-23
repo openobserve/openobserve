@@ -389,12 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <div
                                 :title="value.key"
                                 class="ellipsis q-pr-xs"
-                                :style="
-                                  searchObj.data.stream.selectedStream.length ==
-                                  props.row.streams.length
-                                    ? 'width: calc(100% - 50px)'
-                                    : ''
-                                "
+                                style="width: calc(100% - 50px)"
                               >
                                 {{ value.key }}
                               </div>
