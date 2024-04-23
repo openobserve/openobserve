@@ -375,6 +375,11 @@ export default defineComponent({
         key: "dataZoomSelect",
         dataZoomSelectActive: true,
       });
+
+      console.log(
+        "chart box",
+        chart?.getModel()?.getSeriesByIndex(0)?.getBoxLayout()
+      );
     };
 
     // dispatch tooltip action for all charts

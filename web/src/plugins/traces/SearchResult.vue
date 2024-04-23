@@ -169,6 +169,8 @@ export default defineComponent({
             searchObj.data.histogram,
             store.state.timezone
           );
+
+          console.log(plotChart.value);
           // plotChart.value.forceReLayout();
         });
       }
