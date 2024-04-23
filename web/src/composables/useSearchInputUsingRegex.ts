@@ -18,18 +18,18 @@ export const useSearchInputUsingRegex = (
     }
 
     const regex = new RegExp(searchRegex, "gi");
-    let matchesArray: any[] = [];
-    let match: any;
-    while ((match = regex.exec(val)) !== null) {
-      let needle: any = null;
-      for (let i = 1; i < match.length; i++) {
-        if (match[i] !== undefined) {
-          needle = match[i];
-          break;
-        }
-      }
-      if (needle !== null) {
-        matchesArray.push(needle);
+    let match = regex.exec(val)
+    
+    if(!match) {
+      filteredOptions.value = [];
+      return;
+    }
+
+    let needle: any = null;
+    for (let i = 1; i < match.length; i++) {
+      if (match[i] !== undefined) {
+        needle = match[i];
+        break;
       }
     }
 
@@ -37,9 +37,7 @@ export const useSearchInputUsingRegex = (
       const value =
         typeof option === "object" ? option[searchKey] : option.toString();
       const lowerCaseValue = value.toLowerCase();
-      return matchesArray.some((match) =>
-        lowerCaseValue.includes(match.toLowerCase())
-      );
+      return lowerCaseValue.includes(needle);
     });
   };
 
