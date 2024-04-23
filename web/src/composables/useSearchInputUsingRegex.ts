@@ -18,7 +18,6 @@ export const useSearchInputUsingRegex = (
     }
 
     const regex = new RegExp(searchRegex, "gi");
-    console.log("regex", regex);
     let matchesArray = [];
     let match;
     while ((match = regex.exec(val)) !== null) {
