@@ -506,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.promql_legend
         "
         :items="dashboardSelectfieldPromQlList"
-        searchRegex="(?:^|[^{])\$?(\w+)"
+        searchRegex="(?:{([^}]*)$|([a-zA-Z-_]+)$)"
         color="input-border"
         bg-color="input-bg"
         class="showLabelOnTop"

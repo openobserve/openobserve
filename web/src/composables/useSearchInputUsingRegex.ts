@@ -17,25 +17,30 @@ export const useSearchInputUsingRegex = (
       return;
     }
 
-    const regex = new RegExp(searchRegex, "g");
+    const regex = new RegExp(searchRegex, "gi");
     console.log("regex", regex);
-    
-
-    const match = regex.exec(val);
-    if (!match) {
-      filteredOptions.value = [];
+    let matchesArray = [];
+    let match;
+    while ((match = regex.exec(val)) !== null) {
+      let needle: any = null;
+      for (let i = 1; i < match.length; i++) {
+        if (match[i] !== undefined) {
+          needle = match[i];
+          break;
+        }
+      }
+      if (needle !== null) {
+        matchesArray.push(needle);
+      }
     }
-    console.log("match", match);
-    
-    const needle = match?.[1]?.toLowerCase();
-    console.log("needle", needle);
-    
 
     filteredOptions.value = options.value?.filter((option: any) => {
       const value =
         typeof option === "object" ? option[searchKey] : option.toString();
       const lowerCaseValue = value.toLowerCase();
-      return lowerCaseValue.includes(needle);
+      return matchesArray.some((match) =>
+        lowerCaseValue.includes(match.toLowerCase())
+      );
     });
   };
 
