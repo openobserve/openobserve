@@ -21,7 +21,17 @@ use std::{
 
 use async_recursion::async_recursion;
 use bytes::Bytes;
-use config::{is_local_disk_storage, metrics, utils::asynchronism::file::*, CONFIG};
+use config::{
+    is_local_disk_storage, metrics,
+    utils::{
+        asynchronism::file::*,
+        hash::{
+            gxhash::{self},
+            Sum32,
+        },
+    },
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
@@ -34,6 +44,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
+    multi_dir: Vec<String>,
     data: CacheStrategy,
 }
 
@@ -60,6 +71,13 @@ impl FileData {
                 CONFIG.common.data_cache_dir,
                 storage::format_key("", true)
             ),
+            multi_dir: CONFIG
+                .disk_cache
+                .multi_dir
+                .split(',')
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect(),
             data: CacheStrategy::new(strategy),
         }
     }
@@ -69,7 +87,7 @@ impl FileData {
     }
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
-        let file_path = format!("{}{}", self.root_dir, file);
+        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         let data = match get_file_contents(&file_path).await {
             Ok(data) => Bytes::from(data),
             Err(_) => {
@@ -101,7 +119,7 @@ impl FileData {
         self.cur_size += data_size;
         self.data.insert(file.to_string(), data_size);
         // write file into local disk
-        let file_path = format!("{}{}", self.root_dir, file);
+        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
         put_file_contents(&file_path, &data).await?;
         // metrics
@@ -135,7 +153,12 @@ impl FileData {
             }
             let (key, data_size) = item.unwrap();
             // delete file from local disk
-            let file_path = format!("{}{}", self.root_dir, key);
+            let file_path = format!(
+                "{}{}{}",
+                self.root_dir,
+                self.choose_multi_dir(key.as_str()),
+                key
+            );
             fs::remove_file(&file_path).await?;
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
@@ -158,6 +181,16 @@ impl FileData {
             release_size
         );
         Ok(())
+    }
+
+    fn choose_multi_dir(&self, file: &str) -> String {
+        if self.multi_dir.is_empty() {
+            return "".to_string();
+        }
+
+        let h = gxhash::new().sum32(file);
+        let index = h % (self.multi_dir.len() as u32);
+        format!("{}/", self.multi_dir.get(index as usize).unwrap())
     }
 
     fn size(&self) -> (usize, usize) {
@@ -471,5 +504,36 @@ mod tests {
         assert!(file_data.exist(file_key2).await);
         // get first key, should get error
         assert!(!file_data.exist(file_key1).await);
+    }
+
+    #[tokio::test]
+    async fn test_multi_dir() {
+        let multi_dir: Vec<String> = "dir1 , dir2 , dir3"
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
+
+        let trace_id = "session_123";
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(CONFIG.disk_cache.max_size, "lru");
+        file_data.multi_dir = multi_dir;
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let content = Bytes::from("Some text");
+
+        file_data
+            .set(trace_id, file_key, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key).await);
+
+        file_data
+            .set(trace_id, file_key, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key).await);
+        assert!(file_data.size().0 > 0);
+
+        assert_eq!(file_data.get(&file_key, None).await, Some(content))
     }
 }
