@@ -331,25 +331,23 @@ export default defineComponent({
     });
 
     // Watcher to filter queries based on user_id
-    watch(filterQuery, (newVal) => {
-      console.log("newVal", newVal);
-      console.log("queries", queries.value);
-      if (!newVal) {
-        resultTotal.value = queries.value.length;
-        console.log("resultTotal inside if", resultTotal.value);
-        console.log("queries inside if", queries.value);
-        return;
-      } else {
-        const filteredQueries = newVal
-          ? queries.value.filter((query: any) =>
-              query.user_id.toLowerCase().includes(newVal.toLowerCase())
-            )
-          : queries.value;
-        resultTotal.value = filteredQueries.length;
-        console.log("filteredQueries", filteredQueries);
+    const filteredQueries = ref([]);
 
-        queries.value = filteredQueries;
+    const filteredRows = computed(() => {
+      const newVal = filterQuery.value;
+      if (!newVal) {
+        return queries.value;
+      } else {
+        return queries.value.filter((query: any) =>
+          query.user_id.toLowerCase().includes(newVal.toLowerCase())
+        );
       }
+    });
+
+    // Watcher to filter queries based on user_id
+    watch(filterQuery, () => {
+      // Update the result total based on the filtered array length
+      resultTotal.value = filteredRows.value.length;
     });
 
     const getRunningQueries = () => {
@@ -411,7 +409,7 @@ export default defineComponent({
     };
 
     const rowsQuery = computed(function () {
-      const rows = toRaw(queries.value) ?? [];
+      const rows = toRaw(filteredRows.value) ?? [];
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
@@ -462,6 +460,7 @@ export default defineComponent({
       selectedPerPage,
       qTable,
       rowsQuery,
+      filteredQueries,
     };
   },
 });
