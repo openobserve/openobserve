@@ -89,7 +89,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("template:{}", org_id))
+                        .contains(&format!("template:_all_{}", org_id))
                 {
                     result.push(template);
                 }
