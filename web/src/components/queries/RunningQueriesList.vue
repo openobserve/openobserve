@@ -103,6 +103,7 @@
           :perPageOptions="perPageOptions"
           position="bottom"
           @update:changeRecordPerPage="changePagination"
+          v-model="filterQuery"
         />
       </template>
     </q-table>
@@ -136,6 +137,7 @@ import {
   defineComponent,
   computed,
   toRaw,
+  watch,
 } from "vue";
 import { useQuasar, type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
@@ -328,6 +330,28 @@ export default defineComponent({
       lastRefreshed.value = getCurrentTime();
     });
 
+    // Watcher to filter queries based on user_id
+    watch(filterQuery, (newVal) => {
+      console.log("newVal", newVal);
+      console.log("queries", queries.value);
+      if (!newVal) {
+        resultTotal.value = queries.value.length;
+        console.log("resultTotal inside if", resultTotal.value);
+        console.log("queries inside if", queries.value);
+        return;
+      } else {
+        const filteredQueries = newVal
+          ? queries.value.filter((query: any) =>
+              query.user_id.toLowerCase().includes(newVal.toLowerCase())
+            )
+          : queries.value;
+        resultTotal.value = filteredQueries.length;
+        console.log("filteredQueries", filteredQueries);
+
+        queries.value = filteredQueries;
+      }
+    });
+
     const getRunningQueries = () => {
       const dismiss = q.notify({
         message: "Fetching running queries...",
@@ -337,8 +361,11 @@ export default defineComponent({
       });
       SearchService.get_running_queries()
         .then((response: any) => {
-          resultTotal.value = response?.data?.status?.length;
+          // resultTotal.value = response?.data?.status?.length;
           queries.value = response?.data?.status;
+          resultTotal.value = queries.value.length;
+          console.log("queries inside then", queries.value);
+          console.log("resultTotal inside then", resultTotal.value);
         })
         .catch((error: any) => {
           q.notify({
