@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="layout-panel-container col"
                       style="height: 100%"
                     >
-                      <DashboardQueryBuilder />
+                      <DashboardQueryBuilder :dashboardData="currentDashboardData.data"/>
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel />
+                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
                 </PanelSidebar>
               </div>
             </div>

@@ -590,7 +590,7 @@ export default defineComponent({
 
         variablesData.value.values.forEach((variable: any) => {
           if (variable.type != "dynamic_filters") {
-            drilldownVariables["var-" + variable.name] = variable.value;
+            drilldownVariables[variable.name] = variable.value;
           }
         });
 
@@ -653,11 +653,11 @@ export default defineComponent({
               pos > -1
                 ? window.location.origin +
                   window.location.pathname.slice(0, pos) +
-                  "/web/"
+                  "/web"
                 : window.location.origin;
 
             // always, go to view dashboard page
-            currentUrl += "dashboards/view?";
+            currentUrl += "/dashboards/view?";
 
             // if pass all variables in url
             currentUrl += drilldownData.data.passAllVariables
@@ -670,7 +670,8 @@ export default defineComponent({
             drilldownData.data.variables.forEach((variable: any) => {
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 url.searchParams.set(
-                  replacePlaceholders(variable.name, drilldownVariables),
+                  "var-" +
+                    replacePlaceholders(variable.name, drilldownVariables),
                   replacePlaceholders(variable.value, drilldownVariables)
                 );
               }
@@ -693,7 +694,8 @@ export default defineComponent({
             drilldownData.data.variables.forEach((variable: any) => {
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 oldParams[
-                  replacePlaceholders(variable.name, drilldownVariables)
+                  "var-" +
+                    replacePlaceholders(variable.name, drilldownVariables)
                 ] = replacePlaceholders(variable.value, drilldownVariables);
               }
             });
