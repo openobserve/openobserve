@@ -362,8 +362,6 @@ export default defineComponent({
           // resultTotal.value = response?.data?.status?.length;
           queries.value = response?.data?.status;
           resultTotal.value = queries.value.length;
-          console.log("queries inside then", queries.value);
-          console.log("resultTotal inside then", resultTotal.value);
         })
         .catch((error: any) => {
           q.notify({
