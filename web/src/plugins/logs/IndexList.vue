@@ -66,7 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="fieldList"
         :rows-per-page-options="[]"
         :hide-bottom="
-          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage || searchObj.data.stream.selectedStreamFields.length == 0
+          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
+          searchObj.data.stream.selectedStreamFields.length == 0
         "
       >
         <template #body-cell-name="props">
@@ -711,20 +712,6 @@ export default defineComponent({
       field: any,
       isInterestingField: boolean
     ) => {
-      // if (
-      //   field.name == "_timestamp" &&
-      //   isInterestingField &&
-      //   searchObj.data.stream.interestingFieldList.length > 1
-      // ) {
-      //   $q.notify({
-      //     type: "negative",
-      //     message:
-      //       "Timestamp field cannot be removed from the interesting fields",
-      //   });
-
-      //   return false;
-      // }
-
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
@@ -738,45 +725,27 @@ export default defineComponent({
           field.name
         );
         if (index == -1 && field.name != "*") {
-          // searchObj.data.stream.interestingFieldList.push(field.name);
           for (const stream of searchObj.data.stream.selectedStreamFields) {
             if ((stream as { name: string }).name == field.name) {
               searchObj.data.stream.interestingFieldList.push(field.name);
-              const localInterestingFields: any = useLocalInterestingFields();
-              let localFields: any = {};
-              if (localInterestingFields.value != null) {
-                localFields = localInterestingFields.value;
-              }
-              localFields[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream.value
-              ] = searchObj.data.stream.interestingFieldList;
-              useLocalInterestingFields(localFields);
             }
           }
         }
       }
 
-      searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-        if (searchObj.data.stream.interestingFieldList.includes(field.name)) {
-          field.isInterestingField = true;
-        } else {
-          field.isInterestingField = false;
-        }
-      });
+      field.isInterestingField = !isInterestingField;
 
       const localInterestingFields: any = useLocalInterestingFields();
       let localFields: any = {};
       if (localInterestingFields.value != null) {
         localFields = localInterestingFields.value;
+        localFields[
+          searchObj.organizationIdetifier +
+            "_" +
+            searchObj.data.stream.selectedStream.value
+        ] = searchObj.data.stream.interestingFieldList;
+        useLocalInterestingFields(localFields);
       }
-      localFields[
-        searchObj.organizationIdetifier +
-          "_" +
-          searchObj.data.stream.selectedStream.value
-      ] = searchObj.data.stream.interestingFieldList;
-      useLocalInterestingFields(localFields);
 
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
     };

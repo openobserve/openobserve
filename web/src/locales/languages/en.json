@@ -105,7 +105,8 @@
     "functionErrorLabel": "Function not applied: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
-    "searchSavedView": "Search Saved View"
+    "searchSavedView": "Search Saved View",
+    "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist."
   },
   "menu": {
     "home": "Home",
