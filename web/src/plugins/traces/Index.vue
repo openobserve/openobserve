@@ -1001,7 +1001,7 @@ export default defineComponent({
         searchObj.loading = false;
       } catch (e) {
         searchObj.loading = false;
-        console.log("Error while updaing grid columns");
+        console.log("Error while updating grid columns");
       }
     }
 
