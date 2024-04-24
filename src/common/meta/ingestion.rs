@@ -271,6 +271,7 @@ pub struct KinesisFHIngestionResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[serde(untagged)]
 pub enum AWSRecordType {
     KinesisFHLogs(KinesisFHLogData),
     KinesisFHMetrics(KinesisFHMetricData),
