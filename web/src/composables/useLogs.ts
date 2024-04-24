@@ -410,7 +410,9 @@ const useLogs = () => {
 
     if (searchObj.data.stream.selectedStream.label) {
       query["stream"] = searchObj.data.stream.selectedStream.label;
-      query["stream_value"] = searchObj.data.stream.selectedStream.value;
+      query["stream_value"] =
+        searchObj.data.stream.selectedStream.value ||
+        searchObj.data.stream.selectedStream.label;
     }
 
     if (date.type == "relative") {
@@ -2070,6 +2072,11 @@ const useLogs = () => {
     if (queryParams.stream && queryParams.stream_value) {
       searchObj.data.stream.selectedStream = {
         value: queryParams.stream_value,
+        label: queryParams.stream,
+      };
+    } else if (queryParams.stream) {
+      searchObj.data.stream.selectedStream = {
+        value: queryParams.stream,
         label: queryParams.stream,
       };
     }
