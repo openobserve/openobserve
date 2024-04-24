@@ -45,7 +45,6 @@ use crate::{
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
 ];
-const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
 static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
@@ -337,7 +336,7 @@ impl Sql {
             if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) {
                 // sql mode context, allow limit 0, used to no hits, but return aggs
                 // sql mode full, disallow without limit, default limit 1000
-                meta.limit = SQL_DEFAULT_FULL_MODE_LIMIT;
+                meta.limit = CONFIG.limit.query_full_mode_limit;
             }
             origin_sql = if meta.order_by.is_empty() && !sql_mode.eq(&SqlMode::Full) {
                 let sort_by = if req_query.sort_by.is_empty() {

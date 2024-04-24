@@ -79,7 +79,10 @@ pub fn convert_json_to_record_batch(
                 continue;
             }
             let (data_type, builder) = res.ok_or_else(|| {
-                ArrowError::SchemaError(format!("Cannot find key {} in schema {:?}", k, schema))
+                ArrowError::SchemaError(format!(
+                    "Cannot find key {} (value: {:?}) in schema {:?}",
+                    k, v, schema
+                ))
             })?;
             match data_type {
                 DataType::Utf8 => {
