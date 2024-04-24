@@ -75,7 +75,7 @@ impl FileData {
                 .disk_cache
                 .multi_dir
                 .split(',')
-                .filter(|s| !s.is_empty())
+                .filter(|s| !s.trim().is_empty())
                 .map(|s| s.to_string())
                 .collect(),
             data: CacheStrategy::new(strategy),
@@ -302,12 +302,17 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         }
                     };
                     let data_size = meta.len() as usize;
-                    let file_key = fp
+                    let mut file_key = fp
                         .strip_prefix(root_dir)
                         .unwrap()
                         .to_str()
                         .unwrap()
                         .replace('\\', "/");
+
+                    if !CONFIG.disk_cache.multi_dir.is_empty() {
+                        file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
+                    }
+
                     // write into cache
                     let mut w = FILES.write().await;
                     w.cur_size += data_size;
@@ -510,8 +515,8 @@ mod tests {
     async fn test_multi_dir() {
         let multi_dir: Vec<String> = "dir1 , dir2 , dir3"
             .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.trim().to_string())
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.to_string())
             .collect();
 
         let trace_id = "session_123";
