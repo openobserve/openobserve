@@ -1403,6 +1403,10 @@ const useLogs = () => {
           resolve(true);
         })
         .catch((err) => {
+          if (err?.response?.data?.code == 429) {
+            notificationMsg.value = err.response.data.message;
+          }
+
           searchObj.loading = false;
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
