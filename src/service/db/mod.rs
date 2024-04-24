@@ -52,6 +52,9 @@ pub(crate) async fn put(
     need_watch: bool,
     start_dt: Option<i64>,
 ) -> Result<()> {
+    #[cfg(feature = "enterprise")]
+    let value_clone = value.clone();
+
     let db = infra_db::get_db().await;
     db.put(key, value, need_watch, start_dt).await?;
 
@@ -60,7 +63,7 @@ pub(crate) async fn put(
     if O2_CONFIG.super_cluster.enabled {
         o2_enterprise::enterprise::super_cluster::queue::put(
             key,
-            value.clone(),
+            value_clone,
             need_watch,
             start_dt,
         )
