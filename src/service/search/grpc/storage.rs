@@ -45,6 +45,8 @@ use crate::service::{
     },
 };
 
+type CachedFiles = (usize, usize);
+
 /// search in remote object storage
 #[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
@@ -161,19 +163,25 @@ pub async fn search(
     }
 
     // load files to local cache
-    let (cache_type, deleted_files) = cache_parquet_files(trace_id, &files, &scan_stats).await?;
+    let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) =
+        cache_parquet_files(trace_id, &files, &scan_stats).await?;
     if !deleted_files.is_empty() {
         // remove deleted files from files_group
         for (_, g_files) in files_group.iter_mut() {
             g_files.retain(|f| !deleted_files.contains(&f.key));
         }
     }
+    scan_stats.querier_files = scan_stats.files;
+    scan_stats.querier_memory_cached_files = mem_cached_files as i64;
+    scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, into {:?} cache done",
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
-        scan_stats.files,
+        scan_stats.querier_files,
+        scan_stats.querier_memory_cached_files,
+        scan_stats.querier_disk_cached_files,
         cache_type,
     );
 
@@ -376,7 +384,7 @@ async fn cache_parquet_files(
     trace_id: &str,
     files: &[FileKey],
     scan_stats: &ScanStats,
-) -> Result<(file_data::CacheType, Vec<String>), Error> {
+) -> Result<(file_data::CacheType, Vec<String>, CachedFiles), Error> {
     let cache_type = if CONFIG.memory_cache.enabled
         && scan_stats.compressed_size < CONFIG.memory_cache.skip_size as i64
     {
@@ -390,8 +398,11 @@ async fn cache_parquet_files(
         file_data::CacheType::Disk
     } else {
         // no cache
-        return Ok((file_data::CacheType::None, vec![]));
+        return Ok((file_data::CacheType::None, vec![], (0, 0)));
     };
+
+    let mut mem_cached_files = 0;
+    let mut disk_cached_files = 0;
 
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
@@ -399,63 +410,81 @@ async fn cache_parquet_files(
         let trace_id = trace_id.to_string();
         let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            let ret = match cache_type {
-                file_data::CacheType::Memory => {
-                    if !file_data::memory::exist(&file_name).await
-                        && (CONFIG.memory_cache.skip_disk_check
-                            || !file_data::disk::exist(&file_name).await)
+        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> = tokio::task::spawn(
+            async move {
+                let ret = match cache_type {
+                    file_data::CacheType::Memory => {
+                        let mut disk_exists = false;
+                        let mem_exists = file_data::memory::exist(&file_name).await;
+                        if !mem_exists && !CONFIG.memory_cache.skip_disk_check {
+                            // when skip_disk_check = false, need to check disk cache
+                            disk_exists = file_data::disk::exist(&file_name).await;
+                        }
+                        if !mem_exists && (CONFIG.memory_cache.skip_disk_check || !disk_exists) {
+                            (
+                                file_data::memory::download(&trace_id, &file_name)
+                                    .await
+                                    .err(),
+                                false,
+                                false,
+                            )
+                        } else {
+                            (None, mem_exists, disk_exists)
+                        }
+                    }
+                    file_data::CacheType::Disk => {
+                        if !file_data::disk::exist(&file_name).await {
+                            (
+                                file_data::disk::download(&trace_id, &file_name).await.err(),
+                                false,
+                                false,
+                            )
+                        } else {
+                            (None, false, true)
+                        }
+                    }
+                    _ => (None, false, false),
+                };
+                let file_name = if let Some(e) = ret.0 {
+                    if e.to_string().to_lowercase().contains("not found")
+                        || e.to_string().to_lowercase().contains("data size is zero")
                     {
-                        file_data::memory::download(&trace_id, &file_name)
-                            .await
-                            .err()
+                        // delete file from file list
+                        log::warn!("found invalid file: {}", file_name);
+                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
+                            log::error!(
+                                "[trace_id {trace_id}] search->storage: delete from file_list err: {}",
+                                e
+                            );
+                        }
+                        Some(file_name)
                     } else {
-                        None
-                    }
-                }
-                file_data::CacheType::Disk => {
-                    if !file_data::disk::exist(&file_name).await {
-                        file_data::disk::download(&trace_id, &file_name).await.err()
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-            let ret = if let Some(e) = ret {
-                if e.to_string().to_lowercase().contains("not found")
-                    || e.to_string().to_lowercase().contains("data size is zero")
-                {
-                    // delete file from file list
-                    log::warn!("found invalid file: {}", file_name);
-                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                         log::error!(
-                            "[trace_id {trace_id}] search->storage: delete from file_list err: {}",
+                            "[trace_id {trace_id}] search->storage: download file to cache err: {}",
                             e
                         );
+                        None
                     }
-                    Some(file_name)
                 } else {
-                    log::error!(
-                        "[trace_id {trace_id}] search->storage: download file to cache err: {}",
-                        e
-                    );
                     None
-                }
-            } else {
-                None
-            };
-            drop(permit);
-            ret
-        });
+                };
+                drop(permit);
+                (file_name, ret.1, ret.2)
+            },
+        );
         tasks.push(task);
     }
 
     let mut delete_files = Vec::new();
     for task in tasks {
         match task.await {
-            Ok(ret) => {
-                if let Some(file) = ret {
+            Ok((file, mem_exists, disk_exists)) => {
+                if mem_exists {
+                    mem_cached_files += 1;
+                } else if disk_exists {
+                    disk_cached_files += 1;
+                }
+                if let Some(file) = file {
                     delete_files.push(file);
                 }
             }
@@ -468,5 +497,9 @@ async fn cache_parquet_files(
         }
     }
 
-    Ok((cache_type, delete_files))
+    Ok((
+        cache_type,
+        delete_files,
+        (mem_cached_files, disk_cached_files),
+    ))
 }
