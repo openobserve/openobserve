@@ -39,6 +39,8 @@ use crate::{
     errors::*,
 };
 
+const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
+
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
 pub async fn get_nats_client() -> &'static Client {
@@ -83,7 +85,7 @@ impl NatsDb {
     }
 
     pub fn super_cluster() -> Self {
-        Self::new("super_cluster_kv_")
+        Self::new(SUPER_CLUSTER_PREFIX)
     }
 
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {

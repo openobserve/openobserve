@@ -1115,10 +1115,11 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&from={}&to={}&query={}&org_identifier={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}",
             CONFIG.common.web_url,
             CONFIG.common.base_uri,
             alert.stream_type,
+            alert.stream_name,
             alert.stream_name,
             alert_start_time,
             alert_end_time,
@@ -1143,10 +1144,11 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
             CONFIG.common.web_url,
             CONFIG.common.base_uri,
             alert.stream_type,
+            alert.stream_name,
             alert.stream_name,
             alert_start_time,
             alert_end_time,
