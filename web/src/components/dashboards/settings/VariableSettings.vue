@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @save="handleSaveVariable"
         :variableName="selectedVariable"
         @close="goBackToDashboardList"
+        :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
     <div v-else class="column full-height">

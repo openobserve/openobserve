@@ -213,25 +213,28 @@
             v-for="(variable, index) in drilldownData.data.variables"
             :key="index"
           >
-            <div style="display: flex; gap: 10px; margin-bottom: 10px">
-              <q-input
-                v-model="variable.name"
+            <div
+              style="display: flex; gap: 10px; margin-bottom: 10px"
+              :key="variableNamesFn?.toString()"
+            >
+              <CommonAutoComplete
                 placeholder="Name"
-                stack-label
-                outlined
-                filled
-                dense
-                :data-test="`dashboard-drilldown-variable-name-${index}`"
-              />
-              <q-input
-                v-model="variable.value"
+                v-model="variable.name"
+                searchRegex="(.*)"
+                :items="variableNamesFn"
+                style="width: auto !important; padding-top: 3px !important"
+              ></CommonAutoComplete>
+              <CommonAutoComplete
                 placeholder="Value"
-                stack-label
-                outlined
-                filled
-                dense
-                :data-test="`dashboard-drilldown-variable-value-${index}`"
-              />
+                searchRegex="(.*)"
+                v-model="variable.value"
+                :items="options.selectedValue"
+                style="
+                  width: auto !important;
+                  padding-top: 3px !important;
+                "
+              ></CommonAutoComplete>
+
               <q-icon
                 class="q-mr-xs"
                 size="20px"
@@ -291,7 +294,7 @@
 </template>
 
 <script lang="ts">
-import { ref } from "vue";
+import { reactive, ref, toRef } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -305,14 +308,16 @@ import {
   getAllDashboardsByFolderId,
   getFoldersList,
 } from "../../../utils/commons";
-import { onMounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
     DrilldownUserGuide,
+    CommonAutoComplete,
   },
   props: {
     isEditMode: {
@@ -329,6 +334,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
+
     const getDefaultDrilldownData = () => ({
       name: "",
       type: "byDashboard",
@@ -542,6 +548,80 @@ export default defineComponent({
       drilldownData.value.type = type;
     };
 
+    const options: any = reactive({
+      selectedValue: [],
+      selectedName: [],
+    });
+
+    //want label for dropdown in input and value for its input value
+    const selectedValue = computed(() => {
+      let selectedValues: any = [];
+      if (dashboardPanelData.data.type === "sankey") {
+        selectedValues = [
+          { label: "Edge Source", value: "${edge.__source}" },
+          { label: "Edge Target", value: "${edge.__target}" },
+          { label: "Edge Value", value: "${edge.__value}" },
+          { label: "Node Name", value: "${node.__name}" },
+          { label: "Node Value", value: "${node.__value}" },
+        ];
+      } else if (dashboardPanelData.data.type === "table") {
+        dashboardPanelData.data.queries.forEach((query: any) => {
+          const panelFields = [
+            ...query.fields.x,
+            ...query.fields.y,
+            ...query.fields.z,
+          ];
+          panelFields.forEach((field) => {
+            selectedValues.push({
+              label: field.label,
+              value: '${row.field["' + field.label + '"]}',
+            });
+          });
+        });
+      } else {
+        selectedValues = [
+          { label: "Series Name", value: "${series.__name}" },
+          { label: "Series Value", value: "${series.__value}" },
+        ];
+      }
+      return selectedValues;
+    });
+
+    // Assign selectedValue to options object
+    options.selectedValue = selectedValue;
+
+    const variableNamesFn = ref([]);
+
+    watch(drilldownData.value, async (newData) => {
+      if (newData.data.folder && newData.data.dashboard) {
+        const folder = store.state.organizationData.folders.find(
+          (folder: any) => folder.name === newData.data.folder
+        );
+
+        const allDashboardData = await getAllDashboardsByFolderId(
+          store,
+          folder.folderId
+        );
+        const dashboardData = allDashboardData.find(
+          (dashboard: any) => dashboard.title === newData.data.dashboard
+        );
+
+        if (dashboardData) {
+          const optionsList = dashboardData.variables.list.map(
+            (variable: any) => ({
+              label: variable.name,
+              value: variable.name,
+            })
+          );
+          variableNamesFn.value = optionsList;
+        } else {
+          variableNamesFn.value = [];
+        }
+      } else {
+        variableNamesFn.value = [];
+      }
+    });
+
     return {
       t,
       outlinedDashboard,
@@ -556,6 +636,8 @@ export default defineComponent({
       saveDrilldown,
       isFormURLValid,
       changeTypeOfDrilldown,
+      options,
+      variableNamesFn,
     };
   },
 });

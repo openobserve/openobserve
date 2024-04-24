@@ -497,23 +497,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
-      <q-input
+      <CommonAutoComplete
         v-if="promqlMode"
+        :label="t('common.legend')"
         v-model="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].config.promql_legend
         "
-        :label="t('common.legend')"
+        :items="dashboardSelectfieldPromQlList"
+        searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
         color="input-border"
         bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
+        class="showLabelOnTop"
         stack-label
         outlined
-        filled
-        dense
         label-slot
-        data-test="dashboard-config-promql-legend"
+        style="
+          top: none !important;
+          margin-top: none !important;
+          padding-top: 3px !important;
+          width: auto !important;
+        "
+        :value-replace-fn="selectPromQlNameOption"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -535,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </q-input>
+      </CommonAutoComplete>
 
       <div class="space"></div>
 
@@ -735,10 +741,12 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
-  components: { Drilldown },
-  setup() {
+  components: { Drilldown, CommonAutoComplete },
+  props: ["dashboardPanelData"],
+  setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
 
@@ -913,7 +921,30 @@ export default defineComponent({
         field[value] = key;
       }
     };
-    
+
+    const selectPromQlNameOption = (option: any) => {
+      const inputValue =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.promql_legend;
+
+      const openingBraceIndex = inputValue.lastIndexOf("{");
+      const newValue =
+        inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+      return newValue;
+    };
+
+    const dashboardSelectfieldPromQlList = computed(() =>
+      props.dashboardPanelData.meta.stream.selectedStreamFields.map(
+        (it: any) => {
+          return {
+            label: it.name,
+            value: it.name,
+          };
+        }
+      )
+    );
+
     return {
       t,
       dashboardPanelData,
@@ -927,6 +958,8 @@ export default defineComponent({
       setUnit,
       handleBlur,
       legendWidthValue,
+      dashboardSelectfieldPromQlList,
+      selectPromQlNameOption,
     };
   },
 });

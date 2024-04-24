@@ -177,7 +177,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let Some(entry_bytes) = entry else {
                 break;
             };
-            let entry = match super::Entry::from_bytes(&entry_bytes) {
+            let mut entry = match super::Entry::from_bytes(&entry_bytes) {
                 Ok(v) => v,
                 Err(Error::ReadDataError { source }) => {
                     log::error!("Unable to read entry from: {}, skip the entry", source);
@@ -193,12 +193,8 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
             let infer_schema = Arc::new(infer_schema);
-            if memtable.write(infer_schema.clone(), entry).await.is_err() {
-                // Reset the hash_key and try again
-                let mut entry = super::Entry::from_bytes(&entry_bytes).unwrap();
-                entry.schema_key = infer_schema.hash_key().into();
-                memtable.write(infer_schema, entry).await?;
-            }
+            entry.schema_key = infer_schema.hash_key().into();
+            memtable.write(infer_schema, entry).await?;
         }
         log::warn!(
             "replay wal file: {:?}, entries: {}, records: {}",
