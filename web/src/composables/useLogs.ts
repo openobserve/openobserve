@@ -1026,7 +1026,7 @@ const useLogs = () => {
           queryReq.query.from = 0;
         }
 
-        // get funtion definition
+        // get function definition
         if (
           searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction

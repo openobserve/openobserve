@@ -476,7 +476,7 @@ CREATE TABLE IF NOT EXISTS meta
     .execute(&pool)
     .await?;
 
-    // create start_dt cloumn for old version <= 0.9.2
+    // create start_dt column for old version <= 0.9.2
     let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='meta' AND column_name='start_dt';")
             .fetch_one(&pool)
             .await?;
