@@ -25,6 +25,7 @@ pub mod postgres;
 pub mod sqlite;
 
 static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
+pub const TRIGGERS_KEY: &str = "/triggers/";
 
 pub fn connect() -> Box<dyn Scheduler> {
     match CONFIG.common.meta_store.as_str().into() {
@@ -55,6 +56,7 @@ pub trait Scheduler: Sync + Send + 'static {
         alert_timeout: i64,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>>;
+    async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self) -> Result<Vec<Trigger>>;
     async fn list_module(&self, module: TriggerModule) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self, interval: u64);
@@ -80,6 +82,15 @@ pub enum TriggerModule {
     Report,
     #[default]
     Alert,
+}
+
+impl std::fmt::Display for TriggerModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TriggerModule::Alert => write!(f, "alert"),
+            TriggerModule::Report => write!(f, "report"),
+        }
+    }
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Default)]
@@ -183,6 +194,12 @@ pub async fn pull(
     CLIENT
         .pull(concurrency, alert_timeout, report_timeout)
         .await
+}
+
+/// Returns the scheduled job associated with the given id in read-only fashion
+#[inline]
+pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
+    CLIENT.get(org, module, key).await
 }
 
 /// Background job that frequently (with the given interval) cleans "Completed" jobs

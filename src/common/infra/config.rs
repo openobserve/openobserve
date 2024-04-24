@@ -59,7 +59,7 @@ pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
     Lazy::new(Default::default);
-pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, Vec<db_scheduler::Trigger>>> =
+pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
     Lazy::new(Default::default);

@@ -100,6 +100,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+    tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::dashboards::reports::watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
@@ -132,6 +133,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::destinations::cache()
         .await
         .expect("alerts destinations cache failed");
+    db::alerts::realtime_triggers::cache()
+        .await
+        .expect("alerts realtime triggers cache failed");
     db::alerts::cache().await.expect("alerts cache failed");
     db::dashboards::reports::cache()
         .await

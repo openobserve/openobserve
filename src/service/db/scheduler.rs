@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use infra::scheduler::{Trigger, TriggerModule, TriggerStatus};
+pub use infra::scheduler::{
+    Trigger,
+    TriggerModule,
+    TriggerStatus,
+    TRIGGERS_KEY
+};
 use infra::{
     errors::Result,
     scheduler::{self as infra_scheduler},
@@ -101,6 +106,12 @@ pub async fn pull(
     report_timeout: i64,
 ) -> Result<Vec<Trigger>> {
     infra_scheduler::pull(concurrency, alert_timeout, report_timeout).await
+}
+
+/// Returns the scheduled job associated with the given id in read-only fashion
+#[inline]
+pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
+    infra_scheduler::get(org, module, key).await
 }
 
 #[inline]

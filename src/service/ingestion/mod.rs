@@ -37,7 +37,7 @@ use vrl::{
 
 use crate::{
     common::{
-        infra::config::{STREAM_ALERTS, STREAM_FUNCTIONS},
+        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS},
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
@@ -167,10 +167,18 @@ pub async fn get_stream_alerts(
         if alerts_list.is_none() {
             return;
         }
+        let triggers_cache = REALTIME_ALERT_TRIGGERS.read().await;
         let alerts = alerts_list
             .unwrap()
             .iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
+            .filter(|alert| {
+                let key = format!("{}/{}", key, alert.name);
+                match triggers_cache.get(&key) {
+                    Some(v) => !v.is_silenced,
+                    None => true,
+                }
+            })
             .cloned()
             .collect::<Vec<_>>();
 

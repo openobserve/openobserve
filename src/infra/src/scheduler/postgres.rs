@@ -14,13 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use chrono::Duration;
 use config::CONFIG;
 use sqlx::Row;
 use tokio::time;
 
-use super::{Trigger, TriggerModule, TriggerStatus};
-use crate::{db::postgres::CLIENT, errors::Result};
+use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use crate::{
+    db::{self, postgres::CLIENT},
+    errors::{DbError, Error, Result},
+};
 
 pub struct PostgresScheduler {}
 
@@ -140,6 +144,20 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             log::error!("[POSTGRES] commit push scheduled_jobs error: {}", e);
             return Err(e.into());
         }
+
+        // For now, only send alert triggers
+        if trigger.module == TriggerModule::Alert {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module.to_string(),
+                &trigger.org,
+                &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -151,9 +169,16 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         )
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&pool)
         .await?;
+
+        // For now, only send alert triggers events
+        if module == TriggerModule::Alert {
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module.to_string(), org, key);
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator.delete(&key, false, true, None).await?;
+        }
         Ok(())
     }
 
@@ -174,8 +199,17 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(retries)
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&pool).await?;
+
+        // For now, only send alert triggers
+        if module == TriggerModule::Alert {
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module.to_string(), org, key);
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -191,11 +225,25 @@ WHERE org = $6 AND module_key = $7 AND module = $8;"#,
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
-        .bind(trigger.org)
-        .bind(trigger.module_key)
-        .bind(trigger.module)
+        .bind(&trigger.org)
+        .bind(&trigger.module_key)
+        .bind(&trigger.module)
         .execute(&pool)
         .await?;
+
+        // For now, only send alert triggers
+        if trigger.module == TriggerModule::Alert {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module.to_string(),
+                &trigger.org,
+                &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -257,6 +305,29 @@ RETURNING *;"#;
             .fetch_all(&pool)
             .await?;
         Ok(jobs)
+    }
+
+    async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
+        let pool = CLIENT.clone();
+        let query = r#"
+SELECT * FROM scheduled_jobs
+WHERE org = $1 AND module_key = $2 AND module = $3;"#;
+        let job = match sqlx::query_as::<_, Trigger>(query)
+            .bind(org)
+            .bind(&module)
+            .bind(key)
+            .fetch_one(&pool)
+            .await
+        {
+            Ok(job) => job,
+            Err(_) => {
+                return Err(Error::from(DbError::KeyNotExists(format!(
+                    "{org}/{}/{key}",
+                    module.to_string()
+                ))));
+            }
+        };
+        Ok(job)
     }
 
     async fn list(&self) -> Result<Vec<Trigger>> {
