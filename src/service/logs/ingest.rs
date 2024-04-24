@@ -36,8 +36,7 @@ use crate::{
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
-            IngestionRequest, IngestionResponse, KinesisFHIngestionResponse, KinesisFHLogData,
-            KinesisFHMetricData, StreamStatus,
+            IngestionRequest, IngestionResponse, KinesisFHIngestionResponse, StreamStatus,
         },
         stream::{SchemaRecords, StreamParams},
     },
@@ -408,80 +407,17 @@ impl<'a> IngestionData<'a> {
                             );
                         }
                         Ok(decompressed_data) => {
-                            let mut value;
-
-                            match json::from_str(&decompressed_data) {
-                                Ok(AWSRecordType::KinesisFHLogs(kfh_log_data)) => {
-                                    for event in kfh_log_data.log_events.iter() {
-                                        value = json::to_value(event).unwrap();
-                                        let local_val = value.as_object_mut().unwrap();
-
-                                        local_val.insert(
-                                            "requestId".to_owned(),
-                                            request.request_id.clone().into(),
-                                        );
-                                        local_val.insert(
-                                            "messageType".to_owned(),
-                                            kfh_log_data.message_type.clone().into(),
-                                        );
-                                        local_val.insert(
-                                            "owner".to_owned(),
-                                            kfh_log_data.owner.clone().into(),
-                                        );
-                                        local_val.insert(
-                                            "logGroup".to_owned(),
-                                            kfh_log_data.log_group.clone().into(),
-                                        );
-                                        local_val.insert(
-                                            "logStream".to_owned(),
-                                            kfh_log_data.log_stream.clone().into(),
-                                        );
-                                        local_val.insert(
-                                            "subscriptionFilters".to_owned(),
-                                            kfh_log_data.subscription_filters.clone().into(),
-                                        );
-
-                                        let local_msg = event.message.as_str().unwrap();
-
-                                        if local_msg.starts_with('{') && local_msg.ends_with('}') {
-                                            let result: Result<json::Value, json::Error> =
-                                                json::from_str(local_msg);
-
-                                            match result {
-                                                Err(_e) => {
-                                                    local_val.insert(
-                                                        "message".to_owned(),
-                                                        event.message.clone(),
-                                                    );
-                                                }
-                                                Ok(message_val) => {
-                                                    local_val.insert(
-                                                        "message".to_owned(),
-                                                        message_val.clone(),
-                                                    );
-                                                }
-                                            }
-                                        } else {
-                                            local_val
-                                                .insert("message".to_owned(), local_msg.into());
-                                        }
-
-                                        local_val.insert(
-                                            CONFIG.common.column_timestamp.clone(),
-                                            event.timestamp.into(),
-                                        );
-
-                                        value = local_val.clone().into();
-                                        events.push(value);
-                                    }
-                                }
-                                Ok(AWSRecordType::KinesisFHMetrics(kfh_metric_data)) => {
-                                    value = json::from_str(&decompressed_data).unwrap();
-                                    events.push(value);
-                                }
-                                _ => {
-                                    value = json::from_str(&decompressed_data).unwrap();
-                                    events.push(value);
+                            match deserialize_from_str(&decompressed_data, request_id) {
+                                Ok(parsed_events) => events.extend(parsed_events),
+                                Err(err) => {
+                                    return IngestionDataIter::KinesisFH(
+                                        events.into_iter(),
+                                        Some(KinesisFHIngestionResponse {
+                                            request_id: request_id.to_string(),
+                                            error_message: Some(err.to_string()),
+                                            timestamp: req_timestamp,
+                                        }),
+                                    );
                                 }
                             }
                         }
@@ -501,6 +437,108 @@ pub fn decode_and_decompress(encoded_data: &str) -> Result<String, Box<dyn std::
         Ok(_) => Ok(decompressed_data),
         Err(_) => Ok(String::from_utf8(decoded_data)?),
     }
+}
+
+fn deserialize_from_str(data: &str, request_id: &String) -> Result<Vec<json::Value>> {
+    let mut events = vec![];
+    let mut value;
+    for line in data.lines() {
+        match json::from_str(line) {
+            Ok(AWSRecordType::KinesisFHLogs(kfh_log_data)) => {
+                for event in kfh_log_data.log_events.iter() {
+                    value = json::to_value(event)?;
+                    let local_val = value
+                        .as_object_mut()
+                        .ok_or(anyhow::anyhow!("Error to convert Value to object"))?;
+
+                    local_val.insert("requestId".to_owned(), request_id.clone().into());
+                    local_val.insert(
+                        "messageType".to_owned(),
+                        kfh_log_data.message_type.clone().into(),
+                    );
+                    local_val.insert("owner".to_owned(), kfh_log_data.owner.clone().into());
+                    local_val.insert("logGroup".to_owned(), kfh_log_data.log_group.clone().into());
+                    local_val.insert(
+                        "logStream".to_owned(),
+                        kfh_log_data.log_stream.clone().into(),
+                    );
+                    local_val.insert(
+                        "subscriptionFilters".to_owned(),
+                        kfh_log_data.subscription_filters.clone().into(),
+                    );
+
+                    let local_msg = event.message.as_str().unwrap();
+
+                    if local_msg.starts_with('{') && local_msg.ends_with('}') {
+                        let result: Result<json::Value, json::Error> = json::from_str(local_msg);
+
+                        match result {
+                            Err(_e) => {
+                                local_val.insert("message".to_owned(), event.message.clone());
+                            }
+                            Ok(message_val) => {
+                                local_val.insert("message".to_owned(), message_val.clone());
+                            }
+                        }
+                    } else {
+                        local_val.insert("message".to_owned(), local_msg.into());
+                    }
+
+                    local_val.insert(
+                        CONFIG.common.column_timestamp.clone(),
+                        event.timestamp.into(),
+                    );
+
+                    value = local_val.clone().into();
+                    events.push(value);
+                }
+            }
+            Ok(AWSRecordType::KinesisFHMetrics(kfh_metric_data)) => {
+                // Parse "dimensions" and "values" fields from KinesisFHMetricData
+                let values = json::to_value(kfh_metric_data.value.clone())?;
+                let dimensions = kfh_metric_data.dimensions.clone();
+                let timestamp = kfh_metric_data.timestamp.clone();
+
+                let mut parsed_metric_value = json::to_value(kfh_metric_data)?;
+                let local_parsed_metric_value = parsed_metric_value.as_object_mut().ok_or(
+                    anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object"),
+                )?;
+
+                for (value_name, value_val) in values.as_object().ok_or(anyhow::anyhow!(
+                    "CloudWatch metrics failed to Metric Value Object"
+                ))? {
+                    local_parsed_metric_value.insert(value_name.to_owned(), value_val.to_owned());
+                }
+                local_parsed_metric_value.remove("value");
+
+                let metric_dimensions = dimensions
+                    .as_object()
+                    .ok_or(anyhow::anyhow!(
+                        "CloudWatch metrics failed to Metric dimensions Object"
+                    ))?
+                    .iter()
+                    .map(|(k, v)| format!("{}=[{}]", k, v.to_string()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                local_parsed_metric_value
+                    .insert("metric_dimensions".to_owned(), metric_dimensions.into());
+                local_parsed_metric_value.remove("dimensions");
+
+                local_parsed_metric_value
+                    .insert(CONFIG.common.column_timestamp.clone(), timestamp.into());
+                local_parsed_metric_value.remove("timestamp");
+
+                value = local_parsed_metric_value.clone().into();
+                events.push(value);
+            }
+            _ => {
+                value = json::from_str(line)?;
+                events.push(value);
+            }
+        }
+    }
+    Ok(events)
 }
 
 #[cfg(test)]

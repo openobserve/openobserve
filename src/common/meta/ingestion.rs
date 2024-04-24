@@ -238,12 +238,15 @@ pub struct KinesisFHLogEvent {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KinesisFHMetricData {
+    #[serde(rename = "metric_stream_name")]
     pub metric_stream_name: String,
+    #[serde(rename = "account_id")]
     pub account_id: String,
     pub region: String,
     pub namespace: String,
+    #[serde(rename = "metric_name")]
     pub metric_name: String,
-    pub dimensions: String,
+    pub dimensions: json::Value,
     pub timestamp: i64,
     pub value: KinesisFHMetricValue,
     pub unit: String,
