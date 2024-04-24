@@ -439,7 +439,7 @@ pub fn decode_and_decompress(encoded_data: &str) -> Result<String, Box<dyn std::
     }
 }
 
-fn deserialize_from_str(data: &str, request_id: &String) -> Result<Vec<json::Value>> {
+fn deserialize_from_str(data: &str, request_id: &str) -> Result<Vec<json::Value>> {
     let mut events = vec![];
     let mut value;
     for line in data.lines() {
@@ -451,7 +451,7 @@ fn deserialize_from_str(data: &str, request_id: &String) -> Result<Vec<json::Val
                         .as_object_mut()
                         .ok_or(anyhow::anyhow!("Error to convert Value to object"))?;
 
-                    local_val.insert("requestId".to_owned(), request_id.clone().into());
+                    local_val.insert("requestId".to_owned(), request_id.into());
                     local_val.insert(
                         "messageType".to_owned(),
                         kfh_log_data.message_type.clone().into(),
@@ -497,7 +497,7 @@ fn deserialize_from_str(data: &str, request_id: &String) -> Result<Vec<json::Val
                 // Parse "dimensions" and "values" fields from KinesisFHMetricData
                 let values = json::to_value(kfh_metric_data.value.clone())?;
                 let dimensions = kfh_metric_data.dimensions.clone();
-                let timestamp = kfh_metric_data.timestamp.clone();
+                let timestamp = kfh_metric_data.timestamp;
 
                 let mut parsed_metric_value = json::to_value(kfh_metric_data)?;
                 let local_parsed_metric_value = parsed_metric_value.as_object_mut().ok_or(
@@ -517,7 +517,7 @@ fn deserialize_from_str(data: &str, request_id: &String) -> Result<Vec<json::Val
                         "CloudWatch metrics failed to Metric dimensions Object"
                     ))?
                     .iter()
-                    .map(|(k, v)| format!("{}=[{}]", k, v.to_string()))
+                    .map(|(k, v)| format!("{}=[{}]", k, v))
                     .collect::<Vec<_>>()
                     .join(", ");
 
