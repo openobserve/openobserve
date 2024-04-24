@@ -184,6 +184,11 @@ pub async fn search(
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
     result.set_scan_records(scan_stats.records as usize);
+    result.set_cached_ratio(
+        (((scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files) * 100)
+            as f64
+            / scan_stats.querier_files as f64) as usize,
+    );
 
     if query_type == "table" {
         result.response_type = "table".to_string();
