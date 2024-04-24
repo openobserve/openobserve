@@ -902,7 +902,6 @@ export default defineComponent({
         .get_config()
         .then(async (res: any) => {
           if (res.data.functions_enabled && config.isCloud == "false") {
-            console.log("enable functions");
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
