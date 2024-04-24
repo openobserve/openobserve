@@ -623,7 +623,7 @@ CREATE TABLE IF NOT EXISTS meta
     .execute(&*client)
     .await?;
 
-    // create start_dt cloumn for old version <= 0.9.2
+    // create start_dt column for old version <= 0.9.2
     add_start_dt_column(&client).await?;
 
     // create table index
