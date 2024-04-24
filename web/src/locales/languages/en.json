@@ -382,7 +382,8 @@
     "header": "Pipeline",
     "create": "Create Pipeline",
     "SelectParentNode": "Select Parent Node",
-    "SelectChildNode": "Select Child Node"
+    "SelectChildNode": "Select Child Node",
+    "deleteNode": "Delete"
   },
   "function": {
     "header": "Functions",

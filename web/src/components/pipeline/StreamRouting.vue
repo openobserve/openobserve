@@ -59,10 +59,20 @@
           no-caps
           @click="saveRouting"
         />
+        <q-btn
+          v-if="isUpdating"
+          data-test="associate-function-delete-btn"
+          :label="t('pipeline.deleteNode')"
+          class="text-bold no-border q-ml-md"
+          color="negative"
+          padding="sm xl"
+          no-caps
+          @click="openDeleteDialog"
+        />
       </div>
     </div>
   </div>
-  <ConfirmDialog
+  <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"
@@ -79,6 +89,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import NodeLinks from "./NodeLinks.vue";
 import useStreams from "@/composables/useStreams";
+import ConfirmDialog from "../ConfirmDialog.vue";
 
 interface RouteCondition {
   column: string;
@@ -104,6 +115,11 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  editingRoute: {
+    type: Object,
+    required: false,
+    default: () => null,
+  },
 });
 
 const { t } = useI18n();
@@ -114,7 +130,7 @@ const store = useStore();
 
 const { getStream, getStreams } = useStreams();
 
-const emit = defineEmits(["update:node", "cancel:hideform"]);
+const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const isUpdating = ref(false);
 
@@ -155,6 +171,12 @@ const getDefaultStreamRoute = () => {
 onMounted(() => {
   streamRoute.value.sourceStreamName = props.sourceStreamName;
   streamRoute.value.sourceStreamType = "logs";
+
+  if (props.editingRoute) {
+    isUpdating.value = true;
+    streamRoute.value = props.editingRoute as StreamRoute;
+  }
+
   updateStreamFields();
 });
 
@@ -219,13 +241,8 @@ const removeField = (field: any) => {
   );
 };
 
-const goToRoutings = () => {
-  router.replace({
-    name: "reports",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+const closeDialog = () => {
+  emit("cancel:hideform");
 };
 
 const openCancelDialog = () => {
@@ -233,22 +250,55 @@ const openCancelDialog = () => {
     JSON.stringify(originalStreamRouting.value) ===
     JSON.stringify(streamRoute.value)
   ) {
-    goToRoutings();
+    closeDialog();
     return;
   }
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
-  dialog.value.okCallback = goToRoutings;
+  dialog.value.okCallback = closeDialog;
 };
 
 const saveRouting = () => {
   // Save routing
-  emit("update:node", { data: streamRoute.value, link: nodeLink.value });
+  emit("update:node", {
+    data: {
+      ...streamRoute.value,
+      name: streamRoute.value.destinationStreamName,
+    },
+    link: nodeLink.value,
+  });
 };
 
 const saveUpdatedLink = (link: { from: string; to: string }) => {
   nodeLink.value = link;
+};
+
+const openDeleteDialog = () => {
+  dialog.value.show = true;
+  dialog.value.title = "Delete Node";
+  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.okCallback = deleteRoute;
+};
+
+const deleteRoute = () => {
+  emit("delete:node", {
+    data: {
+      ...props.editingRoute,
+      name: props.editingRoute.destinationStreamName,
+    },
+    type: "streamRouting",
+  });
+
+  emit("delete:node", {
+    data: {
+      ...props.editingRoute,
+      name: props.editingRoute.destinationStreamName + ":" + "condition",
+    },
+    type: "condition",
+  });
+
+  emit("cancel:hideform");
 };
 </script>
 

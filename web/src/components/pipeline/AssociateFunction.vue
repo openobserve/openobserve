@@ -5,10 +5,23 @@
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">Associate Function</div>
     <q-separator />
-    <div class="stream-routing-container full-width q-px-md q-pt-md">
+    <div v-if="loading">
+      <q-spinner
+        v-if="loading"
+        color="primary"
+        size="40px"
+        style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        "
+      />
+    </div>
+    <div v-else class="stream-routing-container full-width q-px-md q-pt-md">
       <q-toggle
         class="q-mb-sm"
-        label="Create new function"
+        :label="isUpdating ? 'Edit function' : 'Create new function'"
         v-model="createNewFunction"
       />
       <div
@@ -33,8 +46,6 @@
             outlined
             filled
             dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
             @update:model-value="updateStreams()"
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 220px"
@@ -45,6 +56,8 @@
       <div v-if="createNewFunction" class="pipeline-add-function">
         <AddFunction
           ref="addFunctionRef"
+          :model-value="functionData"
+          :is-updated="isUpdating"
           @update:list="onFunctionCreation"
           @cancel:hideform="cancelFunctionCreation"
         />
@@ -66,8 +79,6 @@
           filled
           dense
           type="number"
-          v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
           :rules="[(val: any) => !!val.trim() || 'Field is required!']"
           tabindex="0"
           style="width: 480px"
@@ -96,10 +107,20 @@
           no-caps
           @click="saveFunction"
         />
+        <q-btn
+          v-if="isUpdating"
+          data-test="associate-function-delete-btn"
+          :label="t('pipeline.deleteNode')"
+          class="text-bold no-border q-ml-md"
+          color="negative"
+          padding="sm xl"
+          no-caps
+          @click="openDeleteDialog"
+        />
       </div>
     </div>
   </div>
-  <ConfirmDialog
+  <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"
@@ -108,16 +129,13 @@
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref, defineEmits, onBeforeMount } from "vue";
+import { ref, type Ref, defineEmits, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import AddFunction from "../functions/AddFunction.vue";
-import NodeLinks from "./NodeLinks.vue";
-import functionsService from "@/services/jstransform";
-import { VueDraggableNext } from "vue-draggable-next";
+import ConfirmDialog from "../ConfirmDialog.vue";
 
 interface RouteCondition {
   column: string;
@@ -144,9 +162,28 @@ const props = defineProps({
     required: true,
     default: 1,
   },
+  functionData: {
+    type: Object,
+    required: false,
+    default: () => {
+      return null;
+    },
+  },
+  loading: {
+    type: Boolean,
+    required: false,
+    default: false,
+  },
+  functions: {
+    type: Array,
+    required: true,
+    default: () => {
+      return [];
+    },
+  },
 });
 
-const emit = defineEmits(["update:node", "cancel:hideform"]);
+const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const { t } = useI18n();
 
@@ -158,7 +195,7 @@ const selectedFunction = ref("");
 
 const functionOrder = ref(props.defaultOrder);
 
-const filteredFunctions = ref([]);
+const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
 
@@ -182,8 +219,24 @@ const dialog = ref({
   okCallback: () => {},
 });
 
+watch(
+  () => props.functions,
+  (newVal) => {
+    filteredFunctions.value = [...newVal];
+  },
+  {
+    deep: true,
+  }
+);
+
 onBeforeMount(() => {
-  getFunctions();
+  filteredFunctions.value = [...props.functions];
+
+  if (props.functionData) {
+    isUpdating.value = true;
+    selectedFunction.value = props.functionData.name;
+    functionOrder.value = props.functionData.order;
+  }
 });
 
 const getDefaultStreamRoute = () => {
@@ -270,27 +323,19 @@ const updateStreamFields = async (stream_name: any) => {
   // onInputUpdate("stream_name", stream_name);
 };
 
-const goToRoutings = () => {
-  router.replace({
-    name: "reports",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
-};
-
 const openCancelDialog = () => {
-  if (
-    JSON.stringify(originalStreamRouting.value) ===
-    JSON.stringify(streamRoute.value)
-  ) {
-    goToRoutings();
-    return;
-  }
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel routing changes?";
-  dialog.value.okCallback = goToRoutings;
+  dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.okCallback = () => emit("cancel:hideform");
+};
+
+const openDeleteDialog = () => {
+  dialog.value.show = true;
+  dialog.value.title = "Delete Node";
+  dialog.value.message =
+    "Are you sure you want to delete function association?";
+  dialog.value.okCallback = deleteFunction;
 };
 
 const saveFunction = () => {
@@ -316,23 +361,12 @@ const cancelFunctionCreation = () => {
   emit("cancel:hideform");
 };
 
-const getFunctions = () => {
-  functionsService
-    .list(
-      1,
-      100000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier
-    )
-    .then((res) => {
-      filteredFunctions.value = res.data.list.map((func: any) => func.name);
-    });
-};
-
 const saveUpdatedLink = (link: { from: string; to: string }) => {
   nodeLink.value = link;
+};
+
+const deleteFunction = () => {
+  emit("delete:node", { data: props.functionData, type: "function" });
 };
 </script>
 
