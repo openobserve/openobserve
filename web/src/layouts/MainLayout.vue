@@ -92,8 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning"
-size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -180,12 +179,10 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated
-no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md"
-color="grey" text-color="white">
+                <q-avatar size="md" color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -613,9 +610,31 @@ export default defineComponent({
       },
     ];
 
-    onMounted(() => {
+    onMounted(async () => {
       miniMode.value = true;
       filterMenus();
+
+      if (
+        !store.state.zoConfig.hasOwnProperty("version") ||
+        store.state.zoConfig.version == ""
+      ) {
+        getConfig();
+      } else {
+        if (
+          store.state.zoConfig.functions_enabled &&
+          config.isCloud == "false"
+        ) {
+          linksList.value = mainLayoutMixin
+            .setup()
+            .leftNavigationLinks(linksList, t);
+          filterMenus();
+        }
+        await nextTick();
+        // if rum enabled then setUser to capture session details.
+        if (store.state.zoConfig.rum.enabled) {
+          setRumUser();
+        }
+      }
     });
 
     const selectedLanguage: any =
@@ -883,6 +902,7 @@ export default defineComponent({
         .get_config()
         .then(async (res: any) => {
           if (res.data.functions_enabled && config.isCloud == "false") {
+            console.log("enable functions");
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
@@ -897,13 +917,6 @@ export default defineComponent({
         })
         .catch((error) => console.log(error));
     };
-
-    if (
-      !store.state.zoConfig.hasOwnProperty("version") ||
-      store.state.zoConfig.version == ""
-    ) {
-      getConfig();
-    }
 
     if (config.isCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);
