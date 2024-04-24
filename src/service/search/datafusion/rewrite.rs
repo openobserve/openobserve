@@ -19,6 +19,7 @@ use core::ops::ControlFlow;
 
 use config::FxIndexSet;
 use datafusion::error::Result;
+use itertools::Itertools;
 use sqlparser::{
     ast::{Expr, Function, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
     dialect::GenericDialect,
@@ -284,17 +285,17 @@ impl VisitorMut for RemoveWhere {
     }
 }
 
-pub fn add_group_by_field_to_select(sql: &str) -> Result<String> {
+pub fn add_group_by_order_by_field_to_select(sql: &str) -> Result<String> {
     let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
-    statements.visit(&mut AddGroupBy);
+    statements.visit(&mut AddGroupByOrderBy);
     Ok(statements[0].to_string())
 }
 
 // A visitor that add group by field to select
-struct AddGroupBy;
+struct AddGroupByOrderBy;
 
 // Visit each expression after its children have been visited
-impl VisitorMut for AddGroupBy {
+impl VisitorMut for AddGroupByOrderBy {
     type Break = ();
 
     /// Invoked for any queries that appear in the AST before visiting children
@@ -303,7 +304,7 @@ impl VisitorMut for AddGroupBy {
         if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
             // early return if group by clause is empty
             if let GroupByExpr::Expressions(ref exprs) = select.group_by {
-                if exprs.is_empty() {
+                if exprs.is_empty() && query.order_by.is_empty() {
                     return ControlFlow::Break(());
                 }
             }
@@ -319,17 +320,28 @@ impl VisitorMut for AddGroupBy {
                     sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
                         select_exprs.push(trim_quotes(expr.to_string()));
                     }
+                    sqlparser::ast::SelectItem::Wildcard(_) => {
+                        // select * from tbl, don't need add group by and order by field
+                        return ControlFlow::Break(());
+                    }
                     _ => {}
                 }
             }
+            let mut expr_list = vec![];
+            // add group by field to select
             if let GroupByExpr::Expressions(ref exprs) = select.group_by {
-                for expr in exprs.iter() {
-                    let expr_name = trim_quotes(expr.to_string());
-                    if !select_exprs.contains(&expr_name) {
-                        select
-                            .projection
-                            .push(sqlparser::ast::SelectItem::UnnamedExpr(expr.clone()));
-                    }
+                expr_list.extend(exprs);
+            }
+            // add order by field to select
+            if !query.order_by.is_empty() {
+                expr_list.extend(query.order_by.iter().map(|e| &e.expr));
+            }
+            for expr in expr_list.into_iter().sorted().dedup() {
+                let expr_name = trim_quotes(expr.to_string());
+                if !select_exprs.contains(&expr_name) {
+                    select
+                        .projection
+                        .push(sqlparser::ast::SelectItem::UnnamedExpr(expr.clone()));
                 }
             }
         }
@@ -433,9 +445,14 @@ mod tests {
             "SELECT count(*) FROM default group by k8s_namespace_name",
             "SELECT k8s_namespace_name as k8s, count(*) FROM default group by k8s",
             "SELECT k8s_namespace_name, count(*) FROM default group by k8s_namespace_name",
+            "SELECT * FROM default ORDER BY k8s_namespace_name",
+            "SELECT log FROM default ORDER BY k8s_namespace_name",
+            "SELECT count(*) as cnt FROM default GROUP BY log ORDER BY log",
+            "SELECT log, k8s_namespace_name FROM default ORDER BY k8s_namespace_name",
             "SELECT * FROM default where a = b",
             "SELECT a, b, c FROM default",
             "SELECT avg(resource_duration / 1000000) AS y_axis_1, SPLIT_PART(resource_url, '?', 1) AS x_axis_1 FROM tbl WHERE (_timestamp >= 1710404419324000 AND _timestamp < 1710490819324000) AND (resource_duration >= 0) GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+            "SELECT kubernetes_namespace_name, count(*) FROM default GROUP BY kubernetes_namespace_name, stream order by kubernetes_namespace_name, stream ",
         ];
 
         let excepts = [
@@ -443,12 +460,17 @@ mod tests {
             "SELECT count(*), k8s_namespace_name FROM default GROUP BY k8s_namespace_name",
             "SELECT k8s_namespace_name AS k8s, count(*) FROM default GROUP BY k8s",
             "SELECT k8s_namespace_name, count(*) FROM default GROUP BY k8s_namespace_name",
+            "SELECT * FROM default ORDER BY k8s_namespace_name",
+            "SELECT log, k8s_namespace_name FROM default ORDER BY k8s_namespace_name",
+            "SELECT count(*) AS cnt, log FROM default GROUP BY log ORDER BY log",
+            "SELECT log, k8s_namespace_name FROM default ORDER BY k8s_namespace_name",
             "SELECT * FROM default WHERE a = b",
             "SELECT a, b, c FROM default",
             "SELECT avg(resource_duration / 1000000) AS y_axis_1, SPLIT_PART(resource_url, '?', 1) AS x_axis_1 FROM tbl WHERE (_timestamp >= 1710404419324000 AND _timestamp < 1710490819324000) AND (resource_duration >= 0) GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+            "SELECT kubernetes_namespace_name, count(*), stream FROM default GROUP BY kubernetes_namespace_name, stream ORDER BY kubernetes_namespace_name, stream",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
-            let new_sql = add_group_by_field_to_select(sql).unwrap();
+            let new_sql = add_group_by_order_by_field_to_select(sql).unwrap();
             assert_eq!(new_sql, except.to_string());
         }
     }

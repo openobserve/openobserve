@@ -16,6 +16,7 @@
 use async_trait::async_trait;
 use config::{meta::meta_store::MetaStore, CONFIG};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
 
@@ -54,6 +55,7 @@ pub trait Scheduler: Sync + Send + 'static {
         alert_timeout: i64,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>>;
+    async fn list(&self) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self, interval: u64);
     async fn watch_timeout(&self, interval: u64);
     async fn len_module(&self, module: TriggerModule) -> usize;
@@ -62,7 +64,7 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn clear(&self) -> Result<()>;
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
+#[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
 #[repr(i32)]
 pub enum TriggerStatus {
     #[default]
@@ -71,7 +73,7 @@ pub enum TriggerStatus {
     Completed,
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
+#[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
 #[repr(i32)]
 pub enum TriggerModule {
     Report,
@@ -84,7 +86,7 @@ pub struct TriggerId {
     pub id: i64,
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, Default)]
+#[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Trigger {
     pub org: String,
     pub module: TriggerModule,
@@ -98,10 +100,15 @@ pub struct Trigger {
     pub retries: i32,
 }
 
-/// Initializes the scheduler
-pub async fn init(clean_interval: u64, watch_interval: u64) -> Result<()> {
+/// Initializes the scheduler - creates table and index
+pub async fn init() -> Result<()> {
     create_table().await?;
     create_table_index().await?;
+    Ok(())
+}
+
+/// Must be called after calling `scheduler::init()`
+pub async fn init_background_jobs(clean_interval: u64, watch_interval: u64) -> Result<()> {
     tokio::task::spawn(async move {
         clean_complete(clean_interval).await;
     });

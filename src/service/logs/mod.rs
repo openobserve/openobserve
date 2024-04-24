@@ -27,7 +27,10 @@ use config::{
 };
 use infra::schema::unwrap_partition_time_level;
 
-use super::ingestion::{get_string_value, TriggerAlertData};
+use super::{
+    ingestion::{get_string_value, TriggerAlertData},
+    schema::get_invalid_schema_start_dt,
+};
 use crate::{
     common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
     service::{
@@ -266,7 +269,7 @@ async fn add_valid_record(
         .unwrap();
 
     // check schema
-    let (schema_evolution, _) = check_for_schema(
+    let (schema_evolution, _) = match check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -274,7 +277,22 @@ async fn add_valid_record(
         vec![&record_val],
         timestamp,
     )
-    .await?;
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            if e.to_string() == get_invalid_schema_start_dt().to_string() {
+                log::error!(
+                    "Invalid schema start_dt detected for stream: {}, start_dt: {}",
+                    stream_meta.stream_name,
+                    timestamp
+                );
+                return Ok(None);
+            } else {
+                return Err(e);
+            }
+        }
+    };
 
     // get schema
     let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
@@ -427,6 +445,26 @@ struct StreamMeta<'a> {
     partition_keys: &'a Vec<StreamPartition>,
     partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
+}
+
+pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &[String]) {
+    let mut non_schema_map = HashMap::new();
+
+    for (key, value) in original_map.iter() {
+        if !defined_schema_keys.contains(key) {
+            non_schema_map.insert(key.clone(), get_string_value(value));
+        }
+    }
+
+    original_map.retain(|key, _| defined_schema_keys.contains(key));
+
+    if !non_schema_map.is_empty() {
+        let non_schema_json = serde_json::to_string(&non_schema_map).unwrap_or_default();
+        original_map.insert(
+            CONFIG.common.all_fields_name.to_string(),
+            Value::String(non_schema_json),
+        );
+    }
 }
 
 #[cfg(test)]

@@ -148,8 +148,31 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
         .map_err(|_| anyhow::anyhow!("Report not found"))
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Report>, anyhow::Error> {
-    db::dashboards::reports::list(org_id).await
+pub async fn list(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Report>, anyhow::Error> {
+    match db::dashboards::reports::list(org_id).await {
+        Ok(reports) => {
+            let mut result = Vec::new();
+            for report in reports {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("report:{}", report.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("report:_all_{}", org_id))
+                {
+                    result.push(report);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
@@ -405,7 +428,7 @@ async fn generate_report(
     // If the span element is not rendered yet, capture whatever is loaded till now
     if let Err(e) = wait_for_panel_data_load(&page).await {
         log::error!(
-            "[REPORT] error occured while finding the span element for dashboard {dashboard_id}:{e}"
+            "[REPORT] error occurred while finding the span element for dashboard {dashboard_id}:{e}"
         );
     } else {
         log::info!("[REPORT] all panel data loaded for report dashboard: {dashboard_id}");

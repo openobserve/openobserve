@@ -32,6 +32,7 @@ use infra::{
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
+use regex::Regex;
 use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
@@ -59,6 +60,9 @@ pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
+static RE_SELECT_WILDCARD: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
+
 #[tracing::instrument(name = "service:search:enter", skip(req))]
 pub async fn search(
     trace_id: &str,
@@ -68,7 +72,7 @@ pub async fn search(
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let trace_id = if trace_id.is_empty() {
-        if CONFIG.common.tracing_enabled {
+        if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {

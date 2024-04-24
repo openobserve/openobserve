@@ -101,11 +101,11 @@ async fn settings(
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => {
             if let Some(s_type) = v {
-                if s_type == StreamType::EnrichmentTables {
+                if s_type == StreamType::EnrichmentTables || s_type == StreamType::Index {
                     return Ok(
                         HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                             http::StatusCode::BAD_REQUEST.into(),
-                            "Stream type 'EnrichmentTable' not allowed".to_string(),
+                            format!("Stream type '{}' not allowed", s_type),
                         )),
                     );
                 }

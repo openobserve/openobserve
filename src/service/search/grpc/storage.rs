@@ -21,12 +21,10 @@ use config::{
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
+    utils::schema_ext::SchemaExt,
     CONFIG,
 };
-use datafusion::{
-    arrow::{datatypes::Schema, record_batch::RecordBatch},
-    common::FileType,
-};
+use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -39,7 +37,12 @@ use tracing::{info_span, Instrument};
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, sql::Sql},
+    search::{
+        datafusion::exec,
+        grpc::{generate_search_schema, generate_select_start_search_schema},
+        sql::Sql,
+        RE_SELECT_WILDCARD,
+    },
 };
 
 /// search in remote object storage
@@ -134,7 +137,7 @@ pub async fn search(
                         file.meta.min_ts,
                         file.meta.max_ts
                     );
-                    // HACK: use the latest verion if not found in schema versions
+                    // HACK: use the latest version if not found in schema versions
                     schema_latest_id
                 }
             };
@@ -177,14 +180,19 @@ pub async fn search(
     // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field.data_type());
+        schema_latest_map.insert(field.name(), field);
     }
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
-        let mut schema = schema_versions[ver]
-            .clone()
-            .with_metadata(std::collections::HashMap::new());
+        let schema = schema_versions[ver].clone();
+        let schema_dt = schema
+            .metadata()
+            .get("start_dt")
+            .cloned()
+            .unwrap_or_default();
+        let schema = schema.with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
         let session = config::meta::search::Session {
             id: format!("{trace_id}-{ver}"),
@@ -196,34 +204,14 @@ pub async fn search(
             },
             work_group: Some(work_group.to_string()),
         };
+
         // cacluate the diff between latest schema and group schema
-        let mut diff_fields = HashMap::new();
-        let group_fields = schema.fields();
-        for field in group_fields {
-            if let Some(data_type) = schema_latest_map.get(field.name()) {
-                if *data_type != field.data_type() {
-                    diff_fields.insert(field.name().clone(), (*data_type).clone());
-                }
-            }
-        }
-        for (field, alias) in sql.meta.field_alias.iter() {
-            if let Some(v) = diff_fields.get(field) {
-                diff_fields.insert(alias.to_string(), v.clone());
-            }
-        }
-        // add not exists field for wal infered schema
-        let mut new_fields = Vec::new();
-        for field in sql.meta.fields.iter() {
-            if schema.field_with_name(field).is_err() {
-                if let Ok(field) = schema_latest.field_with_name(field) {
-                    new_fields.push(Arc::new(field.clone()));
-                }
-            }
-        }
-        if !new_fields.is_empty() {
-            let new_schema = Schema::new(new_fields);
-            schema = Schema::try_merge(vec![schema, new_schema])?;
-        }
+        let (schema, diff_fields) = if select_wildcard {
+            generate_select_start_search_schema(&sql, &schema_latest_map, &schema)?
+        } else {
+            generate_search_schema(&sql, &schema_latest_map, &schema)?
+        };
+
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
             trace_id,
@@ -250,19 +238,34 @@ pub async fn search(
             )));
         }
 
-        let schema = Arc::new(schema);
         let task = tokio::task::spawn(
             async move {
                 tokio::select! {
                     ret = exec::sql(
                         &session,
-                        schema,
+                        schema.clone(),
                         &diff_fields,
                         &sql,
                         &files,
                         None,
                         FileType::PARQUET,
-                    ) => ret,
+                    ) => {
+                        match ret {
+                            Ok(ret) => Ok(ret),
+                            Err(err) => {
+                                log::error!("[trace_id {}] search->storage: datafusion execute error: {}", session.id, err);
+                                if err.to_string().contains("Invalid comparison operation") {
+                                    // print the session_id, schema, sql, files
+                                    let schema_version = format!("{}/{}/{}/{}", &sql.org_id, &stream_type, &sql.stream_name, schema_dt);
+                                    let schema_fiels = schema.as_ref().simple_fields();
+                                    let files = files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>();
+                                    log::error!("[trace_id {}] search->storage: schema and parquet mismatch, version: {}, schema: {:?}, files: {:?}", 
+                                        session.id, schema_version, schema_fiels, files);
+                                }
+                                Err(err)
+                            }
+                        }
+                    },
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[trace_id {}] search->storage: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
@@ -307,7 +310,6 @@ pub async fn search(
                 }
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] datafusion execute error: {}", err);
                 return Err(err.into());
             }
         };
@@ -401,7 +403,8 @@ async fn cache_parquet_files(
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
                     if !file_data::memory::exist(&file_name).await
-                        && !file_data::disk::exist(&file_name).await
+                        && (CONFIG.memory_cache.skip_disk_check
+                            || !file_data::disk::exist(&file_name).await)
                     {
                         file_data::memory::download(&trace_id, &file_name)
                             .await

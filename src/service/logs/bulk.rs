@@ -25,7 +25,7 @@ use chrono::{Duration, Utc};
 use config::{
     cluster,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, Routing, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -49,7 +49,9 @@ use crate::{
         db,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
+        schema::{
+            get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists, SchemaCache,
+        },
         usage::report_request_usage_stats,
     },
 };
@@ -95,7 +97,7 @@ pub async fn ingest(
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_data_map = HashMap::new();
 
-    let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
     let mut stream_partition_keys_map: HashMap<String, (StreamSchemaChk, PartitioningDetails)> =
         HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -107,6 +109,10 @@ pub async fn ingest(
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
+
+    let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
+
+    let mut user_defined_schema_map: HashMap<String, Vec<String>> = HashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -137,46 +143,76 @@ pub async fn ingest(
                 continue; // skip
             }
 
+            // Start get routing keys
+            crate::service::ingestion::get_stream_routing(
+                StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_owned().into(),
+                },
+                &mut stream_routing_map,
+            )
+            .await;
+
+            let mut streams = vec![StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_type: StreamType::Logs,
+                stream_name: stream_name.to_owned().into(),
+            }];
+
+            if let Some(routes) = stream_routing_map.get(&stream_name) {
+                for route in routes {
+                    streams.push(StreamParams {
+                        org_id: org_id.to_owned().into(),
+                        stream_type: StreamType::Logs,
+                        stream_name: route.destination.clone().into(),
+                    });
+                }
+            }
+
+            // End get stream keys
+
+            crate::service::ingestion::get_user_defined_schema(
+                &streams,
+                &mut user_defined_schema_map,
+            )
+            .await;
+
             next_line_is_data = true;
 
-            // Start Register Transfoms for stream
-
-            crate::service::ingestion::get_stream_transforms(
-                org_id,
-                &StreamType::Logs,
-                &stream_name,
-                &mut stream_transform_map,
+            // Start Register functions for stream
+            crate::service::ingestion::get_stream_functions(
+                &streams,
+                &mut stream_functions_map,
                 &mut stream_vrl_map,
             )
             .await;
-            // End Register Transfoms for index
+            // End Register functions for index
 
             // Start get stream alerts
-            crate::service::ingestion::get_stream_alerts(
-                org_id,
-                &StreamType::Logs,
-                &stream_name,
-                &mut stream_alerts_map,
-            )
-            .await;
+            crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
             // End get stream alert
 
-            if !stream_partition_keys_map.contains_key(&stream_name) {
-                let stream_schema = stream_schema_exists(
-                    org_id,
-                    &stream_name,
-                    StreamType::Logs,
-                    &mut stream_schema_map,
-                )
-                .await;
-                let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                    org_id,
-                    &StreamType::Logs,
-                    &stream_name,
-                )
-                .await;
-                stream_partition_keys_map
-                    .insert(stream_name.clone(), (stream_schema, partition_det));
+            for stream in streams {
+                let local_stream_name = stream.stream_name.to_string();
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    stream_partition_keys_map.entry(local_stream_name.to_owned())
+                {
+                    let stream_schema = stream_schema_exists(
+                        org_id,
+                        &local_stream_name,
+                        StreamType::Logs,
+                        &mut stream_schema_map,
+                    )
+                    .await;
+                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                        org_id,
+                        &StreamType::Logs,
+                        &local_stream_name,
+                    )
+                    .await;
+                    e.insert((stream_schema, partition_det));
+                }
             }
 
             stream_data_map
@@ -187,19 +223,43 @@ pub async fn ingest(
         } else {
             next_line_is_data = false;
 
-            let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
-            let buf = &mut stream_data.data;
-
-            // Start row based transform
-
-            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
 
-            if let Some(transforms) = stream_transform_map.get(&key) {
+            if let Some(routing) = stream_routing_map.get(&stream_name) {
+                if !routing.is_empty() {
+                    for route in routing {
+                        let mut is_routed = true;
+                        let val = &route.routing;
+                        for q_condition in val.iter() {
+                            is_routed =
+                                is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
+                        }
+                        if is_routed && !val.is_empty() {
+                            stream_name = route.destination.clone();
+                            if !stream_data_map.contains_key(&stream_name) {
+                                stream_data_map.insert(
+                                    stream_name.clone(),
+                                    BulkStreamData {
+                                        data: HashMap::new(),
+                                    },
+                                );
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
+            let buf = &mut stream_data.data;
+
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+
+            // Start row based transform
+            if let Some(transforms) = stream_functions_map.get(&key) {
                 let mut ret_value = value.clone();
-                ret_value = crate::service::ingestion::apply_stream_transform(
+                ret_value = crate::service::ingestion::apply_stream_functions(
                     transforms,
                     ret_value,
                     &stream_vrl_map,
@@ -230,6 +290,10 @@ pub async fn ingest(
                 json::Value::Object(v) => v,
                 _ => unreachable!(),
             };
+
+            if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                crate::service::logs::refactor_map(&mut local_val, fields);
+            }
 
             // set _id
             if !doc_id.is_empty() {
@@ -308,7 +372,7 @@ pub async fn ingest(
             // this is for schema inference at stream level , which avoids locks in case schema
             // changes are frequent within request
             if CONFIG.common.infer_schema_per_request {
-                let _ = add_record(
+                if let Err(e) = add_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.clone(),
@@ -319,7 +383,20 @@ pub async fn ingest(
                     buf,
                     local_val,
                 )
-                .await;
+                .await
+                {
+                    bulk_res.errors = true;
+                    add_record_status(
+                        stream_name.clone(),
+                        doc_id.clone(),
+                        action.clone(),
+                        Some(value),
+                        &mut bulk_res,
+                        Some(TS_PARSE_FAILED.to_string()),
+                        Some(e.to_string()),
+                    );
+                    continue;
+                }
             } else {
                 let local_trigger = match super::add_valid_record(
                     &StreamMeta {
@@ -421,7 +498,7 @@ pub async fn ingest(
         req_stats.response_time += time;
         req_stats.user_email = Some(user_email.to_string());
         // metric + data usage
-        let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+        let fns_length: usize = stream_functions_map.values().map(|v| v.len()).sum();
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -502,7 +579,7 @@ async fn process_record(
                     rec.as_object().unwrap()
                 })
                 .collect();
-        let _ = crate::service::schema::check_for_schema(
+        if let Err(e) = crate::service::schema::check_for_schema(
             &stream.org_id,
             &stream.stream_name,
             StreamType::Logs,
@@ -510,7 +587,20 @@ async fn process_record(
             records.clone(),
             timestamp,
         )
-        .await?;
+        .await
+        {
+            if e.to_string() == get_invalid_schema_start_dt().to_string() {
+                log::error!(
+                    "Invalid schema start_dt detected for stream: {}, start_dt: {}",
+                    stream.stream_name,
+                    timestamp
+                );
+                // discard records
+                continue;
+            } else {
+                return Err(e);
+            }
+        }
 
         // get schema
         let rec_schema = stream_schema_map

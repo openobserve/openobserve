@@ -79,7 +79,7 @@ pub async fn ingest(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
         stream_name,
@@ -89,9 +89,11 @@ pub async fn ingest(
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::service::ingestion::get_stream_alerts(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
+        &[StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: stream_name.to_owned().into(),
+            stream_type: StreamType::Logs,
+        }],
         &mut stream_alerts_map,
     )
     .await;
@@ -285,7 +287,7 @@ pub fn apply_functions<'a>(
     let mut value = flatten::flatten_with_level(item, CONFIG.limit.ingest_flatten_level)?;
 
     if !local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_transform(
+        value = crate::service::ingestion::apply_stream_functions(
             local_trans,
             value,
             stream_vrl_map,
@@ -309,7 +311,7 @@ pub fn handle_timestamp(
     let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Cant parse timestamp")),
+            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
         },
         None => Utc::now().timestamp_micros(),
     };

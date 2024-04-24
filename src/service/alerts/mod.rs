@@ -55,7 +55,6 @@ pub mod templates;
 
 pub async fn save(
     org_id: &str,
-    stream_type: StreamType,
     stream_name: &str,
     name: &str,
     mut alert: Alert,
@@ -65,7 +64,7 @@ pub async fn save(
         alert.name = name.trim().to_string();
     }
     alert.org_id = org_id.to_string();
-    alert.stream_type = stream_type;
+    let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
@@ -203,7 +202,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("alert:{}", org_id))
+                        .contains(&format!("alert:_all_{}", org_id))
                 {
                     result.push(alert);
                 }
@@ -457,6 +456,7 @@ impl QueryCondition {
                 uses_zo_fn: false,
                 query_context: None,
                 query_fn: None,
+                skip_wal: false,
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
@@ -1115,10 +1115,11 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&from={}&to={}&query={}&org_identifier={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}",
             CONFIG.common.web_url,
             CONFIG.common.base_uri,
             alert.stream_type,
+            alert.stream_name,
             alert.stream_name,
             alert_start_time,
             alert_end_time,
@@ -1143,10 +1144,11 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
             CONFIG.common.web_url,
             CONFIG.common.base_uri,
             alert.stream_type,
+            alert.stream_name,
             alert.stream_name,
             alert_start_time,
             alert_end_time,
@@ -1269,14 +1271,13 @@ mod tests {
     #[tokio::test]
     async fn test_alert_create() {
         let org_id = "default";
-        let stream_type = StreamType::Logs;
         let stream_name = "default";
         let alert_name = "abc/alert";
         let alert = Alert {
             name: alert_name.to_string(),
             ..Default::default()
         };
-        let ret = save(org_id, stream_type, stream_name, alert_name, alert, true).await;
+        let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
     }

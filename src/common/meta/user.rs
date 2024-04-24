@@ -339,3 +339,9 @@ pub struct RolesResponse {
     pub label: String,
     pub value: String,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct AuthTokens {
+    pub access_token: String,
+    pub refresh_token: String,
+}

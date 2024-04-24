@@ -285,7 +285,7 @@ pub async fn merge(
                         json::to_vec(&vec![{
                             // there is no schema, just set the new schema
                             let schema_metadata = inferred_schema.metadata();
-                            tx.send(None).unwrap();
+                            tx.send(Some((inferred_schema.clone(), vec![]))).unwrap();
                             if schema_metadata.contains_key("created_at")
                                 && schema_metadata.contains_key("start_dt")
                             {
@@ -327,7 +327,8 @@ pub async fn merge(
                     let (is_schema_changed, field_datatype_delta, merged_fields) =
                         get_merge_schema_changes(latest_schema, &inferred_schema);
                     if !is_schema_changed {
-                        tx.send(None).unwrap();
+                        tx.send(Some((latest_schema.clone(), field_datatype_delta)))
+                            .unwrap();
                         return Ok(None); // no change, return
                     }
                     let metadata = latest_schema.metadata().clone();
@@ -348,7 +349,8 @@ pub async fn merge(
                         )))
                     } else {
                         // just update the latest schema
-                        tx.send(Some((final_schema.clone(), vec![]))).unwrap();
+                        tx.send(Some((final_schema.clone(), field_datatype_delta)))
+                            .unwrap();
                         Ok(Some((
                             Some(json::to_vec(&vec![final_schema]).unwrap().into()),
                             None,
@@ -498,6 +500,23 @@ pub async fn delete_fields(
                     }
                 })
                 .collect::<Vec<_>>();
+
+            let mut settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
+
+            if let Some(schema_fields) = settings.defined_schema_fields {
+                let defined_schema_fields = schema_fields
+                    .iter()
+                    .filter_map(|f| {
+                        if deleted_fields.contains(f) {
+                            None
+                        } else {
+                            Some(f.clone())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                settings.defined_schema_fields = Some(defined_schema_fields);
+            };
+            new_metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
             let new_schema = vec![Schema::new_with_metadata(fields, new_metadata)];
             Ok(Some((
                 Some(json::to_vec(&prev_schema).unwrap().into()),

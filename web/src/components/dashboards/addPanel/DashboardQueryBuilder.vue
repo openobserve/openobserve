@@ -702,9 +702,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
-              <div>
-                <div class="q-pa-xs">
-                  <div class="q-gutter-xs">
+              <div style="height: 100%">
+                <div class="q-pa-xs" style="height: 100%">
+                  <div class="q-gutter-xs" style="height: 100%">
                     <q-tabs
                       v-model="
                         dashboardPanelData.data.queries[
@@ -737,6 +737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.filter[index].type
                       "
                       animated
+                      style="height: 100%"
                     >
                       <q-tab-panel
                         data-test="dashboard-filter-condition-panel"
@@ -744,7 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="condition"
                         class="q-pa-none"
                       >
-                        <div class="flex justify-between">
+                        <div class="flex column" style="height: 220px;">
                           <q-select
                             dense
                             filled
@@ -759,9 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <q-input
-                            dense
-                            filled
+                          <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 dashboardPanelData.data.queries[
@@ -769,16 +768,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ].fields?.filter[index]?.operator
                               )
                             "
+                            :label="t('common.value')"
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
                               ].fields.filter[index].value
                             "
-                            data-test="dashboard-filter-condition-input"
-                            :label="t('common.value')"
-                            style="width: 100%; margin-top: 5px"
-                            :rules="[(val) => val?.length > 0 || 'Required']"
-                          />
+                            :items="dashboardVariablesFilterItems"
+                            searchRegex="(?:^|[^$])\$?(\w+)"
+                            :rules="[(val: any) => val?.length > 0 || 'Required']"
+                          ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -892,8 +891,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div></div>
     </div>
   </div>
-  <DashboardMapQueryBuilder />
-  <DashboardSankeyChartBuilder />
+  <DashboardMapQueryBuilder :dashboardData="dashboardData" />
+  <DashboardSankeyChartBuilder :dashboardData="dashboardData" />
 </template>
 
 <script lang="ts">
@@ -906,6 +905,7 @@ import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { useQuasar } from "quasar";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -913,9 +913,11 @@ export default defineComponent({
     DashboardMapQueryBuilder,
     SortByBtnGrp,
     HistogramIntervalDropDown,
-    DashboardSankeyChartBuilder
+    DashboardSankeyChartBuilder,
+    CommonAutoComplete,
   },
-  setup() {
+  props: ["dashboardData"],
+  setup(props) {
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
@@ -928,7 +930,6 @@ export default defineComponent({
       config: true,
       filter: false,
     });
-
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -1312,6 +1313,13 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
+    const dashboardVariablesFilterItems = computed(() =>
+      (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
+        label: it.name,
+        value: "'" + "$" + it.name + "'",
+      }))
+    );
+
     return {
       showXAxis,
       t,
@@ -1358,6 +1366,7 @@ export default defineComponent({
       onFieldDragStart,
       getHistoramIntervalField,
       onDragEnd,
+      dashboardVariablesFilterItems,
     };
   },
 });

@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px)" class="scroll">
+  <div style="height: calc(100vh - 57px)">
     <div class="flex justify-between items-center q-pa-md">
       <div class="flex items-center q-table__title q-mr-md">
         <span data-test="dashboard-viewpanel-title">
@@ -79,7 +79,7 @@
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
               />
-              <div style="flex: 1; overflow: auto;">
+              <div style="flex: 1; overflow: hidden;">
                 <PanelSchemaRenderer
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"

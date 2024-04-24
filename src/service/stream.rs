@@ -81,7 +81,7 @@ pub async fn get_streams(
     let filtered_indices = if let Some(s_type) = stream_type {
         match permitted_streams {
             Some(permitted_streams) => {
-                if permitted_streams.contains(&format!("{}:{}", s_type, org_id)) {
+                if permitted_streams.contains(&format!("{}:_all_{}", s_type, org_id)) {
                     indices
                 } else {
                     indices

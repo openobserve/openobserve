@@ -51,6 +51,10 @@ pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     )
 }
 
+pub(crate) fn get_invalid_schema_start_dt() -> anyhow::Error {
+    anyhow::anyhow!("Schema evolution can't use the past _timestamp")
+}
+
 pub(crate) fn get_request_columns_limit_error(
     stream_name: &str,
     num_fields: usize,
@@ -343,6 +347,16 @@ pub async fn check_for_schema(
                 Some(inferred_schema),
             ));
         }
+        if !field_datatype_delta.is_empty() {
+            // check if the min_ts < current_version_created_at, if yes, discard the data
+            let schema_metadata = schema.schema.metadata();
+            if let Some(start_dt) = schema_metadata.get("start_dt") {
+                let created_at = start_dt.parse().unwrap_or_default();
+                if record_ts <= created_at {
+                    return Err(get_invalid_schema_start_dt());
+                }
+            }
+        }
     }
 
     // slow path
@@ -614,6 +628,9 @@ pub async fn add_stream_schema(
             full_text_search_keys: vec![],
             bloom_filter_fields: vec![],
             data_retention: 0,
+            routing: None,
+            flatten_level: None,
+            defined_schema_fields: None,
         };
         metadata.insert(
             "settings".to_string(),

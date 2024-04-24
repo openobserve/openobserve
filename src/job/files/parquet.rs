@@ -283,9 +283,9 @@ async fn move_files(
     );
 
     // get latest schema
-    let latest_schema = infra::schema::get(&org_id, &stream_name, stream_type)
-        .await
-        .map_err(|e| {
+    let latest_schema = match infra::schema::get(&org_id, &stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
             log::error!(
                 "[INGESTER:JOB:{thread_id}] Failed to get latest schema for stream [{}/{}/{}]: {}",
                 &org_id,
@@ -293,8 +293,13 @@ async fn move_files(
                 &stream_name,
                 e
             );
-            e
-        })?;
+            // need release all the files
+            for file in files_with_size.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Err(e);
+        }
+    };
 
     log::debug!(
         "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
@@ -407,7 +412,9 @@ async fn merge_files(
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
         if new_file_size > 0
-            && new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64
+            && ((new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64)
+                || (CONFIG.limit.file_move_fields_limit > 0
+                    && latest_schema.fields().len() > CONFIG.limit.file_move_fields_limit))
         {
             break;
         }
@@ -473,6 +480,7 @@ async fn merge_files(
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
+    let start = std::time::Instant::now();
     let (mut new_file_meta, _) = match merge_parquet_files(
         tmp_dir.name(),
         stream_type,
@@ -520,11 +528,12 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
+        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {:?}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
         new_file_meta.compressed_size,
+        start.elapsed().as_millis(),
     );
 
     let buf = Bytes::from(buf);
@@ -699,12 +708,12 @@ async fn prepare_index_record_batches_v1(
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
     for column in local.fields().iter() {
-        // 1500 columns --> 100 columns of inverted index
-        let index_df = ctx.table("_tbl_raw_data").await?;
-
         if column.data_type() != &DataType::Utf8 {
             continue;
         }
+
+        // 1500 columns --> 100 columns of inverted index
+        let index_df = ctx.table("_tbl_raw_data").await?;
 
         let column_name = column.name();
         let split_chars = &CONFIG.common.inverted_index_split_chars;

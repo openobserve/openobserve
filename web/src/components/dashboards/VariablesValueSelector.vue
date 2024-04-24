@@ -298,6 +298,9 @@ export default defineComponent({
     const changeInitialVariableValues = async (
       newInitialVariableValues: any
     ) => {
+      // reject all promises
+      rejectAllPromises();
+
       // NOTE: need to re-initialize variables data
       resetVariablesData();
 
@@ -306,9 +309,6 @@ export default defineComponent({
 
       // make list of variables using variables config list
       initializeVariablesData();
-
-      // reject all promises
-      rejectAllPromises();
 
       // load all variables
       loadAllVariablesData();
@@ -481,7 +481,7 @@ export default defineComponent({
                 break;
               }
             } catch (err: any) {
-              // some error occured
+              // some error occurred
               // set value as empty string
               currentVariable.value = null;
               // set options as empty array

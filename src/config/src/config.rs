@@ -307,6 +307,17 @@ pub struct Config {
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
+    pub tokio_console: TokioConsole,
+}
+
+#[derive(EnvConfig)]
+pub struct TokioConsole {
+    #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_ADDR", default = "0.0.0.0")]
+    pub tokio_console_server_addr: String,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_PORT", default = 6699)]
+    pub tokio_console_server_port: u16,
+    #[env_config(name = "ZO_TOKIO_CONSOLE_RETENTION", default = 60)]
+    pub tokio_console_retention: u64,
 }
 
 #[derive(EnvConfig)]
@@ -511,6 +522,8 @@ pub struct Common {
     pub bloom_filter_default_fields: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
+    #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
+    pub tracing_search_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "ZO_TRACING_HEADER_KEY", default = "Authorization")]
@@ -602,7 +615,7 @@ pub struct Common {
     pub inverted_index_enabled: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = " ;,",
+        default = ".,;:|/#_ =-+*^&%$@!~`",
         help = "Characters which should be used as a delimiter to split the string."
     )]
     pub inverted_index_split_chars: String,
@@ -626,6 +639,8 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
+    #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
+    pub all_fields_name: String,
 }
 
 #[derive(EnvConfig)]
@@ -658,12 +673,17 @@ pub struct Limit {
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
+    // over this limit will skip merging on ingester
+    #[env_config(name = "ZO_FILE_MOVE_FIELDS_LIMIT", default = 2000)]
+    pub file_move_fields_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
+    #[env_config(name = "ZO_QUERY_FULL_MODE_LIMIT", default = 1000)]
+    pub query_full_mode_limit: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 10)] // seconds
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MIN_SECS", default = 600)] // seconds
@@ -724,7 +744,7 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 200)]
+    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
     pub quick_mode_strategy: String, // first, last, both
@@ -795,10 +815,12 @@ pub struct MemoryCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 10)] // MB
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 50)] // MB
     pub gc_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
+    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
+    pub skip_disk_check: bool,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
     pub datafusion_max_size: usize,
@@ -823,7 +845,7 @@ pub struct DiskCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
-    #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 10)] // MB
+    #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 100)] // MB
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
@@ -1024,7 +1046,7 @@ pub fn init() -> Config {
         panic!("data path config error: {e}");
     }
 
-    // check memeory cache
+    // check memory cache
     if let Err(e) = check_memory_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
@@ -1148,6 +1170,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Default scrape interval can not be set to lesser than 5s ."
         ));
+    }
+
+    if cfg.common.inverted_index_split_chars.is_empty() {
+        cfg.common.inverted_index_split_chars = " ;,".to_string();
     }
     Ok(())
 }
@@ -1290,6 +1316,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_partition_min_secs == 0 {
         cfg.limit.query_partition_min_secs = 600;
+    }
+    if cfg.limit.query_full_mode_limit == 0 {
+        cfg.limit.query_full_mode_limit = 1000;
     }
     Ok(())
 }

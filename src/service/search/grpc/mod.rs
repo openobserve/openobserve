@@ -13,16 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
+use arrow_schema::{DataType, Field, Schema};
 use config::{
     cluster,
     meta::{
         search::ScanStats,
         stream::{FileKey, StreamType},
     },
-    CONFIG,
+    FxIndexSet, CONFIG,
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -30,7 +31,7 @@ use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
 use tracing::{info_span, Instrument};
 
-use super::datafusion;
+use super::{datafusion, sql::Sql};
 use crate::service::db;
 mod storage;
 mod wal;
@@ -72,6 +73,7 @@ pub async fn search(
     );
 
     // search in WAL parquet
+    let skip_wal = req.query.as_ref().unwrap().skip_wal;
     let work_group1 = work_group.clone();
     let trace_id1 = trace_id.clone();
     let sql1 = sql.clone();
@@ -84,7 +86,7 @@ pub async fn search(
     );
     let task1 = tokio::task::spawn(
         async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
                 wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
@@ -106,7 +108,7 @@ pub async fn search(
     );
     let task2 = tokio::task::spawn(
         async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
                 wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
@@ -337,4 +339,112 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+// generate parquet file search schema
+fn generate_search_schema(
+    sql: &Arc<Sql>,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    schema: &Schema,
+) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
+    // cacluate the diff between latest schema and group schema
+    let mut diff_fields = HashMap::new();
+    let mut new_fields = Vec::new();
+
+    for field in generate_used_fields_in_query(sql).iter() {
+        let group_field = schema.field_with_name(field).ok();
+        let latest_field = schema_latest_map.get(field).map(|f| f.as_ref());
+
+        match (group_field, latest_field) {
+            // When group_field is None and latest_field is Some, clone latest_field
+            (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
+
+            // When both group_field and latest_field are Some, compare their data types
+            (Some(group_field), Some(latest_field)) => {
+                if group_field.data_type() != latest_field.data_type() {
+                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
+                }
+                new_fields.push(Arc::new(group_field.clone()));
+            }
+
+            // should we return error
+            _ => {}
+        }
+    }
+
+    for (field, alias) in sql.meta.field_alias.iter() {
+        if let Some(v) = diff_fields.get(field) {
+            diff_fields.insert(alias.to_string(), v.clone());
+        }
+    }
+
+    let mut schema = Schema::new(new_fields);
+    let timestamp = &CONFIG.common.column_timestamp;
+    if schema.field_with_name(timestamp).is_err() {
+        // self add timestamp column if no exist
+        let field = Arc::new(Field::new(timestamp, DataType::Int64, false));
+        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
+    }
+
+    Ok((Arc::new(schema), diff_fields))
+}
+
+// generate parquet file search schema
+fn generate_select_start_search_schema(
+    sql: &Arc<Sql>,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    schema: &Schema,
+) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
+    let mut schema = schema.clone();
+    // cacluate the diff between latest schema and group schema
+    let mut diff_fields = HashMap::new();
+    let group_fields = schema.fields();
+    for field in group_fields {
+        if let Some(f) = schema_latest_map.get(field.name()) {
+            if f.data_type() != field.data_type() {
+                diff_fields.insert(field.name().clone(), f.data_type().clone());
+            }
+        }
+    }
+    for (field, alias) in sql.meta.field_alias.iter() {
+        if let Some(v) = diff_fields.get(field) {
+            diff_fields.insert(alias.to_string(), v.clone());
+        }
+    }
+    // add not exists field in group schema but used in sql
+    let mut new_fields = Vec::new();
+    for field in generate_used_fields_in_query(sql).iter() {
+        if schema.field_with_name(field).is_err() {
+            if let Some(field) = schema_latest_map.get(field) {
+                new_fields.push(Arc::new(field.as_ref().clone()));
+            }
+        }
+    }
+    if !new_fields.is_empty() {
+        let new_schema = Schema::new(new_fields);
+        schema = Schema::try_merge(vec![schema, new_schema])?;
+    }
+
+    Ok((Arc::new(schema.clone()), diff_fields))
+}
+
+fn generate_used_fields_in_query(sql: &Arc<Sql>) -> Vec<String> {
+    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
+
+    // note field name maybe equal to alias name
+    let mut used_fields: FxIndexSet<_> = sql
+        .meta
+        .group_by
+        .iter()
+        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
+        .filter(|f| !alias_map.contains(*f))
+        .chain(&sql.meta.fields)
+        .cloned()
+        .collect();
+
+    for (_, (_, meta)) in &sql.aggs {
+        used_fields.extend(meta.fields.iter().cloned());
+    }
+
+    used_fields.into_iter().collect()
 }

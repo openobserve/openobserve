@@ -224,17 +224,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                       :options="['=', '!=']"
                     />
-                    <q-input
+                    <CommonAutoComplete
                       v-model="filter.value"
-                      placeholder="Enter Value"
-                      dense
-                      filled
+                      :items="dashboardVariablesFilterItems"
+                      searchRegex="(?:^|[^$])\$?(\w+)"
+                      :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
-                      style="width: 125px"
-                      class=""
-                      data-test="dashboard-query-values-filter-value"
-                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                    />
+                      style="
+                        margin-top: none !important;
+                        width: auto !important;
+                      "
+                      placeholder="Enter Value"
+                    ></CommonAutoComplete>
                     <q-btn
                       size="sm"
                       padding="12px 5px"
@@ -378,6 +379,7 @@ import {
   toRef,
   toRaw,
   type Ref,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
@@ -396,11 +398,12 @@ import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
   name: "AddSettingVariable",
-  props: ["variableName"],
-  components: { DashboardHeader },
+  props: ["variableName", "dashboardVariablesList"],
+  components: { DashboardHeader, CommonAutoComplete },
   emits: ["close", "save"],
   setup(props, { emit }) {
     const $q = useQuasar();
@@ -772,6 +775,14 @@ export default defineComponent({
       emit("close");
     };
 
+    const dashboardVariablesFilterItems = computed(() =>
+      props.dashboardVariablesList
+        .map((it: any) => ({
+          label: it.name,
+          value: "$" + it.name,
+        }))
+        .filter((it: any) => it.label !== variableData.name)
+    );
     return {
       variableData,
       store,
@@ -797,6 +808,7 @@ export default defineComponent({
       removeFilter,
       filterUpdated,
       filterCycleError,
+      dashboardVariablesFilterItems,
     };
   },
 });
