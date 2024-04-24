@@ -29,64 +29,6 @@
           style="width: 480px"
         />
       </div>
-      <div class="flex justify-start items-center" style="padding-top: 0px">
-        <div
-          data-test="add-alert-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm"
-          style="padding-top: 0"
-        >
-          <q-select
-            v-model="streamRoute.sourceStreamType"
-            :options="streamTypes"
-            :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @update:model-value="updateStreams()"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-          />
-        </div>
-        <div
-          data-test="add-alert-stream-select"
-          class="o2-input"
-          style="padding-top: 0"
-        >
-          <q-select
-            v-model="streamRoute.sourceStreamName"
-            :options="filteredStreams"
-            :label="t('alerts.stream_name') + ' *'"
-            :loading="isFetchingStreams"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            filled
-            stack-label
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @filter="filterStreams"
-            @update:model-value="
-              updateStreamFields(streamRoute.sourceStreamName)
-            "
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 250px !important; width: 250px !important"
-          />
-        </div>
-      </div>
 
       <real-time-alert
         :columns="filteredColumns"
@@ -94,8 +36,6 @@
         @field:add="addField"
         @field:remove="removeField"
       />
-
-      <NodeLinks :tree="[]" />
 
       <div
         class="flex justify-start q-mt-lg q-py-sm full-width"
@@ -131,13 +71,14 @@
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref } from "vue";
+import { onMounted, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import NodeLinks from "./NodeLinks.vue";
+import useStreams from "@/composables/useStreams";
 
 interface RouteCondition {
   column: string;
@@ -154,7 +95,26 @@ interface StreamRoute {
   conditions: RouteCondition[];
 }
 
+const props = defineProps({
+  nodeLinks: {
+    type: Array,
+    required: true,
+  },
+  sourceStreamName: {
+    type: String,
+    required: true,
+  },
+});
+
 const { t } = useI18n();
+
+const router = useRouter();
+
+const store = useStore();
+
+const { getStream, getStreams } = useStreams();
+
+const emit = defineEmits(["update:node", "cancel:hideform"]);
 
 const isUpdating = ref(false);
 
@@ -162,11 +122,18 @@ const filteredColumns: any = ref([]);
 
 const isFetchingStreams = ref(false);
 
-const filteredStreams = ref([]);
+const filteredStreams: Ref<any[]> = ref([]);
 
-const router = useRouter();
+const streams: any = ref({});
 
-const store = useStore();
+const indexOptions = ref([]);
+
+const originalStreamFields: Ref<any[]> = ref([]);
+
+const nodeLink = ref({
+  from: "",
+  to: "",
+});
 
 const dialog = ref({
   show: false,
@@ -185,39 +152,17 @@ const getDefaultStreamRoute = () => {
   };
 };
 
+onMounted(() => {
+  streamRoute.value.sourceStreamName = props.sourceStreamName;
+  streamRoute.value.sourceStreamType = "logs";
+  updateStreamFields();
+});
+
 const streamTypes = ["logs", "metrics", "traces"];
 
 const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
-const updateStreams = (resetStream = true) => {
-  // if (resetStream) formData.value.stream_name = "";
-  // if (streams.value[formData.value.stream_type]) {
-  //   schemaList.value = streams.value[formData.value.stream_type];
-  //   indexOptions.value = streams.value[formData.value.stream_type].map(
-  //     (data: any) => {
-  //       return data.name;
-  //     }
-  //   );
-  //   return;
-  // }
-  // if (!formData.value.stream_type) return Promise.resolve();
-  // isFetchingStreams.value = true;
-  // return getStreams(formData.value.stream_type, false)
-  //   .then((res: any) => {
-  //     streams.value[formData.value.stream_type] = res.list;
-  //     schemaList.value = res.list;
-  //     indexOptions.value = res.list.map((data: any) => {
-  //       return data.name;
-  //     });
-  //     if (formData.value.stream_name)
-  //       updateStreamFields(formData.value.stream_name);
-  //     return Promise.resolve();
-  //   })
-  //   .catch(() => Promise.reject())
-  //   .finally(() => (isFetchingStreams.value = false));
-};
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -237,26 +182,26 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 };
 
 const filterStreams = (val: string, update: any) => {
-  // filteredStreams.value = filterColumns(indexOptions.value, val, update);
+  filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
 
-const updateStreamFields = async (stream_name: any) => {
-  // let streamCols: any = [];
-  // const streams: any = await getStream(
-  //   stream_name,
-  //   formData.value.stream_type,
-  //   true
-  // );
-  // if (streams && Array.isArray(streams.schema)) {
-  //   streamCols = streams.schema.map((column: any) => ({
-  //     label: column.name,
-  //     value: column.name,
-  //     type: column.type,
-  //   }));
-  // }
-  // originalStreamFields.value = [...streamCols];
-  // filteredColumns.value = [...streamCols];
-  // onInputUpdate("stream_name", stream_name);
+const updateStreamFields = async () => {
+  let streamCols: any = [];
+  const streams: any = await getStream(
+    streamRoute.value.sourceStreamName,
+    streamRoute.value.sourceStreamType,
+    true
+  );
+
+  if (streams && Array.isArray(streams.schema)) {
+    streamCols = streams.schema.map((column: any) => ({
+      label: column.name,
+      value: column.name,
+      type: column.type,
+    }));
+  }
+  originalStreamFields.value = [...streamCols];
+  filteredColumns.value = [...streamCols];
 };
 
 const addField = () => {
@@ -297,7 +242,14 @@ const openCancelDialog = () => {
   dialog.value.okCallback = goToRoutings;
 };
 
-const saveRouting = () => {};
+const saveRouting = () => {
+  // Save routing
+  emit("update:node", { data: streamRoute.value, link: nodeLink.value });
+};
+
+const saveUpdatedLink = (link: { from: string; to: string }) => {
+  nodeLink.value = link;
+};
 </script>
 
 <style scoped>

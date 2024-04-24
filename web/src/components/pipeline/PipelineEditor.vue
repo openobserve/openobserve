@@ -39,11 +39,14 @@
     <div class="stream-routing-dialog-container full-height">
       <StreamRouting
         v-if="dialog.name === 'streamRouting'"
+        :node-links="nodeLinks"
+        :source-stream-name="nodes[0].name"
         @update:node="addStreamNode"
       />
 
       <AssociateFunction
         v-if="dialog.name === 'associateFunction'"
+        :node-links="nodeLinks"
         @update:node="addFunctionNode"
       />
     </div>
@@ -63,6 +66,7 @@ import NodeLinks from "./NodeLinks.vue";
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
 const streamRouteImage = getImageURL("images/pipeline/stream_route.svg");
+const conditionImage = getImageURL("images/pipeline/routeCondition.svg");
 
 const plotChart = ref({
   options: {
@@ -106,6 +110,10 @@ const nodeRect = ref({
   left: 0,
 });
 
+const functions = ref({
+  stream: [],
+});
+
 const chartContainerRef = ref(null);
 
 const nodeActions = ref(null);
@@ -120,7 +128,7 @@ const dialog = ref({
 
 const onChartClick = (params) => {
   dialog.value.show = true;
-  dialog.value.name = "associateFunction";
+  dialog.value.name = "streamRouting";
   console.log("click", params);
 };
 
@@ -130,14 +138,14 @@ const chartContainerRect = computed(() => {
 
 onBeforeMount(() => {
   nodes.value.push({
-    name: "k8s_event",
+    name: "default",
     x: 0,
     y: 300,
     type: "stream",
     fixed: true,
   });
 
-  nodeLinks.value["k8s_event"] = {
+  nodeLinks.value["default"] = {
     from: [],
     to: [],
   };
@@ -176,26 +184,81 @@ const addStream = () => {
   dialog.value.name = "streamRouting";
 };
 
+const getFunctionFrom = (stream) => {
+  let fromNodeName = stream;
+
+  const functions = nodes.value.filter(
+    (node) => node.type === "function" && node.stream === stream
+  );
+
+  if (functions.length) {
+    fromNodeName = functions[functions.length - 1].name;
+  }
+
+  return fromNodeName;
+};
+
 const addFunctionNode = (data) => {
-  console.log("add function", data);
+  const nodeName = data.data.name;
+
   nodes.value.push({
-    name: data.name,
+    name: nodeName,
     x: 50,
     y: 300,
     type: "function",
     fixed: true,
+    order: data.data.order || functions.value.length,
+    stream: nodes.value[0].name,
   });
 
-  if (!nodeLinks.value[data.name])
-    nodeLinks.value[data.name] = { from: [], to: [] };
+  if (!nodeLinks.value[nodeName])
+    nodeLinks.value[nodeName] = { from: [], to: [] };
 
-  nodeLinks.value[data.name].from.push("k8s_event");
+  // reorder function nodes with order key and its links too
+  const sortedFunctionNodes = nodes.value
+    .filter((node) => node.type === "function")
+    .sort((a, b) => a.order - b.order);
+
+  sortedFunctionNodes.forEach((node, index) => {
+    if (index === 0) {
+      nodeLinks.value[node.name].from = [nodes.value[0].name];
+      nodeLinks.value[nodes.value[0].name].to = [node.name];
+    } else {
+      nodeLinks.value[node.name].from = [sortedFunctionNodes[index - 1].name];
+      nodeLinks.value[sortedFunctionNodes[index - 1].name].to = [node.name];
+    }
+  });
 
   updateGraph();
 };
 
 const addStreamNode = (data) => {
-  console.log(data);
+  const nodeName = data.data.destinationStreamName;
+
+  nodes.value.push({
+    name: nodeName + ":condition",
+    x: 50,
+    y: 300,
+    type: "condition",
+    fixed: true,
+  });
+
+  nodes.value.push({
+    name: nodeName,
+    x: 50,
+    y: 300,
+    type: "streamRoute",
+    fixed: true,
+  });
+
+  nodeLinks.value[nodeName + ":condition"] = {
+    from: [nodes.value[0].name],
+    to: [nodeName],
+  };
+
+  nodeLinks.value[nodeName] = { from: [nodeName + ":condition"], to: [] };
+
+  updateGraph();
 };
 
 const getNodeSymbol = (type) => {
@@ -203,6 +266,7 @@ const getNodeSymbol = (type) => {
     stream: streamImage,
     function: functionImage,
     streamRoute: streamRouteImage,
+    condition: conditionImage,
   };
 
   return "image://" + window.location.origin + "/" + symbolMapping[type];

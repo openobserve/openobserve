@@ -50,7 +50,29 @@
         />
       </div>
 
-      <NodeLinks :tree="[]" />
+      <div
+        data-test="associate-function-order-input"
+        class="o2-input"
+        style="padding-top: 12px"
+      >
+        <q-input
+          v-model="functionOrder"
+          :label="t('function.order') + ' *'"
+          color="input-border"
+          bg-color="input-bg"
+          class="showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          type="number"
+          v-bind:readonly="isUpdating"
+          v-bind:disable="isUpdating"
+          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+          tabindex="0"
+          style="width: 480px"
+        />
+      </div>
 
       <div
         class="flex justify-start q-mt-lg q-py-sm full-width"
@@ -95,6 +117,7 @@ import { useRouter } from "vue-router";
 import AddFunction from "../functions/AddFunction.vue";
 import NodeLinks from "./NodeLinks.vue";
 import functionsService from "@/services/jstransform";
+import { VueDraggableNext } from "vue-draggable-next";
 
 interface RouteCondition {
   column: string;
@@ -111,6 +134,18 @@ interface StreamRoute {
   conditions: RouteCondition[];
 }
 
+const props = defineProps({
+  nodeLinks: {
+    type: Array,
+    required: true,
+  },
+  defaultOrder: {
+    type: Number,
+    required: true,
+    default: 1,
+  },
+});
+
 const emit = defineEmits(["update:node", "cancel:hideform"]);
 
 const { t } = useI18n();
@@ -120,6 +155,8 @@ const addFunctionRef: any = ref(null);
 const isUpdating = ref(false);
 
 const selectedFunction = ref("");
+
+const functionOrder = ref(props.defaultOrder);
 
 const filteredFunctions = ref([]);
 
@@ -132,6 +169,11 @@ const store = useStore();
 const nodes = {};
 
 const links = {};
+
+const nodeLink = ref({
+  from: "",
+  to: "",
+});
 
 const dialog = ref({
   show: false,
@@ -255,13 +297,19 @@ const saveFunction = () => {
   if (createNewFunction.value) {
     addFunctionRef.value.onSubmit();
   } else {
-    emit("update:node", { name: selectedFunction.value });
+    emit("update:node", {
+      data: { name: selectedFunction.value, order: functionOrder.value },
+      link: nodeLink.value,
+    });
   }
 };
 
 const onFunctionCreation = (_function: any) => {
   // Assing newly created function to the block
-  emit("update:node", _function);
+  emit("update:node", {
+    data: { ..._function, order: functionOrder.value },
+    link: nodeLink.value,
+  });
 };
 
 const cancelFunctionCreation = () => {
@@ -281,6 +329,10 @@ const getFunctions = () => {
     .then((res) => {
       filteredFunctions.value = res.data.list.map((func: any) => func.name);
     });
+};
+
+const saveUpdatedLink = (link: { from: string; to: string }) => {
+  nodeLink.value = link;
 };
 </script>
 
