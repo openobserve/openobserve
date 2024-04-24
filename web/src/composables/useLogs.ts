@@ -1621,7 +1621,7 @@ const useLogs = () => {
         }
 
         const streamFieldNames: any =
-          searchObj.data.stream.selectedStreamFields.map((item) => item.name);
+          searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
 
         for (const [
           fieldIndex,
