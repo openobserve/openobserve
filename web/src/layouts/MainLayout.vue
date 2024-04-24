@@ -614,6 +614,7 @@ export default defineComponent({
       miniMode.value = true;
       filterMenus();
 
+      // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
       if (
         !store.state.zoConfig.hasOwnProperty("version") ||
         store.state.zoConfig.version == ""
@@ -631,7 +632,7 @@ export default defineComponent({
         }
         await nextTick();
         // if rum enabled then setUser to capture session details.
-        if (store.state.zoConfig.rum.enabled) {
+        if (store.state.zoConfig.rum?.enabled) {
           setRumUser();
         }
       }
