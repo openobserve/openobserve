@@ -494,7 +494,9 @@ pub async fn get_user_defined_schema(
                 .await
                 .unwrap_or_default();
         if let Some(fields) = stream_settings.defined_schema_fields {
-            user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+            if !fields.is_empty() {
+                user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+            }
         }
     }
 }

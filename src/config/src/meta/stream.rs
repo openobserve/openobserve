@@ -446,8 +446,12 @@ impl Serialize for StreamSettings {
             }
         }
         match self.defined_schema_fields.as_ref() {
-            Some(defined_schema_fields) => {
-                state.serialize_field("defined_schema_fields", defined_schema_fields)?;
+            Some(fields) => {
+                if !fields.is_empty() {
+                    state.serialize_field("defined_schema_fields", fields)?;
+                } else {
+                    state.skip_field("defined_schema_fields")?;
+                }
             }
             None => {
                 state.skip_field("defined_schema_fields")?;
@@ -518,14 +522,15 @@ impl From<&str> for StreamSettings {
 
         let mut defined_schema_fields: Option<Vec<String>> = None;
         if let Some(value) = settings.get("defined_schema_fields") {
-            defined_schema_fields = Some(
-                value
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|item| item.as_str().unwrap().to_string())
-                    .collect(),
-            );
+            let fields = value
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| item.as_str().unwrap().to_string())
+                .collect::<Vec<_>>();
+            if !fields.is_empty() {
+                defined_schema_fields = Some(fields);
+            }
         }
 
         let mut routing: HashMap<String, Vec<RoutingCondition>> = HashMap::new();
