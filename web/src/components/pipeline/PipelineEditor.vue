@@ -18,6 +18,16 @@
       no-caps
       @click="addStream"
     />
+
+    <q-btn
+      data-test="add-report-save-btn"
+      label="Save"
+      class="text-bold no-border q-ml-md"
+      color="secondary"
+      padding="sm xl"
+      no-caps
+      @click="savePipeline"
+    />
   </div>
   <div ref="chartContainerRef" class="relative-position">
     <ChartRenderer
@@ -69,6 +79,7 @@ import StreamRouting from "./StreamRouting.vue";
 import AssociateFunction from "./AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
 import { useStore } from "vuex";
+import StreamSelection from "./StreamSelection.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -464,7 +475,7 @@ const resetDialog = () => {
 
 const getPipelinePayload = () => {
   const payload = {
-    name: "pipeline",
+    name: "pipeline1",
     description: "pipeline",
     stream_name: "stream",
     stream_type: "stream",
@@ -478,6 +489,11 @@ const getPipelinePayload = () => {
       ],
     },
   };
+};
+
+const savePipeline = () => {
+  const payload = getPipelinePayload();
+  console.log("payload", payload);
 };
 </script>
 
