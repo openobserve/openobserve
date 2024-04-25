@@ -1,73 +1,105 @@
 <template>
-  <div class="flex items-center">
-    <div
-      data-test="add-alert-back-btn"
-      class="flex justify-center items-center q-mr-md cursor-pointer"
-      style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px"
-      title="Go Back"
-      @click="openCancelDialog"
-    >
-      <q-icon name="arrow_back_ios_new" size="14px" />
+  <div class="flex justify-between items-center q-pb-sm">
+    <div class="flex items-center">
+      <div
+        data-test="add-alert-back-btn"
+        class="flex justify-center items-center q-mr-md cursor-pointer"
+        style="
+          border: 1.5px solid;
+          border-radius: 50%;
+          width: 22px;
+          height: 22px;
+        "
+        title="Go Back"
+        @click="openCancelDialog"
+      >
+        <q-icon name="arrow_back_ios_new" size="14px" />
+      </div>
+      <div class="text-h6">{{ pipeline.name }}</div>
     </div>
-    <div class="text-h6">{{ pipeline.name }}</div>
+
+    <div class="flex justify-end">
+      <q-btn
+        data-test="add-report-save-btn"
+        label="Cancel"
+        class="text-bold border q-ml-md"
+        padding="sm xl"
+        no-caps
+        @click="openCancelDialog"
+      />
+
+      <q-btn
+        data-test="add-report-save-btn"
+        label="Save"
+        class="text-bold no-border q-ml-md"
+        color="secondary"
+        padding="sm xl"
+        no-caps
+        @click="savePipeline"
+      />
+    </div>
   </div>
-  <div class="flex justify-end">
-    <q-btn
-      data-test="add-report-save-btn"
-      label="Add Function"
-      class="text-bold no-border q-ml-md float-left"
-      color="secondary"
-      padding="sm xl"
-      no-caps
-      @click="addFunction"
-    />
-    <q-btn
-      data-test="add-report-save-btn"
-      label="Add Stream"
-      class="text-bold no-border q-ml-md float-left"
-      color="secondary"
-      padding="sm xl"
-      no-caps
-      @click="addStream"
-    />
 
-    <q-btn
-      data-test="add-report-save-btn"
-      label="Cancel"
-      class="text-bold border q-ml-md"
-      padding="sm xl"
-      no-caps
-      @click="openCancelDialog"
-    />
+  <q-separator class="q-mb-sm" />
 
-    <q-btn
-      data-test="add-report-save-btn"
-      label="Save"
-      class="text-bold no-border q-ml-md"
-      color="secondary"
-      padding="sm xl"
-      no-caps
-      @click="savePipeline"
-    />
-  </div>
-  <div
-    ref="chartContainerRef"
-    class="relative-position bg-grey-2 pipeline-chart-container q-mt-md"
-  >
-    <ChartRenderer
-      data-test="logs-search-result-bar-chart"
-      :data="plotChart"
-      render-type="svg"
-      style="height: 700px"
-      @click="onChartClick"
-      @mouseover="onChartHover"
-      @mouseout="onMouseOut"
-    />
+  <div class="flex q-mt-md">
+    <div class="nodes-drag-container q-pr-md">
+      <div class="text-bold q-mb-sm q-mx-sm">Nodes</div>
 
-    <!-- <div ref="nodeActions" id="node-actions" class="node-actions absolute">
+      <q-separator class="q-mb-md" />
+
+      <template v-for="nodeType in nodeTypes" :key="nodeType.value">
+        <div
+          :id="nodeType.value + '_node'"
+          :draggable="true"
+          @dragstart="(ev) => onNodeDragStart(ev, nodeType.value)"
+          class="flex items-center node-type-row q-mt-sm q-mx-sm"
+        >
+          <img width="30" :src="symbolMapping[nodeType.value]" />
+          <div class="q-px-sm">{{ nodeType.label }}</div>
+        </div>
+      </template>
+      <!-- <q-btn
+        data-test="add-report-save-btn"
+        label="Add Function"
+        class="text-bold no-border q-ml-md float-left"
+        color="secondary"
+        padding="sm xl"
+        no-caps
+        @click="addFunction"
+      />
+      <q-btn
+        data-test="add-report-save-btn"
+        label="Add Stream"
+        class="text-bold no-border q-ml-md float-left q-mt-md"
+        color="secondary"
+        padding="sm xl"
+        no-caps
+        @click="addStream"
+      /> -->
+    </div>
+    <div
+      id="pipelineChartContainer"
+      ref="chartContainerRef"
+      class="relative-position bg-grey-2 pipeline-chart-container"
+    >
+      <ChartRenderer
+        data-test="logs-search-result-bar-chart"
+        :data="plotChart"
+        render-type="svg"
+        style="height: calc(100vh - 150px)"
+        @click="onChartClick"
+        @mouseover="onChartHover"
+        @mouseout="onMouseOut"
+        @drop="onNodeDrop"
+        @dragover="onNodeDragOver"
+      />
+
+      <!-- <div ref="nodeActions" id="node-actions" class="node-actions absolute">
       <q-icon name="delete" class="q-mr-xs cursor-pointer" />
       <q-icon name="add" class="cursor-pointer" size="16px" />
     </div> -->
+    </div>
   </div>
 
   <q-dialog v-model="dialog.show" position="right" full-height maximized>
@@ -92,6 +124,7 @@
         @update:node="addFunctionNode"
         @delete:node="deleteNode"
         @cancel:hideform="resetDialog"
+        @add:function="updateNewFunction"
       />
     </div>
   </q-dialog>
@@ -215,6 +248,11 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
+
+const nodeTypes = [
+  { label: "Function", value: "function" },
+  { label: "Route", value: "streamRoute" },
+];
 
 const nodes: Ref<Node[]> = ref([]);
 
@@ -568,14 +606,14 @@ const createStreamRouteNode = (streamRouteData: { name: string }) => {
   };
 };
 
-const getNodeSymbol = (type: string) => {
-  const symbolMapping: { [key: string]: string } = {
-    stream: streamImage,
-    function: functionImage,
-    streamRoute: streamRouteImage,
-    condition: conditionImage,
-  };
+const symbolMapping: { [key: string]: string } = {
+  stream: streamImage,
+  function: functionImage,
+  streamRoute: streamRouteImage,
+  condition: conditionImage,
+};
 
+const getNodeSymbol = (type: string) => {
   return "image://" + window.location.origin + "/" + symbolMapping[type];
 };
 
@@ -729,6 +767,38 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
+
+// Drag n Drop methods
+
+const onNodeDragStart = (event: any, data: any) => {
+  console.log(event);
+  event.dataTransfer.setData("text", data);
+};
+
+const onNodeDrop = (event: any) => {
+  event.preventDefault();
+  const nodeType = event.dataTransfer.getData("text");
+
+  if (nodeType === "function") {
+    addFunction();
+  }
+
+  if (nodeType === "streamRoute") {
+    addStream();
+  }
+};
+
+const onNodeDragOver = (event: any) => {
+  event.preventDefault();
+  console.log("over", event);
+};
+
+const updateNewFunction = (_function: Function) => {
+  if (!functions.value[_function.name]) {
+    functions.value[_function.name] = _function;
+    functionOptions.value.push(_function.name);
+  }
+};
 </script>
 
 <style scoped lang="scss">
@@ -742,6 +812,19 @@ const resetConfirmDialog = () => {
 
 .pipeline-chart-container {
   border-radius: 12px;
+  width: calc(100% - 200px);
+}
+
+.nodes-drag-container {
+  width: 200px;
+}
+
+.node-type-row {
+  cursor: grab;
+  padding: 5px;
+  border: 1px solid #e4e4e4;
+  border-radius: 8px;
+  user-select: none;
 }
 </style>
 

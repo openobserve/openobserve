@@ -1,6 +1,9 @@
 <template>
   <div>
-    <div data-test="alert-conditions-text" class="text-bold">Conditions *</div>
+    <div data-test="alert-conditions-text" class="text-bold">
+      Conditions * (AND operator is used by default to evaluate multiple
+      conditions)
+    </div>
     <template v-if="!fields.length">
       <q-btn
         data-test="alert-conditions-add-btn"

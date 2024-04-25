@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mx-md q-my-md">
+  <div>
     <div class="add-function-header row items-center no-wrap">
       <div class="col">
         <div v-if="beingUpdated" class="text-h6">

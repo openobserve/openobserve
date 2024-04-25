@@ -3,7 +3,7 @@
     data-test="add-stream-routing-section"
     class="full-width full-height bg-white"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">Add Stream Routing</div>
+    <div class="stream-routing-title q-pb-sm q-pl-md">Routing</div>
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">

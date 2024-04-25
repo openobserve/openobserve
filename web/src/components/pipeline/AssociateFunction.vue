@@ -18,7 +18,7 @@
         "
       />
     </div>
-    <div v-else class="stream-routing-container full-width q-px-md q-pt-md">
+    <div v-else class="stream-routing-container full-width q-pa-md bg-white">
       <q-toggle
         class="q-mb-sm"
         :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -53,6 +53,28 @@
             :error="!functionExists"
           />
         </div>
+
+        <div
+          data-test="associate-function-order-input"
+          class="o2-input full-width"
+          style="padding-top: 12px"
+        >
+          <q-input
+            v-model="functionOrder"
+            :label="t('function.order') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            type="number"
+            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            tabindex="0"
+            style="min-width: 220px"
+          />
+        </div>
       </div>
 
       <div v-if="createNewFunction" class="pipeline-add-function">
@@ -66,29 +88,7 @@
       </div>
 
       <div
-        data-test="associate-function-order-input"
-        class="o2-input"
-        style="padding-top: 12px"
-      >
-        <q-input
-          v-model="functionOrder"
-          :label="t('function.order') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          type="number"
-          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-          tabindex="0"
-          style="width: 480px"
-        />
-      </div>
-
-      <div
-        class="flex justify-start q-mt-lg q-py-sm full-width"
+        class="flex justify-start full-width"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       >
         <q-btn
@@ -131,7 +131,14 @@
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref, defineEmits, onBeforeMount, watch } from "vue";
+import {
+  ref,
+  type Ref,
+  defineEmits,
+  onBeforeMount,
+  watch,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -188,7 +195,12 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
+const emit = defineEmits([
+  "update:node",
+  "cancel:hideform",
+  "delete:node",
+  "add:function",
+]);
 
 const { t } = useI18n();
 
@@ -367,17 +379,16 @@ const saveFunction = () => {
       data: { name: selectedFunction.value, order: functionOrder.value },
       link: nodeLink.value,
     });
+    emit("cancel:hideform");
   }
-
-  emit("cancel:hideform");
 };
 
-const onFunctionCreation = (_function: any) => {
+const onFunctionCreation = async (_function: any) => {
   // Assing newly created function to the block
-  emit("update:node", {
-    data: { ..._function, order: functionOrder.value },
-    link: nodeLink.value,
-  });
+  createNewFunction.value = false;
+  emit("add:function", _function);
+  await nextTick();
+  selectedFunction.value = _function.name;
 };
 
 const cancelFunctionCreation = () => {
