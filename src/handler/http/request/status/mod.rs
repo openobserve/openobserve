@@ -40,6 +40,7 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
+    config::ider,
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
@@ -349,6 +350,14 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
 
+            // generate new UUID for access token & store token in DB
+            let session_id = ider::uuid();
+
+            // store session_id in cluster co-ordinator
+            let _ = crate::service::session::set_session(&session_id, &access_token).await;
+
+            let access_token = format!("session {}", session_id);
+
             let tokens = json::to_string(&AuthTokens {
                 access_token,
                 refresh_token: login_data.refresh_token,
@@ -394,6 +403,15 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     let token = if let Some(cookie) = req.cookie("auth_tokens") {
         let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+
+        // remove old session id from cluster co-ordinator
+
+        let access_token = auth_tokens.access_token;
+        if access_token.starts_with("session") {
+            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
+                .await;
+        }
+
         auth_tokens.refresh_token
     } else {
         return HttpResponse::Unauthorized().finish();
@@ -402,6 +420,14 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
         Ok((access_token, refresh_token)) => {
+            // generate new UUID for access token & store token in DB
+            let session_id = ider::uuid();
+
+            // store session_id in cluster co-ordinator
+            let _ = crate::service::session::set_session(&session_id, &access_token).await;
+
+            let access_token = format!("session {}", session_id);
+
             let tokens = json::to_string(&AuthTokens {
                 access_token,
                 refresh_token,
@@ -449,7 +475,18 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 }
 
 #[get("/logout")]
-async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
+async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
+    // remove the session
+
+    if let Some(cookie) = req.cookie("auth_tokens") {
+        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let access_token = auth_tokens.access_token;
+        if access_token.starts_with("session") {
+            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
+                .await;
+        }
+    };
+
     let tokens = json::to_string(&AuthTokens::default()).unwrap();
     let mut auth_cookie = Cookie::new("auth_tokens", tokens);
     auth_cookie.set_expires(
