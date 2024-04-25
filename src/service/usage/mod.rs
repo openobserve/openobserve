@@ -95,6 +95,7 @@ pub async fn report_request_usage_stats(
             stream_name: stream_name.to_owned(),
             min_ts: None,
             max_ts: None,
+            cached_ratio: None,
             compressed_size: None,
         });
     };
@@ -124,6 +125,7 @@ pub async fn report_request_usage_stats(
             stream_name: stream_name.to_owned(),
             min_ts: stats.min_ts,
             max_ts: stats.max_ts,
+            cached_ratio: stats.cached_ratio,
             compressed_size: None,
         });
     };
@@ -171,6 +173,7 @@ pub async fn report_compression_stats(
         stream_name: stream_name.to_owned(),
         min_ts: stats.min_ts,
         max_ts: stats.max_ts,
+        cached_ratio: None,
         compressed_size: stats.compressed_size,
     }];
 
