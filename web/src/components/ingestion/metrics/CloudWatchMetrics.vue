@@ -56,9 +56,9 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
     
-    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/{metrics}/_kinesis_firehose
+    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]
-Note: Output available under Logs in the stream specified in HTTP endpoint, e.g. {metrics}`;
+Note: Output is available under Logs with stream name 'cloudwatch_metrics'.`;
     return {
       store,
       config,
