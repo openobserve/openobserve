@@ -621,10 +621,7 @@ export default defineComponent({
       ) {
         getConfig();
       } else {
-        if (
-          store.state.zoConfig.functions_enabled &&
-          config.isCloud == "false"
-        ) {
+        if (config.isCloud == "false") {
           linksList.value = mainLayoutMixin
             .setup()
             .leftNavigationLinks(linksList, t);
@@ -895,14 +892,14 @@ export default defineComponent({
 
     /**
      * Get configuration from the backend.
-     * @return {"version":"","instance":"","commit_hash":"","build_date":"","functions_enabled":true,"default_fts_keys":["field1","field2"],"telemetry_enabled":true,"default_functions":[{"name":"function name","text":"match_all('v')"}}
+     * @return {"version":"","instance":"","commit_hash":"","build_date":"","default_fts_keys":["field1","field2"],"telemetry_enabled":true,"default_functions":[{"name":"function name","text":"match_all('v')"}}
      * @throws {Error} If the request fails.
      */
     const getConfig = async () => {
       await configService
         .get_config()
         .then(async (res: any) => {
-          if (res.data.functions_enabled && config.isCloud == "false") {
+          if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
