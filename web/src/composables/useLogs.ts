@@ -1679,12 +1679,19 @@ const useLogs = () => {
           } else {
             index = streamFieldNames.indexOf(row.name);
             if (index > -1) {
-              searchObj.data.stream.selectedStreamFields[
-                index
-              ].isInterestingField =
-                searchObj.data.stream.interestingFieldList.includes(row.name)
-                  ? true
-                  : false;
+              (searchObj.data.stream.selectedStreamFields[index].ftsKey =
+                ftsKeys?.has(row.name)),
+                (searchObj.data.stream.selectedStreamFields[
+                  index
+                ].isSchemaField = schemaFields.has(row.name)),
+                (searchObj.data.stream.selectedStreamFields[index].showValues =
+                  row.name !== timestampField),
+                (searchObj.data.stream.selectedStreamFields[
+                  index
+                ].isInterestingField =
+                  searchObj.data.stream.interestingFieldList.includes(row.name)
+                    ? true
+                    : false);
             }
           }
         }
