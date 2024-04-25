@@ -13,7 +13,7 @@
         style="padding-top: 12px"
       >
         <q-input
-          v-model="streamRoute.destinationStreamName"
+          v-model="streamRoute.name"
           :label="t('alerts.name') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -87,7 +87,6 @@ import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import NodeLinks from "./NodeLinks.vue";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../ConfirmDialog.vue";
 
@@ -99,19 +98,16 @@ interface RouteCondition {
 }
 
 interface StreamRoute {
-  sourceStreamName: string;
-  destinationStreamName: string;
-  sourceStreamType: string;
-  destinationStreamType: string;
+  name: string;
   conditions: RouteCondition[];
 }
 
 const props = defineProps({
-  nodeLinks: {
-    type: Array,
+  streamName: {
+    type: String,
     required: true,
   },
-  sourceStreamName: {
+  streamType: {
     type: String,
     required: true,
   },
@@ -160,18 +156,12 @@ const dialog = ref({
 
 const getDefaultStreamRoute = () => {
   return {
-    sourceStreamName: "",
-    destinationStreamName: "",
-    sourceStreamType: "",
-    destinationStreamType: "",
+    name: "",
     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
   };
 };
 
 onMounted(() => {
-  streamRoute.value.sourceStreamName = props.sourceStreamName;
-  streamRoute.value.sourceStreamType = "logs";
-
   if (props.editingRoute) {
     isUpdating.value = true;
     streamRoute.value = props.editingRoute as StreamRoute;
@@ -210,8 +200,8 @@ const filterStreams = (val: string, update: any) => {
 const updateStreamFields = async () => {
   let streamCols: any = [];
   const streams: any = await getStream(
-    streamRoute.value.sourceStreamName,
-    streamRoute.value.sourceStreamType,
+    props.streamName,
+    props.streamType,
     true
   );
 
@@ -259,12 +249,13 @@ const openCancelDialog = () => {
   dialog.value.okCallback = closeDialog;
 };
 
+// TODO OK : Add check for duplicate routing name
 const saveRouting = () => {
   // Save routing
   emit("update:node", {
     data: {
       ...streamRoute.value,
-      name: streamRoute.value.destinationStreamName,
+      name: streamRoute.value.name,
     },
     link: nodeLink.value,
   });
@@ -285,7 +276,7 @@ const deleteRoute = () => {
   emit("delete:node", {
     data: {
       ...props.editingRoute,
-      name: props.editingRoute.destinationStreamName,
+      name: props.editingRoute.name,
     },
     type: "streamRouting",
   });
@@ -293,7 +284,7 @@ const deleteRoute = () => {
   emit("delete:node", {
     data: {
       ...props.editingRoute,
-      name: props.editingRoute.destinationStreamName + ":" + "condition",
+      name: props.editingRoute.name + ":" + "condition",
     },
     type: "condition",
   });

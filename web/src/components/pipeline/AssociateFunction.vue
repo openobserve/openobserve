@@ -153,10 +153,6 @@ interface StreamRoute {
 }
 
 const props = defineProps({
-  nodeLinks: {
-    type: Array,
-    required: true,
-  },
   defaultOrder: {
     type: Number,
     required: true,

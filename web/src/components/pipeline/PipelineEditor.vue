@@ -50,8 +50,8 @@
     <div class="stream-routing-dialog-container full-height">
       <StreamRouting
         v-if="dialog.name === 'streamRouting'"
-        :node-links="nodeLinks"
-        :source-stream-name="nodes[0].name"
+        :stream-name="pipeline.stream_name"
+        :stream-type="pipeline.stream_type"
         :editing-route="streamRoutes[editingStreamRouteName]"
         @update:node="addStreamNode"
         @cancel:hideform="resetDialog"
@@ -61,7 +61,6 @@
       <AssociateFunction
         v-if="dialog.name === 'associateFunction'"
         :loading="isFetchingFunctions"
-        :node-links="nodeLinks"
         :function-data="functions[editingFunctionName]"
         :functions="functionOptions"
         @update:node="addFunctionNode"
@@ -72,22 +71,64 @@
   </q-dialog>
 </template>
 
-<script setup>
-import { computed, onBeforeMount, ref } from "vue";
+<script setup lang="ts">
+import { computed, onBeforeMount, ref, type Ref } from "vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { getImageURL } from "@/utils/zincutils";
 import StreamRouting from "./StreamRouting.vue";
 import AssociateFunction from "./AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
 import { useStore } from "vuex";
-import StreamSelection from "./StreamSelection.vue";
+import pipelineService from "@/services/pipelines";
+import { useRouter } from "vue-router";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
 const streamRouteImage = getImageURL("images/pipeline/stream_route.svg");
 const conditionImage = getImageURL("images/pipeline/routeCondition.svg");
 
-const plotChart = ref({
+interface Routing {
+  [key: string]: RouteCondition[];
+}
+
+interface RouteCondition {
+  column: string;
+  operator: string;
+  value: string;
+}
+
+interface Function {
+  name: string;
+  description: string;
+  stream: string;
+  order: number;
+}
+
+interface Pipeline {
+  name: string;
+  description: string;
+  stream_name: string;
+  stream_type: string;
+  routing: Routing;
+  functions: Function[];
+}
+
+interface Node {
+  name: string;
+  x: number;
+  y: number;
+  type: string;
+  fixed: boolean;
+  order?: number;
+  stream?: string;
+}
+
+interface NodeLink {
+  from: string[];
+  to: string[];
+}
+
+const plotChart: any = ref({
   options: {
     tooltip: {},
     series: [
@@ -118,34 +159,38 @@ const plotChart = ref({
   },
 });
 
-const store = useStore();
-
-const onChartUpdate = () => {};
-
-const nodes = ref([]);
-
-const nodeLinks = ref({});
-
-const nodeRect = ref({
-  top: 0,
-  left: 0,
+const pipeline = ref<Pipeline>({
+  name: "",
+  stream_type: "",
+  description: "",
+  stream_name: "",
+  routing: {},
+  functions: [],
 });
 
-const functions = ref({});
+const router = useRouter();
 
-const functionOptions = ref([]);
+const store = useStore();
 
-const streamRoutes = ref({});
+const nodes: Ref<Node[] | []> = ref([]);
 
-const editingStreamRouteName = ref(null);
+const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
-const editingFunctionName = ref(null);
+const functions = ref<{ [key: string]: any }>({});
+
+const functionOptions = ref<string[]>([]);
+
+const streamRoutes = ref<{ [key: string]: any }>({});
+
+const editingStreamRouteName = ref<string>("");
+
+const editingFunctionName = ref<string>("");
 
 const isFetchingFunctions = ref(false);
 
 const chartContainerRef = ref(null);
 
-const nodeRows = ref([]);
+const nodeRows = ref<(string | null)[]>([]);
 
 const dialog = ref({
   name: "streamRouting",
@@ -155,7 +200,7 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const onChartClick = (params) => {
+const onChartClick = (params: any) => {
   const { type, name } = params.data;
   if (type === "streamRoute") {
     editingStreamRouteName.value = name;
@@ -171,30 +216,85 @@ const onChartClick = (params) => {
   }
 };
 
-const chartContainerRect = computed(() => {
-  return chartContainerRef.value?.getBoundingClientRect();
-});
-
 onBeforeMount(() => {
-  nodes.value.push({
-    name: "default",
-    x: 0,
-    y: 300,
-    type: "stream",
-    fixed: true,
-  });
-
-  nodeLinks.value["default"] = {
-    from: [],
-    to: [],
-  };
-
-  nodeRows.value = [null, nodes.value[0].name, null];
+  getPipeline();
 
   updateGraph();
 });
 
-const onChartHover = (params) => {
+const getPipeline = () => {
+  const route = router.currentRoute.value;
+  pipelineService
+    .getPipeline({
+      name: route.query.name?.toString() || "",
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((response) => {
+      pipeline.value = response.data;
+    });
+
+  pipeline.value = {
+    name: "pipeline1",
+    description: "pipeline",
+    stream_name: "default",
+    stream_type: "logs",
+    routing: {
+      stream1: [
+        {
+          column: "column",
+          operator: "operator",
+          value: "value",
+        },
+      ],
+    },
+    functions: [],
+  };
+
+  setupNodes();
+};
+
+const setupNodes = () => {
+  const { routing } = pipeline.value;
+
+  nodeRows.value = [null, pipeline.value.stream_name, null];
+
+  // set the base stream node
+  const node: Node = {
+    name: pipeline.value.stream_name,
+    x: 0,
+    y: 300,
+    type: "stream",
+    fixed: true,
+  };
+
+  nodes.value.push(node);
+
+  nodeLinks.value[pipeline.value.stream_name] = {
+    from: [],
+    to: [],
+  };
+
+  // set functions nodes
+  pipeline.value.functions.forEach((_function) => {
+    createFunctionNode(
+      _function.name,
+      pipeline.value.stream_name,
+      _function.order
+    );
+  });
+
+  updateFunctionNodesOrder();
+
+  Object.keys(routing).forEach((stream: string) => {
+    createStreamRouteNode({
+      name: stream,
+    });
+  });
+
+  updateGraph();
+};
+
+const onChartHover = (params: any) => {
   // const nodeRect = params.event.event.srcElement?.getBoundingClientRect();
   // console.log("top and left", nodeRect, chartContainerRect.value);
   // nodeActions.value.style.top = `${
@@ -205,9 +305,9 @@ const onChartHover = (params) => {
   // }px`;
 };
 
-const onMouseMove = (params) => {};
+const onMouseMove = (params: any) => {};
 
-const onMouseOut = (params) => {};
+const onMouseOut = (params: any) => {};
 
 const addFunction = () => {
   getFunctions();
@@ -220,7 +320,7 @@ const addStream = () => {
   dialog.value.name = "streamRouting";
 };
 
-const getFunctionFrom = (stream) => {
+const getFunctionFrom = (stream: string) => {
   let fromNodeName = stream;
 
   const functions = nodes.value.filter(
@@ -234,16 +334,19 @@ const getFunctionFrom = (stream) => {
   return fromNodeName;
 };
 
-const getNodePosition = (type, node) => {
+// TODO OK : create separate functions for each type node i.e. function, streamRoute, stream
+const getNodePosition = (type: string, node?: any) => {
   let lastNode = nodes.value.filter((node) => node.type === type).pop();
 
   if (type === "function" && !lastNode) lastNode = nodes.value[0];
 
   if (type === "function") {
-    return {
-      x: lastNode.x + 50,
-      y: lastNode.y,
-    };
+    if (lastNode?.x?.toString() && lastNode?.y?.toString())
+      return {
+        x: lastNode.x + 50,
+        y: lastNode.y,
+      };
+    else console.log("Error while getting last node position");
   }
 
   const isAnyNull = nodeRows.value.every((row) => row !== null);
@@ -266,10 +369,13 @@ const getNodePosition = (type, node) => {
 
         nodeRows.value[i] = node.name;
 
-        return {
-          x: 50,
-          y: refNode.y - 50,
-        };
+        if (refNode?.y?.toString())
+          return {
+            x: 50,
+            y: refNode.y - 50,
+          };
+        else
+          console.log("Error while getting last node position for streamRoute");
       }
     }
 
@@ -282,16 +388,19 @@ const getNodePosition = (type, node) => {
 
         console.log("node rows 2", i, refRow, node);
 
-        return {
-          x: 50,
-          y: refNode.y + 50,
-        };
+        if (refNode?.y?.toString())
+          return {
+            x: 50,
+            y: refNode.y + 50,
+          };
+        else
+          console.log("Error while getting last node position for streamRoute");
       }
     }
   }
 };
 
-const addFunctionNode = (data) => {
+const addFunctionNode = (data: { data: Function }) => {
   const nodeName = data.data.name;
 
   if (editingFunctionName.value) {
@@ -302,20 +411,7 @@ const addFunctionNode = (data) => {
     editingFunctionName.value = "";
   }
 
-  const position = getNodePosition("function");
-
-  nodes.value.push({
-    name: nodeName,
-    x: position.x,
-    y: position.y,
-    type: "function",
-    fixed: true,
-    order: data.data.order || functions.value.length,
-    stream: nodes.value[0].name,
-  });
-
-  if (!nodeLinks.value[nodeName])
-    nodeLinks.value[nodeName] = { from: [], to: [] };
+  createFunctionNode(nodeName, data.data.stream, data.data.order);
 
   // reorder function nodes with order key and its links too
   updateFunctionNodesOrder();
@@ -323,10 +419,42 @@ const addFunctionNode = (data) => {
   updateGraph();
 };
 
+const createFunctionNode = (
+  nodeName: string,
+  streamName: string,
+  order: number
+) => {
+  const position = getNodePosition("function");
+
+  if (position?.x === undefined || position?.y === undefined) {
+    console.log("Error in getting node position");
+    return;
+  }
+
+  const node = {
+    name: nodeName,
+    x: position.x,
+    y: position.y,
+    type: "function",
+    fixed: true,
+    order: order || functions.value.length,
+    stream: streamName,
+  };
+
+  nodes.value.push(node);
+
+  if (!nodeLinks.value[nodeName])
+    nodeLinks.value[nodeName] = { from: [], to: [] };
+
+  return node;
+};
+
 const updateFunctionNodesOrder = () => {
   const sortedFunctionNodes = nodes.value
     .filter((node) => node.type === "function")
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) =>
+      a.order?.toString() && b.order?.toString() ? a.order - b.order : 0
+    );
 
   sortedFunctionNodes.forEach((node, index) => {
     if (index === 0) {
@@ -339,8 +467,8 @@ const updateFunctionNodesOrder = () => {
   });
 };
 
-const addStreamNode = (data) => {
-  const nodeName = data.data.destinationStreamName;
+const addStreamNode = (data: { data: Node }) => {
+  const nodeName = data.data.name;
 
   streamRoutes.value[nodeName] = data.data;
 
@@ -353,11 +481,18 @@ const addStreamNode = (data) => {
 
     editingStreamRouteName.value = "";
   }
+  createStreamRouteNode(data.data);
 
-  const position = getNodePosition("streamRoute", data.data);
+  updateGraph();
+};
 
-  console.log(position);
-  nodes.value.push({
+const createStreamRouteNode = (streamRouteData: { name: string }) => {
+  const position = getNodePosition("streamRoute", streamRouteData);
+
+  console.log(streamRouteData);
+  const nodeName = streamRouteData.name;
+
+  const condition = nodes.value.push({
     name: nodeName + ":condition",
     x: position.x,
     y: position.y,
@@ -365,7 +500,7 @@ const addStreamNode = (data) => {
     fixed: true,
   });
 
-  nodes.value.push({
+  const stream = nodes.value.push({
     name: nodeName,
     x: position.x + 50,
     y: position.y,
@@ -380,11 +515,14 @@ const addStreamNode = (data) => {
 
   nodeLinks.value[nodeName] = { from: [nodeName + ":condition"], to: [] };
 
-  updateGraph();
+  return {
+    condition,
+    stream,
+  };
 };
 
-const getNodeSymbol = (type) => {
-  const symbolMapping = {
+const getNodeSymbol = (type: string) => {
+  const symbolMapping: { [key: string]: string } = {
     stream: streamImage,
     function: functionImage,
     streamRoute: streamRouteImage,
@@ -405,7 +543,7 @@ const updateGraph = () => {
   }));
 
   // Prepare links from 'nodeLinks'
-  const links = [];
+  const links: any[] = [];
   for (const nodeName in nodeLinks.value) {
     const { to, from } = nodeLinks.value[nodeName];
     from.forEach((source) => {
@@ -442,7 +580,7 @@ const getFunctions = () => {
     .then((res) => {
       functions.value = {};
       functionOptions.value = [];
-      res.data.list.forEach((func) => {
+      res.data.list.forEach((func: Function) => {
         functions.value[func.name] = func;
         functionOptions.value.push(func.name);
       });
@@ -453,10 +591,12 @@ const getFunctions = () => {
 };
 
 const filterFunctions = () => {
-  return functions.value.filter((func) => func.stream === nodes.value[0].name);
+  return functions.value.filter(
+    (func: Function) => func.stream === nodes.value[0].name
+  );
 };
 
-const deleteNode = (node) => {
+const deleteNode = (node: { data: Node }) => {
   nodes.value = nodes.value.filter((n) => n.name !== node.data.name);
   delete nodeLinks.value[node.data.name];
 

@@ -52,7 +52,8 @@
     "type": "Type",
     "search": "Search",
     "expand": "Expand",
-    "date": "Date"
+    "date": "Date",
+    "description": "Description"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -379,12 +380,14 @@
     "addField": "Add Field"
   },
   "pipeline": {
-    "header": "Pipeline",
+    "header": "Pipelines",
     "create": "Create Pipeline",
     "SelectParentNode": "Select Parent Node",
     "SelectChildNode": "Select Child Node",
     "deleteNode": "Delete",
-    "addPipeline": "Add Pipeline"
+    "addPipeline": "Add Pipeline",
+    "deletePipeline": "Delete Pipeline",
+    "search": "Search Pipeline"
   },
   "function": {
     "header": "Functions",
