@@ -178,8 +178,12 @@ const getDefaultStreamRoute = () => {
 onMounted(() => {
   if (props.editingRoute) {
     isUpdating.value = true;
-    streamRoute.value = props.editingRoute as StreamRoute;
+    streamRoute.value = JSON.parse(
+      JSON.stringify(props.editingRoute)
+    ) as StreamRoute;
   }
+
+  originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
 
   existingStreamNames = new Set(
     ...Object.values(props.streamRoutes).map((route: any) => route.name),
@@ -262,6 +266,7 @@ const openCancelDialog = () => {
     closeDialog();
     return;
   }
+
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
@@ -272,14 +277,15 @@ const openCancelDialog = () => {
 const saveRouting = () => {
   isValidName.value = true;
 
-  Object.values(props.streamRoutes).forEach((route: any) => {
-    if (
-      route.name === streamRoute.value.name ||
-      route.name === props.streamName
-    ) {
-      isValidName.value = false;
-    }
-  });
+  if (!isUpdating.value)
+    Object.values(props.streamRoutes).forEach((route: any) => {
+      if (
+        route.name === streamRoute.value.name ||
+        route.name === props.streamName
+      ) {
+        isValidName.value = false;
+      }
+    });
 
   if (!isValidName.value) {
     return;

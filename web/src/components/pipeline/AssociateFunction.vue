@@ -327,6 +327,14 @@ const updateStreamFields = async (stream_name: any) => {
 };
 
 const openCancelDialog = () => {
+  if (
+    selectedFunction.value === (props.functionData?.name || "") &&
+    functionOrder.value === (props.functionData?.order || 1)
+  ) {
+    emit("cancel:hideform");
+    return;
+  }
+
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel changes?";
@@ -344,7 +352,10 @@ const openDeleteDialog = () => {
 const saveFunction = () => {
   functionExists.value = true;
 
-  if (props.associatedFunctions.includes(selectedFunction.value)) {
+  if (
+    !isUpdating.value &&
+    props.associatedFunctions.includes(selectedFunction.value)
+  ) {
     functionExists.value = false;
     return;
   }

@@ -220,7 +220,7 @@ const nodes: Ref<Node[]> = ref([]);
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
-const functions = ref<{ [key: string]: any }>({});
+const functions = ref<{ [key: string]: Function }>({});
 
 const functionOptions = ref<string[]>([]);
 
@@ -281,7 +281,6 @@ const getPipeline = () => {
       pipeline.value = response.data.list.find(
         (pipeline: Pipeline) => pipeline.name === route.query.name
       );
-      console.log("pipeline", pipeline.value);
       setupNodes();
     });
 };
@@ -396,8 +395,6 @@ const getNodePosition = (type: string, node?: any) => {
     nodeRows.value.unshift(null);
   }
 
-  console.log("node rows", isAnyNull, nodeRows.value);
-
   if (type === "streamRoute") {
     const centerIndex = Math.ceil(nodeRows.value.length / 2) - 1;
 
@@ -405,8 +402,6 @@ const getNodePosition = (type: string, node?: any) => {
       if (nodeRows.value[i] === null) {
         const refRow = nodeRows.value[i + 1];
         const refNode = nodes.value.find((node) => node.name === refRow);
-
-        console.log("node rows 1", i, refRow, refNode);
 
         nodeRows.value[i] = node.name;
 
@@ -426,8 +421,6 @@ const getNodePosition = (type: string, node?: any) => {
         const refNode = nodes.value.find((node) => node.name === refRow);
 
         nodeRows.value[i] = node.name;
-
-        console.log("node rows 2", i, refRow, node);
 
         if (refNode?.y?.toString())
           return {
@@ -453,6 +446,13 @@ const addFunctionNode = (data: { data: Function }) => {
   }
 
   createFunctionNode(nodeName, data.data.stream, data.data.order);
+
+  if (!functions.value[nodeName]) {
+    functions.value[nodeName] = data.data;
+    functionOptions.value.push(nodeName);
+  }
+
+  functions.value[nodeName].order = data.data.order;
 
   associatedFunctions.value.push(nodeName);
 
@@ -532,7 +532,6 @@ const addStreamNode = (data: { data: Node }) => {
 const createStreamRouteNode = (streamRouteData: { name: string }) => {
   const position = getNodePosition("streamRoute", streamRouteData);
 
-  console.log(streamRouteData);
   const nodeName = streamRouteData.name;
 
   if (position?.x === undefined || position?.y === undefined) {
@@ -638,17 +637,15 @@ const getFunctions = () => {
     });
 };
 
-const filterFunctions = () => {
-  return functions.value.filter(
-    (func: Function) => func.stream === nodes.value[0].name
-  );
-};
-
 const deleteNode = (node: { data: Node }) => {
   nodes.value = nodes.value.filter((n) => n.name !== node.data.name);
   delete nodeLinks.value[node.data.name];
 
   if (node.data.type === "function") {
+    associatedFunctions.value = associatedFunctions.value.filter(
+      (func) => func !== node.data.name
+    );
+
     associatedFunctions.value = associatedFunctions.value.filter(
       (func) => func !== node.data.name
     );
