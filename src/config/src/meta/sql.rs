@@ -74,6 +74,7 @@ pub struct Order<'a>(pub &'a OrderByExpr);
 pub struct Group<'a>(pub &'a SqlExpr);
 pub struct Offset<'a>(pub &'a SqlOffset);
 pub struct Limit<'a>(pub &'a SqlExpr);
+pub struct Where<'a>(pub &'a Option<SqlExpr>);
 
 impl Sql {
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
@@ -150,13 +151,9 @@ impl TryFrom<&Statement> for Sql {
                 let time_range: Option<(i64, i64)> = Timerange(&selection).try_into()?;
                 let quick_text: Vec<(String, String, SqlOperator)> =
                     Quicktext(&selection).try_into()?;
+                let where_fields: Vec<String> = Where(&selection).try_into()?;
 
-                fields.extend(
-                    quick_text
-                        .iter()
-                        .map(|(field, _value, _op)| field.to_string())
-                        .collect::<Vec<String>>(),
-                );
+                fields.extend(where_fields);
                 fields.sort();
                 fields.dedup();
 
@@ -394,6 +391,19 @@ impl<'a> TryFrom<Quicktext<'a>> for Vec<(String, String, SqlOperator)> {
             })
             .collect();
 
+        Ok(fields)
+    }
+}
+
+impl<'a> TryFrom<Where<'a>> for Vec<String> {
+    type Error = anyhow::Error;
+
+    fn try_from(selection: Where<'a>) -> Result<Self, Self::Error> {
+        let mut fields = Vec::new();
+        match selection.0 {
+            Some(expr) => fields.extend(get_field_name_from_expr(expr).unwrap_or_default()),
+            None => {}
+        }
         Ok(fields)
     }
 }
@@ -771,20 +781,14 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
     match expr {
         SqlExpr::Identifier(ident) => Some(vec![ident.value.to_string()]),
         SqlExpr::BinaryOp { left, op: _, right } => {
-            let left = get_field_name_from_expr(left);
-            let right = get_field_name_from_expr(right);
             let mut fields = Vec::new();
-            if let Some(v) = left {
+            if let Some(v) = get_field_name_from_expr(left) {
                 fields.extend(v);
             }
-            if let Some(v) = right {
+            if let Some(v) = get_field_name_from_expr(right) {
                 fields.extend(v);
             }
-            if fields.is_empty() {
-                None
-            } else {
-                Some(fields)
-            }
+            (!fields.is_empty()).then(|| fields)
         }
         SqlExpr::Function(f) => {
             let mut fields = Vec::with_capacity(f.args.len());
@@ -806,13 +810,35 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
                     _ => {}
                 }
             }
-            if fields.is_empty() {
-                None
-            } else {
-                Some(fields)
-            }
+            (!fields.is_empty()).then(|| fields)
         }
         SqlExpr::Nested(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsFalse(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsNotFalse(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsTrue(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsNotTrue(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsNull(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsNotNull(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsUnknown(expr) => get_field_name_from_expr(expr),
+        SqlExpr::IsNotUnknown(expr) => get_field_name_from_expr(expr),
+        SqlExpr::InList { expr, .. } => get_field_name_from_expr(expr),
+        SqlExpr::Between { expr, .. } => get_field_name_from_expr(expr),
+        SqlExpr::Like { expr, pattern, .. } | SqlExpr::ILike { expr, pattern, .. } => {
+            let mut fields = Vec::new();
+            if let Some(expr) = get_field_name_from_expr(expr) {
+                fields.extend(expr);
+            }
+            if let Some(pattern) = get_field_name_from_expr(pattern) {
+                fields.extend(pattern);
+            }
+            (!fields.is_empty()).then(|| fields)
+        }
+        SqlExpr::Cast { expr, .. } | SqlExpr::TryCast { expr, .. } => {
+            get_field_name_from_expr(expr)
+        }
+        SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
+        SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
+        SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
         _ => None,
     }
 }
@@ -954,6 +980,15 @@ mod tests {
             ("select a, COALESCE(b, c) FROM tbl", vec!["a", "b", "c"]),
             ("select a, COALESCE(b, 'c') FROM tbl", vec!["a", "b"]),
             ("select a, COALESCE(b, \"c\") FROM tbl", vec!["a", "b", "c"]),
+            ("select a, b + 1 FROM tbl where c>1", vec!["a", "b", "c"]),
+            (
+                "select a, b FROM tbl  where (a >= 3 AND a < 10) AND (c='abc' AND d='abcd' AND str_match(b, 'Error')) order by a desc LIMIT 250",
+                vec!["a", "b", "c", "d"],
+            ),
+            (
+                "select _timestamp, message FROM tbl  where (_timestamp >= 17139560000000 AND _timestamp < 171395076000000) AND (pid='2fs93s' AND stream_id='asdf834sdf2' AND str_match(message, 'Error')) order by _timestamp desc LIMIT 250",
+                vec!["_timestamp", "message", "pid", "stream_id"],
+            ),
         ];
         for (sql, fields) in samples {
             let actual = Sql::new(sql).unwrap().fields;
