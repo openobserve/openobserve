@@ -299,6 +299,8 @@ const saveFunction = () => {
     });
     emit("cancel:hideform");
   }
+
+  emit("cancel:hideform");
 };
 
 const onFunctionCreation = async (_function: any) => {
