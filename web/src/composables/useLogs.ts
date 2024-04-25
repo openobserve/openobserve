@@ -485,6 +485,29 @@ const useLogs = () => {
         },
       };
 
+      if (searchObj.data.stream.selectedStreamFields.length == 0) {
+        const streamData: any = getStream(
+          searchObj.data.stream.selectedStream.value,
+          searchObj.data.stream.streamType || "logs",
+          true
+        );
+        searchObj.data.stream.selectedStreamFields = streamData.schema;
+      }
+
+      const streamFieldNames: any =
+        searchObj.data.stream.selectedStreamFields.map(
+          (item: any) => item.name
+        );
+
+      for (const [
+        fieldIndex,
+        fieldName,
+      ] of searchObj.data.stream.interestingFieldList.entries()) {
+        if (!streamFieldNames.includes(fieldName)) {
+          searchObj.data.stream.interestingFieldList.splice(fieldIndex, 1);
+        }
+      }
+
       if (
         searchObj.data.stream.interestingFieldList.length > 0 &&
         searchObj.meta.quickMode
@@ -1621,7 +1644,9 @@ const useLogs = () => {
         }
 
         const streamFieldNames: any =
-          searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
+          searchObj.data.stream.selectedStreamFields.map(
+            (item: any) => item.name
+          );
 
         for (const [
           fieldIndex,
@@ -1663,6 +1688,17 @@ const useLogs = () => {
             }
           }
         }
+
+        let localFields: any = {};
+        if (localInterestingFields.value != null) {
+          localFields = localInterestingFields.value;
+        }
+        localFields[
+          searchObj.organizationIdetifier +
+            "_" +
+            searchObj.data.stream.selectedStream.value
+        ] = searchObj.data.stream.interestingFieldList;
+        useLocalInterestingFields(localFields);
 
         // fields = {};
         // for (const row of queryResult) {
