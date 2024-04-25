@@ -310,19 +310,13 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         .replace('\\', "/");
 
                     if !CONFIG.disk_cache.multi_dir.is_empty() {
-                        let h = gxhash::new().sum32(file_key.as_str());
-                        let dir_index = h % (FILES.read().await.multi_dir.len() as u32);
-                        let skip = CONFIG
-                            .disk_cache
-                            .multi_dir
-                            .split(',')
-                            .filter(|s| !s.trim().is_empty())
-                            .collect::<Vec<_>>()
-                            .get(dir_index as usize)
-                            .unwrap()
-                            .split('/')
-                            .count();
-                        file_key = file_key.split('/').skip(skip).collect::<Vec<_>>().join("/");
+                        if CONFIG.disk_cache.multi_dir.contains('/') {
+                            let err = "ZO_DISK_CACHE_MULTI_DIR only supports a single directory level, cant contains / ";
+                            log::error!("{}", err);
+                            return Err(anyhow::Error::msg(err));
+                        }
+
+                        file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
                     }
 
                     // write into cache
