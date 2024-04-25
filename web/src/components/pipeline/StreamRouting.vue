@@ -27,6 +27,8 @@
           :rules="[(val: any) => !!val.trim() || 'Field is required!']"
           tabindex="0"
           style="width: 480px"
+          error-message="Stream name already exists"
+          :error="!isValidName"
         />
       </div>
 
@@ -89,6 +91,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../ConfirmDialog.vue";
+import { useQuasar } from "quasar";
 
 interface RouteCondition {
   column: string;
@@ -116,9 +119,16 @@ const props = defineProps({
     required: false,
     default: () => null,
   },
+  streamRoutes: {
+    type: Array,
+    required: true,
+    default: () => [],
+  },
 });
 
 const { t } = useI18n();
+
+const q = useQuasar();
 
 const router = useRouter();
 
@@ -141,6 +151,10 @@ const streams: any = ref({});
 const indexOptions = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
+
+const isValidName: Ref<boolean> = ref(true);
+
+let existingStreamNames: any;
 
 const nodeLink = ref({
   from: "",
@@ -166,6 +180,11 @@ onMounted(() => {
     isUpdating.value = true;
     streamRoute.value = props.editingRoute as StreamRoute;
   }
+
+  existingStreamNames = new Set(
+    ...Object.values(props.streamRoutes).map((route: any) => route.name),
+    props.streamName
+  );
 
   updateStreamFields();
 });
@@ -251,6 +270,21 @@ const openCancelDialog = () => {
 
 // TODO OK : Add check for duplicate routing name
 const saveRouting = () => {
+  isValidName.value = true;
+
+  Object.values(props.streamRoutes).forEach((route: any) => {
+    if (
+      route.name === streamRoute.value.name ||
+      route.name === props.streamName
+    ) {
+      isValidName.value = false;
+    }
+  });
+
+  if (!isValidName.value) {
+    return;
+  }
+
   // Save routing
   emit("update:node", {
     data: {

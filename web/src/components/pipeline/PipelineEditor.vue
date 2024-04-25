@@ -1,9 +1,21 @@
 <template>
+  <div class="flex items-center">
+    <div
+      data-test="add-alert-back-btn"
+      class="flex justify-center items-center q-mr-md cursor-pointer"
+      style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px"
+      title="Go Back"
+      @click="openCancelDialog"
+    >
+      <q-icon name="arrow_back_ios_new" size="14px" />
+    </div>
+    <div class="text-h6">{{ pipeline.name }}</div>
+  </div>
   <div class="flex justify-end">
     <q-btn
       data-test="add-report-save-btn"
       label="Add Function"
-      class="text-bold no-border q-ml-md"
+      class="text-bold no-border q-ml-md float-left"
       color="secondary"
       padding="sm xl"
       no-caps
@@ -12,11 +24,20 @@
     <q-btn
       data-test="add-report-save-btn"
       label="Add Stream"
-      class="text-bold no-border q-ml-md"
+      class="text-bold no-border q-ml-md float-left"
       color="secondary"
       padding="sm xl"
       no-caps
       @click="addStream"
+    />
+
+    <q-btn
+      data-test="add-report-save-btn"
+      label="Cancel"
+      class="text-bold border q-ml-md"
+      padding="sm xl"
+      no-caps
+      @click="openCancelDialog"
     />
 
     <q-btn
@@ -29,7 +50,10 @@
       @click="savePipeline"
     />
   </div>
-  <div ref="chartContainerRef" class="relative-position">
+  <div
+    ref="chartContainerRef"
+    class="relative-position bg-grey-2 pipeline-chart-container q-mt-md"
+  >
     <ChartRenderer
       data-test="logs-search-result-bar-chart"
       :data="plotChart"
@@ -53,6 +77,7 @@
         :stream-name="pipeline.stream_name"
         :stream-type="pipeline.stream_type"
         :editing-route="streamRoutes[editingStreamRouteName]"
+        :stream-routes="streamRoutes"
         @update:node="addStreamNode"
         @cancel:hideform="resetDialog"
         @delete:node="deleteNode"
@@ -63,12 +88,20 @@
         :loading="isFetchingFunctions"
         :function-data="functions[editingFunctionName]"
         :functions="functionOptions"
+        :associated-functions="associatedFunctions"
         @update:node="addFunctionNode"
         @delete:node="deleteNode"
         @cancel:hideform="resetDialog"
       />
     </div>
   </q-dialog>
+  <confirm-dialog
+    :title="confirmDialogMeta.title"
+    :message="confirmDialogMeta.message"
+    @update:ok="confirmDialogMeta.onConfirm()"
+    @update:cancel="resetConfirmDialog"
+    v-model="confirmDialogMeta.show"
+  />
 </template>
 
 <script setup lang="ts">
@@ -81,6 +114,9 @@ import functionsService from "@/services/jstransform";
 import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
 import { useRouter } from "vue-router";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useI18n } from "vue-i18n";
+import { useQuasar } from "quasar";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -172,6 +208,14 @@ const router = useRouter();
 
 const store = useStore();
 
+const confirmDialogMeta: any = ref({
+  show: false,
+  title: "",
+  message: "",
+  data: null,
+  onConfirm: () => {},
+});
+
 const nodes: Ref<Node[] | []> = ref([]);
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
@@ -191,6 +235,12 @@ const isFetchingFunctions = ref(false);
 const chartContainerRef = ref(null);
 
 const nodeRows = ref<(string | null)[]>([]);
+
+const q = useQuasar();
+
+const associatedFunctions: Ref<string[]> = ref([]);
+
+const { t } = useI18n();
 
 const dialog = ref({
   name: "streamRouting",
@@ -224,30 +274,19 @@ onBeforeMount(() => {
 
 const getPipeline = () => {
   const route = router.currentRoute.value;
+
   pipelineService
-    .getPipeline({
-      name: route.query.name?.toString() || "",
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
+    .getPipelines(store.state.selectedOrganization.identifier)
     .then((response) => {
-      pipeline.value = response.data;
+      pipeline.value = response.data.list.find(
+        (pipeline: Pipeline) => pipeline.name === route.query.name
+      );
+      console.log("pipeline", pipeline.value);
+      setupNodes();
     });
-
-  pipeline.value = {
-    name: "pipeline1",
-    description: "pipeline",
-    stream_name: "default",
-    stream_type: "logs",
-    routing: {},
-    functions: [],
-  };
-
-  setupNodes();
 };
 
 const setupNodes = () => {
-  const { routing } = pipeline.value;
-
   nodeRows.value = [null, pipeline.value.stream_name, null];
 
   // set the base stream node
@@ -267,21 +306,28 @@ const setupNodes = () => {
   };
 
   // set functions nodes
-  pipeline.value.functions.forEach((_function) => {
+  pipeline.value?.functions?.forEach((_function) => {
     createFunctionNode(
       _function.name,
       pipeline.value.stream_name,
       _function.order
     );
+
+    associatedFunctions.value.push(_function.name);
   });
 
   updateFunctionNodesOrder();
 
-  Object.keys(routing).forEach((stream: string) => {
-    createStreamRouteNode({
-      name: stream,
+  if (pipeline.value?.routing)
+    Object.keys(pipeline.value?.routing).forEach((stream: string) => {
+      createStreamRouteNode({
+        name: stream,
+      });
+      streamRoutes.value[stream] = {
+        name: stream,
+        conditions: pipeline.value?.routing[stream],
+      };
     });
-  });
 
   updateGraph();
 };
@@ -330,12 +376,15 @@ const getFunctionFrom = (stream: string) => {
 const getNodePosition = (type: string, node?: any) => {
   let lastNode = nodes.value.filter((node) => node.type === type).pop();
 
+  // If this if first function node, adding offset to left from the main stream node
+  const nodeGap = !lastNode ? 130 : 50;
+
   if (type === "function" && !lastNode) lastNode = nodes.value[0];
 
   if (type === "function") {
     if (lastNode?.x?.toString() && lastNode?.y?.toString())
       return {
-        x: lastNode.x + 50,
+        x: lastNode.x + nodeGap,
         y: lastNode.y,
       };
     else console.log("Error while getting last node position");
@@ -405,6 +454,8 @@ const addFunctionNode = (data: { data: Function }) => {
 
   createFunctionNode(nodeName, data.data.stream, data.data.order);
 
+  associatedFunctions.value.push(nodeName);
+
   // reorder function nodes with order key and its links too
   updateFunctionNodesOrder();
 
@@ -429,7 +480,7 @@ const createFunctionNode = (
     y: position.y,
     type: "function",
     fixed: true,
-    order: order || functions.value.length,
+    order: order || 1,
     stream: streamName,
   };
 
@@ -558,7 +609,7 @@ const updateGraph = () => {
 };
 
 const getFunctions = () => {
-  if (functions.value.length) return;
+  if (Object.keys(functions.value).length) return;
   isFetchingFunctions.value = true;
   functionsService
     .list(
@@ -592,6 +643,12 @@ const deleteNode = (node: { data: Node }) => {
   nodes.value = nodes.value.filter((n) => n.name !== node.data.name);
   delete nodeLinks.value[node.data.name];
 
+  if (node.data.type === "function") {
+    associatedFunctions.value = associatedFunctions.value.filter(
+      (func) => func !== node.data.name
+    );
+  }
+
   if (node.data.type === "streamRoute") {
     delete streamRoutes.value[node.data.name];
   }
@@ -622,17 +679,51 @@ const savePipeline = () => {
   const payload = getPipelinePayload();
   if (payload.functions !== undefined) delete payload.functions;
 
+  const dismiss = q.notify({
+    message: "Saving pipeline...",
+    position: "bottom",
+    spinner: true,
+  });
+
   pipelineService
     .updatePipeline({
       data: payload,
       org_identifier: store.state.selectedOrganization.identifier,
     })
-    .then((res) => {
-      console.log("Pipeline saved successfully");
+    .then(() => {
+      q.notify({
+        message: "Pipeline saved successfully",
+        color: "positive",
+        position: "bottom",
+        timeout: 3000,
+      });
     })
     .catch((error) => {
-      console.error(error);
+      q.notify({
+        message: error.response?.data?.message || "Error while saving pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+    })
+    .finally(() => {
+      dismiss();
     });
+};
+
+const openCancelDialog = () => {
+  confirmDialogMeta.value.show = true;
+  confirmDialogMeta.value.title = t("common.cancelChanges");
+  confirmDialogMeta.value.message = "Are you sure you want to cancel changes?";
+  confirmDialogMeta.value.onConfirm = () => router.back();
+};
+
+const resetConfirmDialog = () => {
+  confirmDialogMeta.value.show = false;
+  confirmDialogMeta.value.title = "";
+  confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.onConfirm = () => {};
+  confirmDialogMeta.value.data = null;
 };
 </script>
 
@@ -643,6 +734,10 @@ const savePipeline = () => {
 }
 .diagram-container {
   border: 1px solid #000;
+}
+
+.pipeline-chart-container {
+  border-radius: 12px;
 }
 </style>
 

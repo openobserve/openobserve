@@ -120,7 +120,7 @@ import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
-import type { QTableProps } from "quasar";
+import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
@@ -137,6 +137,8 @@ const { t } = useI18n();
 const router = useRouter();
 
 // const qTable: any = ref(null);
+
+const q = useQuasar();
 
 const filterQuery = ref("");
 
@@ -257,8 +259,6 @@ const editPipeline = (pipeline: Pipeline) => {
 };
 
 const openDeleteDialog = (pipeline: Pipeline) => {
-  console.log("openDeleteDialog", pipeline);
-
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
   confirmDialogMeta.value.message =
@@ -268,6 +268,12 @@ const openDeleteDialog = (pipeline: Pipeline) => {
 };
 
 const savePipeline = (data: Pipeline) => {
+  const dismiss = q.notify({
+    message: "saving pipeline...",
+    position: "bottom",
+    spinner: true,
+  });
+
   pipelineService
     .createPipeline({
       ...data,
@@ -276,10 +282,33 @@ const savePipeline = (data: Pipeline) => {
     .then(() => {
       getPipelines();
       showCreatePipeline.value = false;
+      q.notify({
+        message: "Pipeline created successfully",
+        color: "positive",
+        position: "bottom",
+        timeout: 3000,
+      });
+    })
+    .catch((error) => {
+      q.notify({
+        message: error.response?.data?.message || "Error while saving pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+    })
+    .finally(() => {
+      dismiss();
     });
 };
 
 const deletePipeline = () => {
+  const dismiss = q.notify({
+    message: "deleting pipeline...",
+    position: "bottom",
+    spinner: true,
+  });
+
   pipelineService
     .deletePipeline({
       ...confirmDialogMeta.value.data,
@@ -287,8 +316,24 @@ const deletePipeline = () => {
     })
     .then(() => {
       getPipelines();
+      q.notify({
+        message: "Pipeline deleted successfully",
+        color: "positive",
+        position: "bottom",
+        timeout: 3000,
+      });
     })
-    .finally(() => {});
+    .catch((error) => {
+      q.notify({
+        message: error.response?.data?.message || "Error while saving pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+    })
+    .finally(() => {
+      dismiss();
+    });
 
   resetConfirmDialog();
 };

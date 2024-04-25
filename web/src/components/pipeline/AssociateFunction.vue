@@ -49,6 +49,8 @@
             @update:model-value="updateStreams()"
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 220px"
+            error-message="Function is already associated"
+            :error="!functionExists"
           />
         </div>
       </div>
@@ -177,6 +179,13 @@ const props = defineProps({
       return [];
     },
   },
+  associatedFunctions: {
+    type: Array,
+    required: true,
+    default: () => {
+      return [];
+    },
+  },
 });
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
@@ -199,9 +208,7 @@ const router = useRouter();
 
 const store = useStore();
 
-const nodes = {};
-
-const links = {};
+const functionExists = ref(true);
 
 const nodeLink = ref({
   from: "",
@@ -335,6 +342,13 @@ const openDeleteDialog = () => {
 };
 
 const saveFunction = () => {
+  functionExists.value = true;
+
+  if (props.associatedFunctions.includes(selectedFunction.value)) {
+    functionExists.value = false;
+    return;
+  }
+
   if (createNewFunction.value) {
     addFunctionRef.value.onSubmit();
   } else {

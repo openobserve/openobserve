@@ -53,7 +53,8 @@
     "search": "Search",
     "expand": "Expand",
     "date": "Date",
-    "description": "Description"
+    "description": "Description",
+    "cancelChanges": "Cancel Changes"
   },
   "search": {
     "selectIndex": "Select Stream First",

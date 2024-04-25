@@ -240,14 +240,6 @@ const useRoutes = () => {
           },
         },
         {
-          path: "stream-routings",
-          name: "streamRouting",
-          component: StreamRouting,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
