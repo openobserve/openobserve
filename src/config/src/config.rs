@@ -799,6 +799,9 @@ pub struct MemoryCache {
     // Memory data cache strategy, default is lru, other value is fifo
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
+    // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
+    #[env_config(name = "ZO_MEMORY_CACHE_BUCKET_NUM", default = 0)]
+    pub bucket_num: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
     // MB, default is 50% of system memory
@@ -831,6 +834,9 @@ pub struct DiskCache {
     // Disk data cache strategy, default is lru, other value is fifo
     #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
+    // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
+    #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
+    pub bucket_num: usize,
     // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,

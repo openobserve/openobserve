@@ -38,7 +38,21 @@ use tokio::{fs, sync::RwLock};
 use super::CacheStrategy;
 use crate::storage;
 
-static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
+static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
+    let mut files = Vec::with_capacity(max(
+        CONFIG.disk_cache.bucket_num,
+        CONFIG
+            .disk_cache
+            .multi_dir
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .count(),
+    ));
+    for _ in 0..max(1, CONFIG.disk_cache.bucket_num) {
+        files.push(RwLock::new(FileData::new()));
+    }
+    files
+});
 
 pub struct FileData {
     max_size: usize,
@@ -207,14 +221,19 @@ impl FileData {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    let root_dir = FILES.read().await.root_dir.clone();
-    std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    for file in FILES.iter() {
+        let root_dir = file.read().await.root_dir.clone();
+        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    }
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
-        let root_dir = Path::new(&root_dir).canonicalize().unwrap();
-        if let Err(e) = load(&root_dir, &root_dir).await {
-            log::error!("load disk cache error: {}", e);
+        for file in FILES.iter() {
+            let root_dir = file.read().await.root_dir.clone();
+            let root_dir = Path::new(&root_dir).canonicalize().unwrap();
+            if let Err(e) = load(&root_dir, &root_dir).await {
+                log::error!("load disk cache error: {}", e);
+            }
         }
         log::info!("Loading disk cache done, total files: {} ", len().await);
     });
@@ -242,7 +261,8 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     if !CONFIG.disk_cache.enabled {
         return None;
     }
-    let files = FILES.read().await;
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
     files.get(file, range).await
 }
 
@@ -251,7 +271,8 @@ pub async fn exist(file: &str) -> bool {
     if !CONFIG.disk_cache.enabled {
         return false;
     }
-    let files = FILES.read().await;
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
     files.exist(file).await
 }
 
@@ -260,7 +281,8 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
-    let mut files = FILES.write().await;
+    let idx = get_bucket_idx(file);
+    let mut files = FILES[idx].write().await;
     if files.exist(file).await {
         return Ok(());
     }
@@ -320,7 +342,8 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
 
                     // write into cache
-                    let mut w = FILES.write().await;
+                    let idx = get_bucket_idx(&file_key);
+                    let mut w = FILES[idx].write().await;
                     w.cur_size += data_size;
                     w.data.insert(file_key.clone(), data_size);
                     let total = w.len();
@@ -348,34 +371,52 @@ async fn gc() -> Result<(), anyhow::Error> {
     if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
-    let files = FILES.read().await;
-    if files.cur_size + CONFIG.disk_cache.release_size < files.max_size {
-        drop(files);
-        return Ok(());
+    for file in FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + CONFIG.disk_cache.release_size < r.max_size {
+            drop(r);
+            return Ok(());
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc("global", CONFIG.disk_cache.gc_size).await?;
+        drop(w);
     }
-    drop(files);
-    let mut files = FILES.write().await;
-    files.gc("global", CONFIG.disk_cache.gc_size).await?;
-    drop(files);
     Ok(())
 }
 
 #[inline]
 pub async fn stats() -> (usize, usize) {
-    let files = FILES.read().await;
-    files.size()
+    let mut total_size = 0;
+    let mut used_size = 0;
+    for file in FILES.iter() {
+        let r = file.read().await;
+        let (max_size, cur_size) = r.size();
+        total_size += max_size;
+        used_size += cur_size;
+    }
+    (total_size, used_size)
 }
 
 #[inline]
 pub async fn len() -> usize {
-    let files = FILES.read().await;
-    files.len()
+    let mut total = 0;
+    for file in FILES.iter() {
+        let r = file.read().await;
+        total += r.len();
+    }
+    total
 }
 
 #[inline]
 pub async fn is_empty() -> bool {
-    let files = FILES.read().await;
-    files.is_empty()
+    for file in FILES.iter() {
+        let r = file.read().await;
+        if !r.is_empty() {
+            return false;
+        }
+    }
+    true
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
@@ -391,6 +432,15 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         ));
     };
     Ok(())
+}
+
+fn get_bucket_idx(file: &str) -> usize {
+    if CONFIG.disk_cache.bucket_num <= 1 {
+        0
+    } else {
+        let h = gxhash::new().sum32(file);
+        (h as usize) % CONFIG.disk_cache.bucket_num
+    }
 }
 
 #[cfg(test)]
