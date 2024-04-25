@@ -106,6 +106,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
 
+    #[cfg(feature = "enterprise")]
+    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+        tokio::task::spawn(async move { db::session::watch().await });
+    }
+
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata
@@ -166,6 +171,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     db::ofga::cache().await.expect("ofga model cache failed");
+
+    #[cfg(feature = "enterprise")]
+    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+        db::session::cache()
+            .await
+            .expect("user session cache failed");
+    }
 
     // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
