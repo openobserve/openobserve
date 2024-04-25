@@ -76,7 +76,7 @@ pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>)
 
         f.sync_all().context("Failed to sync file")?;
     } else {
-        remove_file(path)?;
+        _ = remove_file(path);
     }
 
     Ok(())
@@ -145,4 +145,32 @@ fn decode_from_wal_file(wal_file: &PathBuf) -> Result<Option<Vec<IngestEntry>>> 
     } else {
         Some(entries)
     })
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::path::PathBuf;
+
+    use config::utils::json;
+
+    use super::decode_from_wal_file;
+    use crate::common::meta::ingestion::IngestionRequest;
+
+    #[test]
+    fn test_decode_from_wal_file() {
+        let wal_path = PathBuf::from("7189115239864991774.wal");
+        let entries = decode_from_wal_file(&wal_path).unwrap().unwrap();
+
+        println!("entry 1 {:?}", entries[0]);
+
+        for entry in entries {
+            println!("entry body {:?}", entry.body);
+            // let json_req = json::from_slice(&entry.body).unwrap_or({
+            //     let val: json::Value = json::from_slice(&entry.body).unwrap();
+            //     vec![val]
+            // });
+            // println!("json_req: {:?}", json_req);
+        }
+    }
 }

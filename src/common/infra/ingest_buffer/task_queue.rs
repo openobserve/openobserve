@@ -27,7 +27,7 @@ use super::{entry::IngestEntry, workers::Workers};
 /// initial # of workers
 static MIN_WORKER_CNT: usize = 3;
 /// max # of requests could be held in channel.
-static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more workers
+static DEFAULT_CHANNEL_CAP: usize = 50; // if channel if full -> init more workers
 
 /// A global hash map that maps stream of a TaskQueue instance.
 static TQ_MANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
