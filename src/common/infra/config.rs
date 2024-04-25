@@ -79,3 +79,5 @@ pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 
 pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
+
+pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
