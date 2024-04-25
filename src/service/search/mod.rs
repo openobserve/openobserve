@@ -236,6 +236,9 @@ pub async fn search_partition(
         partitions.push([start, end]);
         end = start;
     }
+    if partitions.is_empty() {
+        partitions.push([req.start_time, req.end_time]);
+    }
     resp.partitions = partitions;
     Ok(resp)
 }
