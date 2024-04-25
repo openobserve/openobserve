@@ -357,6 +357,8 @@ const saveFunction = () => {
       link: nodeLink.value,
     });
   }
+
+  emit("cancel:hideform");
 };
 
 const onFunctionCreation = (_function: any) => {

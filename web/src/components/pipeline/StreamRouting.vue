@@ -120,9 +120,9 @@ const props = defineProps({
     default: () => null,
   },
   streamRoutes: {
-    type: Array,
+    type: Object,
     required: true,
-    default: () => [],
+    default: () => ({}),
   },
 });
 
@@ -293,6 +293,8 @@ const saveRouting = () => {
     },
     link: nodeLink.value,
   });
+
+  emit("cancel:hideform");
 };
 
 const saveUpdatedLink = (link: { from: string; to: string }) => {

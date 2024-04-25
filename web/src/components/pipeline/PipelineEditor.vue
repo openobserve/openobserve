@@ -216,7 +216,7 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 
-const nodes: Ref<Node[] | []> = ref([]);
+const nodes: Ref<Node[]> = ref([]);
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
@@ -535,6 +535,11 @@ const createStreamRouteNode = (streamRouteData: { name: string }) => {
   console.log(streamRouteData);
   const nodeName = streamRouteData.name;
 
+  if (position?.x === undefined || position?.y === undefined) {
+    console.log("Error in getting node position");
+    return;
+  }
+
   const condition = nodes.value.push({
     name: nodeName + ":condition",
     x: position.x,
@@ -660,13 +665,16 @@ const deleteNode = (node: { data: Node }) => {
 
 const resetDialog = () => {
   dialog.value.show = false;
-  dialog.value.name = "streamRouting";
+  dialog.value.name = "";
 };
 
 const getPipelinePayload = () => {
-  const payload: Pipeline = {
-    ...pipeline.value,
-    routing: {},
+  const payload = {
+    name: pipeline.value.name,
+    description: pipeline.value.description,
+    stream_name: pipeline.value.stream_name,
+    stream_type: pipeline.value.stream_type,
+    routing: {} as Routing,
   };
   Object.values(streamRoutes.value).forEach((route: any) => {
     payload.routing[route.name] = route.conditions;
@@ -677,7 +685,6 @@ const getPipelinePayload = () => {
 
 const savePipeline = () => {
   const payload = getPipelinePayload();
-  if (payload.functions !== undefined) delete payload.functions;
 
   const dismiss = q.notify({
     message: "Saving pipeline...",
