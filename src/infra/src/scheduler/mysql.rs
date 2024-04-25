@@ -151,9 +151,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         if trigger.module == TriggerModule::Alert {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module.to_string(),
-                &trigger.org,
-                &trigger.module_key
+                trigger.module, &trigger.org, &trigger.module_key
             );
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator
@@ -177,7 +175,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
 
         // For now, only send alert triggers
         if module == TriggerModule::Alert {
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module.to_string(), org, key);
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
         }
@@ -204,14 +202,9 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(&module)
         .execute(&pool).await?;
 
-        // For now, only send alert triggers
-        if module == TriggerModule::Alert {
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module.to_string(), org, key);
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, Bytes::from(""), true, None)
-                .await?;
-        }
+        // For status update of triggers, we don't need to send put events
+        // to cluster coordinator for now as it only changes the status and retries
+        // fields of scheduled jobs and not anything else
         Ok(())
     }
 
@@ -237,9 +230,7 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         if trigger.module == TriggerModule::Alert {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module.to_string(),
-                &trigger.org,
-                &trigger.module_key
+                trigger.module, &trigger.org, &trigger.module_key
             );
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator
@@ -369,7 +360,7 @@ WHERE org = ? AND module_key = ? AND module = ?;"#;
             Err(_) => {
                 return Err(Error::from(DbError::KeyNotExists(format!(
                     "{org}/{}/{key}",
-                    module.to_string()
+                    module
                 ))));
             }
         };

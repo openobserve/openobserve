@@ -45,6 +45,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // item_key format -> {org_id}/{module_key}
                 let item_key = ev.key.strip_prefix(&key).unwrap();
                 let columns = item_key.split_once('/').unwrap();
+                log::info!("columns put {}, {}", columns.0, columns.1);
                 let item_value: db::scheduler::Trigger =
                     if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
                         match db::scheduler::get(

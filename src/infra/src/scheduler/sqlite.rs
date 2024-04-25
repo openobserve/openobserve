@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use chrono::Duration;
 use config::{utils::json, CONFIG};
 use sqlx::Row;
@@ -153,11 +152,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         if trigger.module == TriggerModule::Alert {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module.to_string(),
-                &trigger.org,
-                &trigger.module_key
+                trigger.module, &trigger.org, &trigger.module_key
             );
 
+            // TODO: For sqlite cluster coordinator, the alert triggers are put
+            // into the sqlite meta database to send watch events. Hence, there is a
+            // redundancy of alert triggers stored both in scheduled_jobs and meta
+            // tables. How to remove this redundancy?
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator
                 .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
@@ -183,7 +184,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
         // For now, only send alert triggers
         if module == TriggerModule::Alert {
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module.to_string(), org, key);
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
         }
@@ -213,14 +214,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
         drop(client);
 
-        // For now, only send alert triggers
-        if module == TriggerModule::Alert {
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module.to_string(), org, key);
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, Bytes::from(""), true, None)
-                .await?;
-        }
+        // For status update of triggers, we don't need to send put events
+        // to cluster coordinator for now as it only changes the status and retries
+        // fields of scheduled jobs and not anything else
         Ok(())
     }
 
@@ -250,9 +246,7 @@ WHERE org = $6 AND module_key = $7 AND module = $8;"#,
         if trigger.module == TriggerModule::Alert {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module.to_string(),
-                &trigger.org,
-                &trigger.module_key
+                trigger.module, &trigger.org, &trigger.module_key
             );
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator
@@ -338,7 +332,7 @@ WHERE org = $1 AND module_key = $2 AND module = $3;"#;
             Err(_) => {
                 return Err(Error::from(DbError::KeyNotExists(format!(
                     "{org}/{}/{key}",
-                    module.to_string()
+                    module
                 ))));
             }
         };

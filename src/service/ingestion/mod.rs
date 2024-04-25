@@ -19,7 +19,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use chrono::{TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use config::{
     cluster,
     meta::{
@@ -193,7 +193,27 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
     let trigger = trigger.unwrap();
     for (alert, val) in trigger.iter() {
         if let Err(e) = alert.send_notification(val).await {
-            log::error!("Failed to send notification: {}", e)
+            log::error!("Failed to send notification: {}", e);
+        } else if alert.trigger_condition.silence > 0 {
+            // After the notification is sent successfully, we need to update
+            // the silence period of the trigger
+            _ = db::scheduler::update_trigger(db::scheduler::Trigger {
+                org: alert.org_id.to_string(),
+                module: db::scheduler::TriggerModule::Alert,
+                module_key: format!(
+                    "{}/{}/{}",
+                    &alert.stream_type, &alert.stream_name, &alert.name
+                ),
+                is_silenced: true,
+                is_realtime: true,
+                next_run_at: Utc::now().timestamp_micros()
+                    + Duration::try_minutes(alert.trigger_condition.silence)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ..Default::default()
+            })
+            .await;
         }
     }
 }
