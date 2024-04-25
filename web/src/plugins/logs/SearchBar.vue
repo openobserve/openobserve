@@ -1002,7 +1002,7 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.selectedStreamFields,
       (fields) => {
-        if (fields.length) updateFieldKeywords(fields);
+        if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
       { immediate: true, deep: true }
     );
