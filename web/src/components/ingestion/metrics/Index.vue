@@ -64,6 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Telegraf"
           content-class="tab_content"
         />
+        <q-route-tab
+          name="cloudwatchMetrics"
+          :to="{
+            name: 'cloudwatchMetrics',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
+          label="AWS CloudWatch Metrics (via Data Firehose)"
+          content-class="tab_content"
+        />
       </q-tabs>
     </template>
 
@@ -114,7 +126,7 @@ export default defineComponent({
     const confirmUpdate = ref<boolean>(false);
 
     onBeforeMount(() => {
-      const ingestRoutes = ["prometheus", "otelCollector", "telegraf"];
+      const ingestRoutes = ["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
           name: router.currentRoute.value.name,
@@ -183,7 +195,7 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(200),
+      splitterModel: ref(360),
       currentUserEmail: store.state.userInfo.email,
       copyToClipboardFn,
       showUpdateDialogFn,
