@@ -24,7 +24,6 @@ use actix_web::{
 };
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
-    ider,
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
     CONFIG, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -41,6 +40,7 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
+    config::ider,
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,

@@ -21,9 +21,11 @@ use config::CONFIG;
 use futures::future::{ready, Ready};
 
 #[cfg(feature = "enterprise")]
+use crate::common::infra::config::USER_SESSIONS;
+#[cfg(feature = "enterprise")]
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
-    infra::config::{PASSWORD_HASH, USERS, USER_SESSIONS},
+    infra::config::{PASSWORD_HASH, USERS},
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
