@@ -31,7 +31,7 @@ use crate::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    log::debug!("Pulling jobs from scheduler");
+    log::info!("Pulling jobs from scheduler");
     // Scheduler pulls only those triggers that match the conditions-
     // - trigger.next_run_at <= now
     // - !(trigger.is_realtime && !trigger.is_silenced)
@@ -43,7 +43,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    log::debug!("Pulled {} jobs from scheduler", triggers.len());
+    log::info!("Pulled {} jobs from scheduler", triggers.len());
 
     for trigger in triggers {
         tokio::task::spawn(async move {
@@ -63,7 +63,10 @@ pub async fn handle_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyh
 }
 
 async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
-    log::debug!("Inside handle_alert_triggers: processing trigger: {}", &trigger.module_key);
+    log::info!(
+        "Inside handle_alert_triggers: processing trigger: {}",
+        &trigger.module_key
+    );
     let columns = trigger.module_key.split('/').collect::<Vec<&str>>();
     assert_eq!(columns.len(), 3);
     let org_id = &trigger.org;
@@ -180,8 +183,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             }
         }
     } else {
-        log::debug!("Alert conditions not satisfied, org: {}, module_key: {}",
-            &new_trigger.org, &new_trigger.module_key);
+        log::info!(
+            "Alert conditions not satisfied, org: {}, module_key: {}",
+            &new_trigger.org,
+            &new_trigger.module_key
+        );
         db::scheduler::update_trigger(new_trigger).await?;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
@@ -194,7 +200,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 }
 
 async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
-    log::debug!("Inside handle_report_trigger,org: {}, module_key: {}", &trigger.org, &trigger.module_key);
+    log::info!(
+        "Inside handle_report_trigger,org: {}, module_key: {}",
+        &trigger.org,
+        &trigger.module_key
+    );
     let org_id = &trigger.org;
     // For report, trigger.module_key is the report name
     let report_name = &trigger.module_key;
@@ -210,7 +220,11 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     };
 
     if !report.enabled {
-        log::debug!("Report not enabled: org: {}, report: {}", org_id, report_name);
+        log::info!(
+            "Report not enabled: org: {}, report: {}",
+            org_id,
+            report_name
+        );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -282,13 +296,13 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     let now = Utc::now().timestamp_micros();
     match report.send_subscribers().await {
         Ok(_) => {
-            log::debug!("Report send_subscribers done, report: {}", report_name);
+            log::info!("Report send_subscribers done, report: {}", report_name);
             // Report generation successful, update the trigger
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
             }
             db::scheduler::update_trigger(new_trigger).await?;
-            log::debug!("Update trigger for report: {}", report_name);
+            log::info!("Update trigger for report: {}", report_name);
             trigger_data_stream.end_time = Utc::now().timestamp_micros();
         }
         Err(e) => {
