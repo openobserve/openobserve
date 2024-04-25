@@ -218,6 +218,7 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
 
+        log::debug!("Start pulling scheduled_job");
         let now = chrono::Utc::now().timestamp_micros();
         let report_max_time = now
             + Duration::try_seconds(report_timeout)
@@ -257,6 +258,8 @@ FOR UPDATE SKIP LOCKED;
             }
         };
 
+        log::debug!("scheduler pull: selected scheduled jobs for update: {}", job_ids.len());
+
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
 
         if let Err(e) = sqlx::query(
@@ -284,6 +287,7 @@ WHERE FIND_IN_SET(id, ?);
             return Err(e.into());
         }
 
+        log::debug!("Update scheduled jobs for selected pull job ids");
         if let Err(e) = tx.commit().await {
             log::error!("[MYSQL] commit scheduler pull update error: {}", e);
             return Err(e.into());
@@ -295,6 +299,7 @@ WHERE FIND_IN_SET(id, ?);
             .bind(job_ids.join(","))
             .fetch_all(&pool)
             .await?;
+        log::debug!("Returning the pulled triggers: {}", jobs.len());
         Ok(jobs)
     }
 

@@ -45,17 +45,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
+    log::debug!("initializing scheduler background jobs");
     scheduler::init_background_jobs(
         CONFIG.limit.scheduler_clean_interval,
         CONFIG.limit.scheduler_watch_interval,
     )
     .await?;
+    log::debug!("scheduler background jobs init done");
 
     // should run it every 10 seconds
     let mut interval = time::interval(time::Duration::from_secs(30));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        log::debug!("Running alert_manager inside job");
         let ret = service::alerts::alert_manager::run().await;
         if ret.is_err() {
             log::error!("[ALERT MANAGER] run error: {}", ret.err().unwrap());
