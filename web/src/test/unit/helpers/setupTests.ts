@@ -101,7 +101,6 @@ export const restHandlers = [
         instance: "7049348417797095424",
         commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
         build_date: "2023-04-05T11:01:23Z",
-        functions_enabled: true,
         default_fts_keys: ["log", "message", "msg", "content", "data"],
         telemetry_enabled: true,
         default_functions: [

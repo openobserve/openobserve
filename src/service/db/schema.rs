@@ -307,7 +307,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     ev.key.to_string()
                 };
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let schema_versions = match db::list_values(&ev_key).await {
+                let schema_versions = match db::list_values(&format!("{ev_key}/")).await {
                     Ok(val) => val
                         .iter()
                         .flat_map(|v| json::from_slice::<Vec<Schema>>(v).unwrap())

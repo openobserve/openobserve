@@ -339,8 +339,8 @@ impl super::Db for PostgresDb {
                 )
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
-                    module, key1, key2
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND (key2 = '{}' OR key2 LIKE '{}/%');"#,
+                    module, key1, key2, key2
                 )
             }
         } else {
@@ -372,7 +372,7 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
         sql = format!("{} ORDER BY start_dt ASC", sql);
 
@@ -401,7 +401,7 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
         sql = format!("{} ORDER BY start_dt ASC", sql);
         let pool = CLIENT.clone();
@@ -434,7 +434,7 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
         let pool = CLIENT.clone();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;

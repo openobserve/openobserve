@@ -26,7 +26,7 @@ use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
-    CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    CONFIG, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -69,7 +69,6 @@ struct ConfigResponse<'a> {
     instance: String,
     commit_hash: String,
     build_date: String,
-    functions_enabled: bool,
     default_fts_keys: Vec<String>,
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
@@ -196,7 +195,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
         commit_hash: COMMIT_HASH.to_string(),
         build_date: BUILD_DATE.to_string(),
-        functions_enabled: HAS_FUNCTIONS,
         telemetry_enabled: CONFIG.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, CONFIG, INSTANCE_ID};
+use config::{cluster, CONFIG};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
@@ -79,17 +79,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::organization::cache()
         .await
         .expect("organization cache sync failed");
-
-    // set instance id
-    let instance_id = match db::instance::get().await {
-        Ok(Some(instance)) => instance,
-        Ok(None) | Err(_) => {
-            let id = ider::generate();
-            let _ = db::instance::set(&id).await;
-            id
-        }
-    };
-    INSTANCE_ID.insert("instance_id".to_owned(), instance_id);
 
     // check version
     db::version::set().await.expect("db version set failed");
