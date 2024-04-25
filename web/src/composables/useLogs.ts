@@ -2278,6 +2278,27 @@ const useLogs = () => {
 
     await extractFields();
 
+    if (searchObj.data.stream.selectedStreamFields.length == 0) {
+      const streamData: any = await getStream(
+        searchObj.data.stream.selectedStream.value,
+        searchObj.data.stream.streamType || "logs",
+        true
+      );
+      searchObj.data.stream.selectedStreamFields = streamData.schema;
+    }
+
+    const streamFieldNames: any =
+      searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
+
+    for (const [
+      fieldIndex,
+      fieldName,
+    ] of searchObj.data.stream.interestingFieldList.entries()) {
+      if (!streamFieldNames.includes(fieldName)) {
+        searchObj.data.stream.interestingFieldList.splice(fieldIndex, 1);
+      }
+    }
+
     if (queryStr == "") {
       if (
         searchObj.data.stream.interestingFieldList.length > 0 &&
