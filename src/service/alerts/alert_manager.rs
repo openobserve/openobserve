@@ -277,6 +277,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
             trigger_data_stream.end_time = Utc::now().timestamp_micros();
         }
         Err(e) => {
+            log::error!("Error sending report to subscribers: {e}");
             db::scheduler::update_status(
                 &new_trigger.org,
                 new_trigger.module,
