@@ -1017,6 +1017,10 @@ mod tests {
                 "SELECT a FROM tbl WHERE c IS NOT NULL AND (b IS FALSE OR d > 3)",
                 vec!["a", "b", "c", "d"],
             ),
+            (
+                "select _timestamp, message FROM tbl where  (pid='2fs93s' or stream_id='asdf834sdf2') AND str_match(new_message, 'Error')",
+                vec!["_timestamp", "message", "new_message", "pid", "stream_id"],
+            ),
         ];
         for (sql, fields) in samples {
             let actual = Sql::new(sql).unwrap().fields;
