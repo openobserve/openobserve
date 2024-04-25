@@ -331,7 +331,7 @@ async fn generate_report(
         }
     });
 
-    let web_url = &CONFIG.common.web_url;
+    let web_url = format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri);
     let page = browser.new_page(&format!("{web_url}/login")).await?;
     page.disable_log().await?;
     page.find_element("input[type='email']")
