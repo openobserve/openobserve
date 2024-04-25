@@ -788,7 +788,7 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
             if let Some(v) = get_field_name_from_expr(right) {
                 fields.extend(v);
             }
-            (!fields.is_empty()).then(|| fields)
+            (!fields.is_empty()).then_some(fields)
         }
         SqlExpr::Function(f) => {
             let mut fields = Vec::with_capacity(f.args.len());
@@ -810,7 +810,7 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
                     _ => {}
                 }
             }
-            (!fields.is_empty()).then(|| fields)
+            (!fields.is_empty()).then_some(fields)
         }
         SqlExpr::Nested(expr) => get_field_name_from_expr(expr),
         SqlExpr::IsFalse(expr) => get_field_name_from_expr(expr),
@@ -831,7 +831,7 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
             if let Some(pattern) = get_field_name_from_expr(pattern) {
                 fields.extend(pattern);
             }
-            (!fields.is_empty()).then(|| fields)
+            (!fields.is_empty()).then_some(fields)
         }
         SqlExpr::Cast { expr, .. } | SqlExpr::TryCast { expr, .. } => {
             get_field_name_from_expr(expr)
@@ -1013,7 +1013,10 @@ mod tests {
             ("SELECT a AT TIME ZONE 'UTC' FROM tbl", vec!["a"]),
             ("SELECT EXTRACT(YEAR FROM a) FROM tbl", vec!["a"]),
             ("SELECT map['key'] from tbl", vec!["map"]),
-            ("SELECT a FROM tbl WHERE c IS NOT NULL AND (b IS FALSE OR d > 3)", vec!["a", "b", "c", "d"]),
+            (
+                "SELECT a FROM tbl WHERE c IS NOT NULL AND (b IS FALSE OR d > 3)",
+                vec!["a", "b", "c", "d"],
+            ),
         ];
         for (sql, fields) in samples {
             let actual = Sql::new(sql).unwrap().fields;
