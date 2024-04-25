@@ -194,6 +194,10 @@ export default defineComponent({
       type: Object,
       default: () => ({ options: {} }),
     },
+    renderType: {
+      type: String,
+      default: "canvas",
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
@@ -454,7 +458,9 @@ export default defineComponent({
       (newTheme) => {
         const theme = newTheme === "dark" ? "dark" : "light";
         chart?.dispose();
-        chart = echarts.init(chartRef.value, theme, { renderer: "svg" });
+        chart = echarts.init(chartRef.value, theme, {
+          renderer: props.renderType,
+        });
         const options = props.data.options || {};
 
         // change color and background color of tooltip
@@ -488,7 +494,9 @@ export default defineComponent({
         await nextTick();
         const theme = store.state.theme === "dark" ? "dark" : "light";
         if (chartRef.value) {
-          chart = echarts.init(chartRef.value, theme, { renderer: "svg" });
+          chart = echarts.init(chartRef.value, theme, {
+            renderer: props.renderType,
+          });
         }
         chart?.setOption(props?.data?.options || {}, true);
         chartInitialSetUp();

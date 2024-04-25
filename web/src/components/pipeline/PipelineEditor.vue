@@ -33,6 +33,7 @@
     <ChartRenderer
       data-test="logs-search-result-bar-chart"
       :data="plotChart"
+      render-type="svg"
       style="height: 700px"
       @click="onChartClick"
       @mouseover="onChartHover"
