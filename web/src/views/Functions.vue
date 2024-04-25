@@ -107,19 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.streamPipeline')"
               content-class="tab_content"
             />
-
-            <q-route-tab
-              data-test="stream-routing-tab"
-              name="streamRouting"
-              :to="{
-                name: 'streamRouting',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.streamRouting')"
-              content-class="tab_content"
-            />
           </q-tabs>
         </div>
       </template>
