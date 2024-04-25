@@ -839,6 +839,7 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
+        SqlExpr::ArrayIndex { obj, .. } => get_field_name_from_expr(obj),
         _ => None,
     }
 }
@@ -989,6 +990,30 @@ mod tests {
                 "select _timestamp, message FROM tbl  where (_timestamp >= 17139560000000 AND _timestamp < 171395076000000) AND (pid='2fs93s' AND stream_id='asdf834sdf2' AND str_match(message, 'Error')) order by _timestamp desc LIMIT 250",
                 vec!["_timestamp", "message", "pid", "stream_id"],
             ),
+            ("SELECT a FROM tbl WHERE b IS FALSE", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS NOT FALSE", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS TRUE", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS NOT TRUE", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS NULL", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS NOT NULL", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS UNKNOWN", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IS NOT UNKNOWN", vec!["a", "b"]),
+            ("SELECT a FROM tbl WHERE b IN (1, 2, 3)", vec!["a", "b"]),
+            (
+                "SELECT a FROM tbl WHERE b BETWEEN 10 AND 20",
+                vec!["a", "b"],
+            ),
+            ("SELECT a FROM tbl WHERE b LIKE '%pattern%'", vec!["a", "b"]),
+            (
+                "SELECT a FROM tbl WHERE b ILIKE '%pattern%'",
+                vec!["a", "b"],
+            ),
+            ("SELECT CAST(a AS INTEGER) FROM tbl", vec!["a"]),
+            ("SELECT TRY_CAST(a AS INTEGER) FROM tbl", vec!["a"]),
+            ("SELECT a AT TIME ZONE 'UTC' FROM tbl", vec!["a"]),
+            ("SELECT EXTRACT(YEAR FROM a) FROM tbl", vec!["a"]),
+            ("SELECT map['key'] from tbl", vec!["map"]),
+            ("SELECT a FROM tbl WHERE c IS NOT NULL AND (b IS FALSE OR d > 3)", vec!["a", "b", "c", "d"]),
         ];
         for (sql, fields) in samples {
             let actual = Sql::new(sql).unwrap().fields;
