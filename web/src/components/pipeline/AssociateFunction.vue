@@ -46,7 +46,6 @@
             outlined
             filled
             dense
-            @update:model-value="updateStreams()"
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 220px"
             error-message="Function is already associated"
@@ -140,9 +139,7 @@ import {
   nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import AddFunction from "../functions/AddFunction.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 
@@ -216,8 +213,6 @@ const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
 
-const router = useRouter();
-
 const store = useStore();
 
 const functionExists = ref(true);
@@ -241,6 +236,7 @@ watch(
   },
   {
     deep: true,
+    immediate: true,
   }
 );
 
@@ -253,90 +249,6 @@ onBeforeMount(() => {
     functionOrder.value = props.functionData.order;
   }
 });
-
-const getDefaultStreamRoute = () => {
-  return {
-    sourceStreamName: "",
-    destinationStreamName: "",
-    sourceStreamType: "",
-    destinationStreamType: "",
-    conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
-  };
-};
-
-const streamTypes = ["logs", "metrics", "traces"];
-
-const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
-const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
-const updateStreams = (resetStream = true) => {
-  // if (resetStream) formData.value.stream_name = "";
-  // if (streams.value[formData.value.stream_type]) {
-  //   schemaList.value = streams.value[formData.value.stream_type];
-  //   indexOptions.value = streams.value[formData.value.stream_type].map(
-  //     (data: any) => {
-  //       return data.name;
-  //     }
-  //   );
-  //   return;
-  // }
-  // if (!formData.value.stream_type) return Promise.resolve();
-  // isFetchingStreams.value = true;
-  // return getStreams(formData.value.stream_type, false)
-  //   .then((res: any) => {
-  //     streams.value[formData.value.stream_type] = res.list;
-  //     schemaList.value = res.list;
-  //     indexOptions.value = res.list.map((data: any) => {
-  //       return data.name;
-  //     });
-  //     if (formData.value.stream_name)
-  //       updateStreamFields(formData.value.stream_name);
-  //     return Promise.resolve();
-  //   })
-  //   .catch(() => Promise.reject())
-  //   .finally(() => (isFetchingStreams.value = false));
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
-    );
-  });
-  return filteredOptions;
-};
-
-const filterStreams = (val: string, update: any) => {
-  // filteredStreams.value = filterColumns(indexOptions.value, val, update);
-};
-
-const updateStreamFields = async (stream_name: any) => {
-  // let streamCols: any = [];
-  // const streams: any = await getStream(
-  //   stream_name,
-  //   formData.value.stream_type,
-  //   true
-  // );
-  // if (streams && Array.isArray(streams.schema)) {
-  //   streamCols = streams.schema.map((column: any) => ({
-  //     label: column.name,
-  //     value: column.name,
-  //     type: column.type,
-  //   }));
-  // }
-  // originalStreamFields.value = [...streamCols];
-  // filteredColumns.value = [...streamCols];
-  // onInputUpdate("stream_name", stream_name);
-};
 
 const openCancelDialog = () => {
   if (

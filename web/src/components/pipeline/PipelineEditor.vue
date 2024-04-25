@@ -59,35 +59,21 @@
           <div class="q-px-sm">{{ nodeType.label }}</div>
         </div>
       </template>
-      <!-- <q-btn
-        data-test="add-report-save-btn"
-        label="Add Function"
-        class="text-bold no-border q-ml-md float-left"
-        color="secondary"
-        padding="sm xl"
-        no-caps
-        @click="addFunction"
-      />
-      <q-btn
-        data-test="add-report-save-btn"
-        label="Add Stream"
-        class="text-bold no-border q-ml-md float-left q-mt-md"
-        color="secondary"
-        padding="sm xl"
-        no-caps
-        @click="addStream"
-      /> -->
     </div>
     <div
       id="pipelineChartContainer"
       ref="chartContainerRef"
       class="relative-position bg-grey-2 pipeline-chart-container"
     >
+      <div class="q-pl-sm q-pt-xs">
+        Note: During execution of pipeline, routes will get executed before
+        functions
+      </div>
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
         :data="plotChart"
         render-type="svg"
-        style="height: calc(100vh - 150px)"
+        style="height: calc(100vh - 165px)"
         @click="onChartClick"
         @mouseover="onChartHover"
         @mouseout="onMouseOut"
@@ -150,6 +136,8 @@ import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
+import jstransform from "@/services/jstransform";
+import { get } from "http";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -315,10 +303,18 @@ const getPipeline = () => {
 
   pipelineService
     .getPipelines(store.state.selectedOrganization.identifier)
-    .then((response) => {
-      pipeline.value = response.data.list.find(
+    .then(async (response) => {
+      await getFunctions();
+
+      const _pipeline = response.data.list.find(
         (pipeline: Pipeline) => pipeline.name === route.query.name
       );
+
+      pipeline.value = {
+        ..._pipeline,
+        functions: _pipeline?.functions?.list || [],
+      };
+
       setupNodes();
     });
 };
@@ -343,15 +339,19 @@ const setupNodes = () => {
   };
 
   // set functions nodes
-  pipeline.value?.functions?.forEach((_function) => {
-    createFunctionNode(
-      _function.name,
-      pipeline.value.stream_name,
-      _function.order
-    );
+  pipeline.value?.functions
+    ?.sort((a, b) => a.order - b.order)
+    .forEach((_function) => {
+      createFunctionNode(
+        _function.name,
+        pipeline.value.stream_name,
+        _function.order
+      );
 
-    associatedFunctions.value.push(_function.name);
-  });
+      functions.value[_function.name] = _function;
+
+      associatedFunctions.value.push(_function.name);
+    });
 
   updateFunctionNodesOrder();
 
@@ -534,7 +534,9 @@ const updateFunctionNodesOrder = () => {
   const sortedFunctionNodes = nodes.value
     .filter((node) => node.type === "function")
     .sort((a, b) =>
-      a.order?.toString() && b.order?.toString() ? a.order - b.order : 0
+      a.order?.toString() && b.order?.toString()
+        ? Number(a.order) - Number(b.order)
+        : 0
     );
 
   sortedFunctionNodes.forEach((node, index) => {
@@ -653,7 +655,7 @@ const updateGraph = () => {
 const getFunctions = () => {
   if (Object.keys(functions.value).length) return;
   isFetchingFunctions.value = true;
-  functionsService
+  return functionsService
     .list(
       1,
       100000,
@@ -675,21 +677,19 @@ const getFunctions = () => {
     });
 };
 
-const deleteNode = (node: { data: Node }) => {
+const deleteNode = (node: { data: Node; type: string }) => {
   nodes.value = nodes.value.filter((n) => n.name !== node.data.name);
   delete nodeLinks.value[node.data.name];
 
-  if (node.data.type === "function") {
+  if (node.type === "function") {
     associatedFunctions.value = associatedFunctions.value.filter(
       (func) => func !== node.data.name
     );
 
-    associatedFunctions.value = associatedFunctions.value.filter(
-      (func) => func !== node.data.name
-    );
+    deleteFunctionAssociation(node.data.name);
   }
 
-  if (node.data.type === "streamRoute") {
+  if (node.type === "streamRoute") {
     delete streamRoutes.value[node.data.name];
   }
 
@@ -718,7 +718,37 @@ const getPipelinePayload = () => {
   return payload;
 };
 
-const savePipeline = () => {
+const associateFunctions = async () => {
+  const functionNodes = nodes.value.filter((node) => node.type === "function");
+  const associateFunctionPromises = [];
+
+  for (let i = 0; i < functionNodes.length; i++) {
+    associateFunctionPromises.push(
+      jstransform.apply_stream_function(
+        store.state.selectedOrganization.identifier,
+        pipeline.value.stream_name,
+        pipeline.value.stream_type,
+        functionNodes[i].name,
+        {
+          order: Number(functions.value[functionNodes[i].name].order),
+        }
+      )
+    );
+  }
+  return Promise.all(associateFunctionPromises);
+};
+
+const deleteFunctionAssociation = (name: string) => {
+  console.log("Deleting function association", name);
+  return jstransform.delete_stream_function(
+    store.state.selectedOrganization.identifier,
+    pipeline.value.stream_name,
+    pipeline.value.stream_type,
+    name
+  );
+};
+
+const savePipeline = async () => {
   const payload = getPipelinePayload();
 
   const dismiss = q.notify({
@@ -726,6 +756,8 @@ const savePipeline = () => {
     position: "bottom",
     spinner: true,
   });
+
+  await associateFunctions();
 
   pipelineService
     .updatePipeline({
