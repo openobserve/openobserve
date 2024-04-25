@@ -54,20 +54,13 @@ const pipelines = {
   },
 
   updatePipeline: ({
-    stream_name,
-    stream_type,
-    name,
     org_identifier,
     data,
   }: {
-    stream_name: string;
-    stream_type: string;
-    name: string;
     org_identifier: string;
-    description: string;
     data: any;
   }) => {
-    const url = `/api/${org_identifier}/streams/${stream_name}/pipelines/${name}?type=${stream_type}`;
+    const url = `/api/${org_identifier}/streams/${data.stream_name}/pipelines/${data.name}?type=${data.stream_type}`;
     return http().put(url, data);
   },
 };

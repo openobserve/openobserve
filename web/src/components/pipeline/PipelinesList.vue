@@ -39,7 +39,7 @@
               round
               flat
               :title="t('alerts.delete')"
-              @click="openDeleteDialog(props)"
+              @click="openDeleteDialog(props.row)"
             ></q-btn>
           </q-td>
         </template>
@@ -104,6 +104,14 @@
   <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
     <stream-selection @save="savePipeline" />
   </q-dialog>
+
+  <confirm-dialog
+    :title="confirmDialogMeta.title"
+    :message="confirmDialogMeta.message"
+    @update:ok="confirmDialogMeta.onConfirm()"
+    @update:cancel="resetConfirmDialog"
+    v-model="confirmDialogMeta.show"
+  />
 </template>
 <script setup lang="ts">
 import { ref, onBeforeMount } from "vue";
@@ -116,6 +124,7 @@ import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 interface Pipeline {
   name: string;
@@ -137,10 +146,11 @@ const pipelines = ref([]);
 
 const store = useStore();
 
-const confirmDialog = ref({
+const confirmDialogMeta: any = ref({
   show: false,
   title: "",
   message: "",
+  data: null,
   onConfirm: () => {},
 });
 
@@ -246,12 +256,15 @@ const editPipeline = (pipeline: Pipeline) => {
   });
 };
 
-const openDeleteDialog = () => {
-  confirmDialog.value.show = true;
-  confirmDialog.value.title = t("pipeline.deletePipeline");
-  confirmDialog.value.message =
+const openDeleteDialog = (pipeline: Pipeline) => {
+  console.log("openDeleteDialog", pipeline);
+
+  confirmDialogMeta.value.show = true;
+  confirmDialogMeta.value.title = t("pipeline.deletePipeline");
+  confirmDialogMeta.value.message =
     "Are you sure you want to delete this pipeline?";
-  confirmDialog.value.onConfirm = deletePipeline;
+  confirmDialogMeta.value.onConfirm = deletePipeline;
+  confirmDialogMeta.value.data = pipeline;
 };
 
 const savePipeline = (data: Pipeline) => {
@@ -261,16 +274,31 @@ const savePipeline = (data: Pipeline) => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then(() => {
+      getPipelines();
       showCreatePipeline.value = false;
     });
 };
 
 const deletePipeline = () => {
   pipelineService
-    .deletePipeline(store.state.selectedOrganization.identifier)
+    .deletePipeline({
+      ...confirmDialogMeta.value.data,
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
     .then(() => {
-      showCreatePipeline.value = false;
-    });
+      getPipelines();
+    })
+    .finally(() => {});
+
+  resetConfirmDialog();
+};
+
+const resetConfirmDialog = () => {
+  confirmDialogMeta.value.show = false;
+  confirmDialogMeta.value.title = "";
+  confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.onConfirm = () => {};
+  confirmDialogMeta.value.data = null;
 };
 
 const filterData = (rows: any, terms: any) => {

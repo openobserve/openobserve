@@ -238,15 +238,7 @@ const getPipeline = () => {
     description: "pipeline",
     stream_name: "default",
     stream_type: "logs",
-    routing: {
-      stream1: [
-        {
-          column: "column",
-          operator: "operator",
-          value: "value",
-        },
-      ],
-    },
+    routing: {},
     functions: [],
   };
 
@@ -615,26 +607,32 @@ const resetDialog = () => {
 };
 
 const getPipelinePayload = () => {
-  const payload = {
-    name: "pipeline1",
-    description: "pipeline",
-    stream_name: "stream",
-    stream_type: "stream",
-    routing: {
-      stream1: [
-        {
-          column: "column",
-          operator: "operator",
-          value: "value",
-        },
-      ],
-    },
+  const payload: Pipeline = {
+    ...pipeline.value,
+    routing: {},
   };
+  Object.values(streamRoutes.value).forEach((route: any) => {
+    payload.routing[route.name] = route.conditions;
+  });
+
+  return payload;
 };
 
 const savePipeline = () => {
   const payload = getPipelinePayload();
-  console.log("payload", payload);
+  if (payload.functions !== undefined) delete payload.functions;
+
+  pipelineService
+    .updatePipeline({
+      data: payload,
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((res) => {
+      console.log("Pipeline saved successfully");
+    })
+    .catch((error) => {
+      console.error(error);
+    });
 };
 </script>
 
