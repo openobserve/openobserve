@@ -178,7 +178,7 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
         _ => {
             module = columns[0].to_string();
             key1 = columns[1].to_string();
-            key2 = columns[2..].join("/");
+            key2 = columns[2..].join("/").trim_end_matches('/').to_string();
         }
     }
     (module, key1, key2)
