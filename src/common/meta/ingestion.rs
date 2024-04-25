@@ -217,9 +217,9 @@ pub struct KFHRecordRequest {
     pub data: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct KinesisFHData {
+pub struct KinesisFHLogData {
     pub log_events: Vec<KinesisFHLogEvent>,
     pub log_group: String,
     pub log_stream: String,
@@ -228,11 +228,36 @@ pub struct KinesisFHData {
     pub subscription_filters: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct KinesisFHLogEvent {
     pub message: json::Value,
     pub id: String,
     pub timestamp: Option<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KinesisFHMetricData {
+    #[serde(rename = "metric_stream_name")]
+    pub metric_stream_name: String,
+    #[serde(rename = "account_id")]
+    pub account_id: String,
+    pub region: String,
+    pub namespace: String,
+    #[serde(rename = "metric_name")]
+    pub metric_name: String,
+    pub dimensions: json::Value,
+    pub timestamp: i64,
+    pub value: KinesisFHMetricValue,
+    pub unit: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct KinesisFHMetricValue {
+    pub count: f32,
+    pub sum: f32,
+    pub max: f32,
+    pub min: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -244,11 +269,12 @@ pub struct KinesisFHIngestionResponse {
     pub timestamp: i64,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[serde(untagged)]
 pub enum AWSRecordType {
-    JSON,
-    Cloudwatch,
+    KinesisFHLogs(KinesisFHLogData),
+    KinesisFHMetrics(KinesisFHMetricData),
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
