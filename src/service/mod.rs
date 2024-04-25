@@ -37,6 +37,7 @@ pub mod organization;
 pub mod promql;
 pub mod schema;
 pub mod search;
+pub mod session;
 pub mod stream;
 pub mod syslogs_route;
 pub mod traces;
