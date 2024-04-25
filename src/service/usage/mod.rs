@@ -21,7 +21,7 @@ use config::{
         stream::StreamType,
         usage::{
             AggregatedData, GroupKey, RequestStats, TriggerData, UsageData, UsageEvent, UsageType,
-            STATS_STREAM, TRIGGERS_USAGE_STREAM, USAGE_STREAM,
+            TRIGGERS_USAGE_STREAM, USAGE_STREAM,
         },
     },
     metrics,
@@ -100,7 +100,7 @@ pub async fn report_request_usage_stats(
         });
     };
 
-    if !CONFIG.common.usage_report_compressed_size || event != UsageEvent::Ingestion {
+    if event != UsageEvent::Ingestion {
         usage.push(UsageData {
             event,
             day: now.day(),
@@ -129,54 +129,6 @@ pub async fn report_request_usage_stats(
             compressed_size: None,
         });
     };
-    if !usage.is_empty() {
-        publish_usage(usage).await;
-    }
-}
-
-pub async fn report_compression_stats(
-    stats: RequestStats,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) {
-    if !CONFIG.common.usage_enabled || !CONFIG.common.usage_report_compressed_size {
-        return;
-    }
-    if CONFIG.common.usage_org.eq(org_id)
-        && (stream_name.eq(STATS_STREAM) || stream_name.eq(USAGE_STREAM))
-    {
-        return;
-    }
-    let now = Utc::now();
-    let usage = vec![UsageData {
-        event: UsageEvent::Ingestion,
-        year: now.year(),
-        month: now.month(),
-        day: now.day(),
-        hour: now.hour(),
-        event_time_hour: format!(
-            "{:04}{:02}{:02}{:02}",
-            now.year(),
-            now.month(),
-            now.day(),
-            now.hour()
-        ),
-        org_id: org_id.to_owned(),
-        request_body: "".to_owned(),
-        size: stats.size,
-        unit: "MB".to_owned(),
-        user_email: "".to_owned(),
-        response_time: 0.0,
-        num_records: stats.records,
-        stream_type,
-        stream_name: stream_name.to_owned(),
-        min_ts: stats.min_ts,
-        max_ts: stats.max_ts,
-        cached_ratio: None,
-        compressed_size: stats.compressed_size,
-    }];
-
     if !usage.is_empty() {
         publish_usage(usage).await;
     }

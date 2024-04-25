@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
 use actix_web::{http, http::StatusCode, HttpResponse};
 use config::{
     is_local_disk_storage,
-    meta::{
-        stream::{StreamSettings, StreamStats, StreamType},
-        usage::Stats,
-    },
+    meta::stream::{StreamSettings, StreamStats, StreamType},
     utils::json,
     CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -40,7 +37,7 @@ use crate::{
         prom,
         stream::{Stream, StreamProperty},
     },
-    service::{db, metrics::get_prom_metadata_from_schema, search as SearchService},
+    service::{db, metrics::get_prom_metadata_from_schema},
 };
 
 const LOCAL: &str = "disk";
@@ -382,66 +379,6 @@ pub async fn delete_fields(
     )
     .await?;
     Ok(())
-}
-
-/// get stream stats from usage report
-async fn _get_stream_stats(
-    org_id: &str,
-    stream_type: Option<StreamType>,
-    stream_name: Option<String>,
-) -> Result<HashMap<String, StreamStats>, anyhow::Error> {
-    let mut sql = if CONFIG.common.usage_report_compressed_size {
-        format!(
-            "select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(compressed_size) as compressed_size , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}' "
-        )
-    } else {
-        format!(
-            "select min(min_ts) as min_ts  , max(max_ts) as max_ts , max(original_size) as original_size , max(records) as records ,stream_name , org_id , stream_type from  \"stats\" where org_id='{org_id}'"
-        )
-    };
-
-    sql = match stream_type {
-        Some(stream_type) => {
-            format!("{sql } and stream_type='{stream_type}' ")
-        }
-        None => sql,
-    };
-
-    sql = match stream_name {
-        Some(stream_name) => format!("{sql} and stream_name='{stream_name}' "),
-        None => sql,
-    };
-
-    // group by stream_name , org_id , stream_type
-
-    let query = config::meta::search::Query {
-        sql: format!("{sql} group by stream_name , org_id , stream_type"),
-        sql_mode: "full".to_owned(),
-        size: 100000000,
-        ..Default::default()
-    };
-
-    let req = config::meta::search::Request {
-        query,
-        aggs: HashMap::new(),
-        encoding: config::meta::search::RequestEncoding::Empty,
-        clusters: vec![],
-        timeout: 0,
-    };
-    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {
-        Ok(res) => {
-            let mut all_stats = HashMap::new();
-            for item in res.hits {
-                let stats: Stats = json::from_value(item).unwrap();
-                all_stats.insert(
-                    format!("{}/{}", stats.stream_name, stats.stream_type),
-                    stats.into(),
-                );
-            }
-            Ok(all_stats)
-        }
-        Err(err) => Err(err.into()),
-    }
 }
 
 #[cfg(test)]
