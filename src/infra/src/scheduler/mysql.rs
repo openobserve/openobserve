@@ -348,7 +348,7 @@ WHERE FIND_IN_SET(id, ?);
         let pool = CLIENT.clone();
         let query = r#"
 SELECT * FROM scheduled_jobs
-WHERE org = ? AND module_key = ? AND module = ?;"#;
+WHERE org = ? AND module = ? AND module_key = ?;"#;
         let job = match sqlx::query_as::<_, Trigger>(query)
             .bind(org)
             .bind(module.clone())

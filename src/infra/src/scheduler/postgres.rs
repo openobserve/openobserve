@@ -302,7 +302,7 @@ RETURNING *;"#;
         let pool = CLIENT.clone();
         let query = r#"
 SELECT * FROM scheduled_jobs
-WHERE org = $1 AND module_key = $2 AND module = $3;"#;
+WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         let job = match sqlx::query_as::<_, Trigger>(query)
             .bind(org)
             .bind(&module)
