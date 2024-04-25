@@ -66,8 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="fieldList"
         :rows-per-page-options="[]"
         :hide-bottom="
-          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
-          searchObj.data.stream.selectedStreamFields.length == 0
+          searchObj.data.stream.selectedStreamFields != undefined &&
+          (searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
+          searchObj.data.stream.selectedStreamFields.length == 0)
         "
       >
         <template #body-cell-name="props">

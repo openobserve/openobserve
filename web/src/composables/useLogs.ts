@@ -1532,6 +1532,7 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
+      searchObj.data.errorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
       let ftsKeys: Set<any> = new Set();
@@ -1557,6 +1558,11 @@ const useLogs = () => {
             } else {
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
+              if(streamSchema == undefined) {
+                searchObj.data.errorMsg = t("search.noFieldFound");
+                throw new Error(searchObj.data.errorMsg);
+                return;
+              }
               stream.settings = streamData.settings;
               queryResult.push(...streamSchema);
               schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
@@ -2294,6 +2300,10 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields = streamData.schema;
     }
 
+    if(searchObj.data.stream.selectedStreamFields == undefined || searchObj.data.stream.selectedStreamFields.length == 0) {
+      searchObj.data.errorMsg = t("search.noFieldFound");
+      return;
+    }
     const streamFieldNames: any =
       searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
 
