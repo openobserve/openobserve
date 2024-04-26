@@ -166,7 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete" color="grey" size="xs" />
+                            <q-icon name="delete"
+color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -346,7 +347,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item"
+clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -1758,6 +1760,32 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loading = true;
+                if (searchObj.data.stream.selectedStreamFields.length == 0) {
+                  const streamData: any = getStream(
+                    searchObj.data.stream.selectedStream.value,
+                    searchObj.data.stream.streamType || "logs",
+                    true
+                  );
+                  searchObj.data.stream.selectedStreamFields =
+                    streamData.schema;
+                }
+
+                const streamFieldNames: any =
+                  searchObj.data.stream.selectedStreamFields.map(
+                    (item: any) => item.name
+                  );
+
+                for (const [
+                  fieldIndex,
+                  fieldName,
+                ] of searchObj.data.stream.interestingFieldList.entries()) {
+                  if (!streamFieldNames.includes(fieldName)) {
+                    searchObj.data.stream.interestingFieldList.splice(
+                      fieldIndex,
+                      1
+                    );
+                  }
+                }
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
                 updateUrlQueryParams();
