@@ -24,7 +24,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = format!(
         "{}{}/",
         db::scheduler::TRIGGERS_KEY,
-        db::scheduler::TriggerModule::Alert.to_string()
+        db::scheduler::TriggerModule::Alert
     );
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(&key).await?;
