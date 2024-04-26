@@ -195,6 +195,13 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
         if let Err(e) = alert.send_notification(val).await {
             log::error!("Failed to send notification: {}", e);
         } else if alert.trigger_condition.silence > 0 {
+            log::debug!(
+                "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
+                &alert.org_id,
+                &alert.stream_type,
+                &alert.stream_name,
+                &alert.name
+            );
             // After the notification is sent successfully, we need to update
             // the silence period of the trigger
             _ = db::scheduler::update_trigger(db::scheduler::Trigger {
