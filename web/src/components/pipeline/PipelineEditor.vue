@@ -141,8 +141,8 @@ import { get } from "http";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
-const streamRouteImage = getImageURL("images/pipeline/stream_route.svg");
-const conditionImage = getImageURL("images/pipeline/routeCondition.svg");
+const streamRouteImage = getImageURL("images/pipeline/route.svg");
+const conditionImage = getImageURL("images/pipeline/condition.svg");
 
 interface Routing {
   [key: string]: RouteCondition[];
