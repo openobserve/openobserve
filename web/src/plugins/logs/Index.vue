@@ -138,7 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -157,7 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -174,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -545,6 +548,31 @@ export default defineComponent({
               searchObj.data.stream.selectedStream.value +
               `" ` +
               whereClause;
+
+            if (searchObj.data.stream.selectedStreamFields.length == 0) {
+              const streamData: any = getStream(
+                searchObj.data.stream.selectedStream.value,
+                searchObj.data.stream.streamType || "logs",
+                true
+              );
+              searchObj.data.stream.selectedStreamFields = streamData.schema;
+            }
+
+            const streamFieldNames: any =
+              searchObj.data.stream.selectedStreamFields.map(
+                (item: any) => item.name
+              );
+
+            for (
+              let i = searchObj.data.stream.interestingFieldList.length - 1;
+              i >= 0;
+              i--
+            ) {
+              const fieldName = searchObj.data.stream.interestingFieldList[i];
+              if (!streamFieldNames.includes(fieldName)) {
+                searchObj.data.stream.interestingFieldList.splice(i, 1);
+              }
+            }
 
             if (
               searchObj.data.stream.interestingFieldList.length > 0 &&
