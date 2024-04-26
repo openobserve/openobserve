@@ -206,9 +206,9 @@ const perPageOptions: any = [
 ];
 const resultTotal = ref<number>(0);
 const maxRecordToReturn = ref<number>(100);
-const selectedPerPage = ref<number>(2);
+const selectedPerPage = ref<number>(20);
 const pagination: any = ref({
-  rowsPerPage: 2,
+  rowsPerPage: 20,
 });
 
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
