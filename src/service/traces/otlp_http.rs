@@ -31,6 +31,7 @@ use infra::schema::unwrap_partition_time_level;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
+use super::BLOCK_FIELDS;
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -40,10 +41,7 @@ use crate::{
     },
     service::{
         db, format_stream_name,
-        ingestion::{
-            evaluate_trigger, get_string_value, get_uint_value, grpc::get_val_for_attr, write_file,
-            TriggerAlertData,
-        },
+        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
         metadata::{
             distinct_values::DvItem, trace_list_index::TraceListItem, write, MetadataItem,
             MetadataType,
@@ -255,13 +253,17 @@ pub async fn traces_json(
                             .insert(REF_TYPE.to_string(), format!("{:?}", SpanRefType::ChildOf));
                     }
 
-                    let start_time = get_uint_value(span.get("startTimeUnixNano").unwrap());
-                    let end_time = get_uint_value(span.get("endTimeUnixNano").unwrap());
+                    let start_time = json::get_uint_value(span.get("startTimeUnixNano").unwrap());
+                    let end_time = json::get_uint_value(span.get("endTimeUnixNano").unwrap());
                     let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                     let attributes = span.get("attributes").unwrap().as_array().unwrap();
                     for span_att in attributes {
+                        let mut key = span_att.get("key").unwrap().as_str().unwrap().to_string();
+                        if BLOCK_FIELDS.contains(&key.as_str()) {
+                            key = format!("attr_{}", key);
+                        }
                         span_att_map.insert(
-                            span_att.get("key").unwrap().as_str().unwrap().to_string(),
+                            key,
                             get_val_for_attr(span_att.get("value").unwrap().clone()),
                         );
                     }
@@ -284,7 +286,7 @@ pub async fn traces_json(
                         }
                         events.push(Event {
                             name: event.get("name").unwrap().as_str().unwrap().to_string(),
-                            _timestamp: get_uint_value(event.get("timeUnixNano").unwrap()),
+                            _timestamp: json::get_uint_value(event.get("timeUnixNano").unwrap()),
                             attributes: event_att_map.clone(),
                         })
                     }
@@ -294,7 +296,7 @@ pub async fn traces_json(
                         trace_id: trace_id.clone(),
                         span_id,
                         span_kind: span.get("kind").unwrap().to_string(),
-                        span_status: get_string_value(
+                        span_status: json::get_string_value(
                             span.get("status")
                                 .unwrap_or(&json::Value::String("UNSET".to_string())),
                         ),

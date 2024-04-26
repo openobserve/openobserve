@@ -64,6 +64,7 @@ const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
+const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
 
 pub async fn handle_trace_request(
     org_id: &str,
@@ -219,7 +220,11 @@ pub async fn handle_trace_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                 for span_att in span.attributes {
-                    span_att_map.insert(span_att.key, get_val(&span_att.value.as_ref()));
+                    let mut key = span_att.key;
+                    if BLOCK_FIELDS.contains(&key.as_str()) {
+                        key = format!("attr_{}", key);
+                    }
+                    span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
                 let mut events = vec![];

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,10 +29,7 @@ use hashbrown::HashMap;
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
 
-use crate::{
-    common::infra::config::QUERY_FUNCTIONS,
-    service::ingestion::{compile_vrl_function, get_string_value},
-};
+use crate::{common::infra::config::QUERY_FUNCTIONS, service::ingestion::compile_vrl_function};
 
 type FnType = Arc<
     dyn Fn(
@@ -157,13 +154,13 @@ fn get_udf_vrl(
                             let field_builder = col_val_map.entry(col.to_string()).or_default();
                             if res_map.contains_key(&col) {
                                 field_builder
-                                    .insert(i, get_string_value(res_map.get(&col).unwrap()));
+                                    .insert(i, json::get_string_value(res_map.get(&col).unwrap()));
                             } else {
                                 field_builder.insert(i, "".to_string());
                             }
                         }
                     } else {
-                        res_data_vec.insert(i, get_string_value(&result));
+                        res_data_vec.insert(i, json::get_string_value(&result));
                     }
                 }
             }

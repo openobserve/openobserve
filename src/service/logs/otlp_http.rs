@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -42,9 +42,7 @@ use crate::{
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
         db, get_formatted_stream_name,
-        ingestion::{
-            evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
-        },
+        ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
         schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
@@ -267,9 +265,9 @@ pub async fn logs_json_handler(
 
             for log in log_records {
                 let start_time: i64 = if log.get("timeUnixNano").is_some() {
-                    get_int_value(log.get("timeUnixNano").unwrap())
+                    json::get_int_value(log.get("timeUnixNano").unwrap())
                 } else {
-                    get_int_value(log.get("time_unix_nano").unwrap())
+                    json::get_int_value(log.get("time_unix_nano").unwrap())
                 };
 
                 let timestamp = if start_time > 0 {
