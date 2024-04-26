@@ -20,17 +20,14 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
     utils::{
-        json::{estimate_json_bytes, Map, Value},
+        json::{estimate_json_bytes, get_string_value, Map, Value},
         schema_ext::SchemaExt,
     },
     CONFIG,
 };
 use infra::schema::unwrap_partition_time_level;
 
-use super::{
-    ingestion::{get_string_value, TriggerAlertData},
-    schema::get_invalid_schema_start_dt,
-};
+use super::{ingestion::TriggerAlertData, schema::get_invalid_schema_start_dt};
 use crate::{
     common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
     service::{
