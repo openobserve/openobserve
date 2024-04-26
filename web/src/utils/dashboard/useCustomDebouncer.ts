@@ -58,7 +58,7 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
     }, delay);
   };
 
-  // clear existing timeout on deactivation
+  // clear existing timeout onDeactivated
   onDeactivated(() => {
     resetTimeout();
     isComponentActive.value = false;
