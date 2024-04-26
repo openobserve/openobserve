@@ -479,6 +479,14 @@ const addFunctionNode = (data: { data: Function }) => {
     if (editedNode) editedNode.order = data.data.order;
 
     editingFunctionName.value = "";
+  } else {
+    functionNodes.push(
+      createFunctionNode(
+        nodeName,
+        pipeline.value.stream_name,
+        data.data.order
+      ) as Node
+    );
   }
 
   nodes.value = nodes.value.filter((node) => node.type !== "function");
