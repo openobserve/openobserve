@@ -499,12 +499,14 @@ const useLogs = () => {
           (item: any) => item.name
         );
 
-      for (const [
-        fieldIndex,
-        fieldName,
-      ] of searchObj.data.stream.interestingFieldList.entries()) {
+      for (
+        let i = searchObj.data.stream.interestingFieldList.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const fieldName = searchObj.data.stream.interestingFieldList[i];
         if (!streamFieldNames.includes(fieldName)) {
-          searchObj.data.stream.interestingFieldList.splice(fieldIndex, 1);
+          searchObj.data.stream.interestingFieldList.splice(i, 1);
         }
       }
 
@@ -1558,7 +1560,7 @@ const useLogs = () => {
             } else {
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
-              if(streamSchema == undefined) {
+              if (streamSchema == undefined) {
                 searchObj.data.errorMsg = t("search.noFieldFound");
                 throw new Error(searchObj.data.errorMsg);
                 return;
@@ -1654,12 +1656,14 @@ const useLogs = () => {
             (item: any) => item.name
           );
 
-        for (const [
-          fieldIndex,
-          fieldName,
-        ] of searchObj.data.stream.interestingFieldList.entries()) {
+        for (
+          let i = searchObj.data.stream.interestingFieldList.length - 1;
+          i >= 0;
+          i--
+        ) {
+          const fieldName = searchObj.data.stream.interestingFieldList[i];
           if (!streamFieldNames.includes(fieldName)) {
-            searchObj.data.stream.interestingFieldList.splice(fieldIndex, 1);
+            searchObj.data.stream.interestingFieldList.splice(i, 1);
           }
         }
 
@@ -2300,19 +2304,24 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields = streamData.schema;
     }
 
-    if(searchObj.data.stream.selectedStreamFields == undefined || searchObj.data.stream.selectedStreamFields.length == 0) {
+    if (
+      searchObj.data.stream.selectedStreamFields == undefined ||
+      searchObj.data.stream.selectedStreamFields.length == 0
+    ) {
       searchObj.data.errorMsg = t("search.noFieldFound");
       return;
     }
     const streamFieldNames: any =
       searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
 
-    for (const [
-      fieldIndex,
-      fieldName,
-    ] of searchObj.data.stream.interestingFieldList.entries()) {
+    for (
+      let i = searchObj.data.stream.interestingFieldList.length - 1;
+      i >= 0;
+      i--
+    ) {
+      const fieldName = searchObj.data.stream.interestingFieldList[i];
       if (!streamFieldNames.includes(fieldName)) {
-        searchObj.data.stream.interestingFieldList.splice(fieldIndex, 1);
+        searchObj.data.stream.interestingFieldList.splice(i, 1);
       }
     }
 

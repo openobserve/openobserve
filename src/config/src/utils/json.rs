@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,46 @@
 pub use serde_json::{
     from_slice, from_str, from_value, json, to_string, to_value, to_vec, Error, Map, Number, Value,
 };
+
+pub fn get_float_value(val: &Value) -> f64 {
+    match val {
+        Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
+        Value::Number(v) => v.as_f64().unwrap_or(0.0),
+        _ => 0.0,
+    }
+}
+
+pub fn get_int_value(val: &Value) -> i64 {
+    match val {
+        Value::String(v) => v.parse::<i64>().unwrap_or(0),
+        Value::Number(v) => v.as_i64().unwrap_or(0),
+        _ => 0,
+    }
+}
+
+pub fn get_uint_value(val: &Value) -> u64 {
+    match val {
+        Value::String(v) => v.parse::<u64>().unwrap_or(0),
+        Value::Number(v) => v.as_u64().unwrap_or(0),
+        _ => 0,
+    }
+}
+
+pub fn get_string_value(value: &Value) -> String {
+    if value.is_string() {
+        value.as_str().unwrap_or_default().to_string()
+    } else if value.is_i64() {
+        value.as_i64().unwrap_or_default().to_string()
+    } else if value.is_u64() {
+        value.as_u64().unwrap_or_default().to_string()
+    } else if value.is_f64() {
+        value.as_f64().unwrap_or_default().to_string()
+    } else if value.is_boolean() {
+        value.as_bool().unwrap_or_default().to_string()
+    } else {
+        value.to_string()
+    }
+}
 
 pub fn estimate_json_bytes(val: &Value) -> usize {
     let mut size = 0;

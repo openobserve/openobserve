@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ use arrow::{
 use arrow_schema::{ArrowError, DataType, Schema};
 use hashbrown::HashSet;
 
-use super::schema_ext::SchemaExt;
+use super::{json::get_string_value, schema_ext::SchemaExt};
 use crate::FxIndexMap;
 
 const USIZE_SIZE: usize = std::mem::size_of::<usize>();
@@ -93,7 +93,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_str().unwrap());
+                        b.append_value(get_string_value(v));
                     }
                 }
                 DataType::Int64 => {
