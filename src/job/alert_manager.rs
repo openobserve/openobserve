@@ -23,7 +23,6 @@ use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
-        log::info!("This node is not alert_manager, returning");
         return Ok(());
     }
     // check super cluster
@@ -46,13 +45,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
-    log::info!("initializing scheduler background jobs");
     scheduler::init_background_jobs(
         CONFIG.limit.scheduler_clean_interval,
         CONFIG.limit.scheduler_watch_interval,
     )
     .await?;
-    log::info!("scheduler background jobs init done");
 
     // should run it every 10 seconds
     let mut interval = time::interval(time::Duration::from_secs(30));

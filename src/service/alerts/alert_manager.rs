@@ -63,7 +63,7 @@ pub async fn handle_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyh
 }
 
 async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
-    log::info!(
+    log::debug!(
         "Inside handle_alert_triggers: processing trigger: {}",
         &trigger.module_key
     );
@@ -183,7 +183,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             }
         }
     } else {
-        log::info!(
+        log::debug!(
             "Alert conditions not satisfied, org: {}, module_key: {}",
             &new_trigger.org,
             &new_trigger.module_key
@@ -200,7 +200,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 }
 
 async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
-    log::info!(
+    log::debug!(
         "Inside handle_report_trigger,org: {}, module_key: {}",
         &trigger.org,
         &trigger.module_key
@@ -220,7 +220,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     };
 
     if !report.enabled {
-        log::info!(
+        log::debug!(
             "Report not enabled: org: {}, report: {}",
             org_id,
             report_name
@@ -296,13 +296,13 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     let now = Utc::now().timestamp_micros();
     match report.send_subscribers().await {
         Ok(_) => {
-            log::info!("Report send_subscribers done, report: {}", report_name);
+            log::debug!("Report send_subscribers done, report: {}", report_name);
             // Report generation successful, update the trigger
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
             }
             db::scheduler::update_trigger(new_trigger).await?;
-            log::info!("Update trigger for report: {}", report_name);
+            log::debug!("Update trigger for report: {}", report_name);
             trigger_data_stream.end_time = Utc::now().timestamp_micros();
         }
         Err(e) => {
