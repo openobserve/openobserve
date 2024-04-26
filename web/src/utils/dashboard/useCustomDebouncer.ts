@@ -6,7 +6,6 @@ import {
   onMounted,
   onBeforeUnmount,
 } from "vue";
-import { onBeforeRouteUpdate } from "vue-router";
 
 /**
  * Custom hook to debounce a value
@@ -74,11 +73,6 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
   });
 
   onBeforeUnmount(() => {
-    resetTimeout();
-    isComponentActive.value = false;
-  });
-
-  onBeforeRouteUpdate(() => {
     resetTimeout();
     isComponentActive.value = false;
   });
