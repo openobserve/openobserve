@@ -333,10 +333,10 @@ async fn generate_report(
     });
 
     let web_url = format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri);
-    log::info!("Navigating to web url: {}", &web_url);
+    log::debug!("Navigating to web url: {}", &web_url);
     let page = browser.new_page(&format!("{web_url}/login")).await?;
     page.disable_log().await?;
-    log::info!("headless: new page created");
+    log::debug!("headless: new page created");
 
     page.find_element("input[type='email']")
         .await?
@@ -344,7 +344,7 @@ async fn generate_report(
         .await?
         .type_str(user_id)
         .await?;
-    log::info!("headless: email input filled");
+    log::debug!("headless: email input filled");
 
     page.find_element("input[type='password']")
         .await?
@@ -354,7 +354,7 @@ async fn generate_report(
         .await?
         .press_key("Enter")
         .await?;
-    log::info!("headless: password input filled");
+    log::debug!("headless: password input filled");
 
     // Does not seem to work for single page client application
     page.wait_for_navigation().await?;
@@ -368,7 +368,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&timezone={timezone}&var-__dynamic_filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -412,23 +412,29 @@ async fn generate_report(
             };
 
             let email_dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-__dynamic_filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true",
             );
             (dashb_url, email_dashb_url)
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&timezone={timezone}&var-__dynamic_filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
         }
     };
 
-    log::info!("headless: going to dash url");
+    log::debug!("headless: going to dash url");
+    // First navigate to the correct org
+    page.goto(&format!("{web_url}/?org_identifier={org_id}"))
+        .await?;
+    page.wait_for_navigation().await?;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    log::debug!("headless: navigated to the org_id: {org_id}");
 
     page.goto(&dashb_url).await?;
-    log::info!("headless: going to dash url");
+    log::debug!("headless: going to dash url");
 
     // Wait for navigation does not really wait until it is fully loaded
     page.wait_for_navigation().await?;
@@ -470,7 +476,7 @@ async fn generate_report(
 
     browser.close().await?;
     handle.await?;
-    log::info!("done with headless browser");
+    log::debug!("done with headless browser");
     Ok((pdf_data, email_dashb_url))
 }
 
