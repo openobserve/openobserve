@@ -1760,32 +1760,6 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loading = true;
-                if (searchObj.data.stream.selectedStreamFields.length == 0) {
-                  const streamData: any = getStream(
-                    searchObj.data.stream.selectedStream.value,
-                    searchObj.data.stream.streamType || "logs",
-                    true
-                  );
-                  searchObj.data.stream.selectedStreamFields =
-                    streamData.schema;
-                }
-
-                const streamFieldNames: any =
-                  searchObj.data.stream.selectedStreamFields.map(
-                    (item: any) => item.name
-                  );
-
-                for (const [
-                  fieldIndex,
-                  fieldName,
-                ] of searchObj.data.stream.interestingFieldList.entries()) {
-                  if (!streamFieldNames.includes(fieldName)) {
-                    searchObj.data.stream.interestingFieldList.splice(
-                      fieldIndex,
-                      1
-                    );
-                  }
-                }
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
                 updateUrlQueryParams();
