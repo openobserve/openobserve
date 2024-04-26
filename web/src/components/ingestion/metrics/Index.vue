@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             },
           }"
           :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
-          label="AWS CloudWatch Metrics (via Data Firehose)"
+          label="AWS CloudWatch Metrics"
           content-class="tab_content"
         />
       </q-tabs>
@@ -195,7 +195,7 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(360),
+      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       copyToClipboardFn,
       showUpdateDialogFn,
