@@ -75,7 +75,6 @@
         render-type="svg"
         style="height: calc(100vh - 165px)"
         @click="onChartClick"
-        @mouseover="onChartHover"
         @mouseout="onMouseOut"
         @drop="onNodeDrop"
         @dragover="onNodeDragOver"
@@ -278,7 +277,7 @@ const dialog = ref({
 
 const onChartClick = (params: any) => {
   const { type, name } = params.data;
-  if (type === "streamRoute") {
+  if (type === "streamRoute" || type === "condition") {
     editingStreamRouteName.value = name;
     dialog.value.show = true;
     dialog.value.name = "streamRouting";
@@ -367,17 +366,6 @@ const setupNodes = () => {
     });
 
   updateGraph();
-};
-
-const onChartHover = (params: any) => {
-  // const nodeRect = params.event.event.srcElement?.getBoundingClientRect();
-  // console.log("top and left", nodeRect, chartContainerRect.value);
-  // nodeActions.value.style.top = `${
-  //   nodeRect.top - chartContainerRect.value.top
-  // }px`;
-  // nodeActions.value.style.left = `${
-  //   nodeRect.left - chartContainerRect.value.left + 30
-  // }px`;
 };
 
 const onMouseMove = (params: any) => {};
@@ -475,15 +463,39 @@ const getNodePosition = (type: string, node?: any) => {
 const addFunctionNode = (data: { data: Function }) => {
   const nodeName = data.data.name;
 
+  // TODO OK: Optimize this function node creation
+  // Get all function nodes
+  // Get the editing node
+  // Remove function nodes from the nodes state
+  // Create functions nodes again and sort function nodes by order
+
+  const functionNodes = nodes.value.filter((node) => node.type === "function");
+
   if (editingFunctionName.value) {
-    nodes.value = nodes.value.filter(
-      (node) => node.name !== editingFunctionName.value
+    const editedNode = nodes.value.find(
+      (node) => node.name === editingFunctionName.value
     );
+
+    if (editedNode) editedNode.order = data.data.order;
 
     editingFunctionName.value = "";
   }
 
-  createFunctionNode(nodeName, data.data.stream, data.data.order);
+  nodes.value = nodes.value.filter((node) => node.type !== "function");
+
+  functionNodes
+    .sort((a, b) =>
+      a.order?.toString() && b.order?.toString()
+        ? Number(a.order) - Number(b.order)
+        : 0
+    )
+    .forEach((node) => {
+      createFunctionNode(
+        node.name,
+        node.stream as string,
+        node.order as number
+      );
+    });
 
   if (!functions.value[nodeName]) {
     functions.value[nodeName] = data.data;
@@ -524,8 +536,7 @@ const createFunctionNode = (
 
   nodes.value.push(node);
 
-  if (!nodeLinks.value[nodeName])
-    nodeLinks.value[nodeName] = { from: [], to: [] };
+  nodeLinks.value[nodeName] = { from: [], to: [] };
 
   return node;
 };
@@ -540,6 +551,8 @@ const updateFunctionNodesOrder = () => {
     );
 
   sortedFunctionNodes.forEach((node, index) => {
+    nodeLinks.value[node.name] = { from: [], to: [] };
+
     if (index === 0) {
       nodeLinks.value[node.name].from = [nodes.value[0].name];
       nodeLinks.value[nodes.value[0].name].to = [node.name];
@@ -739,7 +752,6 @@ const associateFunctions = async () => {
 };
 
 const deleteFunctionAssociation = (name: string) => {
-  console.log("Deleting function association", name);
   return jstransform.delete_stream_function(
     store.state.selectedOrganization.identifier,
     pipeline.value.stream_name,
@@ -803,7 +815,6 @@ const resetConfirmDialog = () => {
 // Drag n Drop methods
 
 const onNodeDragStart = (event: any, data: any) => {
-  console.log(event);
   event.dataTransfer.setData("text", data);
 };
 
@@ -822,7 +833,6 @@ const onNodeDrop = (event: any) => {
 
 const onNodeDragOver = (event: any) => {
   event.preventDefault();
-  console.log("over", event);
 };
 
 const updateNewFunction = (_function: Function) => {
