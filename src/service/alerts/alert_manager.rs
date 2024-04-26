@@ -31,7 +31,7 @@ use crate::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    log::info!("Pulling jobs from scheduler");
+    log::debug!("Pulling jobs from scheduler");
     // Scheduler pulls only those triggers that match the conditions-
     // - trigger.next_run_at <= now
     // - !(trigger.is_realtime && !trigger.is_silenced)
@@ -43,7 +43,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    log::info!("Pulled {} jobs from scheduler", triggers.len());
+    log::debug!("Pulled {} jobs from scheduler", triggers.len());
 
     for trigger in triggers {
         tokio::task::spawn(async move {

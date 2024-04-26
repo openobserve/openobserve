@@ -170,7 +170,6 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         retries: i32,
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        log::debug!("MySQL Updating trigger status");
         sqlx::query(
             r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#
         )
@@ -180,13 +179,11 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(key)
         .bind(module)
         .execute(&pool).await?;
-        log::debug!("MySQL Updating trigger status done");
         Ok(())
     }
 
     async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
         let pool = CLIENT.clone();
-        log::debug!("MySQL updating trigger");
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?
@@ -202,7 +199,6 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         .bind(trigger.module)
         .execute(&pool)
         .await?;
-        log::debug!("MySQL updating trigger done");
         Ok(())
     }
 

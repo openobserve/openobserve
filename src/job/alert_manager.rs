@@ -59,7 +59,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        log::info!("Running alert_manager inside job");
         let ret = service::alerts::alert_manager::run().await;
         if ret.is_err() {
             log::error!("[ALERT MANAGER] run error: {}", ret.err().unwrap());
