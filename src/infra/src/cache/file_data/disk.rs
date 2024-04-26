@@ -369,7 +369,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         let r = file.read().await;
         if r.cur_size + CONFIG.disk_cache.release_size < r.max_size {
             drop(r);
-            return Ok(());
+            continue;
         }
         drop(r);
         let mut w = file.write().await;
