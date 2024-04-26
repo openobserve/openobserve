@@ -760,7 +760,7 @@ const associateFunctions = async () => {
 };
 
 const deleteFunctionAssociation = (name: string) => {
-  return jstransform.delete_stream_function(
+  return jstransform.remove_stream_function(
     store.state.selectedOrganization.identifier,
     pipeline.value.stream_name,
     pipeline.value.stream_type,
