@@ -33,6 +33,7 @@ pub mod organization;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
+pub mod session;
 pub mod syslog;
 pub mod user;
 pub mod version;
@@ -52,21 +53,18 @@ pub(crate) async fn put(
     need_watch: bool,
     start_dt: Option<i64>,
 ) -> Result<()> {
+    let db = infra_db::get_db().await;
+    db.put(key, value.clone(), need_watch, start_dt).await?;
+
     // super cluster
     #[cfg(feature = "enterprise")]
     if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::put(
-            key,
-            value.clone(),
-            need_watch,
-            start_dt,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
+        o2_enterprise::enterprise::super_cluster::queue::put(key, value, need_watch, start_dt)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    let db = infra_db::get_db().await;
-    db.put(key, value, need_watch, start_dt).await
+    Ok(())
 }
 
 #[inline]

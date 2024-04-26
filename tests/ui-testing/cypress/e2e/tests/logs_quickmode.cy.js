@@ -155,6 +155,7 @@ describe("Logs Quickmode testcases", () => {
     cy.get(
       '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]:last'
     ).click({ force: true });
+    cy.wait(2000);
     cy.get('[data-test="logs-search-bar-query-editor"]').should(
       "not.contain",
       "kubernetes_pod_id"

@@ -34,6 +34,10 @@ use o2_enterprise::enterprise::openfga::{
     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
 #[cfg(feature = "enterprise")]
+use once_cell::sync::Lazy;
+#[cfg(feature = "enterprise")]
+use regex::Regex;
+#[cfg(feature = "enterprise")]
 use {
     crate::{
         common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
@@ -43,6 +47,9 @@ use {
 };
 #[cfg(feature = "enterprise")]
 use {serde_json::Value, std::collections::HashMap};
+
+#[cfg(feature = "enterprise")]
+static RE_ROLE_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 #[cfg(feature = "enterprise")]
 pub async fn process_token(
@@ -83,7 +90,7 @@ pub async fn process_token(
         for group in groups {
             let role_org = parse_dn(group.as_str().unwrap()).unwrap();
             if O2_CONFIG.openfga.map_group_to_role {
-                custom_roles.push(role_org.custom_role.unwrap());
+                custom_roles.push(format_role_name(role_org.custom_role.unwrap()));
             } else {
                 source_orgs.push(UserOrg {
                     role: role_org.role,
@@ -456,4 +463,9 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             }
         }
     }
+}
+
+#[cfg(feature = "enterprise")]
+fn format_role_name(role: String) -> String {
+    RE_ROLE_NAME.replace_all(&role, "_").to_string()
 }

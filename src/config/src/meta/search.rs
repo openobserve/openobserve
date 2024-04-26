@@ -192,6 +192,7 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing)]
     pub file_count: usize,
+    pub cached_ratio: usize,
     pub scan_size: usize,
     pub scan_records: usize,
     #[serde(default)]
@@ -230,6 +231,7 @@ impl Response {
             from,
             size,
             file_count: 0,
+            cached_ratio: 0,
             scan_size: 0,
             scan_records: 0,
             columns: Vec::new(),
@@ -277,6 +279,10 @@ impl Response {
 
     pub fn set_file_count(&mut self, val: usize) {
         self.file_count = val;
+    }
+
+    pub fn set_cached_ratio(&mut self, val: usize) {
+        self.cached_ratio = val;
     }
 
     pub fn set_scan_size(&mut self, val: usize) {
@@ -348,6 +354,9 @@ pub struct ScanStats {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub querier_files: i64,
+    pub querier_memory_cached_files: i64,
+    pub querier_disk_cached_files: i64,
 }
 
 impl ScanStats {
@@ -360,6 +369,9 @@ impl ScanStats {
         self.records += other.records;
         self.original_size += other.original_size;
         self.compressed_size += other.compressed_size;
+        self.querier_files += other.querier_files;
+        self.querier_memory_cached_files += other.querier_memory_cached_files;
+        self.querier_disk_cached_files += other.querier_disk_cached_files;
     }
 
     pub fn format_to_mb(&mut self) {
@@ -420,6 +432,9 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
+            querier_files: req.querier_files,
+            querier_memory_cached_files: req.querier_memory_cached_files,
+            querier_disk_cached_files: req.querier_disk_cached_files,
         }
     }
 }
@@ -431,6 +446,9 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
+            querier_files: req.querier_files,
+            querier_memory_cached_files: req.querier_memory_cached_files,
+            querier_disk_cached_files: req.querier_disk_cached_files,
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,23 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cluster;
-pub mod config;
-pub mod ider;
-pub mod meta;
-pub mod metrics;
-pub mod utils;
+use super::db;
 
-pub use config::*;
+pub async fn get_session(session_id: &str) -> Option<String> {
+    db::session::get(session_id).await.ok()
+}
 
-pub async fn init() -> Result<(), anyhow::Error> {
-    // init ider
-    ider::init();
+pub async fn set_session(session_id: &str, val: &str) -> Option<()> {
+    db::session::set(session_id, val).await.ok()
+}
 
-    // initialize chrome launch options, so that if chrome download is
-    // needed, it will happen now and not during serving report API
-    if cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
-        let _ = get_chrome_launch_options().await;
-    }
-    Ok(())
+pub async fn remove_session(session_id: &str) {
+    let _ = db::session::delete(session_id).await;
 }

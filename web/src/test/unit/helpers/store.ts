@@ -32,7 +32,6 @@ const store = createStore({
       version: "v0.2.0",
       commit_hash: "dc2b38c0f8be27bde395922d61134f09a3b4c",
       build_date: "2023-03-11T03:55:28Z",
-      functions_enabled: true,
       default_fts_keys: ["log", "message", "msg", "content", "data"],
       default_functions: [
         {

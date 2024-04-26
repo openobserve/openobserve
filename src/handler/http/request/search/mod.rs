@@ -277,6 +277,7 @@ pub async fn search(
                 user_email: Some(user_id.to_str().unwrap().to_string()),
                 min_ts: Some(req.query.start_time),
                 max_ts: Some(req.query.end_time),
+                cached_ratio: Some(res.cached_ratio),
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
@@ -627,6 +628,7 @@ pub async fn around(
     resp.size = around_size;
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;
     resp.took = resp_forward.took + resp_backward.took;
+    resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -660,6 +662,7 @@ pub async fn around(
         user_email: Some(user_id.to_string()),
         min_ts: Some(around_start_time),
         max_ts: Some(around_end_time),
+        cached_ratio: Some(resp.cached_ratio),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1013,6 +1016,7 @@ async fn values_v1(
     resp.size = size;
     resp.scan_size = resp_search.scan_size;
     resp.took = start.elapsed().as_millis() as usize;
+    resp.cached_ratio = resp_search.cached_ratio;
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -1042,6 +1046,7 @@ async fn values_v1(
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),
         max_ts: Some(end_time),
+        cached_ratio: Some(resp.cached_ratio),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1200,6 +1205,7 @@ async fn values_v2(
     resp.size = size;
     resp.scan_size = resp_search.scan_size;
     resp.took = start.elapsed().as_millis() as usize;
+    resp.cached_ratio = resp_search.cached_ratio;
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -1229,6 +1235,7 @@ async fn values_v2(
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),
         max_ts: Some(end_time),
+        cached_ratio: Some(resp.cached_ratio),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

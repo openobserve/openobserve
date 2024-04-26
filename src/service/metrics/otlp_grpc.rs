@@ -28,6 +28,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG,
 };
+use hashbrown::HashSet;
 use infra::schema::unwrap_partition_time_level;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -296,12 +297,24 @@ pub async fn handle_grpc_request(
                     let value_str = json::to_string(&val_map).unwrap();
 
                     // check for schema evolution
-                    let schema_fields_num = match metric_schema_map.get(local_metric_name) {
-                        Some(schema) => schema.schema().fields().len(),
-                        None => 0,
+                    let schema_fields = match metric_schema_map.get(local_metric_name) {
+                        Some(schema) => schema
+                            .schema()
+                            .fields()
+                            .iter()
+                            .map(|f| f.name())
+                            .collect::<HashSet<_>>(),
+                        None => HashSet::default(),
                     };
-                    if (schema_fields_num < val_map.len()
-                        || !schema_evolved.contains_key(local_metric_name))
+                    let mut need_schema_check = !schema_evolved.contains_key(local_metric_name);
+                    for key in val_map.keys() {
+                        if !schema_fields.contains(&key) {
+                            need_schema_check = true;
+                            break;
+                        }
+                    }
+                    drop(schema_fields);
+                    if need_schema_check
                         && check_for_schema(
                             org_id,
                             local_metric_name,

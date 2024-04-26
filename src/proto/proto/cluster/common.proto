@@ -52,6 +52,9 @@ message ScanStats {
     int64 records         = 2;
     int64 original_size   = 3; // unit: MB
     int64 compressed_size = 4; // unit: MB
+    int64 querier_files   = 5;
+    int64 querier_memory_cached_files = 6;
+    int64 querier_disk_cached_files   = 7;
 }
 
 message FileList {

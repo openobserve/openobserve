@@ -61,7 +61,6 @@ pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 pub const PARQUET_WRITE_BUFFER_SIZE: usize = 4096;
 
-pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
@@ -547,8 +546,6 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "ZO_USAGE_REPORTING_COMPRESSED_SIZE", default = false)]
-    pub usage_report_compressed_size: bool,
     #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
     pub usage_org: String,
     #[env_config(
