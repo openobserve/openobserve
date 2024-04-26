@@ -321,6 +321,7 @@ async fn generate_report(
     log::info!("launching browser for dashboard {dashboard_id}");
     let (mut browser, mut handler) =
         Browser::launch(get_chrome_launch_options().await.as_ref().unwrap().clone()).await?;
+    log::info!("browser launched");
 
     let handle = tokio::task::spawn(async move {
         while let Some(h) = handler.next().await {
@@ -332,14 +333,18 @@ async fn generate_report(
     });
 
     let web_url = format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri);
+    log::info!("Navigating to web url: {}", &web_url);
     let page = browser.new_page(&format!("{web_url}/login")).await?;
     page.disable_log().await?;
+    log::info!("headless: new page created");
+
     page.find_element("input[type='email']")
         .await?
         .click()
         .await?
         .type_str(user_id)
         .await?;
+    log::info!("headless: email input filled");
 
     page.find_element("input[type='password']")
         .await?
@@ -349,6 +354,7 @@ async fn generate_report(
         .await?
         .press_key("Enter")
         .await?;
+    log::info!("headless: password input filled");
 
     // Does not seem to work for single page client application
     page.wait_for_navigation().await?;
@@ -419,7 +425,11 @@ async fn generate_report(
         }
     };
 
+    log::info!("headless: going to dash url");
+
     page.goto(&dashb_url).await?;
+    log::info!("headless: going to dash url");
+
     // Wait for navigation does not really wait until it is fully loaded
     page.wait_for_navigation().await?;
 
@@ -460,12 +470,14 @@ async fn generate_report(
 
     browser.close().await?;
     handle.await?;
+    log::info!("done with headless browser");
     Ok((pdf_data, email_dashb_url))
 }
 
 async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
+    log::info!("waiting for headless data to load");
     loop {
         if page
             .find_element("span#dashboardVariablesAndPanelsDataLoaded")
