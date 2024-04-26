@@ -29,6 +29,7 @@ import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
 import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
 import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
+import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
@@ -145,6 +146,14 @@ const useIngestionRoutes = () => {
                   path: "telegraf",
                   name: "telegraf",
                   component: TelegrafConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "cloudwatchMetrics",
+                  name: "cloudwatchMetrics",
+                  component: CloudWatchMetricConfig,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },

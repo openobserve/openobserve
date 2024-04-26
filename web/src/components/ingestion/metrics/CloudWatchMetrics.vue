@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2024 Zinc Labs Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md">
-    <CopyContent class="q-mt-sm" :content="content" />
+  <div>
+    <div class="q-ma-md">
+      <CopyContent class="q-mt-sm" :content="content" />
+    </div>
+    <div>
+      <a
+        href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
+        class="q-ml-lg text-bold"
+        style="padding-right: 2px"
+        target="_blank"
+        title="AWS CloudWatch Metrics - Set up a custom metric stream with Firehose"
+      >
+        Click here</a
+      >
+      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve.
+      <p class="q-ml-lg text-italic" style="padding-right: 2px">Note: Output is available under Logs with stream name 'cloudwatch_metrics'.</p>
+    </div>
   </div>
 </template>
 
@@ -28,7 +43,7 @@ import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 
 export default defineComponent({
-  name: "kineses-firehose",
+  name: "cloudwatchMetrics",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -56,7 +71,7 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
     
-    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_logs/_kinesis_firehose
+    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
       store,
