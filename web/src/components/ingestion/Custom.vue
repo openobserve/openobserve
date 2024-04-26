@@ -105,7 +105,7 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
-    const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
+    const metricRoutes = ["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"];
     const traceRoutes = ["tracesOTLP"];
     const rumRoutes = ["frontendMonitoring"];
 
