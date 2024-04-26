@@ -1379,9 +1379,9 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.multi_dir.contains('/') {
-        let err =
-            "ZO_DISK_CACHE_MULTI_DIR only supports a single directory level, can not contains / ";
-        return Err(anyhow::anyhow!(err));
+        return Err(anyhow::anyhow!(
+            "ZO_DISK_CACHE_MULTI_DIR only supports a single directory level, can not contains / "
+        ));
     }
 
     Ok(())
