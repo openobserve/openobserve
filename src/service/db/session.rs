@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{utils::json, CONFIG};
 
 use crate::{
     common::infra::config::USER_SESSIONS,
@@ -29,10 +29,7 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
     match USER_SESSIONS.get(session_id) {
         Some(val) => Ok(val.to_string()),
         None => {
-            let cluster_coordinator = db::get_coordinator().await;
-            let val = cluster_coordinator
-                .get(&format!("{USER_SESSION_KEY}{session_id}"))
-                .await?;
+            let val = db::get(&format!("{USER_SESSION_KEY}{session_id}")).await?;
 
             Ok(json::to_string(&val).unwrap())
         }
@@ -40,28 +37,24 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 }
 
 pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
-    cluster_coordinator
-        .put(
-            &format!("{USER_SESSION_KEY}{session_id}"),
-            json::to_vec(&val).unwrap().into(),
-            db::NEED_WATCH,
-            None,
-        )
-        .await?;
+    db::put(
+        &format!("{USER_SESSION_KEY}{session_id}"),
+        json::to_vec(&val).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?;
     Ok(())
 }
 
 pub async fn delete(session_id: &str) -> Result<(), anyhow::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
-    Ok(cluster_coordinator
-        .delete(
-            &format!("{USER_SESSION_KEY}{session_id}"),
-            false,
-            db::NEED_WATCH,
-            None,
-        )
-        .await?)
+    Ok(db::delete(
+        &format!("{USER_SESSION_KEY}{session_id}"),
+        false,
+        db::NEED_WATCH,
+        None,
+    )
+    .await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -81,7 +74,23 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value = if CONFIG.common.meta_store_external {
+                    match db::get(&ev.key).await {
+                        Ok(val) => match json::from_slice(&val) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    }
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 USER_SESSIONS.insert(item_key.to_string(), item_value);
             }
             db::Event::Delete(ev) => {
@@ -95,8 +104,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = USER_SESSION_KEY;
-    let cluster_coordinator = db::get_coordinator().await;
-    let ret = cluster_coordinator.list(key).await?;
+    let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let session_id = item_key.strip_prefix(key).unwrap();
         let json_val: String = json::from_slice(&item_value).unwrap();
