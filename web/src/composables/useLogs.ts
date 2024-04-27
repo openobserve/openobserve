@@ -410,7 +410,9 @@ const useLogs = () => {
 
     if (searchObj.data.stream.selectedStream.label) {
       query["stream"] = searchObj.data.stream.selectedStream.label;
-      query["stream_value"] = searchObj.data.stream.selectedStream.value;
+      query["stream_value"] =
+        searchObj.data.stream.selectedStream.value ||
+        searchObj.data.stream.selectedStream.label;
     }
 
     if (date.type == "relative") {
@@ -482,6 +484,31 @@ const useLogs = () => {
             ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
+
+      if (searchObj.data.stream.selectedStreamFields.length == 0) {
+        const streamData: any = getStream(
+          searchObj.data.stream.selectedStream.value,
+          searchObj.data.stream.streamType || "logs",
+          true
+        );
+        searchObj.data.stream.selectedStreamFields = streamData.schema;
+      }
+
+      const streamFieldNames: any =
+        searchObj.data.stream.selectedStreamFields.map(
+          (item: any) => item.name
+        );
+
+      for (
+        let i = searchObj.data.stream.interestingFieldList.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const fieldName = searchObj.data.stream.interestingFieldList[i];
+        if (!streamFieldNames.includes(fieldName)) {
+          searchObj.data.stream.interestingFieldList.splice(i, 1);
+        }
+      }
 
       if (
         searchObj.data.stream.interestingFieldList.length > 0 &&
@@ -1024,7 +1051,7 @@ const useLogs = () => {
           queryReq.query.from = 0;
         }
 
-        // get funtion definition
+        // get function definition
         if (
           searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
@@ -1507,6 +1534,7 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
+      searchObj.data.errorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
       let ftsKeys: Set<any> = new Set();
@@ -1532,6 +1560,11 @@ const useLogs = () => {
             } else {
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
+              if (streamSchema == undefined) {
+                searchObj.data.errorMsg = t("search.noFieldFound");
+                throw new Error(searchObj.data.errorMsg);
+                return;
+              }
               stream.settings = streamData.settings;
               queryResult.push(...streamSchema);
               schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
@@ -1581,7 +1614,12 @@ const useLogs = () => {
           }
         }
 
-        let fields: any = {};
+        let environmentInterestingFields = [];
+        if (store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")) {
+          environmentInterestingFields =
+            store.state?.zoConfig?.default_quick_mode_fields;
+        }
+
         const localInterestingFields: any = useLocalInterestingFields();
         searchObj.data.stream.interestingFieldList =
           localInterestingFields.value != null &&
@@ -1600,17 +1638,43 @@ const useLogs = () => {
                   "_" +
                   searchObj.data.stream.selectedStream.value
               ]
+            : environmentInterestingFields.length > 0
+            ? [...environmentInterestingFields]
             : [...schemaInterestingFields];
 
-        let environmentInterestingFields = [];
-        if (store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")) {
-          environmentInterestingFields =
-            store.state?.zoConfig?.default_quick_mode_fields;
+        if (searchObj.data.stream.selectedStreamFields.length == 0) {
+          const streamData: any = await getStream(
+            searchObj.data.stream.selectedStream.value,
+            searchObj.data.stream.streamType || "logs",
+            true
+          );
+          searchObj.data.stream.selectedStreamFields = streamData.schema;
         }
+
+        const streamFieldNames: any =
+          searchObj.data.stream.selectedStreamFields.map(
+            (item: any) => item.name
+          );
+
+        for (
+          let i = searchObj.data.stream.interestingFieldList.length - 1;
+          i >= 0;
+          i--
+        ) {
+          const fieldName = searchObj.data.stream.interestingFieldList[i];
+          if (!streamFieldNames.includes(fieldName)) {
+            searchObj.data.stream.interestingFieldList.splice(i, 1);
+          }
+        }
+
         let index = -1;
+        const fields: any = {};
         // queryResult.forEach((row: any) => {
         for (const row of queryResult) {
-          if (fields[row.name] == undefined) {
+          if (
+            fields[row.name] == undefined &&
+            !streamFieldNames.includes(row.name)
+          ) {
             fields[row.name] = {};
             searchObj.data.stream.selectedStreamFields.push({
               name: row.name,
@@ -1622,48 +1686,76 @@ const useLogs = () => {
                   ? true
                   : false,
             });
+          } else {
+            index = streamFieldNames.indexOf(row.name);
+            if (index > -1) {
+              (searchObj.data.stream.selectedStreamFields[index].ftsKey =
+                ftsKeys?.has(row.name)),
+                (searchObj.data.stream.selectedStreamFields[
+                  index
+                ].isSchemaField = schemaFields.has(row.name)),
+                (searchObj.data.stream.selectedStreamFields[index].showValues =
+                  row.name !== timestampField),
+                (searchObj.data.stream.selectedStreamFields[
+                  index
+                ].isInterestingField =
+                  searchObj.data.stream.interestingFieldList.includes(row.name)
+                    ? true
+                    : false);
+            }
           }
         }
 
-        fields = {};
-        for (const row of queryResult) {
-          // let keys = deepKeys(row);
-          // for (let i in row) {
-          if (fields[row.name] == undefined) {
-            fields[row.name] = {};
-            if (environmentInterestingFields.includes(row.name)) {
-              index = searchObj.data.stream.interestingFieldList.indexOf(
-                row.name
-              );
-              if (index == -1 && row.name != "*") {
-                for (const [
-                  index,
-                  stream,
-                ] of searchObj.data.stream.selectedStreamFields.entries()) {
-                  if ((stream as { name: string }).name == row.name) {
-                    searchObj.data.stream.interestingFieldList.push(row.name);
-                    const localInterestingFields: any =
-                      useLocalInterestingFields();
-                    let localFields: any = {};
-                    if (localInterestingFields.value != null) {
-                      localFields = localInterestingFields.value;
-                    }
-                    localFields[
-                      searchObj.organizationIdetifier +
-                        "_" +
-                        searchObj.data.stream.selectedStream.value
-                    ] = searchObj.data.stream.interestingFieldList;
-                    useLocalInterestingFields(localFields);
-                    searchObj.data.stream.selectedStreamFields[
-                      index
-                    ].isInterestingField = true;
-                  }
-                }
-              }
-            }
-          }
-          // }
+        let localFields: any = {};
+        if (localInterestingFields.value != null) {
+          localFields = localInterestingFields.value;
         }
+        localFields[
+          searchObj.organizationIdetifier +
+            "_" +
+            searchObj.data.stream.selectedStream.value
+        ] = searchObj.data.stream.interestingFieldList;
+        useLocalInterestingFields(localFields);
+
+        // fields = {};
+        // for (const row of queryResult) {
+        //   // let keys = deepKeys(row);
+        //   // for (let i in row) {
+        //   if (fields[row.name] == undefined) {
+        //     fields[row.name] = {};
+        //     if (environmentInterestingFields.includes(row.name)) {
+        //       index = searchObj.data.stream.interestingFieldList.indexOf(
+        //         row.name
+        //       );
+        //       if (index == -1 && row.name != "*") {
+        //         for (const [
+        //           index,
+        //           stream,
+        //         ] of searchObj.data.stream.selectedStreamFields.entries()) {
+        //           if ((stream as { name: string }).name == row.name) {
+        //             searchObj.data.stream.interestingFieldList.push(row.name);
+        //             searchObj.data.stream.selectedStreamFields[
+        //               index
+        //             ].isInterestingField = true;
+        //           }
+        //         }
+
+        //         const localInterestingFields: any = useLocalInterestingFields();
+        //         let localFields: any = {};
+        //         if (localInterestingFields.value != null) {
+        //           localFields = localInterestingFields.value;
+        //         }
+        //         localFields[
+        //           searchObj.organizationIdetifier +
+        //             "_" +
+        //             searchObj.data.stream.selectedStream.value
+        //         ] = searchObj.data.stream.interestingFieldList;
+        //         useLocalInterestingFields(localFields);
+        //       }
+        //     }
+        //   }
+        //   // }
+        // }
       }
     } catch (e: any) {
       console.log("Error while extracting fields");
@@ -2072,6 +2164,11 @@ const useLogs = () => {
         value: queryParams.stream_value,
         label: queryParams.stream,
       };
+    } else if (queryParams.stream) {
+      searchObj.data.stream.selectedStream = {
+        value: queryParams.stream,
+        label: queryParams.stream,
+      };
     }
 
     if (queryParams.show_histogram) {
@@ -2198,6 +2295,36 @@ const useLogs = () => {
 
     await extractFields();
 
+    if (searchObj.data.stream.selectedStreamFields.length == 0) {
+      const streamData: any = await getStream(
+        searchObj.data.stream.selectedStream.value,
+        searchObj.data.stream.streamType || "logs",
+        true
+      );
+      searchObj.data.stream.selectedStreamFields = streamData.schema;
+    }
+
+    if (
+      searchObj.data.stream.selectedStreamFields == undefined ||
+      searchObj.data.stream.selectedStreamFields.length == 0
+    ) {
+      searchObj.data.errorMsg = t("search.noFieldFound");
+      return;
+    }
+    const streamFieldNames: any =
+      searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
+
+    for (
+      let i = searchObj.data.stream.interestingFieldList.length - 1;
+      i >= 0;
+      i--
+    ) {
+      const fieldName = searchObj.data.stream.interestingFieldList[i];
+      if (!streamFieldNames.includes(fieldName)) {
+        searchObj.data.stream.interestingFieldList.splice(i, 1);
+      }
+    }
+
     if (queryStr == "") {
       if (
         searchObj.data.stream.interestingFieldList.length > 0 &&
@@ -2311,6 +2438,7 @@ const useLogs = () => {
     getFunctions,
     getStreamList,
     fieldValues,
+    extractFields,
     getQueryData,
     searchAroundData,
     updateGridColumns,

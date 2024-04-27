@@ -380,8 +380,8 @@ impl super::Db for MysqlDb {
                 )
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
-                    module, key1, key2
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND (key2 = '{}' OR key2 LIKE '{}/%');"#,
+                    module, key1, key2, key2
                 )
             }
         } else {
@@ -413,7 +413,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
         sql = format!("{} ORDER BY start_dt ASC", sql);
 
@@ -442,7 +442,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
 
         sql = format!("{} ORDER BY start_dt ASC", sql);
@@ -476,7 +476,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
         let pool = CLIENT.clone();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
@@ -518,7 +518,7 @@ CREATE TABLE IF NOT EXISTS meta
     .execute(&pool)
     .await?;
 
-    // create start_dt cloumn for old version <= 0.9.2
+    // create start_dt column for old version <= 0.9.2
     let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='meta' AND column_name='start_dt';")
             .fetch_one(&pool)
             .await?;

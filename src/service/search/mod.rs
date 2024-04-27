@@ -236,6 +236,9 @@ pub async fn search_partition(
         partitions.push([start, end]);
         end = start;
     }
+    if partitions.is_empty() {
+        partitions.push([req.start_time, req.end_time]);
+    }
     resp.partitions = partitions;
     Ok(resp)
 }
@@ -360,6 +363,9 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 records: scan_stats.records,
                 original_size: scan_stats.original_size / 1024 / 1024, // change to MB
                 compressed_size: scan_stats.compressed_size / 1024 / 1024, // change to MB
+                querier_files: scan_stats.querier_files,
+                querier_memory_cached_files: scan_stats.querier_memory_cached_files,
+                querier_disk_cached_files: scan_stats.querier_disk_cached_files,
             });
         let query_status = if result.is_queue {
             "waiting"

@@ -34,6 +34,10 @@ use o2_enterprise::enterprise::openfga::{
     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
 #[cfg(feature = "enterprise")]
+use once_cell::sync::Lazy;
+#[cfg(feature = "enterprise")]
+use regex::Regex;
+#[cfg(feature = "enterprise")]
 use {
     crate::{
         common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
@@ -43,6 +47,9 @@ use {
 };
 #[cfg(feature = "enterprise")]
 use {serde_json::Value, std::collections::HashMap};
+
+#[cfg(feature = "enterprise")]
+static RE_ROLE_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 #[cfg(feature = "enterprise")]
 pub async fn process_token(
@@ -83,7 +90,7 @@ pub async fn process_token(
         for group in groups {
             let role_org = parse_dn(group.as_str().unwrap()).unwrap();
             if O2_CONFIG.openfga.map_group_to_role {
-                custom_roles.push(role_org.custom_role.unwrap());
+                custom_roles.push(format_role_name(role_org.custom_role.unwrap()));
             } else {
                 source_orgs.push(UserOrg {
                     role: role_org.role,
@@ -366,7 +373,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             .await;
             tuples.push(get_user_org_tuple(&O2_CONFIG.dex.default_org, user_email));
             tuples.push(get_user_org_tuple(user_email, user_email));
-
+            let start = std::time::Instant::now();
             check_and_get_crole_tuple_for_new_user(
                 user_email,
                 &O2_CONFIG.dex.default_org,
@@ -374,6 +381,10 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                 &mut tuples,
             )
             .await;
+            log::info!(
+                "group_to_custom_role: Time taken to get crole tuple: {:?}",
+                start.elapsed()
+            );
         }
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
@@ -393,6 +404,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             Ok(_) => {
                 log::info!("group_to_custom_role: User added to the database");
                 if O2_CONFIG.openfga.enabled {
+                    let start = std::time::Instant::now();
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("group_to_custom_role: User updated to the openfga");
@@ -404,6 +416,11 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                             );
                         }
                     }
+
+                    log::info!(
+                        "group_to_custom_role: Time taken to update roles to db for new user: {:?}",
+                        start.elapsed()
+                    );
                 }
             }
             Err(e) => {
@@ -429,20 +446,22 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         }
 
         // Find new roles to add: present in custom_role but not in existing_role
-        for new_role in custom_roles {
-            if !existing_roles.contains(&new_role) {
-                // add role
-                check_and_get_crole_tuple_for_new_user(
-                    user_email,
-                    &O2_CONFIG.dex.default_org,
-                    vec![new_role],
-                    &mut add_tuples,
-                )
-                .await;
-            }
-        }
+        let new_roles = custom_roles
+            .iter()
+            .filter(|&role| !existing_roles.contains(role))
+            .cloned()
+            .collect();
+
+        check_and_get_crole_tuple_for_new_user(
+            user_email,
+            &O2_CONFIG.dex.default_org,
+            new_roles,
+            &mut add_tuples,
+        )
+        .await;
 
         if O2_CONFIG.openfga.enabled {
+            let start = std::time::Instant::now();
             match update_tuples(add_tuples, remove_tuples).await {
                 Ok(_) => {
                     log::info!("group_to_custom_role: User updated to the openfga");
@@ -454,6 +473,15 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                     );
                 }
             }
+            log::info!(
+                "group_to_custom_role: Time taken to update roles to db for existing user: {:?}",
+                start.elapsed()
+            );
         }
     }
+}
+
+#[cfg(feature = "enterprise")]
+fn format_role_name(role: String) -> String {
+    RE_ROLE_NAME.replace_all(&role, "_").to_string()
 }

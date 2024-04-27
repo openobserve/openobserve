@@ -514,7 +514,11 @@ pub async fn delete_fields(
                         }
                     })
                     .collect::<Vec<_>>();
-                settings.defined_schema_fields = Some(defined_schema_fields);
+                if defined_schema_fields.is_empty() {
+                    settings.defined_schema_fields = None;
+                } else {
+                    settings.defined_schema_fields = Some(defined_schema_fields);
+                }
             };
             new_metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
             let new_schema = vec![Schema::new_with_metadata(fields, new_metadata)];

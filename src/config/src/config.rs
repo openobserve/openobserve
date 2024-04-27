@@ -61,7 +61,6 @@ pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
 pub const PARQUET_WRITE_BUFFER_SIZE: usize = 4096;
 
-pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
@@ -199,6 +198,10 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
                 ..Viewport::default()
             });
 
+        if CONFIG.chrome.chrome_with_head {
+            browser_config = browser_config.with_head();
+        }
+
         if CONFIG.chrome.chrome_no_sandbox {
             browser_config = browser_config.no_sandbox();
         }
@@ -332,6 +335,8 @@ pub struct Chrome {
     pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
+    #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
+    pub chrome_with_head: bool,
     #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
     pub chrome_sleep_secs: u16,
     #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
@@ -549,8 +554,6 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "ZO_USAGE_REPORTING_COMPRESSED_SIZE", default = false)]
-    pub usage_report_compressed_size: bool,
     #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
     pub usage_org: String,
     #[env_config(

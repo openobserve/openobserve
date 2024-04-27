@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, CONFIG, INSTANCE_ID};
+use config::{cluster, CONFIG};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
@@ -80,17 +80,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("organization cache sync failed");
 
-    // set instance id
-    let instance_id = match db::instance::get().await {
-        Ok(Some(instance)) => instance,
-        Ok(None) | Err(_) => {
-            let id = ider::generate();
-            let _ = db::instance::set(&id).await;
-            id
-        }
-    };
-    INSTANCE_ID.insert("instance_id".to_owned(), instance_id);
-
     // check version
     db::version::set().await.expect("db version set failed");
 
@@ -116,6 +105,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
+
+    #[cfg(feature = "enterprise")]
+    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+        tokio::task::spawn(async move { db::session::watch().await });
+    }
 
     tokio::task::yield_now().await; // yield let other tasks run
 
@@ -177,6 +171,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     db::ofga::cache().await.expect("ofga model cache failed");
+
+    #[cfg(feature = "enterprise")]
+    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+        db::session::cache()
+            .await
+            .expect("user session cache failed");
+    }
 
     // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

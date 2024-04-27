@@ -501,7 +501,7 @@ export default defineComponent({
               selectedStreamItemObj = itemObj;
             }
 
-            // If stream from query params dosent match the selected stream, then select the stream from last updated time
+            // If stream from query params doesn't match the selected stream, then select the stream from last updated time
             if (
               item.stats.doc_time_max >= lastUpdatedStreamTime &&
               !(

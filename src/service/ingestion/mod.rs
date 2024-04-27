@@ -26,10 +26,7 @@ use config::{
         stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
         usage::RequestStats,
     },
-    utils::{
-        flatten,
-        json::{self, Map, Value},
-    },
+    utils::{flatten, json::*},
     CONFIG, SIZE_IN_MB,
 };
 use vector_enrichment::TableRegistry;
@@ -339,65 +336,25 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
     Ok(())
 }
 
-pub fn get_float_value(val: &Value) -> f64 {
-    match val {
-        Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
-        Value::Number(v) => v.as_f64().unwrap_or(0.0),
-        _ => 0.0,
-    }
-}
-
-pub fn get_int_value(val: &Value) -> i64 {
-    match val {
-        Value::String(v) => v.parse::<i64>().unwrap_or(0),
-        Value::Number(v) => v.as_i64().unwrap_or(0),
-        _ => 0,
-    }
-}
-
-pub fn get_uint_value(val: &Value) -> u64 {
-    match val {
-        Value::String(v) => v.parse::<u64>().unwrap_or(0),
-        Value::Number(v) => v.as_u64().unwrap_or(0),
-        _ => 0,
-    }
-}
-
-pub fn get_string_value(value: &Value) -> String {
-    if value.is_boolean() {
-        value.as_bool().unwrap_or_default().to_string()
-    } else if value.is_i64() {
-        value.as_i64().unwrap_or_default().to_string()
-    } else if value.is_u64() {
-        value.as_u64().unwrap_or_default().to_string()
-    } else if value.is_f64() {
-        value.as_f64().unwrap_or_default().to_string()
-    } else if value.is_string() {
-        value.as_str().unwrap_or_default().to_string()
-    } else {
-        value.to_string()
-    }
-}
-
 pub fn get_val_for_attr(attr_val: &Value) -> Value {
     let local_val = attr_val.as_object().unwrap();
     if let Some((key, value)) = local_val.into_iter().next() {
         match key.as_str() {
             "stringValue" | "string_value" => {
-                return json::json!(get_string_value(value));
+                return json!(get_string_value(value));
             }
             "boolValue" | "bool_value" => {
-                return json::json!(value.as_bool().unwrap_or(false).to_string());
+                return json!(value.as_bool().unwrap_or(false).to_string());
             }
             "intValue" | "int_value" => {
-                return json::json!(get_int_value(value).to_string());
+                return json!(get_int_value(value).to_string());
             }
             "doubleValue" | "double_value" => {
-                return json::json!(get_float_value(value).to_string());
+                return json!(get_float_value(value).to_string());
             }
 
             "bytesValue" | "bytes_value" => {
-                return json::json!(value.as_str().unwrap_or("").to_string());
+                return json!(value.as_str().unwrap_or("").to_string());
             }
 
             "arrayValue" | "array_value" => {
@@ -411,11 +368,11 @@ pub fn get_val_for_attr(attr_val: &Value) -> Value {
                 {
                     vals.push(get_val_for_attr(item));
                 }
-                return json::json!(vals);
+                return json!(vals);
             }
 
             "kvlistValue" | "kvlist_value" => {
-                let mut vals = json::Map::new();
+                let mut vals = Map::new();
                 for item in value
                     .get("values")
                     .unwrap()
@@ -428,11 +385,11 @@ pub fn get_val_for_attr(attr_val: &Value) -> Value {
                     let value = item.get("value").unwrap().clone();
                     vals.insert(key, get_val_for_attr(&value));
                 }
-                return json::json!(vals);
+                return json!(vals);
             }
 
             _ => {
-                return json::json!(get_string_value(value));
+                return json!(get_string_value(value));
             }
         }
     };
@@ -442,19 +399,19 @@ pub fn get_val_for_attr(attr_val: &Value) -> Value {
 pub fn get_val_with_type_retained(val: &Value) -> Value {
     match val {
         Value::String(val) => {
-            json::json!(val)
+            json!(val)
         }
         Value::Bool(val) => {
-            json::json!(val)
+            json!(val)
         }
         Value::Number(val) => {
-            json::json!(val)
+            json!(val)
         }
         Value::Array(val) => {
-            json::json!(val)
+            json!(val)
         }
         Value::Object(val) => {
-            json::json!(val)
+            json!(val)
         }
         Value::Null => Value::Null,
     }
@@ -494,7 +451,9 @@ pub async fn get_user_defined_schema(
                 .await
                 .unwrap_or_default();
         if let Some(fields) = stream_settings.defined_schema_fields {
-            user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+            if !fields.is_empty() {
+                user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+            }
         }
     }
 }

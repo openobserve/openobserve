@@ -189,6 +189,12 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .expect("common infra init failed");
 
+    // init enterprise
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::init()
+        .await
+        .expect("enerprise init failed");
+
     // check version upgrade
     let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
     migration::check_upgrade(&old_version, VERSION).await?;
@@ -200,12 +206,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // init job
     job::init().await.expect("job init failed");
-
-    // init enterprise
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::init()
-        .await
-        .expect("enerprise init failed");
 
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
