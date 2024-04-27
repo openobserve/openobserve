@@ -407,7 +407,7 @@ impl<'a> IngestionData<'a> {
                             );
                         }
                         Ok(decompressed_data) => {
-                            match deserialize_from_str(&decompressed_data, request_id) {
+                            match deserialize_aws_record_from_str(&decompressed_data, request_id) {
                                 Ok(parsed_events) => events.extend(parsed_events),
                                 Err(err) => {
                                     return IngestionDataIter::KinesisFH(
@@ -439,7 +439,7 @@ pub fn decode_and_decompress(encoded_data: &str) -> Result<String, Box<dyn std::
     }
 }
 
-fn deserialize_from_str(data: &str, request_id: &str) -> Result<Vec<json::Value>> {
+fn deserialize_aws_record_from_str(data: &str, request_id: &str) -> Result<Vec<json::Value>> {
     let mut events = vec![];
     let mut value;
     for line in data.lines() {
@@ -514,7 +514,7 @@ fn deserialize_from_str(data: &str, request_id: &str) -> Result<Vec<json::Value>
                 let metric_dimensions = dimensions
                     .as_object()
                     .ok_or(anyhow::anyhow!(
-                        "CloudWatch metrics failed to Metric dimensions Object"
+                        "CloudWatch metrics dimensions parsing failed"
                     ))?
                     .iter()
                     .map(|(k, v)| format!("{}=[{}]", k, v))
@@ -543,7 +543,7 @@ fn deserialize_from_str(data: &str, request_id: &str) -> Result<Vec<json::Value>
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_and_decompress, deserialize_from_str};
+    use super::{decode_and_decompress, deserialize_aws_record_from_str};
 
     #[test]
     fn test_decode_and_decompress_success() {
@@ -579,7 +579,7 @@ mod tests {
         assert!(decoded.is_ok());
         let decoded = decoded.unwrap();
         let request_id = "test_id".to_string();
-        let result = deserialize_from_str(&decoded, &request_id);
+        let result = deserialize_aws_record_from_str(&decoded, &request_id);
         assert!(result.is_ok());
         let value = result.unwrap();
         for val in value {
@@ -594,7 +594,7 @@ mod tests {
         assert!(decoded.is_ok());
         let decoded = decoded.unwrap();
         let request_id = "test_id".to_string();
-        let result = deserialize_from_str(&decoded, &request_id);
+        let result = deserialize_aws_record_from_str(&decoded, &request_id);
         assert!(result.is_ok());
         let result = result.unwrap();
         for val in result {

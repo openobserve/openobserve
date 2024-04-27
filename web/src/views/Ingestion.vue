@@ -212,7 +212,7 @@ export default defineComponent({
     const ingestTabType = ref("recommended");
 
     const activeTab = ref("recommended");
-    const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
+    const metricRoutes = ["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"];
     const traceRoutes = ["tracesOTLP"];
     const rumRoutes = ["frontendMonitoring"];
 

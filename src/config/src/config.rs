@@ -198,6 +198,10 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
                 ..Viewport::default()
             });
 
+        if CONFIG.chrome.chrome_with_head {
+            browser_config = browser_config.with_head();
+        }
+
         if CONFIG.chrome.chrome_no_sandbox {
             browser_config = browser_config.no_sandbox();
         }
@@ -331,6 +335,8 @@ pub struct Chrome {
     pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
+    #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
+    pub chrome_with_head: bool,
     #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
     pub chrome_sleep_secs: u16,
     #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]

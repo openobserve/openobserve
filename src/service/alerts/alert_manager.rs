@@ -169,14 +169,26 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
-                db::scheduler::update_status(
-                    &new_trigger.org,
-                    new_trigger.module,
-                    &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                )
-                .await?;
+                if trigger.retries + 1 >= CONFIG.limit.scheduler_max_retries {
+                    // It has been tried the maximum time, just update the
+                    // next_run_at to the next expected trigger time
+                    log::debug!(
+                        "This alert trigger: {}/{} has reached maximum retries",
+                        &new_trigger.org,
+                        &new_trigger.module_key
+                    );
+                    db::scheduler::update_trigger(new_trigger).await?;
+                } else {
+                    // Otherwise update its status only
+                    db::scheduler::update_status(
+                        &new_trigger.org,
+                        new_trigger.module,
+                        &new_trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                    )
+                    .await?;
+                }
                 trigger_data_stream.status = TriggerDataStatus::Failed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
@@ -307,14 +319,24 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
         Err(e) => {
             log::error!("Error sending report to subscribers: {e}");
-            db::scheduler::update_status(
-                &new_trigger.org,
-                new_trigger.module,
-                &new_trigger.module_key,
-                db::scheduler::TriggerStatus::Waiting,
-                trigger.retries + 1,
-            )
-            .await?;
+            if trigger.retries + 1 >= CONFIG.limit.scheduler_max_retries && !run_once {
+                // It has been tried the maximum time, just update the
+                // next_run_at to the next expected trigger time
+                log::debug!(
+                    "This report trigger: {org_id}/{report_name} has reached maximum possible retries"
+                );
+                db::scheduler::update_trigger(new_trigger).await?;
+            } else {
+                // Otherwise update its status only
+                db::scheduler::update_status(
+                    &new_trigger.org,
+                    new_trigger.module,
+                    &new_trigger.module_key,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                )
+                .await?;
+            }
             trigger_data_stream.end_time = Utc::now().timestamp_micros();
             trigger_data_stream.status = TriggerDataStatus::Failed;
             trigger_data_stream.error = Some(format!("error processing report: {e}"));
