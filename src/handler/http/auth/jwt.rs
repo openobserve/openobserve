@@ -431,7 +431,12 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         for existing_role in &existing_roles {
             if !custom_roles.contains(existing_role) {
                 // delete role
-                get_user_crole_removal_tuples(user_email, existing_role, &mut remove_tuples);
+                get_user_crole_removal_tuples(
+                    &O2_CONFIG.dex.default_org,
+                    user_email,
+                    existing_role,
+                    &mut remove_tuples,
+                );
             }
         }
 
