@@ -16,27 +16,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-lg">
-    <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md"
-      style="margin: 0 auto; justify-content: center">
+    <div
+      v-if="!no_data_ingest"
+      class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center"
+    >
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+        <q-card-section align="center" flat
+bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
-          <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
-          <div class="text-h6">{{ summary.ingested_data }}</div>
+          <div class="row justify-center" v-if="isCloud == 'false'">
+            <div class="col-5">
+              <div class="text-subtitle1">
+                {{ t("home.totalDataIngested") }}
+              </div>
+              <div class="text-h6">{{ summary.ingested_data }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col-5">
+              <div class="text-subtitle1">
+                {{ t("home.totalDataCompressed") }}
+              </div>
+              <div class="text-h6">{{ summary.compressed_data }}</div>
+            </div>
+          </div>
+          <div v-else>
+            <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
+            <div class="text-h6">{{ summary.ingested_data }}</div>
+          </div>
         </q-card-section>
 
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
-            <router-link exact :to="{ name: 'logstreams' }" class="absolute full-width full-height"></router-link>
+          <q-btn no-caps
+color="primary" flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'logstreams' }"
+              class="absolute full-width full-height"
+            ></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
 
       <q-card align="center" class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+        <q-card-section align="center" flat
+bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
           <div class="text-h6">{{ summary.query_fns }}</div>
           <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
@@ -44,14 +72,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
         <q-separator />
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
-            <router-link exact :to="{ name: 'functions' }" class="absolute full-width full-height"></router-link>
+          <q-btn no-caps
+color="primary" flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'functions' }"
+              class="absolute full-width full-height"
+            ></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
 
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+        <q-card-section align="center" flat
+bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
           <div class="text-h6">{{ summary.scheduled_alerts }}</div>
           <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
@@ -59,17 +94,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
         <q-separator />
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
-            <router-link exact :to="{ name: 'alerts' }" class="absolute full-width full-height"></router-link>
+          <q-btn no-caps
+color="primary" flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'alerts' }"
+              class="absolute full-width full-height"
+            ></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
     </div>
 
-    <div v-if="no_data_ingest" class="q-pa-md row items-start q-gutter-md"
-      style="margin: 0 auto; justify-content: center">
+    <div
+      v-if="no_data_ingest"
+      class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center"
+    >
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+        <q-card-section align="center" flat
+bordered class="my-card">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
         </q-card-section>
@@ -77,8 +122,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" @click="() => $router.push({ name: 'ingestion' })" flat>{{
-      t("home.findIngestion") }}
+          <q-btn
+            no-caps
+            color="primary"
+            @click="() => $router.push({ name: 'ingestion' })"
+            flat
+            >{{ t("home.findIngestion") }}
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -131,7 +180,7 @@ export default defineComponent({
 
           let streamsCount = res.data.streams.num_streams;
           let sum = res.data.streams.total_storage_size;
-
+          let compressedData = res.data.streams.total_compressed_size;
 
           let ingest_fns = 0;
           let query_fns = 0;
@@ -159,6 +208,7 @@ export default defineComponent({
           summary.value = {
             streams_count: streamsCount,
             ingested_data: formatSizeFromMB(sum.toFixed(2)),
+            compressed_data: formatSizeFromMB(compressedData.toFixed(2)),
             ingest_fns: ingest_fns,
             query_fns: query_fns,
             rt_alerts: rt_alerts,
