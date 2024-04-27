@@ -135,7 +135,7 @@ impl IngestEntry {
         };
 
         let body = self.body.to_byte_slice();
-        buf.write_u16::<BigEndian>(body.len() as u16)
+        buf.write_u32::<BigEndian>(body.len() as u32)
             .context("IngestEntry::into_bytes() failed at <body>")?;
         buf.extend_from_slice(body);
 
@@ -198,7 +198,7 @@ impl IngestEntry {
         };
 
         let body_len = cursor
-            .read_u16::<BigEndian>()
+            .read_u32::<BigEndian>()
             .context("IngestEntry::from_bytes() failed at reading <body_len>")?;
         let mut body = vec![0; body_len as usize];
         cursor
