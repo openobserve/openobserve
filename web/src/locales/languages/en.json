@@ -632,7 +632,8 @@
   },
   "home": {
     "streams": "Streams",
-    "totalDataIngested": "Total data ingested",
+    "totalDataIngested": "Ingested Size",
+    "totalDataCompressed": "Compressed Size",
     "view": "View More >>",
     "queryFunctions": "Query functions",
     "ingestFunctions": "Ingest functions",
