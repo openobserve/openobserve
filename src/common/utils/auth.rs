@@ -196,7 +196,7 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 {
+        } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
             if method.eq("GET") {
                 method = "LIST".to_string();
             }
@@ -205,7 +205,7 @@ impl FromRequest for AuthExtractor {
                 OFGA_MODELS
                     .get(path_columns[1])
                     .map_or(path_columns[1], |model| model.key),
-                path_columns[url_len - 2]
+                path_columns[0]
             )
         } else if url_len == 3 {
             if path_columns[2].starts_with("alerts")
