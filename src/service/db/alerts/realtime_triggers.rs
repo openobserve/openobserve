@@ -39,13 +39,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
+            // Cluster coordinator sends put events only for realtime alerts
             db::Event::Put(ev) => {
                 // Currently, cluster coordinator sends only the alert triggers
                 // ev.key format -> /triggers/<alert|report>/{item_key}
                 // item_key format -> {org_id}/{module_key}
                 let item_key = ev.key.strip_prefix(&key).unwrap();
                 let columns = item_key.split_once('/').unwrap();
-                log::info!("columns put {}, {}", columns.0, columns.1);
                 let item_value: db::scheduler::Trigger =
                     if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
                         match db::scheduler::get(
@@ -65,17 +65,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         json::from_slice(&ev.value.unwrap()).unwrap()
                     };
 
-                if item_value.is_realtime {
-                    REALTIME_ALERT_TRIGGERS
-                        .write()
-                        .await
-                        .insert(item_key.to_owned(), item_value);
-                } else if REALTIME_ALERT_TRIGGERS.read().await.contains_key(item_key) {
-                    // This means this trigger was earlier a realtime trigger,
-                    // but now it is updated to a non-realtime trigger. So, simply
-                    // delete this trigger from triggers cache
-                    REALTIME_ALERT_TRIGGERS.write().await.remove(item_key);
-                }
+                REALTIME_ALERT_TRIGGERS
+                    .write()
+                    .await
+                    .insert(item_key.to_owned(), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(&key).unwrap();
@@ -88,7 +81,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let triggers = db::scheduler::list_module(db::scheduler::TriggerModule::Alert).await?;
+    let triggers = db::scheduler::list(Some(db::scheduler::TriggerModule::Alert)).await?;
     let mut cache = REALTIME_ALERT_TRIGGERS.write().await;
     for trigger in triggers {
         if trigger.is_realtime {

@@ -148,8 +148,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // release lock
         drop(client);
 
-        // For now, only send alert triggers
-        if trigger.module == TriggerModule::Alert {
+        // For now, only send realtime alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
                 trigger.module, &trigger.org, &trigger.module_key
@@ -184,6 +184,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
         // For now, only send alert triggers
         if module == TriggerModule::Alert {
+            // For status update of triggers, we don't need to send put events
+            // to cluster coordinator for now as it only changes the status and retries
+            // fields of scheduled jobs and not anything else
             let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
@@ -243,7 +246,7 @@ WHERE org = $6 AND module_key = $7 AND module = $8;"#,
         drop(client);
 
         // For now, only send alert triggers
-        if trigger.module == TriggerModule::Alert {
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
                 trigger.module, &trigger.org, &trigger.module_key
@@ -339,22 +342,20 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         Ok(job)
     }
 
-    async fn list(&self) -> Result<Vec<Trigger>> {
+    async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
         let client = CLIENT_RO.clone();
-        let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
-            .fetch_all(&client)
-            .await?;
-        Ok(jobs)
-    }
-
-    async fn list_module(&self, module: TriggerModule) -> Result<Vec<Trigger>> {
-        let client = CLIENT_RO.clone();
-        let query = r#"SELECT * FROM scheduled_jobs WHERE module = $1 ORDER BY id;"#;
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
-            .bind(module)
-            .fetch_all(&client)
-            .await?;
+        let jobs: Vec<Trigger> = if let Some(module) = module {
+            let query = r#"SELECT * FROM scheduled_jobs WHERE module = $1 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(module)
+                .fetch_all(&client)
+                .await?
+        } else {
+            let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .fetch_all(&client)
+                .await?
+        };
         Ok(jobs)
     }
 
