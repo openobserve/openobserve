@@ -36,6 +36,7 @@ use crate::{
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
 pub const ACCESS_TOKEN: &str = "access_token";
 pub const REFRESH_TOKEN: &str = "refresh_token";
+pub const ID_TOKEN_HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
 pub async fn validator(
     req: ServiceRequest,
@@ -118,6 +119,9 @@ pub async fn validate_credentials(
                 user_email: "".to_string(),
                 is_internal_user: false,
                 user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
             });
         }
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -149,6 +153,9 @@ pub async fn validate_credentials(
             user_email: "".to_string(),
             is_internal_user: false,
             user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
         });
     }
     let user = user.unwrap();
@@ -161,6 +168,9 @@ pub async fn validate_credentials(
             user_email: user.email,
             is_internal_user: !user.is_external,
             user_role: Some(user.role),
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
         });
     }
 
@@ -171,6 +181,9 @@ pub async fn validate_credentials(
             user_email: "".to_string(),
             is_internal_user: false,
             user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
         });
     }
     if !path.contains("/user")
@@ -184,6 +197,9 @@ pub async fn validate_credentials(
             user_email: user.email,
             is_internal_user: !user.is_external,
             user_role: Some(user.role),
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
         })
     } else {
         Err(ErrorForbidden("Not allowed"))
@@ -204,6 +220,9 @@ async fn validate_user_from_db(
                     user_email: user.email,
                     is_internal_user: !user.is_external,
                     user_role: None,
+                    user_name: user.first_name.to_owned(),
+                    family_name: user.last_name,
+                    given_name: user.first_name,
                 })
             } else {
                 Err(ErrorForbidden("Not allowed"))

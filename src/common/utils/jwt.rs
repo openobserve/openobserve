@@ -51,12 +51,38 @@ pub(crate) async fn verify_decode_token(
                     &validation,
                 )?;
 
-                let user_email = decoded_token.claims.get("email").unwrap().as_str().unwrap();
+                let user_email = if let Some(email) = decoded_token.claims.get("email") {
+                    email.as_str().unwrap()
+                } else {
+                    ""
+                };
+
+                let user_name = if let Some(name) = decoded_token.claims.get("name") {
+                    name.as_str().unwrap()
+                } else {
+                    ""
+                };
+
+                let family_name = if let Some(family_name) = decoded_token.claims.get("family_name")
+                {
+                    family_name.as_str().unwrap()
+                } else {
+                    ""
+                };
+
+                let given_name = if let Some(given_name) = decoded_token.claims.get("given_name") {
+                    given_name.as_str().unwrap()
+                } else {
+                    ""
+                };
 
                 Ok((
                     TokenValidationResponse {
                         is_valid: true,
                         user_email: user_email.to_owned(),
+                        user_name: user_name.to_owned(),
+                        family_name: family_name.to_owned(),
+                        given_name: given_name.to_owned(),
                         is_internal_user: false,
                         user_role: None,
                     },
