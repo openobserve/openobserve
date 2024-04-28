@@ -440,7 +440,7 @@ pub async fn search(
             work_group
                 .as_ref()
                 .unwrap()
-                .done(trace_id)
+                .done(&trace_id)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
