@@ -303,6 +303,9 @@ pub struct SignInResponse {
 pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
+    pub user_name: String,
+    pub family_name: String,
+    pub given_name: String,
     pub is_internal_user: bool,
     pub user_role: Option<UserRole>,
 }
