@@ -25,10 +25,7 @@ use config::{
     is_local_disk_storage, metrics,
     utils::{
         asynchronism::file::*,
-        hash::{
-            gxhash::{self},
-            Sum32,
-        },
+        hash::{gxhash, Sum32},
     },
     CONFIG,
 };
