@@ -81,7 +81,9 @@ impl TaskQueueManager {
             ));
         };
         if tq.workers.running_worker_count().await == 0 {
-            tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+            tq.workers
+                .add_workers_by(tq.workers.tq_index, MIN_WORKER_CNT)
+                .await;
         }
         self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         tq.send_task(task).await
@@ -121,11 +123,13 @@ impl TaskQueue {
         }
         while let Err(e) = self.sender.try_send(task.clone()) {
             log::info!(
-                "TaskQueue({}) channel currently full {:?}. Increase worker count",
+                "TaskQueue({}) channel currently full {:?}. Waiting",
                 self.workers.tq_index,
                 e
             );
-            self.workers.add_workers_by(MIN_WORKER_CNT).await;
+            self.workers
+                .add_workers_by(self.workers.tq_index, MIN_WORKER_CNT)
+                .await;
             // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }

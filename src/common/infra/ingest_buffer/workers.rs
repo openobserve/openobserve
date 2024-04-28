@@ -30,6 +30,8 @@ type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<Result<()>>;
 
 // REVIEW: static ok or env variables?
+// Upper bound of worker count to control excessive memory usage
+static MAX_WORKER_CNT: usize = 10;
 /// seconds between each pull for a worker
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
 /// max idle time in seconds before shut down
@@ -60,9 +62,13 @@ impl Workers {
     }
 
     /// Initializes additional {count} number of workers.
-    pub async fn add_workers_by(&self, count: usize) {
+    pub async fn add_workers_by(&self, tq_index: usize, count: usize) {
         let mut rw = self.handles.write().await;
-        for _ in 0..count {
+        let add_count = count.min(MAX_WORKER_CNT - rw.len());
+        if add_count > 0 {
+            log::info!("TaskQueue({}) adding {} workers", tq_index, add_count);
+        }
+        for _ in 0..add_count {
             let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
             rw.push(handle);
         }
