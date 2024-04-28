@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use ::config::CONFIG;
 use ::config::{ider, INSTANCE_ID};
 
 use crate::service::db::instance;
@@ -42,10 +40,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     ingest_buffer::init().await?;
-
-    // check incomplete work group
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::search::queue::clean(CONFIG.limit.query_timeout as i64).await?;
 
     Ok(())
 }
