@@ -39,8 +39,11 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::jwt::verify_decode_token,
-    crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    config::ider,
+    crate::handler::http::auth::{
+        jwt::process_token,
+        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG},
+    },
+    config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
@@ -338,15 +341,34 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         }
     };
 
+    log::info!("entering exchange_code: {}", code);
+
     match exchange_code(code).await {
         Ok(login_data) => {
+            let login_url;
             let access_token = login_data.access_token;
             let keys = get_jwks().await;
             let token_ver =
                 verify_decode_token(&access_token, &keys, &O2_CONFIG.dex.client_id, true).await;
-
+            let id_token;
             match token_ver {
-                Ok(res) => process_token(res).await,
+                Ok(res) => {
+                    id_token = json::to_string(&json::json!({
+                        "email": res.0.user_email,
+                        "name": res.0.user_name,
+                        "family_name": res.0.family_name,
+                        "given_name": res.0.given_name,
+                        "is_valid": res.0.is_valid,
+                    }))
+                    .unwrap();
+                    login_url = format!(
+                        "{}#id_token={}.{}",
+                        login_data.url,
+                        ID_TOKEN_HEADER,
+                        base64::encode(&id_token)
+                    );
+                    process_token(res).await
+                }
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
 
@@ -377,8 +399,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             } else {
                 auth_cookie.set_same_site(SameSite::None);
             }
+            log::info!("Redirecting user after processing token");
             Ok(HttpResponse::Found()
-                .append_header((header::LOCATION, login_data.url))
+                .append_header((header::LOCATION, login_url))
                 .cookie(auth_cookie)
                 .finish())
         }
