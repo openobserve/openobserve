@@ -28,7 +28,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamType},
         usage::UsageType,
     },
-    utils::{json, schema_ext::SchemaExt},
+    utils::{flatten::format_key, json, schema_ext::SchemaExt},
     CONFIG,
 };
 use futures::{StreamExt, TryStreamExt};
@@ -60,6 +60,7 @@ pub async fn save_enrichment_data(
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
     let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let table_name = table_name.trim();
     let stream_name = &format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -126,7 +127,16 @@ pub async fn save_enrichment_data(
                 data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
             }
             let mut rdr = csv::Reader::from_reader(data.as_ref());
-            let headers = rdr.headers()?.clone();
+            let headers: csv::StringRecord = rdr
+                .headers()?
+                .iter()
+                .map(|x| {
+                    let mut x = x.trim().to_string();
+                    format_key(&mut x);
+                    x
+                })
+                .collect::<Vec<_>>()
+                .into();
 
             for result in rdr.records() {
                 // The iterator yields Result<StringRecord, Error>, so we check the
