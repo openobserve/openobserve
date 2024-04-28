@@ -1303,13 +1303,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.memory_cache.bucket_num == 0 {
         cfg.memory_cache.bucket_num = 1;
     }
-
-    if cfg.memory_cache.bucket_num > 1 {
-        cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
-        cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
-        cfg.memory_cache.skip_size /= cfg.memory_cache.bucket_num;
-        cfg.memory_cache.gc_size /= cfg.memory_cache.bucket_num;
-    }
+    cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
+    cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
+    cfg.memory_cache.gc_size /= cfg.memory_cache.bucket_num;
 
     // for memtable limit check
     if cfg.limit.mem_table_max_size == 0 {
@@ -1401,7 +1397,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.disk_cache.bucket_num == 0 {
         cfg.disk_cache.bucket_num = 1;
     }
-
     cfg.disk_cache.bucket_num = max(
         cfg.disk_cache.bucket_num,
         cfg.disk_cache
@@ -1410,13 +1405,9 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             .filter(|s| !s.trim().is_empty())
             .count(),
     );
-
-    if cfg.disk_cache.bucket_num > 1 {
-        cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
-        cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
-        cfg.disk_cache.skip_size /= cfg.disk_cache.bucket_num;
-        cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-    }
+    cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
 
     Ok(())
 }

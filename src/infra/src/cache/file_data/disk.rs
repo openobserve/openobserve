@@ -112,10 +112,7 @@ impl FileData {
                 data_size
             );
             // cache is full, need release some space
-            let need_release_size = min(
-                CONFIG.disk_cache.max_size,
-                max(CONFIG.disk_cache.release_size, data_size * 100),
-            );
+            let need_release_size = min(self.max_size, max(CONFIG.disk_cache.release_size, data_size * 100));
             self.gc(trace_id, need_release_size).await?;
         }
 
@@ -323,7 +320,10 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     if !CONFIG.disk_cache.multi_dir.is_empty() {
                         file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
                     }
-
+                    // check file already exists
+                    if exist(&file_key).await {
+                        continue;
+                    }
                     // write into cache
                     let idx = get_bucket_idx(&file_key);
                     let mut w = FILES[idx].write().await;

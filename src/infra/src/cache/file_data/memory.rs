@@ -95,10 +95,7 @@ impl FileData {
                 data_size
             );
             // cache is full, need release some space
-            let need_release_size = min(
-                CONFIG.memory_cache.max_size,
-                max(CONFIG.memory_cache.release_size, data_size * 100),
-            );
+            let need_release_size = min(self.max_size, max(CONFIG.memory_cache.release_size, data_size * 100));
             self.gc(trace_id, need_release_size).await?;
         }
 
