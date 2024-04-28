@@ -129,8 +129,7 @@ pub async fn save_enrichment_data(
             let mut rdr = csv::Reader::from_reader(data.as_ref());
             let headers: csv::StringRecord = rdr
                 .headers()?
-                .clone()
-                .into_iter()
+                .iter()
                 .map(|x| {
                     let mut x = x.trim().to_string();
                     format_key(&mut x);
