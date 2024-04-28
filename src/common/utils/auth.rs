@@ -215,7 +215,11 @@ impl FromRequest for AuthExtractor {
                 path_columns[0].to_string()
             }
         } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
-            if method.eq("GET") {
+            if path_columns[1].starts_with("settings") {
+                if method.eq("POST") || method.eq("DELETE") {
+                    method = "PUT".to_string();
+                }
+            } else if method.eq("GET") {
                 method = "LIST".to_string();
             }
             format!(
