@@ -77,8 +77,7 @@ pub async fn update_template(
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let tmpl = tmpl.into_inner();
-    let name = name.trim();
-    match templates::save(&org_id, name, tmpl, false).await {
+    match templates::save(&org_id, &name, tmpl, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
