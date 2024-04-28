@@ -25,7 +25,7 @@ use actix_web::{
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
-    utils::{base64, json, schema_ext::SchemaExt},
+    utils::{json, schema_ext::SchemaExt},
     CONFIG, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -43,7 +43,7 @@ use {
         jwt::process_token,
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG},
     },
-    config::ider,
+    config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
