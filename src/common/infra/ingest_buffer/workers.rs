@@ -62,21 +62,14 @@ impl Workers {
     }
 
     /// Initializes additional {count} number of workers.
-    pub async fn add_workers_by(&self, tq_index: usize, count: usize) {
+    pub async fn add_workers_by(&self, count: usize) -> usize {
         let mut rw = self.handles.write().await;
         let add_count = count.min(MAX_WORKER_CNT - rw.len());
-        if add_count > 0 {
-            log::info!("TaskQueue({}) adding {} workers", tq_index, add_count);
-        } else {
-            log::info!(
-                "TaskQueue({}) maximum workers count reached. Waiting",
-                tq_index
-            );
-        }
         for _ in 0..add_count {
             let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
             rw.push(handle);
         }
+        add_count
     }
 
     /// Removes finished workers and returns remaining active worker count.

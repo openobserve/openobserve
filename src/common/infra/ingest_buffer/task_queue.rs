@@ -81,9 +81,7 @@ impl TaskQueueManager {
             ));
         };
         if tq.workers.running_worker_count().await == 0 {
-            tq.workers
-                .add_workers_by(tq.workers.tq_index, MIN_WORKER_CNT)
-                .await;
+            tq.workers.add_workers_by(MIN_WORKER_CNT).await;
         }
         self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         tq.send_task(task).await
@@ -121,16 +119,23 @@ impl TaskQueue {
                 self.workers.tq_index
             ));
         }
+        let mut exponential_delay = tokio::time::Duration::from_millis(500);
         while self.sender.try_send(task.clone()).is_err() {
             log::info!(
                 "TaskQueue({}) channel currently full. Attempt to add more workers",
                 self.workers.tq_index,
             );
-            self.workers
-                .add_workers_by(self.workers.tq_index, MIN_WORKER_CNT)
-                .await;
+            let added_worker_count = self.workers.add_workers_by(MIN_WORKER_CNT).await;
+            if added_worker_count > 0 {
+                log::info!(
+                    "TaskQueue({}) channel added {} new workers",
+                    self.workers.tq_index,
+                    added_worker_count
+                );
+            }
             // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(exponential_delay).await;
+            exponential_delay *= 2; // Exponential backoff
         }
         Ok(())
     }
