@@ -125,7 +125,7 @@ async fn audit_middleware(
         if res.response().error().is_none() {
             let body = if path.ends_with("/settings/logo") {
                 // Binary data, encode it with base64
-                general_purpose::STANDARD.encode(request_body.to_vec())
+                general_purpose::STANDARD.encode(&request_body)
             } else {
                 String::from_utf8(request_body.to_vec()).unwrap()
             };
