@@ -92,9 +92,7 @@ pub async fn update_alert(
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
-
-    let name = name.trim();
-    match alerts::save(&org_id, &stream_name, name, alert, false).await {
+    match alerts::save(&org_id, &stream_name, &name, alert, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
