@@ -33,6 +33,7 @@ use {
     crate::{common::meta::ingestion::INGESTION_EP, service::usage::audit},
     actix_http::h1::Payload,
     actix_web::{web::BytesMut, HttpMessage},
+    base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{auditor::AuditMessage, infra::config::O2_CONFIG},
 };
@@ -122,7 +123,12 @@ async fn audit_middleware(
         let res = next.call(req).await?;
 
         if res.response().error().is_none() {
-            let body = String::from_utf8(request_body.to_vec()).unwrap();
+            let body = if path.ends_with("/settings/logo") {
+                // Binary data, encode it with base64
+                general_purpose::STANDARD.encode(request_body.to_vec())
+            } else {
+                String::from_utf8(request_body.to_vec()).unwrap()
+            };
             audit(AuditMessage {
                 user_email,
                 org_id,
