@@ -123,9 +123,8 @@ impl TaskQueue {
         }
         while let Err(e) = self.sender.try_send(task.clone()) {
             log::info!(
-                "TaskQueue({}) channel currently full {:?}. Waiting",
+                "TaskQueue({}) channel currently full. Attempt to add more workers",
                 self.workers.tq_index,
-                e
             );
             self.workers
                 .add_workers_by(self.workers.tq_index, MIN_WORKER_CNT)

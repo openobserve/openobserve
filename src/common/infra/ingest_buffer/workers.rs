@@ -67,6 +67,11 @@ impl Workers {
         let add_count = count.min(MAX_WORKER_CNT - rw.len());
         if add_count > 0 {
             log::info!("TaskQueue({}) adding {} workers", tq_index, add_count);
+        } else {
+            log::info!(
+                "TaskQueue({}) maximum workers count reached. Waiting",
+                tq_index
+            );
         }
         for _ in 0..add_count {
             let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
