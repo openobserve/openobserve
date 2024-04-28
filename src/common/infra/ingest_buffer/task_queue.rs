@@ -27,7 +27,7 @@ use super::{entry::IngestEntry, workers::Workers};
 /// initial # of workers
 static MIN_WORKER_CNT: usize = 3;
 /// max # of requests could be held in channel.
-static DEFAULT_CHANNEL_CAP: usize = 50; // if channel if full -> init more workers
+static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more workers
 
 /// A global hash map that maps stream of a TaskQueue instance.
 static TQ_MANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
@@ -132,10 +132,12 @@ impl TaskQueue {
                     self.workers.tq_index,
                     added_worker_count
                 );
+                // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            } else {
+                tokio::time::sleep(exponential_delay).await;
+                exponential_delay *= 2; // Exponential backoff
             }
-            // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
-            tokio::time::sleep(exponential_delay).await;
-            exponential_delay *= 2; // Exponential backoff
         }
         Ok(())
     }
