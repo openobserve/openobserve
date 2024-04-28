@@ -32,17 +32,16 @@ use crate::storage;
 
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let mut files = Vec::with_capacity(CONFIG.memory_cache.bucket_num);
-    let bn = max(1, CONFIG.memory_cache.bucket_num);
-    for _ in 0..bn {
+    for _ in 0..CONFIG.memory_cache.bucket_num {
         let mut fd = FileData::new();
-        fd.max_size = CONFIG.memory_cache.max_size / bn;
+        fd.max_size = CONFIG.memory_cache.max_size / CONFIG.memory_cache.bucket_num;
         files.push(RwLock::new(fd));
     }
     files
 });
 static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
     let mut datas = Vec::with_capacity(CONFIG.memory_cache.bucket_num);
-    for _ in 0..max(1, CONFIG.memory_cache.bucket_num) {
+    for _ in 0..CONFIG.memory_cache.bucket_num {
         datas.push(Default::default());
     }
     datas
