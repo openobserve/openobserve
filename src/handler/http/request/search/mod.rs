@@ -230,6 +230,7 @@ pub async fn search(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
+    log::info!("http search API wait in queue took: {}", took_wait);
 
     let search_fut = SearchService::search(
         &trace_id,
@@ -439,15 +440,20 @@ pub async fn around(
         .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
 
     // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
-    let _locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !CONFIG.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!("http search around API wait in queue took: {}", took_wait);
 
-    // We don't need query_context now
-    // let query_context = if uses_fn {
-    //     Some(around_sql.clone())
-    // } else {
-    //     None
-    // };
     let query_context: Option<String> = None;
 
     let timeout = query
@@ -900,8 +906,19 @@ async fn values_v1(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
-    let _locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !CONFIG.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!("http search value_v1 API wait in queue took: {}", took_wait);
 
     // search
     let mut req = config::meta::search::Request {
@@ -1115,6 +1132,21 @@ async fn values_v2(
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+
+    // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !CONFIG.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!("http search value_v2 API wait in queue took: {}", took_wait);
 
     // search
     let req = config::meta::search::Request {

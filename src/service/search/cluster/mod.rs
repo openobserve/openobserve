@@ -437,6 +437,12 @@ pub async fn search(
             log::info!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             );
+            work_group
+                .as_ref()
+                .unwrap()
+                .done(trace_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             ))));

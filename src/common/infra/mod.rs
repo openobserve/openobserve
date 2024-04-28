@@ -40,9 +40,5 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    // check incomplete work group
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::search::queue::clean(CONFIG.limit.query_timeout as i64).await?;
-
     Ok(())
 }
