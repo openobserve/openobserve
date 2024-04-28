@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::cmp::max;
 
 use chrono::Duration;
 use config::{
@@ -33,16 +33,16 @@ use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
 use regex::Regex;
-use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     hashbrown::HashSet,
-    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
-    o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
     tracing::{info_span, Instrument},
 };
+#[cfg(not(feature = "enterprise"))]
+use {std::sync::Arc, tokio::sync::Mutex};
 
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
@@ -57,6 +57,7 @@ pub(crate) mod sql;
 
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 
+#[cfg(not(feature = "enterprise"))]
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
