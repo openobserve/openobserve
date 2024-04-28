@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{cmp::max, collections::BTreeMap, path::Path, time::Duration};
 
 use chromiumoxide::{
     browser::BrowserConfig,
@@ -1300,6 +1300,17 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
 
+    if cfg.memory_cache.bucket_num == 0 {
+        cfg.memory_cache.bucket_num = 1;
+    }
+
+    if cfg.memory_cache.bucket_num > 1 {
+        cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
+        cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
+        cfg.memory_cache.skip_size /= cfg.memory_cache.bucket_num;
+        cfg.memory_cache.gc_size /= cfg.memory_cache.bucket_num;
+    }
+
     // for memtable limit check
     if cfg.limit.mem_table_max_size == 0 {
         cfg.limit.mem_table_max_size = mem_total / 2; // 50%
@@ -1385,6 +1396,26 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "ZO_DISK_CACHE_MULTI_DIR only supports a single directory level, can not contains / "
         ));
+    }
+
+    if cfg.disk_cache.bucket_num == 0 {
+        cfg.disk_cache.bucket_num = 1;
+    }
+
+    cfg.disk_cache.bucket_num = max(
+        cfg.disk_cache.bucket_num,
+        cfg.disk_cache
+            .multi_dir
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .count(),
+    );
+
+    if cfg.disk_cache.bucket_num > 1 {
+        cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
+        cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
+        cfg.disk_cache.skip_size /= cfg.disk_cache.bucket_num;
+        cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
     }
 
     Ok(())
