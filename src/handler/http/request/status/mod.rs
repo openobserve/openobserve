@@ -338,13 +338,17 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         }
     };
 
+    log::info!("entering exchange_code: {}", code);
+
     match exchange_code(code).await {
         Ok(login_data) => {
+            log::info!("exchange_code success");
             let access_token = login_data.access_token;
             let keys = get_jwks().await;
+            log::info!("got jwks: {}", keys);
             let token_ver =
                 verify_decode_token(&access_token, &keys, &O2_CONFIG.dex.client_id, true).await;
-
+            log::info!("token verification done");
             match token_ver {
                 Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
@@ -377,6 +381,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             } else {
                 auth_cookie.set_same_site(SameSite::None);
             }
+            log::info!("Redirecting user to {}", login_data.url);
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
                 .cookie(auth_cookie)
