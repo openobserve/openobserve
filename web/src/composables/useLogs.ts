@@ -516,7 +516,15 @@ const useLogs = () => {
       ) {
         req.query.sql = req.query.sql.replace(
           "[FIELD_LIST]",
-          searchObj.data.stream.interestingFieldList.join(",")
+          searchObj.data.stream.interestingFieldList
+            .map((field) => {
+              if (field.includes("-")) {
+                return `"${field}"`;
+              } else {
+                return field;
+              }
+            })
+            .join(",")
         );
       } else {
         req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
@@ -1961,7 +1969,15 @@ const useLogs = () => {
         ) {
           query_context = query_context.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(",")
+            searchObj.data.stream.interestingFieldList
+              .map((field) => {
+                if (field.includes("-")) {
+                  return `"${field}"`;
+                } else {
+                  return field;
+                }
+              })
+              .join(",")
           );
         } else {
           query_context = query_context.replace("[FIELD_LIST]", "*");
@@ -2332,7 +2348,15 @@ const useLogs = () => {
       ) {
         query = query.replace(
           "[FIELD_LIST]",
-          searchObj.data.stream.interestingFieldList.join(",")
+          searchObj.data.stream.interestingFieldList
+            .map((field) => {
+              if (field.includes("-")) {
+                return `"${field}"`;
+              } else {
+                return field;
+              }
+            })
+            .join(",")
         );
       } else {
         query = query.replace("[FIELD_LIST]", "*");

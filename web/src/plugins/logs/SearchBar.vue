@@ -2086,7 +2086,15 @@ export default defineComponent({
         ) {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(",")
+            searchObj.data.stream.interestingFieldList
+              .map((field) => {
+                if (field.includes("-")) {
+                  return `"${field}"`;
+                } else {
+                  return field;
+                }
+              })
+              .join(",")
           );
         } else {
           searchObj.data.query = searchObj.data.query.replace(
