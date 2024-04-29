@@ -63,6 +63,7 @@ pub async fn save(
     if !name.is_empty() {
         destination.name = name.to_string();
     }
+    destination.name = destination.name.trim().to_string();
     if destination.name.is_empty() {
         return Err((
             http::StatusCode::BAD_REQUEST,

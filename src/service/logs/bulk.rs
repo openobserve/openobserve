@@ -46,7 +46,7 @@ use crate::{
         stream::StreamParams,
     },
     service::{
-        db,
+        db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
         schema::{
@@ -131,6 +131,8 @@ pub async fn ingest(
                 continue; // skip
             }
             (action, stream_name, doc_id) = ret.unwrap();
+
+            stream_name = format_stream_name(&stream_name);
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);

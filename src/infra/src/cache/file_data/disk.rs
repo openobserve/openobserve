@@ -289,10 +289,10 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     let columns = file_key.split('/').collect::<Vec<&str>>();
                     metrics::QUERY_DISK_CACHE_FILES
                         .with_label_values(&[columns[1], columns[2]])
-                        .dec();
+                        .inc();
                     metrics::QUERY_DISK_CACHE_USED_BYTES
                         .with_label_values(&[columns[1], columns[2]])
-                        .sub(data_size as i64);
+                        .add(data_size as i64);
                 }
             }
         }

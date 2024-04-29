@@ -61,8 +61,9 @@ pub async fn save(
     create: bool,
 ) -> Result<(), anyhow::Error> {
     if !name.is_empty() {
-        alert.name = name.trim().to_string();
+        alert.name = name.to_string();
     }
+    alert.name = alert.name.trim().to_string();
     alert.org_id = org_id.to_string();
     let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();
@@ -878,6 +879,10 @@ pub async fn send_email_notification(
 
     for recepient in recepients {
         email = email.to(recepient.parse()?);
+    }
+
+    if !CONFIG.smtp.smtp_reply_to.is_empty() {
+        email = email.reply_to(CONFIG.smtp.smtp_reply_to.parse()?);
     }
 
     let email = email.singlepart(SinglePart::html(msg)).unwrap();
