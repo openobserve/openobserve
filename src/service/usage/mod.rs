@@ -149,6 +149,10 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
+    if !CONFIG.common.usage_enabled {
+        return;
+    }
+
     let mut usages = TRIGGERS_USAGE_DATA.write().await;
     usages.push(trigger);
     if usages.len() < CONFIG.common.usage_batch_size {
@@ -209,23 +213,11 @@ async fn flush_triggers_usage() {
 
 async fn ingest_usages(curr_usages: Vec<UsageData>) {
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
+    let mut search_events = vec![];
     for usage_data in &curr_usages {
         // Skip aggregation for usage_data with event "Search"
         if usage_data.event == UsageEvent::Search {
-            let key = GroupKey {
-                stream_name: usage_data.stream_name.clone(),
-                org_id: usage_data.org_id.clone(),
-                stream_type: usage_data.stream_type,
-                day: usage_data.day,
-                hour: usage_data.hour,
-                event: usage_data.event,
-                email: usage_data.user_email.clone(),
-            };
-
-            groups.entry(key).or_insert_with(|| AggregatedData {
-                count: 1,
-                usage_data: usage_data.clone(),
-            });
+            search_events.push(usage_data.clone());
             continue;
         }
 
@@ -261,6 +253,9 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         usage_data.response_time /= data.count as f64;
         report_data.push(usage_data);
     }
+
+    // Push all the search events
+    report_data.append(&mut search_events);
 
     if &CONFIG.common.usage_reporting_mode != "local"
         && !CONFIG.common.usage_reporting_url.is_empty()
