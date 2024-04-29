@@ -646,7 +646,13 @@ const symbolMapping: { [key: string]: string } = {
 };
 
 const getNodeSymbol = (type: string) => {
-  return "image://" + window.location.origin + "/" + symbolMapping[type];
+  return (
+    "image://" +
+    window.location.origin +
+    (symbolMapping[type].startsWith("/")
+      ? symbolMapping[type]
+      : "/" + symbolMapping[type])
+  );
 };
 
 const updateGraph = () => {

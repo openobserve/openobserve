@@ -53,7 +53,7 @@
       >
         <q-input
           v-model="formData.description"
-          :label="t('alerts.description') + ' *'"
+          :label="t('alerts.description')"
           color="input-border"
           bg-color="input-bg"
           class="showLabelOnTop"

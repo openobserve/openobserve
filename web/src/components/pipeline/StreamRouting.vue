@@ -15,7 +15,7 @@
       >
         <q-input
           v-model="streamRoute.name"
-          :label="t('alerts.name') + ' *'"
+          :label="t('function.stream_name') + ' *'"
           color="input-border"
           bg-color="input-bg"
           class="showLabelOnTop"
