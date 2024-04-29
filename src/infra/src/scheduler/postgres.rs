@@ -14,13 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use chrono::Duration;
 use config::CONFIG;
 use sqlx::Row;
 use tokio::time;
 
-use super::{Trigger, TriggerModule, TriggerStatus};
-use crate::{db::postgres::CLIENT, errors::Result};
+use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use crate::{
+    db::{self, postgres::CLIENT},
+    errors::{DbError, Error, Result},
+};
 
 pub struct PostgresScheduler {}
 
@@ -114,8 +118,8 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT DO NOTHING;
         "#,
         )
@@ -127,6 +131,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(&trigger.status)
         .bind(0)
         .bind(trigger.next_run_at)
+        .bind(0)
+        .bind(0)
         .execute(&mut *tx)
         .await
         {
@@ -140,6 +146,18 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             log::error!("[POSTGRES] commit push scheduled_jobs error: {}", e);
             return Err(e.into());
         }
+
+        // For now, only send realtime alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module, &trigger.org, &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -151,9 +169,19 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         )
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&pool)
         .await?;
+
+        // For now, only send alert triggers events
+        if module == TriggerModule::Alert {
+            // It will send event even if the alert is not realtime alert.
+            // But that is okay, for non-realtime alerts, since the triggers are not
+            // present in the cache at all, it will just do nothin.
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator.delete(&key, false, true, None).await?;
+        }
         Ok(())
     }
 
@@ -174,8 +202,12 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(retries)
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&pool).await?;
+
+        // For status update of triggers, we don't need to send put events
+        // to cluster coordinator for now as it only changes the status and retries
+        // fields of scheduled jobs and not anything else
         Ok(())
     }
 
@@ -191,11 +223,23 @@ WHERE org = $6 AND module_key = $7 AND module = $8;"#,
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
-        .bind(trigger.org)
-        .bind(trigger.module_key)
-        .bind(trigger.module)
+        .bind(&trigger.org)
+        .bind(&trigger.module_key)
+        .bind(&trigger.module)
         .execute(&pool)
         .await?;
+
+        // For now, only send realtime alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module, &trigger.org, &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -259,10 +303,41 @@ RETURNING *;"#;
         Ok(jobs)
     }
 
-    async fn list(&self) -> Result<Vec<Trigger>> {
+    async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT.clone();
-        let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query).fetch_all(&pool).await?;
+        let query = r#"
+SELECT * FROM scheduled_jobs
+WHERE org = $1 AND module = $2 AND module_key = $3;"#;
+        let job = match sqlx::query_as::<_, Trigger>(query)
+            .bind(org)
+            .bind(&module)
+            .bind(key)
+            .fetch_one(&pool)
+            .await
+        {
+            Ok(job) => job,
+            Err(_) => {
+                return Err(Error::from(DbError::KeyNotExists(format!(
+                    "{org}/{}/{key}",
+                    module
+                ))));
+            }
+        };
+        Ok(job)
+    }
+
+    async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+        let pool = CLIENT.clone();
+        let jobs: Vec<Trigger> = if let Some(module) = module {
+            let query = r#"SELECT * FROM scheduled_jobs WHERE module = $1 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(module)
+                .fetch_all(&pool)
+                .await?
+        } else {
+            let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query).fetch_all(&pool).await?
+        };
         Ok(jobs)
     }
 

@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod destinations;
+pub mod realtime_triggers;
 pub mod templates;
 
 pub async fn get(
