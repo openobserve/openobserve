@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="currentRouteName === 'pipelines'">
     <div class="full-wdith">
       <q-table
         data-test="alert-list-table"
@@ -101,6 +101,9 @@
       </q-table>
     </div>
   </div>
+
+  <router-view v-else />
+
   <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
     <stream-selection @save="savePipeline" />
   </q-dialog>
@@ -114,7 +117,7 @@
   />
 </template>
 <script setup lang="ts">
-import { ref, onBeforeMount } from "vue";
+import { ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
@@ -175,6 +178,10 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   // qTable.value?.setPagination(pagination.value);
 };
+
+const currentRouteName = computed(() => {
+  return router.currentRoute.value.name;
+});
 
 const editingPipeline = ref<Pipeline | null>(null);
 
