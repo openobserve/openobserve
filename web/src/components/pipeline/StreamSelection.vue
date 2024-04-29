@@ -3,145 +3,147 @@
     class="full-height"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="flex justify-between items-center q-px-md q-py-sm">
-      <div data-test="add-role-section-title" style="font-size: 18px">
-        {{ t("pipeline.addPipeline") }}
+    <q-form @submit="savePipeline">
+      <div class="flex justify-between items-center q-px-md q-py-sm">
+        <div data-test="add-role-section-title" style="font-size: 18px">
+          {{ t("pipeline.addPipeline") }}
+        </div>
+        <q-icon
+          data-test="add-role-close-dialog-btn"
+          name="cancel"
+          class="cursor-pointer"
+          size="20px"
+          :v-close-popup="true"
+        />
       </div>
-      <q-icon
-        data-test="add-role-close-dialog-btn"
-        name="cancel"
-        class="cursor-pointer"
-        size="20px"
-        :v-close-popup="true"
-      />
-    </div>
 
-    <div class="full-width bg-grey-4" style="height: 1px" />
+      <div class="full-width bg-grey-4" style="height: 1px" />
 
-    <div class="q-px-md">
-      <div
-        data-test="add-alert-name-input"
-        class="alert-name-input o2-input"
-        style="padding-top: 12px"
-      >
-        <q-input
-          v-model="formData.name"
-          :label="t('alerts.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
-          :rules="[
-            (val, rules) =>
-              !!val
-                ? isValidName ||
-                  `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-                : t('common.nameRequired'),
-          ]"
-          tabindex="0"
-          style="min-width: 480px"
-        />
+      <div class="q-px-md">
+        <div
+          data-test="add-alert-name-input"
+          class="alert-name-input o2-input"
+          style="padding-top: 12px"
+        >
+          <q-input
+            v-model="formData.name"
+            :label="t('alerts.name') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
+            :rules="[
+              (val, rules) =>
+                !!val
+                  ? isValidName ||
+                    `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                  : t('common.nameRequired'),
+            ]"
+            tabindex="0"
+            style="min-width: 480px"
+          />
+        </div>
+        <div
+          data-test="add-alert-name-input"
+          class="alert-name-input o2-input q-mb-sm"
+        >
+          <q-input
+            v-model="formData.description"
+            :label="t('alerts.description')"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            tabindex="0"
+            style="min-width: 480px"
+          />
+        </div>
+        <div
+          data-test="add-alert-stream-type-select"
+          class="alert-stream-type o2-input q-mr-sm q-mb-sm"
+          style="padding-top: 0"
+        >
+          <q-select
+            v-model="formData.stream_type"
+            :options="streamTypes"
+            :label="t('alerts.streamType') + ' *'"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case"
+            emit-value
+            map-options
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
+            @update:model-value="updateStreams()"
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            style="min-width: 220px"
+          />
+        </div>
+        <div
+          data-test="add-alert-stream-select"
+          class="o2-input"
+          style="padding-top: 0"
+        >
+          <q-select
+            v-model="formData.stream_name"
+            :options="filteredStreams"
+            :label="t('alerts.stream_name') + ' *'"
+            :loading="isFetchingStreams"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case"
+            filled
+            stack-label
+            dense
+            use-input
+            hide-selected
+            fill-input
+            :input-debounce="400"
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
+            @filter="filterStreams"
+            behavior="menu"
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            style="min-width: 250px !important"
+          />
+        </div>
       </div>
-      <div
-        data-test="add-alert-name-input"
-        class="alert-name-input o2-input q-mb-sm"
-      >
-        <q-input
-          v-model="formData.description"
-          :label="t('alerts.description')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          tabindex="0"
-          style="min-width: 480px"
-        />
-      </div>
-      <div
-        data-test="add-alert-stream-type-select"
-        class="alert-stream-type o2-input q-mr-sm q-mb-sm"
-        style="padding-top: 0"
-      >
-        <q-select
-          v-model="formData.stream_type"
-          :options="streamTypes"
-          :label="t('alerts.streamType') + ' *'"
-          :popup-content-style="{ textTransform: 'lowercase' }"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop no-case"
-          emit-value
-          map-options
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
-          @update:model-value="updateStreams()"
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          style="min-width: 220px"
-        />
-      </div>
-      <div
-        data-test="add-alert-stream-select"
-        class="o2-input"
-        style="padding-top: 0"
-      >
-        <q-select
-          v-model="formData.stream_name"
-          :options="filteredStreams"
-          :label="t('alerts.stream_name') + ' *'"
-          :loading="isFetchingStreams"
-          :popup-content-style="{ textTransform: 'lowercase' }"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop no-case"
-          filled
-          stack-label
-          dense
-          use-input
-          hide-selected
-          fill-input
-          :input-debounce="400"
-          v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
-          @filter="filterStreams"
-          behavior="menu"
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          style="min-width: 250px !important"
-        />
-      </div>
-    </div>
 
-    <div class="flex justify-start q-mt-lg q-px-md">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        :v-close-popup="true"
-        class="q-mb-md text-bold"
-        :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        no-caps
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        no-caps
-        @click="savePipeline"
-      />
-    </div>
+      <div class="flex justify-start q-mt-lg q-px-md">
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          :v-close-popup="true"
+          class="q-mb-md text-bold"
+          :label="t('alerts.cancel')"
+          text-color="light-text"
+          padding="sm md"
+          no-caps
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          :label="t('alerts.save')"
+          class="q-mb-md text-bold no-border q-ml-md"
+          color="secondary"
+          padding="sm xl"
+          no-caps
+          type="submit"
+        />
+      </div>
+    </q-form>
   </div>
 </template>
 
