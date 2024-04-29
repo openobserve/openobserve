@@ -138,7 +138,7 @@ export default defineComponent({
       isVariablesLoading: false,
       values: [],
     });
-
+    console.log("variablesData", variablesData);
     // variables dependency graph
     let variablesDependencyGraph: any = {};
 

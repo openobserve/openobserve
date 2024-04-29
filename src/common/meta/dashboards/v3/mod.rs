@@ -274,6 +274,7 @@ pub struct VariableList {
     pub query_data: Option<QueryData>,
     pub value: Option<String>,
     pub options: Option<Vec<CustomFieldsOption>>,
+    pub show_multiple_values: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

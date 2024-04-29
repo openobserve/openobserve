@@ -527,6 +527,7 @@
     "DefaultValue": "Default value (optional)",
     "typeOfVariable": "Type of variable",
     "DefaultSize": "Default max record size(optional)",
+    "showMultipleValues": "Show multiple values",
     "maxRecordSize": "Default max record size is 10. You can update this value as required",
     "newFolderBtnLabel": "New Folder",
     "folderLabel": "Folders",
