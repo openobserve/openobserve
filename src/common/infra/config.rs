@@ -33,7 +33,9 @@ use crate::{
         syslog::SyslogRoute,
         user::User,
     },
-    service::{enrichment::StreamTable, enrichment_table::geoip::Geoip, db::scheduler as db_scheduler},
+    service::{
+        db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
+    },
 };
 
 // global version variables
