@@ -158,6 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <div>
+                <q-toggle
+                  v-model="variableData.show_multiple_values"
+                  :label="t('dashboard.showMultipleValues')"
+                  data-test="dashboard-query_values-show_multiple_values"
+                />
+              </div>
+              <div>
                 <div class="flex flex-row">
                   <div
                     data-test="dashboard-query-values-filter"
@@ -293,6 +300,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
+            <div>
+              <q-toggle
+                v-model="variableData.show_multiple_values"
+                :label="t('dashboard.showMultipleValues')"
+                data-test="dashboard-custom-show_multiple_values"
+              />
+            </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
@@ -457,8 +471,10 @@ export default defineComponent({
       },
       value: "",
       options: [],
+      show_multiple_values: false,
     });
-
+    console.log("variableData addSetting", variableData);
+    
     const filterCycleError: any = ref("");
 
     const addFilter = () => {

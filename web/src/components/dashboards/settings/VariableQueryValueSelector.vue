@@ -52,6 +52,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+      <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+        <q-item v-bind="itemProps">
+          <q-item-section>
+            <q-item-label v-html="opt.label" />
+          </q-item-section>
+          <q-item-section side>
+            <q-checkbox
+              :model-value="selected"
+              @update:model-value="toggleOption(opt)"
+            />
+          </q-item-section>
+        </q-item>
+      </template>
     </q-select>
   </div>
 </template>
@@ -65,6 +78,8 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    console.log("props", props);
+    
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
