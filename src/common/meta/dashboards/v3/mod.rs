@@ -256,7 +256,7 @@ pub struct VariableList {
     pub value: Option<String>,
     pub options: Option<Vec<CustomFieldsOption>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    show_multiple_values: Option<bool>,
+    pub show_multiple_values: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
