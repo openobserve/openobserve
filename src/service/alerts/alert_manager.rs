@@ -151,8 +151,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time,
-        end_time: trigger.end_time,
+        start_time: trigger.start_time.unwrap_or_default(),
+        end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
     };
@@ -205,7 +205,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     // publish the triggers as stream
-    trigger_data_stream.end_time = Some(Utc::now().timestamp_micros());
+    trigger_data_stream.end_time = Utc::now().timestamp_micros();
     publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())
@@ -299,8 +299,8 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time,
-        end_time: trigger.end_time,
+        start_time: trigger.start_time.unwrap_or_default(),
+        end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
     };
@@ -315,7 +315,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
             }
             db::scheduler::update_trigger(new_trigger).await?;
             log::debug!("Update trigger for report: {}", report_name);
-            trigger_data_stream.end_time = Some(Utc::now().timestamp_micros());
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
         }
         Err(e) => {
             log::error!("Error sending report to subscribers: {e}");
@@ -337,7 +337,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
                 )
                 .await?;
             }
-            trigger_data_stream.end_time = Some(Utc::now().timestamp_micros());
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
             trigger_data_stream.status = TriggerDataStatus::Failed;
             trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }

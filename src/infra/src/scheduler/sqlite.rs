@@ -118,8 +118,8 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT DO NOTHING;
         "#,
         )
@@ -131,6 +131,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(&trigger.status)
         .bind(0)
         .bind(trigger.next_run_at)
+        .bind(0)
+        .bind(0)
         .execute(&mut *tx)
         .await
         {

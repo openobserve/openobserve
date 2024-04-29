@@ -106,6 +106,9 @@ pub struct Trigger {
     pub is_realtime: bool,
     pub is_silenced: bool,
     pub status: TriggerStatus,
+    // #[sqlx(default)] only works when the column itself is missing.
+    // For NULL value it does not work.
+    // TODO: See https://github.com/launchbadge/sqlx/issues/1106
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_time: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]

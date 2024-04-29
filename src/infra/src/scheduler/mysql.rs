@@ -121,8 +121,8 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? , ?);
         "#,
         )
         .bind(&trigger.org)
@@ -133,6 +133,8 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(&trigger.status)
         .bind(0)
         .bind(trigger.next_run_at)
+        .bind(0)
+        .bind(0)
         .execute(&mut *tx)
         .await
         {

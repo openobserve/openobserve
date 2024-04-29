@@ -51,10 +51,8 @@ pub struct TriggerData {
     pub is_realtime: bool,
     pub is_silenced: bool,
     pub status: TriggerDataStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start_time: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_time: Option<i64>,
+    pub start_time: i64,
+    pub end_time: i64,
     pub retries: i32,
     pub error: Option<String>,
 }
