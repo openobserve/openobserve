@@ -600,26 +600,28 @@ pub fn get_merge_schema_changes(
                         merged_fields[*idx] = item;
                         field_datatype_delta.push((**item).clone());
                     } else {
-                        let mut meta = existing_field.metadata().clone();
-                        meta.insert("zo_cast".to_owned(), true.to_string());
-                        field_datatype_delta
-                            .push(existing_field.as_ref().clone().with_metadata(meta));
+                        field_datatype_delta.push(existing_field.as_ref().clone().with_metadata({
+                            let mut meta = existing_field.metadata().clone();
+                            meta.insert("zo_cast".to_owned(), true.to_string());
+                            meta
+                        }));
                     }
                 }
             }
         }
     }
-    if !is_schema_changed {
-        (false, field_datatype_delta, vec![])
-    } else {
+
+    if is_schema_changed {
         (
             true,
             field_datatype_delta,
             merged_fields
                 .into_iter()
                 .map(|f| f.as_ref().clone())
-                .collect::<Vec<_>>(),
+                .collect(),
         )
+    } else {
+        (false, vec![], vec![])
     }
 }
 
