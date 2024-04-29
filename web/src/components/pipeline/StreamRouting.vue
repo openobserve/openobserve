@@ -8,71 +8,73 @@
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
-      <div
-        data-test="stream-routing-name-input"
-        class="o2-input"
-        style="padding-top: 12px"
-      >
-        <q-input
-          v-model="streamRoute.name"
-          :label="t('function.stream_name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="isUpdating"
-          v-bind:disable="isUpdating"
-          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-          tabindex="0"
-          style="width: 480px"
-          error-message="Stream name already exists"
-          :error="!isValidName"
-        />
-      </div>
+      <q-form @submit="saveRouting">
+        <div
+          data-test="stream-routing-name-input"
+          class="o2-input"
+          style="padding-top: 12px"
+        >
+          <q-input
+            v-model="streamRoute.name"
+            :label="t('function.stream_name') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
+            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            tabindex="0"
+            style="width: 480px"
+            error-message="Stream name already exists"
+            :error="!isValidName"
+          />
+        </div>
 
-      <real-time-alert
-        :columns="filteredColumns"
-        :conditions="streamRoute.conditions"
-        @field:add="addField"
-        @field:remove="removeField"
-      />
+        <real-time-alert
+          :columns="filteredColumns"
+          :conditions="streamRoute.conditions"
+          @field:add="addField"
+          @field:remove="removeField"
+        />
 
-      <div
-        class="flex justify-start q-mt-lg q-py-sm full-width"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      >
-        <q-btn
-          data-test="add-report-cancel-btn"
-          class="text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-          @click="openCancelDialog"
-        />
-        <q-btn
-          data-test="add-report-save-btn"
-          :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
-          @click="saveRouting"
-        />
-        <q-btn
-          v-if="isUpdating"
-          data-test="associate-function-delete-btn"
-          :label="t('pipeline.deleteNode')"
-          class="text-bold no-border q-ml-md"
-          color="negative"
-          padding="sm xl"
-          no-caps
-          @click="openDeleteDialog"
-        />
-      </div>
+        <div
+          class="flex justify-start q-mt-lg q-py-sm full-width"
+          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        >
+          <q-btn
+            data-test="add-report-cancel-btn"
+            class="text-bold"
+            :label="t('alerts.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="openCancelDialog"
+          />
+          <q-btn
+            data-test="add-report-save-btn"
+            :label="t('alerts.save')"
+            class="text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            no-caps
+            type="submit"
+          />
+          <q-btn
+            v-if="isUpdating"
+            data-test="associate-function-delete-btn"
+            :label="t('pipeline.deleteNode')"
+            class="text-bold no-border q-ml-md"
+            color="negative"
+            padding="sm xl"
+            no-caps
+            @click="openDeleteDialog"
+          />
+        </div>
+      </q-form>
     </div>
   </div>
   <confirm-dialog

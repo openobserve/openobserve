@@ -25,103 +25,105 @@
         :label="isUpdating ? 'Edit function' : 'Create new function'"
         v-model="createNewFunction"
       />
-      <div
-        v-if="!createNewFunction"
-        class="flex justify-start items-center full-width"
-        style="padding-top: 0px"
-      >
+      <q-form @submit="saveFunction">
         <div
-          data-test="add-alert-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm full-width"
-          style="padding-top: 0"
+          v-if="!createNewFunction"
+          class="flex justify-start items-center full-width"
+          style="padding-top: 0px"
         >
-          <q-select
-            v-model="selectedFunction"
-            :options="filteredFunctions"
-            :label="t('function.selectFunction') + ' *'"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            error-message="Function is already associated"
-            :error="!functionExists"
+          <div
+            data-test="add-alert-stream-type-select"
+            class="alert-stream-type o2-input q-mr-sm full-width"
+            style="padding-top: 0"
+          >
+            <q-select
+              v-model="selectedFunction"
+              :options="filteredFunctions"
+              :label="t('function.selectFunction') + ' *'"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop no-case"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              style="min-width: 220px"
+              v-bind:readonly="isUpdating"
+              v-bind:disable="isUpdating"
+              error-message="Function is already associated"
+              :error="!functionExists"
+            />
+          </div>
+
+          <div
+            data-test="associate-function-order-input"
+            class="o2-input full-width"
+            style="padding-top: 12px"
+          >
+            <q-input
+              v-model="functionOrder"
+              :label="t('function.order') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              type="number"
+              :rules="[(val: any) => (!!val && val > -1) || 'Field is required!']"
+              tabindex="0"
+              style="min-width: 220px"
+            />
+          </div>
+        </div>
+
+        <div v-if="createNewFunction" class="pipeline-add-function">
+          <AddFunction
+            ref="addFunctionRef"
+            :model-value="functionData"
+            :is-updated="isUpdating"
+            @update:list="onFunctionCreation"
+            @cancel:hideform="cancelFunctionCreation"
           />
         </div>
 
         <div
-          data-test="associate-function-order-input"
-          class="o2-input full-width"
-          style="padding-top: 12px"
+          class="flex justify-start full-width"
+          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-          <q-input
-            v-model="functionOrder"
-            :label="t('function.order') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            type="number"
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-            tabindex="0"
-            style="min-width: 220px"
+          <q-btn
+            data-test="add-report-cancel-btn"
+            class="text-bold"
+            :label="t('alerts.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="openCancelDialog"
+          />
+          <q-btn
+            data-test="add-report-save-btn"
+            :label="t('alerts.save')"
+            class="text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            no-caps
+            type="submit"
+          />
+          <q-btn
+            v-if="isUpdating"
+            data-test="associate-function-delete-btn"
+            :label="t('pipeline.deleteNode')"
+            class="text-bold no-border q-ml-md"
+            color="negative"
+            padding="sm xl"
+            no-caps
+            @click="openDeleteDialog"
           />
         </div>
-      </div>
-
-      <div v-if="createNewFunction" class="pipeline-add-function">
-        <AddFunction
-          ref="addFunctionRef"
-          :model-value="functionData"
-          :is-updated="isUpdating"
-          @update:list="onFunctionCreation"
-          @cancel:hideform="cancelFunctionCreation"
-        />
-      </div>
-
-      <div
-        class="flex justify-start full-width"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      >
-        <q-btn
-          data-test="add-report-cancel-btn"
-          class="text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-          @click="openCancelDialog"
-        />
-        <q-btn
-          data-test="add-report-save-btn"
-          :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
-          @click="saveFunction"
-        />
-        <q-btn
-          v-if="isUpdating"
-          data-test="associate-function-delete-btn"
-          :label="t('pipeline.deleteNode')"
-          class="text-bold no-border q-ml-md"
-          color="negative"
-          padding="sm xl"
-          no-caps
-          @click="openDeleteDialog"
-        />
-      </div>
+      </q-form>
     </div>
   </div>
   <confirm-dialog
@@ -277,6 +279,7 @@ const openDeleteDialog = () => {
 };
 
 const saveFunction = () => {
+  console.log("saveFunction");
   functionExists.value = true;
 
   if (
