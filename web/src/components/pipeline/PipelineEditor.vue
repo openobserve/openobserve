@@ -63,9 +63,13 @@
     <div
       id="pipelineChartContainer"
       ref="chartContainerRef"
-      class="relative-position bg-grey-2 pipeline-chart-container"
+      class="relative-position pipeline-chart-container"
+      :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
     >
-      <div class="q-pl-sm q-pt-xs">
+      <div
+        class="q-pl-sm q-pt-xs"
+        :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'"
+      >
         Note: During execution of pipeline, routes will get executed before
         functions
       </div>
@@ -136,7 +140,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import jstransform from "@/services/jstransform";
-import { get } from "http";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -277,8 +280,12 @@ const dialog = ref({
 
 const onChartClick = (params: any) => {
   const { type, name } = params.data;
+
+  resetDialog();
+
   if (type === "streamRoute" || type === "condition") {
-    editingStreamRouteName.value = name;
+    if (type === "condition") editingStreamRouteName.value = name.split(":")[0];
+    else editingStreamRouteName.value = name;
     dialog.value.show = true;
     dialog.value.name = "streamRouting";
   }
@@ -374,11 +381,13 @@ const onMouseOut = (params: any) => {};
 
 const addFunction = () => {
   getFunctions();
+  resetDialog();
   dialog.value.show = true;
   dialog.value.name = "associateFunction";
 };
 
 const addStream = () => {
+  resetDialog();
   dialog.value.show = true;
   dialog.value.name = "streamRouting";
 };
@@ -648,6 +657,15 @@ const updateGraph = () => {
     symbol: getNodeSymbol(node.type),
     fixed: node.fixed,
     type: node.type,
+    label: {
+      show: true,
+      position: "bottom",
+      fontSize: 12,
+      formatter: (params: any) => {
+        if (params.data.type === "condition") return "Condition";
+        else return params.data.name;
+      },
+    },
   }));
 
   // Prepare links from 'nodeLinks'
@@ -706,12 +724,12 @@ const deleteNode = (node: { data: Node; type: string }) => {
     associatedFunctions.value = associatedFunctions.value.filter(
       (func) => func !== node.data.name
     );
-
-    deleteFunctionAssociation(node.data.name);
+    editingFunctionName.value = "";
   }
 
   if (node.type === "streamRoute") {
     delete streamRoutes.value[node.data.name];
+    editingStreamRouteName.value = "";
   }
 
   updateFunctionNodesOrder();
@@ -722,6 +740,8 @@ const deleteNode = (node: { data: Node; type: string }) => {
 const resetDialog = () => {
   dialog.value.show = false;
   dialog.value.name = "";
+  editingFunctionName.value = "";
+  editingStreamRouteName.value = "";
 };
 
 const getPipelinePayload = () => {
@@ -740,18 +760,36 @@ const getPipelinePayload = () => {
 };
 
 const associateFunctions = async () => {
-  const functionNodes = nodes.value.filter((node) => node.type === "function");
   const associateFunctionPromises = [];
 
-  for (let i = 0; i < functionNodes.length; i++) {
+  const previousAssociatedFunctions = pipeline.value.functions.map(
+    (func) => func.name
+  );
+
+  for (let i = 0; i < associatedFunctions.value.length; i++) {
+    const functionIndex = previousAssociatedFunctions.indexOf(
+      associatedFunctions.value[i]
+    );
+
+    // If function is already associated with the pipeline and order is same, skip.
+    // If there is no change in associated function name and order, skip.
+    if (functionIndex > -1) {
+      if (
+        pipeline.value.functions[i].name === associatedFunctions.value[i] &&
+        pipeline.value.functions[i].order ===
+          functions.value[associatedFunctions.value[i]].order
+      )
+        continue;
+    }
+
     associateFunctionPromises.push(
       jstransform.apply_stream_function(
         store.state.selectedOrganization.identifier,
         pipeline.value.stream_name,
         pipeline.value.stream_type,
-        functionNodes[i].name,
+        associatedFunctions.value[i],
         {
-          order: Number(functions.value[functionNodes[i].name].order),
+          order: Number(functions.value[associatedFunctions.value[i]].order),
         }
       )
     );
@@ -776,6 +814,18 @@ const savePipeline = async () => {
     position: "bottom",
     spinner: true,
   });
+
+  if (pipeline.value.functions.length) {
+    const deleteFunctionPromises = [];
+    for (let i = 0; i < pipeline.value.functions.length; i++) {
+      if (!associatedFunctions.value.includes(pipeline.value.functions[i].name))
+        deleteFunctionPromises.push(
+          deleteFunctionAssociation(pipeline.value.functions[i].name)
+        );
+    }
+
+    await Promise.all(deleteFunctionPromises);
+  }
 
   await associateFunctions();
 

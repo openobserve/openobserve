@@ -1,5 +1,8 @@
 <template>
-  <div class="bg-white full-height">
+  <div
+    class="full-height"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
     <div class="flex justify-between items-center q-px-md q-py-sm">
       <div data-test="add-role-section-title" style="font-size: 18px">
         {{ t("pipeline.addPipeline") }}
@@ -146,6 +149,7 @@
 import useStreams from "@/composables/useStreams";
 import { ref, computed, type Ref, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 const props = defineProps({
   isUpdating: {
@@ -156,6 +160,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["save"]);
+
+const store = useStore();
 
 const formData = ref({
   name: "",

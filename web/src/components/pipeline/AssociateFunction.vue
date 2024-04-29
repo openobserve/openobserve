@@ -1,7 +1,8 @@
 <template>
   <div
     data-test="add-stream-routing-section"
-    class="full-width bg-white full-height"
+    class="full-width full-height"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">Associate Function</div>
     <q-separator />
@@ -18,7 +19,7 @@
         "
       />
     </div>
-    <div v-else class="stream-routing-container full-width q-pa-md bg-white">
+    <div v-else class="stream-routing-container full-width full-height q-pa-md">
       <q-toggle
         class="q-mb-sm"
         :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -48,6 +49,8 @@
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 220px"
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
             error-message="Function is already associated"
             :error="!functionExists"
           />
@@ -313,6 +316,7 @@ const saveUpdatedLink = (link: { from: string; to: string }) => {
 
 const deleteFunction = () => {
   emit("delete:node", { data: props.functionData, type: "function" });
+  emit("cancel:hideform");
 };
 </script>
 

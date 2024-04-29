@@ -1,7 +1,8 @@
 <template>
   <div
     data-test="add-stream-routing-section"
-    class="full-width full-height bg-white"
+    class="full-width full-height"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">Routing</div>
     <q-separator />
