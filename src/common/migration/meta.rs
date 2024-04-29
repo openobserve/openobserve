@@ -112,7 +112,7 @@ async fn migrate_scheduler(from: &str, to: &str) -> Result<(), anyhow::Error> {
     dest.create_table().await?;
     dest.create_table_index().await?;
 
-    let items = src.list().await?;
+    let items = src.list(None).await?;
     for item in items.iter() {
         dest.push(item.to_owned()).await?;
     }

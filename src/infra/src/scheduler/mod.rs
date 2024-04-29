@@ -25,6 +25,7 @@ pub mod postgres;
 pub mod sqlite;
 
 static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
+pub const TRIGGERS_KEY: &str = "/triggers/";
 
 pub fn connect() -> Box<dyn Scheduler> {
     match CONFIG.common.meta_store.as_str().into() {
@@ -55,7 +56,8 @@ pub trait Scheduler: Sync + Send + 'static {
         alert_timeout: i64,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>>;
-    async fn list(&self) -> Result<Vec<Trigger>>;
+    async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
+    async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self, interval: u64);
     async fn watch_timeout(&self, interval: u64);
     async fn len_module(&self, module: TriggerModule) -> usize;
@@ -81,6 +83,15 @@ pub enum TriggerModule {
     Alert,
 }
 
+impl std::fmt::Display for TriggerModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TriggerModule::Alert => write!(f, "alert"),
+            TriggerModule::Report => write!(f, "report"),
+        }
+    }
+}
+
 #[derive(sqlx::FromRow, Debug, Clone, Default)]
 pub struct TriggerId {
     pub id: i64,
@@ -95,8 +106,13 @@ pub struct Trigger {
     pub is_realtime: bool,
     pub is_silenced: bool,
     pub status: TriggerStatus,
-    pub start_time: i64,
-    pub end_time: i64,
+    // #[sqlx(default)] only works when the column itself is missing.
+    // For NULL value it does not work.
+    // TODO: See https://github.com/launchbadge/sqlx/issues/1106
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<i64>,
     pub retries: i32,
 }
 
@@ -184,6 +200,12 @@ pub async fn pull(
         .await
 }
 
+/// Returns the scheduled job associated with the given id in read-only fashion
+#[inline]
+pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
+    CLIENT.get(org, module, key).await
+}
+
 /// Background job that frequently (with the given interval) cleans "Completed" jobs
 /// or jobs with retries >= scheduler_max_retries set through environment config
 #[inline]
@@ -211,6 +233,12 @@ pub async fn len_module(module: TriggerModule) -> usize {
 #[inline]
 pub async fn len() -> usize {
     CLIENT.len().await
+}
+
+/// List the jobs for the given module
+#[inline]
+pub async fn list(module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+    CLIENT.list(module).await
 }
 
 #[inline]
