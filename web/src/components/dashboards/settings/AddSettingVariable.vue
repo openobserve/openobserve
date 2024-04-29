@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <q-toggle
-                  v-model="variableData.show_multiple_values"
+                  v-model="variableData.showMultipleValues"
                   :label="t('dashboard.showMultipleValues')"
                   data-test="dashboard-query_values-show_multiple_values"
                 />
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="variableData.type == 'custom'">
             <div>
               <q-toggle
-                v-model="variableData.show_multiple_values"
+                v-model="variableData.showMultipleValues"
                 :label="t('dashboard.showMultipleValues')"
                 data-test="dashboard-custom-show_multiple_values"
               />
@@ -471,7 +471,7 @@ export default defineComponent({
       },
       value: "",
       options: [],
-      show_multiple_values: false,
+      showMultipleValues: false,
     });
     console.log("variableData addSetting", variableData);
     
