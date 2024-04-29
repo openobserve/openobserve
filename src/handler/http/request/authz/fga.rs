@@ -101,6 +101,10 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
             if value.starts_with(prefix) {
                 *value = value.strip_prefix(prefix).unwrap().to_string();
             }
+            let role_prefix = format!("{org_id}/");
+            if value.starts_with(&role_prefix) {
+                *value = value.strip_prefix(&role_prefix).unwrap().to_string()
+            }
         }
         permitted = Some(local_permitted);
     }
@@ -128,10 +132,11 @@ pub async fn update_role(
     path: web::Path<(String, String)>,
     update_role: web::Json<RoleRequest>,
 ) -> Result<HttpResponse, Error> {
-    let (_org_id, role_id) = path.into_inner();
+    let (org_id, role_id) = path.into_inner();
     let update_role = update_role.into_inner();
 
     match o2_enterprise::enterprise::openfga::authorizer::roles::update_role(
+        &org_id,
         &role_id,
         update_role.add,
         update_role.remove,
@@ -295,6 +300,10 @@ pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<Htt
             if value.starts_with(prefix) {
                 *value = value.strip_prefix(prefix).unwrap().to_string();
             }
+            let group_prefix = format!("{org_id}/");
+            if value.starts_with(&group_prefix) {
+                *value = value.strip_prefix(&group_prefix).unwrap().to_string()
+            }
         }
         permitted = Some(local_permitted);
     }
@@ -316,10 +325,13 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/groups/{group_name}")]
 pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_org_id, group_name) = path.into_inner();
+    let (org_id, group_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::groups::get_group_details(&group_name)
-        .await
+    match o2_enterprise::enterprise::openfga::authorizer::groups::get_group_details(
+        &org_id,
+        &group_name,
+    )
+    .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
