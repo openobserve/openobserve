@@ -198,10 +198,7 @@ async fn move_files(
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] check deletion for partition: {}",
-        prefix
-    );
+    // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
@@ -231,10 +228,7 @@ async fn move_files(
         return Ok(());
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] start processing for partition: {}",
-        prefix
-    );
+    // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
     let wal_dir = wal_dir.clone();
     // sort by created time
