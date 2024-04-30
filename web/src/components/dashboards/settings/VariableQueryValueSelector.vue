@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
+      :multiple="shouldAllowMultipleSelections"
     >
       <template v-slot:no-option>
         <q-item>
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section>
             <q-item-label v-html="opt.label" />
           </q-item-section>
-          <q-item-section side>
+          <q-item-section side v-if="shouldAllowMultipleSelections">
             <q-checkbox
               :model-value="selected"
               @update:model-value="toggleOption(opt)"
@@ -97,6 +98,10 @@ export default defineComponent({
       }
     );
 
+    const shouldAllowMultipleSelections = ref(
+      props.variableItem?.showMultipleValues === true
+    );
+
     // update selected value
     watch(selectedValue, () => {
       emit("update:modelValue", selectedValue.value);
@@ -106,6 +111,7 @@ export default defineComponent({
       selectedValue,
       fieldsFilterFn,
       fieldsFilteredOptions,
+      shouldAllowMultipleSelections,
     };
   },
 });
