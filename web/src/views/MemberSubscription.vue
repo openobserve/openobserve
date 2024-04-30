@@ -94,9 +94,9 @@ export default defineComponent({
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 
-            window.location.href = "/organizations";
+            window.location.href = "/iam/organizations";
           } else {
-            window.location.href = "/organizations";
+            window.location.href = "/iam/organizations";
           }
           return res;
         })
