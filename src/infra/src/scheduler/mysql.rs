@@ -305,6 +305,13 @@ FOR UPDATE SKIP LOCKED;
             "scheduler pull: selected scheduled jobs for update: {}",
             job_ids.len()
         );
+        if job_ids.is_empty() {
+            if let Err(e) = tx.commit().await {
+                log::error!("[MYSQL] commit scheduler pull error: {}", e);
+                return Err(e.into());
+            }
+            return Ok(vec![]);
+        }
 
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
 
