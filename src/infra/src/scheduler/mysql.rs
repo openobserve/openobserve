@@ -281,7 +281,7 @@ WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? A
 ORDER BY next_run_at
 LIMIT ?
 FOR UPDATE SKIP LOCKED;
-        "#,
+            "#,
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
@@ -315,7 +315,7 @@ SET status = ?, start_time = ?,
         WHEN module = ? THEN ?
         ELSE ?
     END
-WHERE FIND_IN_SET(id, ?);
+WHERE id IN (?);
             "#,
         )
         .bind(TriggerStatus::Processing)
@@ -339,8 +339,8 @@ WHERE FIND_IN_SET(id, ?);
             return Err(e.into());
         }
 
-        let query = r#"SELECT * FROM scheduled_jobs WHERE FIND_IN_SET(id, ?);"#;
-
+        let query = r#"SELECT * FROM scheduled_jobs WHERE id IN (?);"#; 
+        let pool = CLIENT.clone();
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
             .bind(job_ids.join(","))
             .fetch_all(&pool)
@@ -351,9 +351,7 @@ WHERE FIND_IN_SET(id, ?);
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT.clone();
-        let query = r#"
-SELECT * FROM scheduled_jobs
-WHERE org = ? AND module = ? AND module_key = ?;"#;
+        let query = r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#;
         let job = match sqlx::query_as::<_, Trigger>(query)
             .bind(org)
             .bind(module.clone())

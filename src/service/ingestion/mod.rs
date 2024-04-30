@@ -232,7 +232,7 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
                     .unwrap();
             // After the notification is sent successfully, we need to update
             // the silence period of the trigger
-            _ = db::scheduler::update_trigger(db::scheduler::Trigger {
+            if let Err(e) = db::scheduler::update_trigger(db::scheduler::Trigger {
                 org: alert.org_id.to_string(),
                 module: db::scheduler::TriggerModule::Alert,
                 module_key,
@@ -241,7 +241,10 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
                 next_run_at,
                 ..Default::default()
             })
-            .await;
+            .await
+            {
+                log::error!("Failed to update trigger: {}", e);
+            }
             trigger_data_stream.next_run_at = next_run_at;
         }
         trigger_data_stream.end_time = Utc::now().timestamp_micros();

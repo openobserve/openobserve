@@ -64,6 +64,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     } else {
                         json::from_slice(&ev.value.unwrap()).unwrap()
                     };
+                log::debug!("realtime_alert: event:put: get trigger: {:?}", item_value);
 
                 REALTIME_ALERT_TRIGGERS
                     .write()
@@ -85,7 +86,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let mut cache = REALTIME_ALERT_TRIGGERS.write().await;
     for trigger in triggers {
         if trigger.is_realtime {
-            cache.insert(trigger.module_key.clone(), trigger);
+            cache.insert(format!("{}/{}", trigger.org, trigger.module_key), trigger);
         }
     }
     log::info!("Alert realtime triggers Cached");
