@@ -280,12 +280,13 @@ WHERE id IN (
     FROM scheduled_jobs
     WHERE status = $6 AND next_run_at <= $7 AND retries < $8 AND NOT (is_realtime = $9 AND is_silenced = $10)
     ORDER BY next_run_at
-    FOR UPDATE SKIP LOCKED
     LIMIT $11
+    FOR UPDATE
 )
 RETURNING *;"#;
 
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
+        let mut tx = pool.begin().await?;
+        let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
             .bind(TriggerModule::Alert)
@@ -297,8 +298,22 @@ RETURNING *;"#;
             .bind(true)
             .bind(false)
             .bind(concurrency)
-            .fetch_all(&pool)
-            .await?;
+            .fetch_all(&mut *tx)
+            .await
+        {
+            Ok(jobs) => jobs,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback pull scheduled_jobs error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit pull scheduled_jobs error: {}", e);
+            return Err(e.into());
+        }
         Ok(jobs)
     }
 

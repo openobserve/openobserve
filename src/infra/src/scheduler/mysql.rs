@@ -279,7 +279,7 @@ FROM scheduled_jobs
 WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? AND is_silenced = ?)
 ORDER BY next_run_at
 LIMIT ?
-FOR UPDATE SKIP LOCKED;
+FOR UPDATE;
             "#,
         )
         .bind(TriggerStatus::Waiting)
@@ -305,15 +305,14 @@ FOR UPDATE SKIP LOCKED;
             job_ids.len()
         );
         if job_ids.is_empty() {
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit scheduler pull error: {}", e);
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback scheduler pull error: {}", e);
                 return Err(e.into());
             }
             return Ok(vec![]);
         }
 
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
-
         if let Err(e) = sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, start_time = ?,
