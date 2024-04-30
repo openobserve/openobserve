@@ -72,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :display-value="
             item.value
-              ? item.value
+              ? Array.isArray(item.value)
+                ? item.value.join(', ')
+                : item.value
               : !item.isLoading
               ? '(No Options Available)'
               : ''
@@ -88,11 +90,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           emit-value
           data-test="dashboard-variable-custom-selector"
           @update:model-value="onVariablesValueUpdated(index)"
+          :multiple="item.showMultipleValues"
         >
           <template v-slot:no-option>
             <q-item>
               <q-item-section class="text-italic text-grey">
                 No Options Available
+              </q-item-section>
+            </q-item>
+          </template>
+          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+            <q-item v-bind="itemProps">
+              <q-item-section>
+                <q-item-label v-html="opt.label" />
+              </q-item-section>
+              <q-item-section side v-if="item.showMultipleValues">
+                <q-checkbox
+                  :model-value="selected"
+                  @update:model-value="toggleOption(opt)"
+                />
               </q-item-section>
             </q-item>
           </template>
@@ -185,6 +201,7 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: true,
         };
+        console.log("variableData variablesValueSelector", variableData);
 
         // need to use initial value
         // also, constant type variable should not be updated
@@ -370,6 +387,10 @@ export default defineComponent({
 
         switch (currentVariable.type) {
           case "query_values": {
+            console.log(
+              "currentVariable variablesValueSelector",
+              currentVariable
+            );
             try {
               // set loading as true
               currentVariable.isLoading = true;
@@ -502,21 +523,43 @@ export default defineComponent({
             break;
           }
           case "custom": {
-            // assign options
-            currentVariable["options"] = currentVariable?.options;
+            currentVariable.options = currentVariable?.options;
 
-            // if the old value exist in dropdown set the old value
-            // otherwise set first value of drop down
-            // otherwise set null value
-            let oldVariableObjectSelectedValue = currentVariable.options.find(
-              (option: any) =>
-                option.value === oldVariablesData[currentVariable.name]
+            console.log(
+              "currentVariable variablesValueSelector",
+              currentVariable
             );
-            // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-            if (oldVariableObjectSelectedValue) {
-              currentVariable.value = oldVariableObjectSelectedValue.value;
+
+            // Check if the old value exists and set it
+            let oldVariableSelectedValues = [];
+            if (oldVariablesData[currentVariable.name]) {
+              oldVariableSelectedValues = Array.isArray(
+                oldVariablesData[currentVariable.name]
+              )
+                ? oldVariablesData[currentVariable.name]
+                : [oldVariablesData[currentVariable.name]];
+            }
+
+            // If showMultipleValues is true, set the value as an array containing old value(s) and selected value(s)
+            if (currentVariable.showMultipleValues) {
+              const selectedValues = currentVariable.options
+                .filter((option: any) =>
+                  oldVariableSelectedValues.includes(option.value)
+                )
+                .map((option: any) => option.value);
+              currentVariable.value =
+                selectedValues.length > 0
+                  ? selectedValues
+                  : oldVariableSelectedValues;
             } else {
-              currentVariable.value = currentVariable.options[0]?.value ?? null;
+              // If showMultipleValues is false, set the value as a single value from options which is selected
+              currentVariable.value =
+                currentVariable.options.find(
+                  (option: any) => option.value === oldVariableSelectedValues[0]
+                )?.value ??
+                (currentVariable.options.length > 0
+                  ? currentVariable.options[0].value
+                  : null); // If no option is available, set as the first value
             }
 
             resolve(true);
