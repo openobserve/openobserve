@@ -335,7 +335,7 @@ pub async fn merge(
                     let metadata = latest_schema.metadata().clone();
                     let final_schema = Schema::new(merged_fields).with_metadata(metadata);
 
-                    // As casting of data to existing schema isnt new version, we filter records
+                    // Casting of data to existing schema isnt new version, we remove records
                     // with zo_cast metadata
                     let schema_version_changes = field_datatype_delta
                         .iter()
