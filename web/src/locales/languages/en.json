@@ -140,7 +140,7 @@
     "settings": "Management",
     "iam": "IAM",
     "report": "Reports",
-    "pipeline": "Pipeline"
+    "pipeline": "Pipelines"
   },
   "rum": {
     "title": "Real User Monitoring",
