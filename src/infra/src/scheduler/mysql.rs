@@ -339,7 +339,7 @@ WHERE id IN (?);
             return Err(e.into());
         }
 
-        let query = r#"SELECT * FROM scheduled_jobs WHERE id IN (?);"#; 
+        let query = r#"SELECT * FROM scheduled_jobs WHERE id IN (?);"#;
         let pool = CLIENT.clone();
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
             .bind(job_ids.join(","))
@@ -351,7 +351,8 @@ WHERE id IN (?);
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT.clone();
-        let query = r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#;
+        let query =
+            r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#;
         let job = match sqlx::query_as::<_, Trigger>(query)
             .bind(org)
             .bind(module.clone())
