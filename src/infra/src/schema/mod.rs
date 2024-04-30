@@ -326,6 +326,7 @@ pub async fn merge(
                     // merge schema
                     let (is_schema_changed, field_datatype_delta, merged_fields) =
                         get_merge_schema_changes(latest_schema, &inferred_schema);
+
                     if !is_schema_changed {
                         tx.send(Some((latest_schema.clone(), field_datatype_delta)))
                             .unwrap();
@@ -333,7 +334,15 @@ pub async fn merge(
                     }
                     let metadata = latest_schema.metadata().clone();
                     let final_schema = Schema::new(merged_fields).with_metadata(metadata);
-                    let need_new_version = !field_datatype_delta.is_empty();
+
+                    // Casting of data to existing schema isnt new version, we remove records
+                    // with zo_cast metadata
+                    let schema_version_changes = field_datatype_delta
+                        .iter()
+                        .filter(|f| f.metadata().get("zo_cast").is_none())
+                        .collect::<Vec<_>>();
+                    let need_new_version = !schema_version_changes.is_empty();
+
                     if need_new_version && start_dt.is_some() {
                         // update old version end_dt
                         let mut metadata = latest_schema.metadata().clone();
