@@ -23,9 +23,14 @@ mod stream;
 mod wal;
 mod writer;
 
+use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
+use once_cell::sync::Lazy;
 pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+
+pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
+    Lazy::new(Default::default);
 
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
@@ -42,9 +47,12 @@ pub async fn init() -> errors::Result<()> {
         ));
         interval.tick().await; // the first tick is immediate
         loop {
+            // persist immutable data to disk
             if let Err(e) = immutable::persist().await {
                 log::error!("persist error: {}", e);
             }
+            // shrink metadata cache
+            WAL_PARQUET_METADATA.write().await.shrink_to_fit();
             interval.tick().await;
         }
     });

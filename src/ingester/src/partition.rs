@@ -77,7 +77,8 @@ impl Partition {
         stream_type: &str,
         stream_name: &str,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
-        let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
+        let base_path = PathBuf::from(&CONFIG.common.data_wal_dir);
+        let mut path = base_path.clone();
         path.push("files");
         path.push(org_id);
         path.push(stream_type);
@@ -118,6 +119,7 @@ impl Partition {
                     .context(WriteParquetRecordBatchSnafu)?;
             }
             writer.close().await.context(WriteParquetRecordBatchSnafu)?;
+            file_meta.compressed_size = buf_parquet.len() as i64;
 
             // write into local file
             let file_name = generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts);
@@ -137,6 +139,21 @@ impl Partition {
             f.write_all(&buf_parquet)
                 .await
                 .context(WriteFileSnafu { path: path.clone() })?;
+
+            // set parquet metadata cache
+            let mut file_key = path.clone();
+            file_key.set_extension("parquet");
+            let file_key = file_key
+                .strip_prefix(base_path.clone())
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/")
+                .trim_start_matches('/')
+                .to_string();
+            super::WAL_PARQUET_METADATA
+                .write()
+                .await
+                .insert(file_key, file_meta);
 
             // update metrics
             metrics::INGEST_WAL_USED_BYTES
