@@ -472,19 +472,44 @@ export default defineComponent({
                     value: value.zo_sql_key.toString(),
                   }));
 
-                // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-                if (
-                  oldVariablesData[currentVariable.name] !== undefined ||
-                  oldVariablesData[currentVariable.name] !== null
-                ) {
-                  currentVariable.value = currentVariable.options.some(
-                    (option: any) =>
-                      option.value === oldVariablesData[currentVariable.name]
+                // Define oldVariableSelectedValues array
+                let oldVariableSelectedValues = [];
+                if (oldVariablesData[currentVariable.name]) {
+                  oldVariableSelectedValues = Array.isArray(
+                    oldVariablesData[currentVariable.name]
                   )
                     ? oldVariablesData[currentVariable.name]
-                    : currentVariable.options.length
-                    ? currentVariable.options[0].value
-                    : null;
+                    : [oldVariablesData[currentVariable.name]];
+                }
+                console.log(
+                  "oldVariableSelectedValues query_values",
+                  oldVariableSelectedValues);
+                
+                // if the old value exists in the dropdown, set the old value; otherwise, set the first value of the dropdown; otherwise, set a blank string value
+                if (
+                  oldVariablesData[currentVariable.name] !== undefined &&
+                  oldVariablesData[currentVariable.name] !== null
+                ) {
+                  if (currentVariable.showMultipleValues) {
+                    const selectedValues = currentVariable.options
+                      .filter((option: any) =>
+                        oldVariableSelectedValues.includes(option.value)
+                      )
+                      .map((option: any) => option.value);
+                    currentVariable.value =
+                      selectedValues.length > 0
+                        ? selectedValues
+                        : [currentVariable.options[0].value]; // If no option is available, set as the first value
+                  } else {
+                    currentVariable.value = currentVariable.options.some(
+                      (option: any) =>
+                        option.value === oldVariablesData[currentVariable.name]
+                    )
+                      ? oldVariablesData[currentVariable.name]
+                      : currentVariable.options.length
+                      ? currentVariable.options[0].value
+                      : null;
+                  }
                 } else {
                   currentVariable.value = currentVariable.options.length
                     ? currentVariable.options[0].value
