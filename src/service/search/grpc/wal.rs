@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::{cmp::min, path::Path, sync::Arc};
 
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
@@ -31,12 +31,13 @@ use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
     common::FileType,
 };
-use futures::future::try_join_all;
+use futures::{future::try_join_all, StreamExt};
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
+use ingester::WAL_PARQUET_METADATA;
 use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
@@ -100,27 +101,45 @@ pub async fn search_parquet(
     let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // get file metadata to build file_list
-    let mut new_files = Vec::with_capacity(files.len());
-    for file in files.iter() {
-        let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
-        let parquet_meta = read_metadata_from_file(&source_file.into())
-            .await
-            .unwrap_or_default();
-
+    let files_num = files.len();
+    let mut new_files = Vec::with_capacity(files_num);
+    let files_metadata = futures::stream::iter(files)
+        .map(|file| async move {
+            let r = WAL_PARQUET_METADATA.read().await;
+            if let Some(meta) = r.get(file.key.as_str()) {
+                let mut file = file;
+                file.meta = meta.clone();
+                return file;
+            }
+            drop(r);
+            let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
+            let meta = read_metadata_from_file(&source_file.into())
+                .await
+                .unwrap_or_default();
+            let mut file = file;
+            file.meta = meta;
+            WAL_PARQUET_METADATA
+                .write()
+                .await
+                .insert(file.key.clone(), file.meta.clone());
+            file
+        })
+        .buffer_unordered(min(files_num, 10))
+        .collect::<Vec<FileKey>>()
+        .await;
+    for file in files_metadata {
         if let Some((min_ts, max_ts)) = sql.meta.time_range {
-            if parquet_meta.min_ts > max_ts || parquet_meta.max_ts < min_ts {
+            if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
                 log::debug!(
                     "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{}]",
                     &file.key,
-                    parquet_meta.min_ts,
-                    parquet_meta.max_ts
+                    file.meta.min_ts,
+                    file.meta.max_ts
                 );
                 wal::release_files(&[file.key.clone()]).await;
                 continue;
             }
         }
-        let mut file = file.clone();
-        file.meta = parquet_meta;
         new_files.push(file);
     }
     let files = new_files;

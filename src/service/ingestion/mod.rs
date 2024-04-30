@@ -19,12 +19,12 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use chrono::{TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use config::{
     cluster,
     meta::{
         stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
-        usage::RequestStats,
+        usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
     utils::{flatten, json::*},
     CONFIG, SIZE_IN_MB,
@@ -35,9 +35,10 @@ use vrl::{
     prelude::state,
 };
 
+use super::usage::publish_triggers_usage;
 use crate::{
     common::{
-        infra::config::{STREAM_ALERTS, STREAM_FUNCTIONS},
+        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS},
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
@@ -45,7 +46,7 @@ use crate::{
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::{db, format_partition_key, format_stream_name},
 };
 
 pub mod grpc;
@@ -167,10 +168,18 @@ pub async fn get_stream_alerts(
         if alerts_list.is_none() {
             return;
         }
+        let triggers_cache = REALTIME_ALERT_TRIGGERS.read().await;
         let alerts = alerts_list
             .unwrap()
             .iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
+            .filter(|alert| {
+                let key = format!("{}/{}", key, alert.name);
+                match triggers_cache.get(&key) {
+                    Some(v) => !v.is_silenced,
+                    None => true,
+                }
+            })
             .cloned()
             .collect::<Vec<_>>();
 
@@ -183,10 +192,62 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
         return;
     }
     let trigger = trigger.unwrap();
+    let mut trigger_usage_reports = vec![];
     for (alert, val) in trigger.iter() {
+        let module_key = format!(
+            "{}/{}/{}",
+            &alert.stream_type, &alert.stream_name, &alert.name
+        );
+        let now = Utc::now().timestamp_micros();
+        let mut trigger_data_stream = TriggerData {
+            org: alert.org_id.to_string(),
+            module: TriggerDataType::Alert,
+            key: module_key.clone(),
+            next_run_at: now,
+            is_realtime: true,
+            is_silenced: false,
+            status: TriggerDataStatus::Completed,
+            start_time: now,
+            end_time: 0,
+            retries: 0,
+            error: None,
+        };
         if let Err(e) = alert.send_notification(val).await {
-            log::error!("Failed to send notification: {}", e)
+            log::error!("Failed to send notification: {}", e);
+            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+        } else if alert.trigger_condition.silence > 0 {
+            log::debug!(
+                "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
+                &alert.org_id,
+                &alert.stream_type,
+                &alert.stream_name,
+                &alert.name
+            );
+            // After the notification is sent successfully, we need to update
+            // the silence period of the trigger
+            _ = db::scheduler::update_trigger(db::scheduler::Trigger {
+                org: alert.org_id.to_string(),
+                module: db::scheduler::TriggerModule::Alert,
+                module_key,
+                is_silenced: true,
+                is_realtime: true,
+                next_run_at: Utc::now().timestamp_micros()
+                    + Duration::try_minutes(alert.trigger_condition.silence)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap(),
+                ..Default::default()
+            })
+            .await;
         }
+        trigger_data_stream.end_time = Utc::now().timestamp_micros();
+        // Let all the alerts send notifications first
+        trigger_usage_reports.push(trigger_data_stream);
+    }
+
+    for trigger_data_stream in trigger_usage_reports {
+        publish_triggers_usage(trigger_data_stream).await;
     }
 }
 
@@ -433,7 +494,7 @@ pub async fn get_stream_routing(
         .unwrap_or_default()
         .iter()
         .map(|(k, v)| Routing {
-            destination: k.to_string(),
+            destination: format_stream_name(k),
             routing: v.clone(),
         })
         .collect();

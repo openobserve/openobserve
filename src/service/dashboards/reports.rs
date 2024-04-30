@@ -269,6 +269,10 @@ impl Report {
             email = email.to(recepient.parse()?);
         }
 
+        if !CONFIG.smtp.smtp_reply_to.is_empty() {
+            email = email.reply_to(CONFIG.smtp.smtp_reply_to.parse()?);
+        }
+
         let email = email
             .multipart(
                 MultiPart::mixed()

@@ -14,13 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use chrono::Duration;
 use config::CONFIG;
 use sqlx::Row;
 use tokio::time;
 
-use super::{Trigger, TriggerId, TriggerModule, TriggerStatus};
-use crate::{db::mysql::CLIENT, errors::Result};
+use super::{Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use crate::{
+    db::{self, mysql::CLIENT},
+    errors::{DbError, Error, Result},
+};
 
 pub struct MySqlScheduler {}
 
@@ -112,14 +116,13 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
 
     /// Pushes a Trigger job into the queue
     async fn push(&self, trigger: Trigger) -> Result<()> {
-        // let db = db::get_db().await;
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? , ?);
         "#,
         )
         .bind(&trigger.org)
@@ -130,6 +133,8 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(&trigger.status)
         .bind(0)
         .bind(trigger.next_run_at)
+        .bind(0)
+        .bind(0)
         .execute(&mut *tx)
         .await
         {
@@ -143,6 +148,18 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
             log::error!("[MYSQL] commit push scheduled_jobs error: {}", e);
             return Err(e.into());
         }
+
+        // For now, only send realtime alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module, &trigger.org, &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -153,10 +170,20 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
             r#"DELETE FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#,
         )
         .bind(org)
-        .bind(module)
+        .bind(&module)
         .bind(key)
         .execute(&pool)
         .await?;
+
+        // For now, only send alert triggers
+        if module == TriggerModule::Alert {
+            // It will send event even if the alert is not realtime alert.
+            // But that is okay, for non-realtime alerts, since the triggers are not
+            // present in the cache at all, it will just do nothin.
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator.delete(&key, false, true, None).await?;
+        }
         Ok(())
     }
 
@@ -177,8 +204,12 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(retries)
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&pool).await?;
+
+        // For status update of triggers, we don't need to send put events
+        // to cluster coordinator for now as it only changes the status and retries
+        // fields of scheduled jobs and not anything else
         Ok(())
     }
 
@@ -194,11 +225,23 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
-        .bind(trigger.org)
-        .bind(trigger.module_key)
-        .bind(trigger.module)
+        .bind(&trigger.org)
+        .bind(&trigger.module_key)
+        .bind(&trigger.module)
         .execute(&pool)
         .await?;
+
+        // For now, only send realtime alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module, &trigger.org, &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -306,10 +349,41 @@ WHERE FIND_IN_SET(id, ?);
         Ok(jobs)
     }
 
-    async fn list(&self) -> Result<Vec<Trigger>> {
+    async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT.clone();
-        let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query).fetch_all(&pool).await?;
+        let query = r#"
+SELECT * FROM scheduled_jobs
+WHERE org = ? AND module = ? AND module_key = ?;"#;
+        let job = match sqlx::query_as::<_, Trigger>(query)
+            .bind(org)
+            .bind(module.clone())
+            .bind(key)
+            .fetch_one(&pool)
+            .await
+        {
+            Ok(job) => job,
+            Err(_) => {
+                return Err(Error::from(DbError::KeyNotExists(format!(
+                    "{org}/{}/{key}",
+                    module
+                ))));
+            }
+        };
+        Ok(job)
+    }
+
+    async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+        let pool = CLIENT.clone();
+        let jobs: Vec<Trigger> = if let Some(module) = module {
+            let query = r#"SELECT * FROM scheduled_jobs WHERE module = ? ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(module)
+                .fetch_all(&pool)
+                .await?
+        } else {
+            let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query).fetch_all(&pool).await?
+        };
         Ok(jobs)
     }
 

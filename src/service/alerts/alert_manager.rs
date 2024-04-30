@@ -151,8 +151,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time,
-        end_time: trigger.end_time,
+        start_time: trigger.start_time.unwrap_or_default(),
+        end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
     };
@@ -299,8 +299,8 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time,
-        end_time: trigger.end_time,
+        start_time: trigger.start_time.unwrap_or_default(),
+        end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
     };

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use infra::scheduler::{Trigger, TriggerModule, TriggerStatus};
+pub use infra::scheduler::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use infra::{
     errors::Result,
     scheduler::{self as infra_scheduler},
@@ -103,6 +103,12 @@ pub async fn pull(
     infra_scheduler::pull(concurrency, alert_timeout, report_timeout).await
 }
 
+/// Returns the scheduled job associated with the given id in read-only fashion
+#[inline]
+pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
+    infra_scheduler::get(org, module, key).await
+}
+
 #[inline]
 pub async fn clean_complete(interval: u64) {
     infra_scheduler::clean_complete(interval).await
@@ -122,6 +128,12 @@ pub async fn len_module(module: TriggerModule) -> usize {
 #[inline]
 pub async fn len() -> usize {
     infra_scheduler::len().await
+}
+
+/// List the jobs for the given module
+#[inline]
+pub async fn list(module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+    infra_scheduler::list(module).await
 }
 
 #[inline]

@@ -222,8 +222,19 @@ pub async fn get_latest_traces(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
-    let _locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !CONFIG.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!("http traces latest API wait in queue took: {}", took_wait);
 
     // search
     let query_sql = format!(

@@ -15,14 +15,17 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::CONFIG;
+use config::{utils::json, CONFIG};
 use sqlx::Row;
 use tokio::time;
 
-use super::{Trigger, TriggerModule, TriggerStatus};
+use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
-    db::sqlite::{CLIENT_RO, CLIENT_RW},
-    errors::Result,
+    db::{
+        self,
+        sqlite::{CLIENT_RO, CLIENT_RW},
+    },
+    errors::{DbError, Error, Result},
 };
 
 pub struct SqliteScheduler {}
@@ -115,8 +118,8 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT DO NOTHING;
         "#,
         )
@@ -128,6 +131,8 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(&trigger.status)
         .bind(0)
         .bind(trigger.next_run_at)
+        .bind(0)
+        .bind(0)
         .execute(&mut *tx)
         .await
         {
@@ -141,6 +146,26 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             log::error!("[SQLITE] commit push scheduled_jobs error: {}", e);
             return Err(e.into());
         }
+
+        // release lock
+        drop(client);
+
+        // For now, only send realtime alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module, &trigger.org, &trigger.module_key
+            );
+
+            // TODO: For sqlite cluster coordinator, the alert triggers are put
+            // into the sqlite meta database to send watch events. Hence, there is a
+            // redundancy of alert triggers stored both in scheduled_jobs and meta
+            // tables. How to remove this redundancy?
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -153,9 +178,21 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         )
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&*client)
         .await?;
+
+        drop(client);
+
+        // For now, only send alert triggers
+        if module == TriggerModule::Alert {
+            // For status update of triggers, we don't need to send put events
+            // to cluster coordinator for now as it only changes the status and retries
+            // fields of scheduled jobs and not anything else
+            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator.delete(&key, false, true, None).await?;
+        }
         Ok(())
     }
 
@@ -177,8 +214,14 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(retries)
         .bind(org)
         .bind(key)
-        .bind(module)
+        .bind(&module)
         .execute(&*client).await?;
+
+        drop(client);
+
+        // For status update of triggers, we don't need to send put events
+        // to cluster coordinator for now as it only changes the status and retries
+        // fields of scheduled jobs and not anything else
         Ok(())
     }
 
@@ -190,16 +233,31 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5
 WHERE org = $6 AND module_key = $7 AND module = $8;"#,
         )
-        .bind(trigger.status)
+        .bind(&trigger.status)
         .bind(trigger.retries)
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
-        .bind(trigger.org)
-        .bind(trigger.module_key.clone())
-        .bind(trigger.module)
+        .bind(&trigger.org)
+        .bind(&trigger.module_key)
+        .bind(&trigger.module)
         .execute(&*client)
         .await?;
+
+        // release lock
+        drop(client);
+
+        // For now, only send alert triggers
+        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+            let key = format!(
+                "{TRIGGERS_KEY}{}/{}/{}",
+                trigger.module, &trigger.org, &trigger.module_key
+            );
+            let cluster_coordinator = db::get_coordinator().await;
+            cluster_coordinator
+                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
+                .await?;
+        }
         Ok(())
     }
 
@@ -263,12 +321,43 @@ RETURNING *;"#;
         Ok(jobs)
     }
 
-    async fn list(&self) -> Result<Vec<Trigger>> {
+    async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
+        let pool = CLIENT_RO.clone();
+        let query = r#"
+SELECT * FROM scheduled_jobs
+WHERE org = $1 AND module = $2 AND module_key = $3;"#;
+        let job = match sqlx::query_as::<_, Trigger>(query)
+            .bind(org)
+            .bind(module.clone())
+            .bind(key)
+            .fetch_one(&pool)
+            .await
+        {
+            Ok(job) => job,
+            Err(_) => {
+                return Err(Error::from(DbError::KeyNotExists(format!(
+                    "{org}/{}/{key}",
+                    module
+                ))));
+            }
+        };
+        Ok(job)
+    }
+
+    async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
         let client = CLIENT_RO.clone();
-        let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
-            .fetch_all(&client)
-            .await?;
+        let jobs: Vec<Trigger> = if let Some(module) = module {
+            let query = r#"SELECT * FROM scheduled_jobs WHERE module = $1 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(module)
+                .fetch_all(&client)
+                .await?
+        } else {
+            let query = r#"SELECT * FROM scheduled_jobs ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .fetch_all(&client)
+                .await?
+        };
         Ok(jobs)
     }
 
