@@ -106,9 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else style="margin-top: 17px">
-            <q-label class="q-pt-md text-bold">{{
+            <div class="q-pt-md text-bold">{{
               t("settings.customLogoText")
-            }}</q-label
+            }}</div
             ><br />
             {{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
             <q-btn
@@ -124,8 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator class="q-mt-sm"></q-separator>
         <div class="q-gutter-sm row q-mt-xs">
-          <q-label class="q-pt-sm text-bold full-width"
-            >{{ t("settings.customLogoTitle") }} </q-label
+          <div class="q-pt-sm text-bold full-width"
+            >{{ t("settings.customLogoTitle") }} </div
           ><br />
           <div
             v-if="
