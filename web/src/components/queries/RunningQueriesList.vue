@@ -185,6 +185,7 @@ export default defineComponent({
       message: "Are you sure you want to delete this running query?",
       data: null as any,
     });
+    
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
