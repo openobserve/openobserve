@@ -128,6 +128,14 @@ const search = {
     const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
     return http().post(url, query);
   },
+  get_running_queries: () => {
+    const url = `/api/query_manager/status`;
+    return http().get(url);
+  },
+  delete_running_query: (traceID: string) => {
+    const url = `/api/query_manager/${traceID}`;
+    return http().delete(url);
+  },
 };
 
 export default search;

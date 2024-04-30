@@ -1416,6 +1416,11 @@ const useLogs = () => {
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage);
           }
+
+          if (err?.response?.data?.code == 429) {
+            notificationMsg.value = err.response.data.message;
+            searchObj.data.errorMsg = err.response.data.message;
+          }
           reject(false);
         });
     });
