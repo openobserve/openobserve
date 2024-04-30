@@ -34,8 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           vertical
         >
           <q-route-tab
-            exact
             default
+            name="queryManagement"
+            :to="'/settings/query_management'"
+            icon="query_stats"
+            :label="t('settings.queryManagement')"
+            content-class="tab_content"
+            v-if="isMetaOrg"
+          />
+          <q-route-tab
             name="general"
             :to="'/settings/general'"
             :icon="outlinedSettings"
@@ -67,6 +74,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -76,31 +84,40 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
     const settingsTab = ref("general");
+    const { isMetaOrg } = useIsMetaOrg();
+
+    const handleSettingsRouting = () => {
+      if (router.currentRoute.value.name === "settings") {
+        if (isMetaOrg.value && config.isEnterprise === "true") {
+          settingsTab.value = "queryManagement";
+          router.push({
+            path: "/settings/query_management",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        } else {
+          settingsTab.value = "general";
+          router.push({
+            path: "/settings/general",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          });
+        }
+      }
+    };
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name == "settings") {
-        settingsTab.value = "general";
-        router.push({ path: "/settings/general" });
-      }
+      handleSettingsRouting();
     });
 
-    // render general settings component
     onActivated(() => {
-      settingsTab.value = "general";
-      router.push({ path: "/settings/general" });
+      handleSettingsRouting();
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "settings") {
-        settingsTab.value = "general";
-        router.push({
-          name: "general",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
+      handleSettingsRouting();
     });
 
     return {
@@ -111,6 +128,7 @@ export default defineComponent({
       settingsTab,
       splitterModel: ref(200),
       outlinedSettings,
+      isMetaOrg,
     };
   },
 });
