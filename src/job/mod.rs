@@ -94,7 +94,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // initialize metadata watcher
-    if CONFIG.common.schema_cache_disabled {
+    if !CONFIG.common.schema_cache_disabled {
         tokio::task::spawn(async move { db::schema::watch().await });
     }
     tokio::task::spawn(async move { db::functions::watch().await });
@@ -117,7 +117,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata
-    if CONFIG.common.schema_cache_disabled {
+    if !CONFIG.common.schema_cache_disabled {
         db::schema::cache().await.expect("stream cache failed");
     }
     db::functions::cache()
