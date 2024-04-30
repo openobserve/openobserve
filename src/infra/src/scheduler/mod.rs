@@ -58,8 +58,8 @@ pub trait Scheduler: Sync + Send + 'static {
     ) -> Result<Vec<Trigger>>;
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
-    async fn clean_complete(&self, interval: u64);
-    async fn watch_timeout(&self, interval: u64);
+    async fn clean_complete(&self) -> Result<()>;
+    async fn watch_timeout(&self) -> Result<()>;
     async fn len_module(&self, module: TriggerModule) -> usize;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
@@ -120,19 +120,6 @@ pub struct Trigger {
 pub async fn init() -> Result<()> {
     create_table().await?;
     create_table_index().await?;
-    Ok(())
-}
-
-/// Must be called after calling `scheduler::init()`
-pub async fn init_background_jobs(clean_interval: u64, watch_interval: u64) -> Result<()> {
-    tokio::task::spawn(async move {
-        clean_complete(clean_interval).await;
-    });
-
-    tokio::task::spawn(async move {
-        watch_timeout(watch_interval).await;
-    });
-
     Ok(())
 }
 
@@ -209,8 +196,8 @@ pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger>
 /// Background job that frequently (with the given interval) cleans "Completed" jobs
 /// or jobs with retries >= scheduler_max_retries set through environment config
 #[inline]
-pub async fn clean_complete(interval: u64) {
-    CLIENT.clean_complete(interval).await
+pub async fn clean_complete() -> Result<()> {
+    CLIENT.clean_complete().await
 }
 
 /// Background job that watches for timeout of a job
@@ -220,8 +207,8 @@ pub async fn clean_complete(interval: u64) {
 /// - Get the record ids with difference more than the given timeout
 /// - Update their status back to "Waiting" and increase their "retries" by 1
 #[inline]
-pub async fn watch_timeout(interval: u64) {
-    CLIENT.watch_timeout(interval).await
+pub async fn watch_timeout() -> Result<()> {
+    CLIENT.watch_timeout().await
 }
 
 /// The count of jobs for the given module (Report/Alert etc.)

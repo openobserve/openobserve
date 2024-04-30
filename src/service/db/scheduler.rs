@@ -109,16 +109,6 @@ pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger>
     infra_scheduler::get(org, module, key).await
 }
 
-#[inline]
-pub async fn clean_complete(interval: u64) {
-    infra_scheduler::clean_complete(interval).await
-}
-
-#[inline]
-pub async fn watch_timeout(interval: u64) {
-    infra_scheduler::watch_timeout(interval).await
-}
-
 /// The count of jobs for the given module (Report/Alert etc.)
 #[inline]
 pub async fn len_module(module: TriggerModule) -> usize {

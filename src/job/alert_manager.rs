@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster, config::CONFIG};
-use infra::scheduler;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use tokio::time;
@@ -25,6 +24,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
+
     // check super cluster
     #[cfg(feature = "enterprise")]
     if O2_CONFIG.super_cluster.enabled {
@@ -45,19 +45,46 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
-    scheduler::init_background_jobs(
-        CONFIG.limit.scheduler_clean_interval,
-        CONFIG.limit.scheduler_watch_interval,
-    )
-    .await?;
+    tokio::task::spawn(async move { run_schedule_jobs().await });
+    tokio::task::spawn(async move { clean_complete_jobs().await });
+    tokio::task::spawn(async move { watch_timeout_jobs().await });
 
-    // should run it every 10 seconds
+    Ok(())
+}
+
+async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(30));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
         if let Err(e) = service::alerts::alert_manager::run().await {
-            log::error!("[ALERT MANAGER] run error: {}", e);
+            log::error!("[ALERT MANAGER] run schedule jobs error: {}", e);
+        }
+    }
+}
+
+async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.limit.scheduler_clean_interval,
+    ));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = infra::scheduler::clean_complete().await {
+            log::error!("[ALERT MANAGER] clean complete jobs error: {}", e);
+        }
+    }
+}
+
+async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.limit.scheduler_watch_interval,
+    ));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = infra::scheduler::clean_complete().await {
+            log::error!("[ALERT MANAGER] watch timeout jobs error: {}", e);
         }
     }
 }
