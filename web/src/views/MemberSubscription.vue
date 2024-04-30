@@ -81,6 +81,8 @@ export default defineComponent({
   methods: {
     async ProcessSubscription(s: any, action: string) {
       const baseURL = getPath();
+      const route = this.$router.resolve({ name: "organizations" });
+      const redirectURI = route.href || baseURL;
       await organizationsService
         .process_subscription(s, action)
         .then((res) => {
@@ -94,9 +96,9 @@ export default defineComponent({
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 
-            window.location.href = "/iam/organizations";
+            window.location.href = redirectURI;
           } else {
-            window.location.href = "/iam/organizations";
+            window.location.href = redirectURI;
           }
           return res;
         })
