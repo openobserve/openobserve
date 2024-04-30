@@ -487,6 +487,10 @@ export default defineComponent({
         value: "",
       });
     };
+    // by default, use showMultipleValues as false
+    if (!variableData.showMultipleValues) {
+      variableData.showMultipleValues = false;
+    }
 
     const filterUpdated = (index: number, filter: any) => {
       variableData.query_data.filter[index].name = filter.name;
