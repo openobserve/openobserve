@@ -23,7 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       v-model="selectedValue"
       :display-value="
-        selectedValue || selectedValue == ''
+        selectedValue
+          ? Array.isArray(selectedValue)
+            ? selectedValue.join(', ')
+            : selectedValue
+          : selectedValue || selectedValue == ''
           ? selectedValue == ''
             ? '<blank>'
             : selectedValue
@@ -44,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
-      :multiple="shouldAllowMultipleSelections"
+      :multiple="variableItem.showMultipleValues"
     >
       <template v-slot:no-option>
         <q-item>
@@ -58,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section>
             <q-item-label v-html="opt.label" />
           </q-item-section>
-          <q-item-section side v-if="shouldAllowMultipleSelections">
+          <q-item-section side v-if="variableItem.showMultipleValues">
             <q-checkbox
               :model-value="selected"
               @update:model-value="toggleOption(opt)"
@@ -80,7 +84,7 @@ export default defineComponent({
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
     console.log("props", props);
-    
+
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -98,10 +102,6 @@ export default defineComponent({
       }
     );
 
-    const shouldAllowMultipleSelections = ref(
-      props.variableItem?.showMultipleValues === true
-    );
-
     // update selected value
     watch(selectedValue, () => {
       emit("update:modelValue", selectedValue.value);
@@ -111,7 +111,6 @@ export default defineComponent({
       selectedValue,
       fieldsFilterFn,
       fieldsFilteredOptions,
-      shouldAllowMultipleSelections,
     };
   },
 });
