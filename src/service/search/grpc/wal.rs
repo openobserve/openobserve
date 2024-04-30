@@ -37,6 +37,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
+use ingester::WAL_PARQUET_METADATA;
 use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
@@ -104,12 +105,23 @@ pub async fn search_parquet(
     let mut new_files = Vec::with_capacity(files_num);
     let files_metadata = futures::stream::iter(files)
         .map(|file| async move {
+            let r = WAL_PARQUET_METADATA.read().await;
+            if let Some(meta) = r.get(file.key.as_str()) {
+                let mut file = file;
+                file.meta = meta.clone();
+                return file;
+            }
+            drop(r);
             let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();
             let mut file = file;
             file.meta = meta;
+            WAL_PARQUET_METADATA
+                .write()
+                .await
+                .insert(file.key.clone(), file.meta.clone());
             file
         })
         .buffer_unordered(min(files_num, 10))
