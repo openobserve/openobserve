@@ -265,7 +265,6 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         } else {
             format!("Basic {}", &CONFIG.common.usage_reporting_creds)
         };
-        // let creds = format!("Basic {}", &CONFIG.common.usage_reporting_creds);
         if let Err(e) = Client::builder()
             .build()
             .unwrap()
