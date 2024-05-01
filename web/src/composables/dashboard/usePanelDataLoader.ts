@@ -433,20 +433,95 @@ export const usePanelDataLoader = (
         });
       }
       query = query.replaceAll(variableName, variableValue);
+      console.log("query---- fixed", query);
     });
 
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
-        const variableName = `$${variable.name}`;
-        const variableValue = variable.value === null ? "" : variable.value;
-        if (query.includes(variableName)) {
-          metadata.push({
-            type: "variable",
-            name: variable.name,
-            value: variable.value,
-          });
+        console.log("query---- variable usePanelDataLoader variable", variable);
+
+        const possibleTypes = ["csv", "pipe", "doublequote", "singlequote"];
+
+        let variableType = "";
+
+        possibleTypes.forEach((type) => {
+          if (query.includes(`:${type}`)) {
+            variableType = type;
+          }
+        });
+
+        const defaultVariableName = `$${variable.name}`;
+
+        const variableName = Array.isArray(variable.value)
+          ? `$${variable.name}:${variableType}`
+          : `$${variable.name}`;
+        console.log("variableName", variableName);
+
+        let variableValue = "";
+        console.log(
+          "query---- variable.value usePanelDataLoader",
+          variable.value
+        );
+        if (Array.isArray(variable.value)) {
+          console.log(
+            "query---- variable.value usePanelDataLoader inside if",
+            variable.value
+          );
+
+          if (variableType === "csv") {
+            console.log("---------------------- csv");
+
+            variableValue = variable.value.join(", ");
+            console.log("variableValue csv", variableValue);
+
+            query = query.replaceAll(variableName, variableValue);
+            console.log("query---- csv", query);
+          } else if (variableType === "pipe") {
+            console.log("---------------------- pipe");
+
+            variableValue = variable.value.join("|");
+            console.log("variableValue pipe", variableValue);
+            query = query.replaceAll(variableName, variableValue);
+            console.log("query---- pipe", query);
+          } else if (variableType === "doublequote") {
+            console.log("---------------------- doublequote");
+            variableValue = variable.value
+              .map((value: any) => `"${value}"`)
+              .join(",");
+            console.log("variableValue doublequote", variableValue);
+            query = query.replaceAll(variableName, variableValue);
+            console.log("query---- doublequote", query);
+          } else if (variableType === "singlequote") {
+            console.log("---------------------- singlequote");
+            variableValue = variable.value
+              .map((value: any) => `'${value}'`)
+              .join(",");
+            console.log("variableValue singlequote", variableValue);
+            query = query.replaceAll(variableName, variableValue);
+            console.log("query---- singlequote", query);
+          } else {
+            console.log("---------------------- csv else");
+            variableValue = variable.value.join(", ");
+            query = query.replaceAll(defaultVariableName, variableValue);
+            console.log("query---- csv", query);
+          }
+        } else {
+          console.log(
+            "query---- variable.value usePanelDataLoader outside if",
+            variable.value
+          );
+
+          variableValue = variable.value === null ? "" : variable.value;
+          if (query.includes(variableName)) {
+            metadata.push({
+              type: "variable",
+              name: variable.name,
+              value: variable.value,
+            });
+          }
+          query = query.replaceAll(variableName, variableValue);
+          console.log("query----", query);
         }
-        query = query.replaceAll(variableName, variableValue);
       });
 
       return { query, metadata };
