@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use arrow_schema::{Field, Schema};
 use bytes::Bytes;
@@ -22,7 +22,8 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
     schema::{
-        unwrap_stream_settings, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST,
+        STREAM_SETTINGS,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -310,10 +311,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 let item_key = ev_key.strip_prefix(key).unwrap();
                 let schema_versions = match db::list_values(&format!("{ev_key}/")).await {
-                    Ok(val) => val
-                        .iter()
-                        .flat_map(|v| json::from_slice::<Vec<Schema>>(v).unwrap())
-                        .collect::<Vec<Schema>>(),
+                    Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
                         continue;
@@ -322,23 +320,54 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if schema_versions.is_empty() {
                     continue;
                 }
-
-                let settings =
-                    unwrap_stream_settings(schema_versions.last().unwrap()).unwrap_or_default();
+                let latest_schema: Vec<Schema> =
+                    match json::from_slice(schema_versions.last().unwrap()) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
+                            continue;
+                        }
+                    };
+                if latest_schema.is_empty() {
+                    continue;
+                }
+                let latest_schema = latest_schema.last().unwrap();
+                let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.insert(
-                    item_key.to_string(),
-                    schema_versions.last().unwrap().clone(),
-                );
+                w.insert(item_key.to_string(), latest_schema.clone());
                 drop(w);
-                let schema_bytes = json::to_vec(&schema_versions).unwrap();
-                let schema_compressed = zstd::encode_all(schema_bytes.as_slice(), 3)?;
-                let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
-                w.insert(item_key.to_string(), schema_compressed.into());
-                drop(w);
+                if CONFIG.common.schema_cache_compress_enabled {
+                    let mut schema_bytes = Vec::with_capacity(
+                        schema_versions.iter().map(|v| v.len()).sum::<usize>()
+                            + schema_versions.len()
+                            + 2,
+                    );
+                    _ = schema_bytes.write("[".as_bytes()).unwrap();
+                    for (i, v) in schema_versions.iter().enumerate() {
+                        if i > 0 {
+                            _ = schema_bytes.write(",".as_bytes()).unwrap();
+                        }
+                        _ = schema_bytes.write(v).unwrap();
+                    }
+                    _ = schema_bytes.write("]".as_bytes()).unwrap();
+                    let compressed_bytes = zstd::encode_all(schema_bytes.as_slice(), 3).unwrap();
+                    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+                    w.insert(item_key.to_string(), compressed_bytes.into());
+                    w.shrink_to_fit();
+                    drop(w);
+                } else {
+                    let schema_versions = schema_versions
+                        .iter()
+                        .flat_map(|v| json::from_slice::<Vec<Schema>>(v).unwrap())
+                        .collect::<Vec<Schema>>();
+                    let mut w = STREAM_SCHEMAS.write().await;
+                    w.insert(item_key.to_string(), schema_versions);
+                    w.shrink_to_fit();
+                    drop(w);
+                }
 
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -414,35 +443,56 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     for item_key in keys.iter() {
-        let Some(mut versions) = schemas.remove(item_key) else {
+        let Some(mut schema_versions) = schemas.remove(item_key) else {
             continue;
         };
-        versions.sort_by(|a, b| a.1.cmp(&b.1));
-        let mut schema_versions = Vec::with_capacity(versions.len());
-        for (val, _) in versions.iter() {
-            let schema: Vec<Schema> = json::from_slice(val).map_err(|e| {
-                anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)
-            })?;
-            schema_versions.extend(schema);
-        }
         if schema_versions.is_empty() {
             continue;
         }
-        let settings = unwrap_stream_settings(schema_versions.last().unwrap()).unwrap_or_default();
+        schema_versions.sort_by(|a, b| a.1.cmp(&b.1));
+        let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().0)
+            .map_err(|e| {
+                anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)
+            })?;
+        if latest_schema.is_empty() {
+            continue;
+        }
+        let latest_schema = latest_schema.last().unwrap();
+        let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(
-            item_key.to_string(),
-            schema_versions.last().unwrap().clone(),
-        );
+        w.insert(item_key.to_string(), latest_schema.clone());
         drop(w);
-        let schema_bytes = json::to_vec(&schema_versions).unwrap();
-        let schema_compressed = zstd::encode_all(schema_bytes.as_slice(), 3)?;
-        let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
-        w.insert(item_key.to_string(), schema_compressed.into());
-        drop(w);
+        if CONFIG.common.schema_cache_compress_enabled {
+            let mut schema_bytes = Vec::with_capacity(
+                schema_versions.iter().map(|(v, _)| v.len()).sum::<usize>()
+                    + schema_versions.len()
+                    + 2,
+            );
+            _ = schema_bytes.write("[".as_bytes()).unwrap();
+            for (i, (v, _)) in schema_versions.iter().enumerate() {
+                if i > 0 {
+                    _ = schema_bytes.write(",".as_bytes()).unwrap();
+                }
+                _ = schema_bytes.write(v).unwrap();
+            }
+            _ = schema_bytes.write("]".as_bytes()).unwrap();
+            let compressed_bytes = zstd::encode_all(schema_bytes.as_slice(), 3).unwrap();
+            let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+            w.insert(item_key.to_string(), compressed_bytes.into());
+            drop(w);
+        } else {
+            let schema_versions = schema_versions
+                .iter()
+                .flat_map(|(v, _)| json::from_slice::<Vec<Schema>>(v).unwrap())
+                .collect::<Vec<Schema>>();
+            let mut w = STREAM_SCHEMAS.write().await;
+            w.insert(item_key.to_string(), schema_versions);
+            w.shrink_to_fit();
+            drop(w);
+        }
     }
     log::info!("Stream schemas Cached");
     Ok(())

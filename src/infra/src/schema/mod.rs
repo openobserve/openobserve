@@ -27,6 +27,7 @@ use crate::{
     errors::{DbError, Error},
 };
 
+pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, bytes::Bytes>> =
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
@@ -93,11 +94,18 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
-    let r = STREAM_SCHEMAS_COMPRESSED.read().await;
-    if let Some(data) = r.get(cache_key) {
-        let schema_bytes = zstd::decode_all(data.as_ref())?;
-        let schemas = json::from_slice(&schema_bytes)?;
-        return Ok(schemas);
+    if CONFIG.common.schema_cache_compress_enabled {
+        let r = STREAM_SCHEMAS_COMPRESSED.read().await;
+        if let Some(data) = r.get(cache_key) {
+            let schema_bytes = zstd::decode_all(data.as_ref())?;
+            let schemas: Vec<Vec<Schema>> = json::from_slice(&schema_bytes)?;
+            return Ok(schemas.into_iter().flatten().collect());
+        }
+    } else {
+        let r = STREAM_SCHEMAS.read().await;
+        if let Some(schemas) = r.get(cache_key) {
+            return Ok(schemas.clone());
+        }
     }
 
     let db = infra_db::get_db().await;

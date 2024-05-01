@@ -22,6 +22,7 @@ use actix_web::{
     http::header,
     put, web, HttpRequest, HttpResponse,
 };
+use arrow_schema::Schema;
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
@@ -31,7 +32,9 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     cache, file_list,
-    schema::{STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST},
+    schema::{
+        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
+    },
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -292,6 +295,17 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
     let mut mem_size = 0;
+    let r = STREAM_SCHEMAS.read().await;
+    for (key, val) in r.iter() {
+        stream_num += 1;
+        mem_size += std::mem::size_of::<Vec<Schema>>();
+        mem_size += key.len();
+        for schema in val.iter() {
+            stream_schema_num += 1;
+            mem_size += schema.size();
+        }
+    }
+    drop(r);
     let r = STREAM_SCHEMAS_COMPRESSED.read().await;
     for (key, val) in r.iter() {
         stream_num += 1;
