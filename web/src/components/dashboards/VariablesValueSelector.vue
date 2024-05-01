@@ -473,7 +473,7 @@ export default defineComponent({
                   }));
 
                 // Define oldVariableSelectedValues array
-                let oldVariableSelectedValues = [];
+                let oldVariableSelectedValues: any = [];
                 if (oldVariablesData[currentVariable.name]) {
                   oldVariableSelectedValues = Array.isArray(
                     oldVariablesData[currentVariable.name]
