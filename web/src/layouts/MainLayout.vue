@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <q-toolbar-title></q-toolbar-title>
-        {{store.state.organizationData}}
         <div
           class="headerMenu float-left"
           v-if="
