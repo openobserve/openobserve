@@ -34,7 +34,7 @@ use config::{
 use futures::{StreamExt, TryStreamExt};
 use infra::{
     cache::stats,
-    schema::{STREAM_SCHEMAS, STREAM_SETTINGS},
+    schema::{STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS},
 };
 
 use crate::{
@@ -253,7 +253,10 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
 
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    let mut w = STREAM_SCHEMAS.write().await;
+    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+    w.remove(&key);
+    drop(w);
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.remove(&key);
     drop(w);
 

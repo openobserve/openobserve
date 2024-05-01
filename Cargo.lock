@@ -2285,6 +2285,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "utoipa",
+ "zstd",
 ]
 
 [[package]]
@@ -4076,6 +4077,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "zstd",
 ]
 
 [[package]]

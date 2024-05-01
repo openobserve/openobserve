@@ -488,6 +488,21 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
             .collect())
     }
 
+    async fn del_stream_stats(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<()> {
+        let sql = format!(
+            "DELETE FROM stream_stats WHERE stream = '{}/{}/{}';",
+            org_id, stream_type, stream_name
+        );
+        let pool = CLIENT.clone();
+        sqlx::query(&sql).execute(&pool).await?;
+        Ok(())
+    }
+
     async fn set_stream_stats(
         &self,
         org_id: &str,

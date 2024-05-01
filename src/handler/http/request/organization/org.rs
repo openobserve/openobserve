@@ -16,7 +16,7 @@
 use std::{collections::HashSet, io::Error};
 
 use actix_web::{get, http, post, put, web, HttpResponse, Result};
-use infra::schema::STREAM_SCHEMAS;
+use infra::schema::STREAM_SCHEMAS_COMPRESSED;
 
 use crate::{
     common::{
@@ -73,7 +73,7 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
             user_obj: user_detail.clone(),
         });
 
-        let r = STREAM_SCHEMAS.read().await;
+        let r = STREAM_SCHEMAS_COMPRESSED.read().await;
         for key in r.keys() {
             if !key.contains('/') {
                 continue;

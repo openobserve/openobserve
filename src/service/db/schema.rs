@@ -21,7 +21,9 @@ use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFI
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
-    schema::{unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS},
+    schema::{
+        unwrap_stream_settings, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+    },
 };
 #[cfg(feature = "enterprise")]
 use {
@@ -179,7 +181,7 @@ async fn list_stream_schemas(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Vec<StreamSchema> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     if r.is_empty() {
         return vec![];
     }
@@ -203,7 +205,7 @@ async fn list_stream_schemas(
                     stream_name,
                     stream_type,
                     schema: if fetch_schema {
-                        val.last().unwrap().clone()
+                        val.clone()
                     } else {
                         Schema::empty()
                     },
@@ -219,7 +221,7 @@ pub async fn list(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<Vec<StreamSchema>, anyhow::Error> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     if !r.is_empty() {
         drop(r);
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
@@ -332,9 +334,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     schema_versions.last().unwrap().clone(),
                 );
                 drop(w);
-                let mut sa = STREAM_SCHEMAS.write().await;
-                sa.insert(item_key.to_string(), schema_versions);
-                drop(sa);
+                let schema_bytes = json::to_vec(&schema_versions).unwrap();
+                let schema_compressed = zstd::encode_all(schema_bytes.as_slice(), 3)?;
+                let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+                w.insert(item_key.to_string(), schema_compressed.into());
+                drop(w);
 
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -360,7 +364,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = columns[0];
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
-                let mut w = STREAM_SCHEMAS.write().await;
+                let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
                 w.remove(item_key);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
@@ -408,7 +412,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((val, start_dt));
     }
-    for (item_key, versions) in schemas.iter_mut() {
+    let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    for item_key in keys.iter() {
+        let Some(mut versions) = schemas.remove(item_key) else {
+            continue;
+        };
         versions.sort_by(|a, b| a.1.cmp(&b.1));
         let mut schema_versions = Vec::with_capacity(versions.len());
         for (val, _) in versions.iter() {
@@ -430,8 +438,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             schema_versions.last().unwrap().clone(),
         );
         drop(w);
-        let mut w = STREAM_SCHEMAS.write().await;
-        w.insert(item_key.to_string(), schema_versions);
+        let schema_bytes = json::to_vec(&schema_versions).unwrap();
+        let schema_compressed = zstd::encode_all(schema_bytes.as_slice(), 3)?;
+        let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+        w.insert(item_key.to_string(), schema_compressed.into());
         drop(w);
     }
     log::info!("Stream schemas Cached");
@@ -439,7 +449,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     let mut tables = HashMap::new();
     for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {
