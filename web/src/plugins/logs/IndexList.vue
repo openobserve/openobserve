@@ -908,7 +908,7 @@ export default defineComponent({
               }
             }
           }
-          
+
           useLocalInterestingFields(localStreamFields);
         }
       } else {
