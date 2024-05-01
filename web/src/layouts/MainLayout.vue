@@ -82,9 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <q-toolbar-title></q-toolbar-title>
+        {{store.state.organizationData}}
         <div
           class="headerMenu float-left"
-          v-if="store.state.organizationData.quotaThresholdMsg"
+          v-if="
+            config.isCloud == 'true' &&
+            store.state.organizationData.quotaThresholdMsg
+          "
         >
           <div
             type="warning"
@@ -92,7 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -179,10 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated
+no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
