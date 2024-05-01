@@ -162,6 +162,15 @@ pub async fn delete_all(
         stream_name
     );
 
+    // delete stream stats
+    infra_file_list::del_stream_stats(org_id, stream_type, stream_name).await?;
+    log::info!(
+        "deleted stream_stats for: {}/{}/{}/all",
+        org_id,
+        stream_type,
+        stream_name
+    );
+
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, None).await?;
     log::info!(

@@ -21,7 +21,7 @@ use config::{
     CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT,
 };
 use hashbrown::HashSet;
-use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS};
+use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS_LATEST};
 use segment::{message::Track, Client, Message};
 use sysinfo::SystemExt;
 
@@ -122,9 +122,9 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     let mut logs_streams = 0;
     let mut metrics_streams = 0;
     let mut orgs = HashSet::new();
-    let r = STREAM_SCHEMAS.read().await;
-    for (key, val) in r.iter() {
-        num_streams += val.len();
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    for key in r.keys() {
+        num_streams += 1;
         let stream_type = key.split('/').collect::<Vec<&str>>();
         orgs.insert(stream_type[0].to_string());
         if stream_type.len() < 2 {

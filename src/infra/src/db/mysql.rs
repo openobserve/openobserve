@@ -160,20 +160,23 @@ impl super::Db for MysqlDb {
         update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
-        let lock_tx = CLIENT.clone();
+        let lock_pool = CLIENT.clone();
         let lock_key = format!("get_for_update_{}", key);
         let lock_sql = format!(
             "SELECT GET_LOCK('{}', {})",
             lock_key, CONFIG.limit.meta_transaction_lock_timeout
         );
         let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_key);
+        let mut lock_tx = lock_pool.begin().await?;
         match sqlx::query_scalar::<_, i64>(&lock_sql)
-            .fetch_one(&lock_tx)
+            .fetch_one(&mut *lock_tx)
             .await
         {
             Ok(v) => {
                 if v != 1 {
+                    if let Err(e) = lock_tx.rollback().await {
+                        log::error!("[MYSQL] rollback lock for get_for_update error: {}", e);
+                    }
                     return Err(Error::from(DbError::DBOperError(
                         "LockTimeout".to_string(),
                         key.to_string(),
@@ -181,10 +184,14 @@ impl super::Db for MysqlDb {
                 }
             }
             Err(e) => {
+                if let Err(e) = lock_tx.rollback().await {
+                    log::error!("[MYSQL] rollback lock for get_for_update error: {}", e);
+                }
                 return Err(e.into());
             }
         };
 
+        let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
@@ -205,8 +212,11 @@ impl super::Db for MysqlDb {
                         if let Err(e) = tx.rollback().await {
                             log::error!("[MYSQL] rollback get_for_update error: {}", e);
                         }
-                        if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+                        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                             log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                        }
+                        if let Err(e) = lock_tx.commit().await {
+                            log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
                         }
                         return Err(e.into());
                     }
@@ -230,8 +240,11 @@ impl super::Db for MysqlDb {
                         if let Err(e) = tx.rollback().await {
                             log::error!("[MYSQL] rollback get_for_update error: {}", e);
                         }
-                        if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+                        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                             log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                        }
+                        if let Err(e) = lock_tx.commit().await {
+                            log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
                         }
                         return Err(e.into());
                     }
@@ -246,8 +259,11 @@ impl super::Db for MysqlDb {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[MYSQL] rollback get_for_update error: {}", e);
                 }
-                if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                     log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
                 }
                 return Err(e);
             }
@@ -255,8 +271,11 @@ impl super::Db for MysqlDb {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[MYSQL] rollback get_for_update error: {}", e);
                 }
-                if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                     log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
                 }
                 return Ok(());
             }
@@ -287,8 +306,11 @@ impl super::Db for MysqlDb {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[MYSQL] rollback get_for_update error: {}", e);
                 }
-                if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                     log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
                 }
                 return Err(e.into());
             }
@@ -311,8 +333,11 @@ impl super::Db for MysqlDb {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[MYSQL] rollback get_for_update error: {}", e);
                 }
-                if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                     log::error!("[MYSQL] unlock get_for_update error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
                 }
                 return Err(e.into());
             }
@@ -322,8 +347,11 @@ impl super::Db for MysqlDb {
             log::error!("[MYSQL] commit get_for_update error: {}", e);
             return Err(e.into());
         }
-        if let Err(e) = sqlx::query(&unlock_sql).execute(&lock_tx).await {
+        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
             log::error!("[MYSQL] unlock get_for_update error: {}", e);
+        }
+        if let Err(e) = lock_tx.commit().await {
+            log::error!("[MYSQL] commit for unlock get_for_update error: {}", e);
         }
 
         // event watch

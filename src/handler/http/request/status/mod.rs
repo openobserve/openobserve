@@ -22,17 +22,19 @@ use actix_web::{
     http::header,
     put, web, HttpRequest, HttpResponse,
 };
+use arrow_schema::Schema;
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
     CONFIG, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{
     cache, file_list,
-    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST},
+    schema::{
+        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
+    },
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -302,6 +304,13 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
             stream_schema_num += 1;
             mem_size += schema.size();
         }
+    }
+    drop(r);
+    let r = STREAM_SCHEMAS_COMPRESSED.read().await;
+    for (key, val) in r.iter() {
+        stream_num += 1;
+        mem_size += key.len();
+        mem_size += val.len();
     }
     drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;
