@@ -183,7 +183,7 @@ export default defineComponent({
       // make list of variables using variables config list
       // set initial variables values from props
       props?.variablesConfig?.list?.forEach((item: any) => {
-        const initialValue =
+        let initialValue =
           item.type == "dynamic_filters"
             ? JSON.parse(
                 decodeURIComponent(
@@ -193,6 +193,11 @@ export default defineComponent({
               ) ?? []
             : props.initialVariableValues?.value[item.name] ?? null;
 
+        if (item.showMultipleValues) {
+          initialValue = Array.isArray(initialValue)
+            ? initialValue
+            : [initialValue];
+        }
         const variableData = {
           ...item,
           // isLoading is used to check that currently, if the variable is loading(it is used to show the loading icon)
