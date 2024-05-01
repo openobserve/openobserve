@@ -56,12 +56,12 @@ pub async fn merge_by_stream(
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
-    log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] start",
-        org_id,
-        stream_type,
-        stream_name,
-    );
+    // log::debug!(
+    //     "[COMPACTOR] merge_by_stream [{}/{}/{}] start",
+    //     org_id,
+    //     stream_type,
+    //     stream_name,
+    // );
 
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;

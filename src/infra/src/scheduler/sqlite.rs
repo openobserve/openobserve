@@ -17,7 +17,6 @@ use async_trait::async_trait;
 use chrono::Duration;
 use config::{utils::json, CONFIG};
 use sqlx::Row;
-use tokio::time;
 
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
@@ -363,29 +362,15 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
-    async fn clean_complete(&self, interval: u64) {
-        let mut interval = time::interval(time::Duration::from_secs(interval));
+    async fn clean_complete(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        interval.tick().await; // trigger the first run
-        loop {
-            interval.tick().await;
-            let client = client.lock().await;
-            let res =
-                sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
-                    .bind(TriggerStatus::Completed)
-                    .bind(CONFIG.limit.scheduler_max_retries)
-                    .execute(&*client)
-                    .await;
-
-            if res.is_err() {
-                log::error!(
-                    "[SQLITE] error cleaning up completed and dead scheduled_jobs: {}",
-                    res.err().unwrap()
-                );
-            } else {
-                log::debug!("[SCHEDULER] clean up complete");
-            }
-        }
+        let client = client.lock().await;
+        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
+            .bind(TriggerStatus::Completed)
+            .bind(CONFIG.limit.scheduler_max_retries)
+            .execute(&*client)
+            .await?;
+        Ok(())
     }
 
     /// Background job that watches for timeout of a job
@@ -394,35 +379,22 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// - calculate the current timestamp and difference from `start_time` of each record
     /// - Get the record ids with difference more than the given timeout
     /// - Update their status back to "Waiting" and increase their "retries" by 1
-    async fn watch_timeout(&self, interval: u64) {
-        let mut interval = time::interval(time::Duration::from_secs(interval));
+    async fn watch_timeout(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        interval.tick().await; // trigger the first run
-        loop {
-            interval.tick().await;
-            let client = client.lock().await;
-            let now = chrono::Utc::now().timestamp_micros();
-            let res = sqlx::query(
-                r#"UPDATE scheduled_jobs
+        let client = client.lock().await;
+        let now = chrono::Utc::now().timestamp_micros();
+        sqlx::query(
+            r#"UPDATE scheduled_jobs
 SET status = $1, retries = retries + 1
 WHERE status = $2 AND end_time <= $3;
                 "#,
-            )
-            .bind(TriggerStatus::Waiting)
-            .bind(TriggerStatus::Processing)
-            .bind(now)
-            .execute(&*client)
-            .await;
-
-            if res.is_err() {
-                log::error!(
-                    "[SCHEDULER] error during watching timeout jobs: {}",
-                    res.err().unwrap()
-                );
-            } else {
-                log::debug!("[SCHEDULER] watching timeout jobs run complete");
-            }
-        }
+        )
+        .bind(TriggerStatus::Waiting)
+        .bind(TriggerStatus::Processing)
+        .bind(now)
+        .execute(&*client)
+        .await?;
+        Ok(())
     }
 
     async fn len(&self) -> usize {
