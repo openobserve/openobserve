@@ -493,7 +493,7 @@ export default defineComponent({
 
                 // if the old value exists in the dropdown, set the old value; otherwise, set the first value of the dropdown; otherwise, set a blank string value
                 if (
-                  oldVariablesData[currentVariable.name] !== undefined &&
+                  oldVariablesData[currentVariable.name] !== undefined ||
                   oldVariablesData[currentVariable.name] !== null
                 ) {
                   if (currentVariable.multiSelect) {
@@ -571,7 +571,7 @@ export default defineComponent({
                 : [oldVariablesData[currentVariable.name]];
             }
 
-            // If multiSelect is true, set the value as an array containing old value(s) and selected value(s)
+            // If multiSelect is true, set the value as an array containing old value and selected value
             if (currentVariable.multiSelect) {
               const selectedValues = currentVariable.options
                 .filter((option: any) =>
@@ -590,7 +590,7 @@ export default defineComponent({
                 )?.value ??
                 (currentVariable.options.length > 0
                   ? currentVariable.options[0].value
-                  : null); // If no option is available, set as the first value
+                  : null); 
             }
 
             resolve(true);
