@@ -28,7 +28,8 @@ use crate::{
 };
 
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Vec<Schema>>> =
+    Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
     Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
@@ -47,7 +48,7 @@ pub async fn get(
 
     let r = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.clone());
+        return Ok(schema.last().unwrap().clone());
     }
     drop(r);
     // if not found in cache, get from db
