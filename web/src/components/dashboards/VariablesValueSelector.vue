@@ -554,7 +554,7 @@ export default defineComponent({
             );
 
             // Check if the old value exists and set it
-            let oldVariableSelectedValues = [];
+            let oldVariableSelectedValues: any = [];
             if (oldVariablesData[currentVariable.name]) {
               oldVariableSelectedValues = Array.isArray(
                 oldVariablesData[currentVariable.name]
