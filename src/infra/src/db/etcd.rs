@@ -355,6 +355,67 @@ impl super::Db for Etcd {
         Ok(result)
     }
 
+    async fn list_values_by_start_dt(
+        &self,
+        prefix: &str,
+        start_dt: Option<(i64, i64)>,
+    ) -> Result<Vec<(i64, Bytes)>> {
+        if start_dt.is_none() || start_dt == Some((0, 0)) {
+            let vals = self.list_values(prefix).await?;
+            return Ok(vals.into_iter().map(|v| (0, v)).collect());
+        }
+
+        let (min_dt, max_dt) = start_dt.unwrap();
+        let mut result = Vec::new();
+        let key = format!("{}{}", self.prefix, prefix);
+        let mut client = get_etcd_client().await.clone();
+        let mut opt = GetOptions::new()
+            .with_prefix()
+            .with_sort(SortTarget::Key, SortOrder::Ascend)
+            .with_limit(CONFIG.etcd.load_page_size);
+        let mut resp = client.get(key.clone(), Some(opt.clone())).await?;
+        let mut first_call = true;
+        let mut have_next = true;
+        let mut last_key = String::new();
+        loop {
+            let kvs_num = resp.kvs().len() as i64;
+            if kvs_num < CONFIG.etcd.load_page_size {
+                have_next = false;
+            }
+            for kv in resp.kvs() {
+                let item_key = kv.key_str().unwrap();
+                if !item_key.starts_with(&key) {
+                    have_next = false;
+                    break;
+                }
+                if item_key.eq(last_key.as_str()) {
+                    continue;
+                }
+                let start_dt = item_key
+                    .split('/')
+                    .last()
+                    .unwrap()
+                    .parse::<i64>()
+                    .unwrap_or_default();
+                if start_dt >= min_dt && start_dt <= max_dt {
+                    result.push((start_dt, Bytes::from(kv.value().to_vec())));
+                }
+            }
+            tokio::task::yield_now().await; // yield to other tasks
+
+            if !have_next {
+                break;
+            }
+            if first_call {
+                first_call = false;
+                opt = opt.with_from_key();
+            }
+            last_key = resp.kvs().last().unwrap().key_str().unwrap().to_string();
+            resp = client.get(last_key.clone(), Some(opt.clone())).await?;
+        }
+        Ok(result)
+    }
+
     async fn count(&self, prefix: &str) -> Result<i64> {
         let key = format!("{}{}", self.prefix, prefix);
         let mut client = get_etcd_client().await.clone();

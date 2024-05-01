@@ -462,6 +462,43 @@ impl super::Db for MysqlDb {
             .collect())
     }
 
+    async fn list_values_by_start_dt(
+        &self,
+        prefix: &str,
+        start_dt: Option<(i64, i64)>,
+    ) -> Result<Vec<(i64, Bytes)>> {
+        if start_dt.is_none() || start_dt == Some((0, 0)) {
+            let vals = self.list_values(prefix).await?;
+            return Ok(vals.into_iter().map(|v| (0, v)).collect());
+        }
+
+        let (min_dt, max_dt) = start_dt.unwrap();
+        let (module, key1, key2) = super::parse_key(prefix);
+        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
+        if !module.is_empty() {
+            sql = format!("{} WHERE module = '{}'", sql, module);
+        }
+        if !key1.is_empty() {
+            sql = format!("{} AND key1 = '{}'", sql, key1);
+        }
+        if !key2.is_empty() {
+            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+        }
+        sql = format!(
+            "{} AND start_dt >= {} AND start_dt <= {}",
+            sql, min_dt, max_dt
+        );
+        sql = format!("{} ORDER BY start_dt ASC", sql);
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
+            .fetch_all(&pool)
+            .await?;
+        Ok(ret
+            .into_iter()
+            .map(|r| (r.start_dt, Bytes::from(r.value)))
+            .collect())
+    }
+
     async fn count(&self, prefix: &str) -> Result<i64> {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
