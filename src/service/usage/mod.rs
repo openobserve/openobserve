@@ -260,7 +260,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         && !CONFIG.common.usage_reporting_creds.is_empty()
     {
         let url = url::Url::parse(&CONFIG.common.usage_reporting_url).unwrap();
-        let creds = CONFIG.common.usage_reporting_creds.to_string();
+        let creds = format!("Basic {}", &CONFIG.common.usage_reporting_creds);
         if let Err(e) = Client::builder()
             .build()
             .unwrap()
