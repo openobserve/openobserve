@@ -72,12 +72,7 @@ const useEnvRoutes = () => {
       path: "/cb",
       name: "callback",
       component: LoginCallback,
-    }, 
-     {
-      path: "/web/cb",
-      name: "callback",
-      component: LoginCallback,
-    },      
+    },
   ];
 
   const homeChildRoutes = [
