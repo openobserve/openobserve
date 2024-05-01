@@ -179,7 +179,11 @@ async fn list_stream_schemas(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Vec<StreamSchema> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = if CONFIG.common.cache_all_schema_versions {
+        STREAM_SCHEMAS.read().await
+    } else {
+        STREAM_SCHEMAS_LATEST.read().await
+    };
     if r.is_empty() {
         return vec![];
     }
@@ -219,7 +223,11 @@ pub async fn list(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<Vec<StreamSchema>, anyhow::Error> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = if CONFIG.common.cache_all_schema_versions {
+        STREAM_SCHEMAS.read().await
+    } else {
+        STREAM_SCHEMAS_LATEST.read().await
+    };
     if !r.is_empty() {
         drop(r);
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
@@ -329,12 +337,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.insert(
                     item_key.to_string(),
-                    schema_versions.last().unwrap().clone(),
+                    vec![schema_versions.last().unwrap().clone()],
                 );
                 drop(w);
-                let mut sa = STREAM_SCHEMAS.write().await;
-                sa.insert(item_key.to_string(), schema_versions);
-                drop(sa);
+                if CONFIG.common.cache_all_schema_versions {
+                    let mut sa = STREAM_SCHEMAS.write().await;
+                    sa.insert(item_key.to_string(), schema_versions);
+                    drop(sa);
+                }
 
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -398,6 +408,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
     let items = db::list(db_key).await?;
+    let start = std::time::Instant::now();
     let mut schemas: HashMap<String, Vec<(Bytes, i64)>> = HashMap::with_capacity(items.len());
     for (key, val) in items {
         let key = key.strip_prefix(db_key).unwrap();
@@ -427,13 +438,18 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(
             item_key.to_string(),
-            schema_versions.last().unwrap().clone(),
+            vec![schema_versions.last().unwrap().clone()],
         );
         drop(w);
-        let mut w = STREAM_SCHEMAS.write().await;
-        w.insert(item_key.to_string(), schema_versions);
-        drop(w);
+        if CONFIG.common.cache_all_schema_versions {
+            let mut w = STREAM_SCHEMAS.write().await;
+            w.insert(item_key.to_string(), schema_versions);
+            drop(w);
+        } else {
+            break;
+        }
     }
+    log::info!("Stream schemas Cached, elapsed: {:?}", start.elapsed());
     log::info!("Stream schemas Cached");
     Ok(())
 }
