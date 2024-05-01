@@ -97,7 +97,7 @@ pub async fn get_versions(
     if let Some(schema) = r.get(cache_key) {
         return Ok(schema.clone());
     }
-
+    let time = std::time::Instant::now();
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
         Err(e) => {
@@ -108,6 +108,7 @@ pub async fn get_versions(
             }
         }
         Ok(v) => {
+            println!("get_versions took: {:?}", time.elapsed().as_millis());
             let schemas: Result<Vec<Schema>, _> = json::from_slice(&v);
             if let Ok(schemas) = schemas {
                 schemas
@@ -677,6 +678,40 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)
+}
+
+pub async fn get_versions_for_time_range(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
+) -> Result<Vec<Schema>, anyhow::Error> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let db = infra_db::get_db().await;
+
+    Ok(match db.list_values_by_start_dt(&key, time_range).await {
+        Err(e) => {
+            if let Error::DbError(DbError::KeyNotExists(_)) = e {
+                vec![]
+            } else {
+                return Err(anyhow::anyhow!("Error getting schema versions: {}", e));
+            }
+        }
+        Ok(v) => {
+            let mut schemas: Vec<Schema> = vec![];
+            for (_ts, schema) in v {
+                let schema: Result<Vec<Schema>, _> = json::from_slice(&schema);
+                if let Ok(schema) = schema {
+                    schemas.push(schema.last().unwrap().clone());
+                }
+            }
+            println!(
+                "get_versions_for_time_range schemas len: {:?}",
+                schemas.len()
+            );
+            schemas
+        }
+    })
 }
 
 #[cfg(test)]

@@ -64,7 +64,7 @@ pub async fn search_parquet(
     timeout: u64,
 ) -> super::SearchResult {
     // fetch all schema versions, group files by version
-    let schema_versions =
+    let schema_versions = if CONFIG.common.cache_all_schema_versions {
         match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
@@ -73,7 +73,35 @@ pub async fn search_parquet(
                     sql.stream_name.clone(),
                 )));
             }
-        };
+        }
+    } else {
+        let start = std::time::Instant::now();
+        match infra::schema::get_versions_for_time_range(
+            &sql.org_id,
+            &sql.stream_name,
+            stream_type,
+            sql.meta.time_range,
+        )
+        .await
+        {
+            Ok(versions) => {
+                log::info!(
+                    "[trace_id {trace_id}] got schema {} versions for time range{:?} took: {} miils",
+                    versions.len(),
+                    sql.meta.time_range,
+                    start.elapsed().as_millis()
+                );
+
+                versions
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] get schema error: {}", err);
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    sql.stream_name.clone(),
+                )));
+            }
+        }
+    };
     if schema_versions.is_empty() {
         return Ok((HashMap::new(), ScanStats::new()));
     }
