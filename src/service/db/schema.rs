@@ -393,6 +393,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = columns[0];
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
+                let mut w = STREAM_SCHEMAS.write().await;
+                w.remove(item_key);
+                drop(w);
                 let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
                 w.remove(item_key);
                 drop(w);
