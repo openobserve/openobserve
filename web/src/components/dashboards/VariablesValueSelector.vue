@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           emit-value
           data-test="dashboard-variable-custom-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-          :multiple="item.showMultipleValues"
+          :multiple="item.multiSelect"
         >
           <template v-slot:no-option>
             <q-item>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item-section>
                 <q-item-label v-html="opt.label" />
               </q-item-section>
-              <q-item-section side v-if="item.showMultipleValues">
+              <q-item-section side v-if="item.multiSelect">
                 <q-checkbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
@@ -193,7 +193,7 @@ export default defineComponent({
               ) ?? []
             : props.initialVariableValues?.value[item.name] ?? null;
 
-        if (item.showMultipleValues) {
+        if (item.multiSelect) {
           initialValue = Array.isArray(initialValue)
             ? initialValue
             : [initialValue];
@@ -486,14 +486,15 @@ export default defineComponent({
                 }
                 console.log(
                   "oldVariableSelectedValues query_values",
-                  oldVariableSelectedValues);
-                
+                  oldVariableSelectedValues
+                );
+
                 // if the old value exists in the dropdown, set the old value; otherwise, set the first value of the dropdown; otherwise, set a blank string value
                 if (
                   oldVariablesData[currentVariable.name] !== undefined &&
                   oldVariablesData[currentVariable.name] !== null
                 ) {
-                  if (currentVariable.showMultipleValues) {
+                  if (currentVariable.multiSelect) {
                     const selectedValues = currentVariable.options
                       .filter((option: any) =>
                         oldVariableSelectedValues.includes(option.value)
@@ -568,8 +569,8 @@ export default defineComponent({
                 : [oldVariablesData[currentVariable.name]];
             }
 
-            // If showMultipleValues is true, set the value as an array containing old value(s) and selected value(s)
-            if (currentVariable.showMultipleValues) {
+            // If multiSelect is true, set the value as an array containing old value(s) and selected value(s)
+            if (currentVariable.multiSelect) {
               const selectedValues = currentVariable.options
                 .filter((option: any) =>
                   oldVariableSelectedValues.includes(option.value)
@@ -580,7 +581,7 @@ export default defineComponent({
                   ? selectedValues
                   : oldVariableSelectedValues;
             } else {
-              // If showMultipleValues is false, set the value as a single value from options which is selected
+              // If multiSelect is false, set the value as a single value from options which is selected
               currentVariable.value =
                 currentVariable.options.find(
                   (option: any) => option.value === oldVariableSelectedValues[0]

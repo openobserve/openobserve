@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
-      :multiple="variableItem.showMultipleValues"
+      :multiple="variableItem.multiSelect"
     >
       <template v-slot:no-option>
         <q-item>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section>
             <q-item-label v-html="opt.label" />
           </q-item-section>
-          <q-item-section side v-if="variableItem.showMultipleValues">
+          <q-item-section side v-if="variableItem.multiSelect">
             <q-checkbox
               :model-value="selected"
               @update:model-value="toggleOption(opt)"
