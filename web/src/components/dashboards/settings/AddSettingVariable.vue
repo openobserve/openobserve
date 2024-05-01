@@ -159,8 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <q-toggle
-                  v-model="variableData.showMultipleValues"
-                  :label="t('dashboard.showMultipleValues')"
+                  v-model="variableData.multiSelect"
+                  :label="t('dashboard.multiSelect')"
                   data-test="dashboard-query_values-show_multiple_values"
                 />
               </div>
@@ -302,8 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="variableData.type == 'custom'">
             <div>
               <q-toggle
-                v-model="variableData.showMultipleValues"
-                :label="t('dashboard.showMultipleValues')"
+                v-model="variableData.multiSelect"
+                :label="t('dashboard.multiSelect')"
                 data-test="dashboard-custom-show_multiple_values"
               />
             </div>
@@ -471,10 +471,10 @@ export default defineComponent({
       },
       value: "",
       options: [],
-      showMultipleValues: false,
+      multiSelect: false,
     });
     console.log("variableData addSetting", variableData);
-    
+
     const filterCycleError: any = ref("");
 
     const addFilter = () => {
@@ -487,9 +487,9 @@ export default defineComponent({
         value: "",
       });
     };
-    // by default, use showMultipleValues as false
-    if (!variableData.showMultipleValues) {
-      variableData.showMultipleValues = false;
+    // by default, use multiSelect as false
+    if (!variableData.multiSelect) {
+      variableData.multiSelect = false;
     }
 
     const filterUpdated = (index: number, filter: any) => {
