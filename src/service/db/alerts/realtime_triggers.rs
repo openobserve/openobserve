@@ -64,8 +64,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     } else {
                         json::from_slice(&ev.value.unwrap()).unwrap()
                     };
-                log::debug!("realtime_alert: event:put: get trigger: {:?}", item_value);
-
                 REALTIME_ALERT_TRIGGERS
                     .write()
                     .await
