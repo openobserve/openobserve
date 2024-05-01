@@ -642,6 +642,8 @@ pub struct Common {
     pub report_user_password: String,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,
+    #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
+    pub schema_cache_compress_enabled: bool,
 }
 
 #[derive(EnvConfig)]

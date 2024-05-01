@@ -4076,6 +4076,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "zstd",
 ]
 
 [[package]]

@@ -27,7 +27,7 @@ use config::{
     utils::{base64, json},
     CONFIG, DISTINCT_FIELDS,
 };
-use infra::{errors, schema::STREAM_SCHEMAS};
+use infra::{errors, schema::STREAM_SCHEMAS_LATEST};
 use opentelemetry::{global, trace::TraceContextExt};
 use tracing::{Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -946,9 +946,9 @@ async fn values_v1(
 
     // skip fields which aren't part of the schema
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     let schema = if let Some(schema) = r.get(&key) {
-        schema.last().unwrap().clone()
+        schema.clone()
     } else {
         arrow_schema::Schema::empty()
     };
