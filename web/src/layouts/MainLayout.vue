@@ -867,7 +867,7 @@ export default defineComponent({
         });
       }
 
-      if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
+      if (config.isCloud == "true") {
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
 
