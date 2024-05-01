@@ -144,6 +144,11 @@ pub trait Db: Sync + Send + 'static {
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
+    async fn list_values_by_start_dt(
+        &self,
+        prefix: &str,
+        start_dt: Option<(i64, i64)>,
+    ) -> Result<Vec<(i64, Bytes)>>;
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
     async fn close(&self) -> Result<()>;
