@@ -101,11 +101,13 @@ pub async fn get_versions(
             let schemas: Vec<Vec<Schema>> = json::from_slice(&schema_bytes)?;
             return Ok(schemas.into_iter().flatten().collect());
         }
+        drop(r);
     } else {
         let r = STREAM_SCHEMAS.read().await;
         if let Some(schemas) = r.get(cache_key) {
             return Ok(schemas.clone());
         }
+        drop(r);
     }
 
     let db = infra_db::get_db().await;
