@@ -123,3 +123,12 @@ pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
     let db = infra_db::get_db().await;
     db.list_values(prefix).await
 }
+
+#[inline]
+pub(crate) async fn list_values_by_start_dt(
+    prefix: &str,
+    start_dt: Option<(i64, i64)>,
+) -> Result<Vec<(i64, Bytes)>> {
+    let db = infra_db::get_db().await;
+    db.list_values_by_start_dt(prefix, start_dt).await
+}

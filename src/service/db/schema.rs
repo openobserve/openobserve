@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Write, sync::Arc};
+use std::sync::Arc;
 
 use arrow_schema::{Field, Schema};
 use bytes::Bytes;
@@ -310,18 +310,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     ev.key.to_string()
                 };
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let schema_versions = match db::list_values(&format!("{ev_key}/")).await {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
+                let schema_versions =
+                    match db::list_values_by_start_dt(&format!("{ev_key}/"), None).await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    };
                 if schema_versions.is_empty() {
                     continue;
                 }
                 let latest_schema: Vec<Schema> =
-                    match json::from_slice(schema_versions.last().unwrap()) {
+                    match json::from_slice(&schema_versions.last().unwrap().1) {
                         Ok(val) => val,
                         Err(e) => {
                             log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
@@ -340,29 +341,30 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 w.insert(item_key.to_string(), latest_schema.clone());
                 drop(w);
                 if CONFIG.common.schema_cache_compress_enabled {
-                    let mut schema_bytes = Vec::with_capacity(
-                        schema_versions.iter().map(|v| v.len()).sum::<usize>()
-                            + schema_versions.len()
-                            + 2,
-                    );
-                    _ = schema_bytes.write("[".as_bytes()).unwrap();
-                    for (i, v) in schema_versions.iter().enumerate() {
-                        if i > 0 {
-                            _ = schema_bytes.write(",".as_bytes()).unwrap();
-                        }
-                        _ = schema_bytes.write(v).unwrap();
-                    }
-                    _ = schema_bytes.write("]".as_bytes()).unwrap();
-                    let compressed_bytes = zstd::encode_all(schema_bytes.as_slice(), 3).unwrap();
+                    let schema_versions = schema_versions
+                        .into_iter()
+                        .map(|(start_dt, data)| {
+                            let en_data = zstd::encode_all(data.as_ref(), 3).unwrap();
+                            (start_dt, en_data.into())
+                        })
+                        .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
-                    w.insert(item_key.to_string(), compressed_bytes.into());
+                    w.insert(item_key.to_string(), schema_versions);
                     w.shrink_to_fit();
                     drop(w);
                 } else {
                     let schema_versions = schema_versions
-                        .iter()
-                        .flat_map(|v| json::from_slice::<Vec<Schema>>(v).unwrap())
-                        .collect::<Vec<Schema>>();
+                        .into_iter()
+                        .map(|(start_dt, data)| {
+                            (
+                                start_dt,
+                                json::from_slice::<Vec<Schema>>(&data)
+                                    .unwrap()
+                                    .pop()
+                                    .unwrap(),
+                            )
+                        })
+                        .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS.write().await;
                     w.insert(item_key.to_string(), schema_versions);
                     w.shrink_to_fit();
@@ -434,7 +436,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
     let items = db::list(db_key).await?;
-    let mut schemas: HashMap<String, Vec<(Bytes, i64)>> = HashMap::with_capacity(items.len());
+    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items.len());
     for (key, val) in items {
         let key = key.strip_prefix(db_key).unwrap();
         let columns = key.split('/').take(4).collect::<Vec<_>>();
@@ -442,7 +444,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let item_key = format!("{}/{}/{}", columns[0], columns[1], columns[2]);
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
-        entry.push((val, start_dt));
+        entry.push((start_dt, val));
     }
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     for item_key in keys.iter() {
@@ -452,8 +454,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         if schema_versions.is_empty() {
             continue;
         }
-        schema_versions.sort_by(|a, b| a.1.cmp(&b.1));
-        let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().0)
+        schema_versions.sort_by(|a, b| a.0.cmp(&b.0));
+        let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().1)
             .map_err(|e| {
                 anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)
             })?;
@@ -469,31 +471,31 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         w.insert(item_key.to_string(), latest_schema.clone());
         drop(w);
         if CONFIG.common.schema_cache_compress_enabled {
-            let mut schema_bytes = Vec::with_capacity(
-                schema_versions.iter().map(|(v, _)| v.len()).sum::<usize>()
-                    + schema_versions.len()
-                    + 2,
-            );
-            _ = schema_bytes.write("[".as_bytes()).unwrap();
-            for (i, (v, _)) in schema_versions.iter().enumerate() {
-                if i > 0 {
-                    _ = schema_bytes.write(",".as_bytes()).unwrap();
-                }
-                _ = schema_bytes.write(v).unwrap();
-            }
-            _ = schema_bytes.write("]".as_bytes()).unwrap();
-            let compressed_bytes = zstd::encode_all(schema_bytes.as_slice(), 3).unwrap();
+            let schema_versions = schema_versions
+                .into_iter()
+                .map(|(start_dt, data)| {
+                    let en_data = zstd::encode_all(data.as_ref(), 3).unwrap();
+                    (start_dt, en_data.into())
+                })
+                .collect::<Vec<_>>();
             let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
-            w.insert(item_key.to_string(), compressed_bytes.into());
+            w.insert(item_key.to_string(), schema_versions);
             drop(w);
         } else {
             let schema_versions = schema_versions
-                .iter()
-                .flat_map(|(v, _)| json::from_slice::<Vec<Schema>>(v).unwrap())
-                .collect::<Vec<Schema>>();
+                .into_iter()
+                .map(|(start_dt, data)| {
+                    (
+                        start_dt,
+                        json::from_slice::<Vec<Schema>>(&data)
+                            .unwrap()
+                            .pop()
+                            .unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>();
             let mut w = STREAM_SCHEMAS.write().await;
             w.insert(item_key.to_string(), schema_versions);
-            w.shrink_to_fit();
             drop(w);
         }
     }
