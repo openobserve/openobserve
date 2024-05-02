@@ -76,15 +76,15 @@ export const usePanelDataLoader = (
 
   console.log("currentDependentVariablesData", currentDependentVariablesData);
 
-  console.log(
-    "variablesData.value currentAdHocVariablesData",
-    JSON.parse(JSON.stringify(variablesData.value))
-  );
+  // console.log(
+  //   "variablesData.value currentAdHocVariablesData",
+  //   JSON.parse(JSON.stringify(variablesData.value))
+  // );
 
-  console.log(
-    "variablesData.value.values currentAdHocVariablesData",
-    JSON.parse(JSON.stringify(variablesData.value.values))
-  );
+  // console.log(
+  //   "variablesData.value.values currentAdHocVariablesData",
+  //   JSON.parse(JSON.stringify(variablesData.value.values))
+  // );
 
   let currentDynamicVariablesData = variablesData.value?.values
     ? JSON.parse(
@@ -734,16 +734,16 @@ export const usePanelDataLoader = (
 
   const areArraysEqual = (array1: any, array2: any) => {
     // Check if both arrays have the same length
-    if (array1.length !== array2.length) {
+    if (array1?.length !== array2?.length) {
       return false;
     }
 
     // Sort both arrays
-    const sortedArray1 = array1.slice().sort();
-    const sortedArray2 = array2.slice().sort();
+    const sortedArray1 = array1?.slice().sort();
+    const sortedArray2 = array2?.slice().sort();
 
     // Compare sorted arrays element by element
-    for (let i = 0; i < sortedArray1.length; i++) {
+    for (let i = 0; i < sortedArray1?.length; i++) {
       if (sortedArray1[i] !== sortedArray2[i]) {
         return false;
       }
