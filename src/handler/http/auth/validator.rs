@@ -377,10 +377,10 @@ async fn oo_validator_internal(
             .map_err(|_| ())
             .expect("Failed to decode base64 string");
         let parts: Vec<&str> = credentials.split(':').collect();
-        if parts.len() != 2 {
-            return Err((ErrorUnauthorized("Unauthorized Access"), req));
-        }
-        let (username, password) = (parts[0], parts[1]);
+        let (username, password) = match parts.split_first() {
+            None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+            Some((user, pass_array)) => (user, pass_array.join(":")),
+        };
         let username = username.to_owned();
         let password = password.to_owned();
         validator(req, &username, &password, auth_info, path_prefix).await
