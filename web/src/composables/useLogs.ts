@@ -2131,7 +2131,7 @@ const useLogs = () => {
                 ? fieldToStreamsMap[row.name]
                 : [],
               isInterestingField:
-                searchObj.data.stream.interestingFieldList.includes(group.name)
+                searchObj.data.stream.interestingFieldList.includes(row.name)
                   ? true
                   : false,
             });
@@ -2886,7 +2886,6 @@ const useLogs = () => {
     fieldValues,
     extractFields,
     getQueryData,
-    extractFields,
     searchAroundData,
     updateGridColumns,
     refreshData,
