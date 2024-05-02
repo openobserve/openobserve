@@ -41,9 +41,9 @@ export const usePanelDataLoader = (
   forceLoad: any
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (true) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
 
   const state = reactive({
@@ -74,15 +74,17 @@ export const usePanelDataLoader = (
       )
     : [];
 
-  // console.log(
-  //   "variablesData.value currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value))
-  // );
+  console.log("currentDependentVariablesData", currentDependentVariablesData);
 
-  // console.log(
-  //   "variablesData.value.values currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value.values))
-  // );
+  console.log(
+    "variablesData.value currentAdHocVariablesData",
+    JSON.parse(JSON.stringify(variablesData.value))
+  );
+
+  console.log(
+    "variablesData.value.values currentAdHocVariablesData",
+    JSON.parse(JSON.stringify(variablesData.value.values))
+  );
 
   let currentDynamicVariablesData = variablesData.value?.values
     ? JSON.parse(
@@ -268,9 +270,11 @@ export const usePanelDataLoader = (
         };
       } else {
         // Call search API
+        console.log("panelSchema", panelSchema.value);
 
         // Get the page type from the first query in the panel schema
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
+        console.log("pageType", pageType);
 
         const sqlqueryPromise = panelSchema.value.queries?.map(
           async (it: any) => {
@@ -420,6 +424,7 @@ export const usePanelDataLoader = (
         value: `${formateRateInterval(__rate_interval)}`,
       },
     ];
+    console.log("query---- fixedVariables", fixedVariables);
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
@@ -712,6 +717,10 @@ export const usePanelDataLoader = (
   const updateCurrentDependentVariablesData = (
     newDependentVariablesData: any
   ) => {
+    console.log(
+      "isAllRegularVariablesValuesSameWith updateCurrentDependentVariablesData: newDependentVariablesData",
+      newDependentVariablesData
+    );
     currentDependentVariablesData = JSON.parse(
       JSON.stringify(newDependentVariablesData)
     );
@@ -723,6 +732,27 @@ export const usePanelDataLoader = (
     );
   };
 
+  const areArraysEqual = (array1: any, array2: any) => {
+    // Check if both arrays have the same length
+    if (array1.length !== array2.length) {
+      return false;
+    }
+
+    // Sort both arrays
+    const sortedArray1 = array1.slice().sort();
+    const sortedArray2 = array2.slice().sort();
+
+    // Compare sorted arrays element by element
+    for (let i = 0; i < sortedArray1.length; i++) {
+      if (sortedArray1[i] !== sortedArray2[i]) {
+        return false;
+      }
+    }
+
+    // If all elements are equal, return true
+    return true;
+  };
+
   const isAllRegularVariablesValuesSameWith = (
     newDependentVariablesData: any
   ) =>
@@ -730,7 +760,22 @@ export const usePanelDataLoader = (
       const oldValue = currentDependentVariablesData.find(
         (it2: any) => it2.name == it.name
       );
-      return it.value == oldValue?.value && oldValue?.value != "";
+      console.log(
+        "isAllRegularVariablesValuesSameWith: oldValue",
+        JSON.stringify(oldValue)
+      );
+      console.log(
+        "isAllRegularVariablesValuesSameWith: it",
+        JSON.stringify(it)
+      );
+      console.log(
+        "isAllRegularVariablesValuesSameWith: return value: ",
+        it.value == oldValue?.value && oldValue?.value != ""
+      );
+      // return it.value == oldValue?.value && oldValue?.value != "";
+      return it.multiSelect
+        ? areArraysEqual(it.value, oldValue?.value)
+        : it.value == oldValue?.value && oldValue?.value != "";
     });
 
   const isAllDynamicVariablesValuesSameWith = (newDynamicVariablesData: any) =>
@@ -795,14 +840,14 @@ export const usePanelDataLoader = (
     // so we need to fire the query
     log("Step3: checking if no of variables have changed, starting...");
 
-    // log(
-    //   "Step3: newDependentVariablesData,",
-    //   JSON.stringify(newDependentVariablesData, null, 2)
-    // );
-    // log(
-    //   "Step3: newDynamicVariablesData...",
-    //   JSON.stringify(newDynamicVariablesData, null, 2)
-    // );
+    log(
+      "Step3: newDependentVariablesData,",
+      JSON.stringify(newDependentVariablesData, null, 2)
+    );
+    log(
+      "Step3: newDynamicVariablesData...",
+      JSON.stringify(newDynamicVariablesData, null, 2)
+    );
 
     // if the length of the any of the regular and old dynamic data has changed,
     // we need to fire the query
@@ -889,7 +934,16 @@ export const usePanelDataLoader = (
       const isAllRegularVariablesValuesSame =
         isAllRegularVariablesValuesSameWith(newDependentVariablesData);
 
+      console.log(
+        "isAllRegularVariablesValuesSameWith Step4: 2: regular variables has same old value, returning false--",
+        isAllRegularVariablesValuesSame
+      );
+
       if (isAllRegularVariablesValuesSame) {
+        console.log(
+          "isAllRegularVariablesValuesSameWith Step4: 2: regular variables has same old value, returning false"
+        );
+
         log("Step4: 2: regular variables has same old value, returning false");
         return false;
       }
