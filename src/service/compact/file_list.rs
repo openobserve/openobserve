@@ -22,7 +22,7 @@ use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{cluster::LOCAL_NODE_UUID, ider, meta::stream::FileKey, utils::json, CONFIG};
 use hashbrown::HashMap;
-use infra::{dist_lock, schema::STREAM_SCHEMAS, storage};
+use infra::{dist_lock, schema::STREAM_SCHEMAS_LATEST, storage};
 use tokio::sync::{RwLock, Semaphore};
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
@@ -55,9 +55,9 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     if offset == 0 {
         // get earliest date from schema
         offset = time_now.timestamp_micros();
-        let r = STREAM_SCHEMAS.read().await;
+        let r = STREAM_SCHEMAS_LATEST.read().await;
         for (key, val) in r.iter() {
-            if let Some(val) = val.last().unwrap().metadata.get("created_at") {
+            if let Some(val) = val.metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
                 if time_min == 0 {
                     log::info!(

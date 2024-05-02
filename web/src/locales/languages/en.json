@@ -51,7 +51,8 @@
     "actions": "Actions",
     "type": "Type",
     "search": "Search",
-    "expand": "Expand"
+    "expand": "Expand",
+    "date": "Date"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -134,7 +135,7 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "Real User Monitoring",
-    "settings": "Settings",
+    "settings": "Management",
     "iam": "IAM",
     "report": "Reports"
   },
@@ -788,7 +789,7 @@
     "addToDashboard": "Add to dashboard"
   },
   "settings": {
-    "header": "Settings",
+    "header": "Management",
     "userKeyLabel": "User Key",
     "rumKeyLabel": "RUM Key",
     "newUserKeyBtnLbl": "Add User Key",
@@ -800,7 +801,8 @@
     "updateuserKey": "Update User Key",
     "id": "Id",
     "update": "Update",
-    "generalLabel": "General",
+    "generalLabel": "Settings",
+    "queryManagement": "Query Management",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
@@ -828,5 +830,18 @@
     "description": "Description",
     "cron": "Cron Job",
     "cronExpression": "Cron expression"
+  },
+  "queries": {
+    "runningQueries": "Running Queries",
+    "search": "Search",
+    "sessionId": "Session ID",
+    "initiatedAt": "Initiated At",
+    "query": "Query",
+    "queryList": "Query Details",
+    "duration": "Exec. Duration",
+    "status": "Status",
+    "cancelQuery": "Cancel Query",
+    "queryRange": "Query Range",
+    "refreshQuery": "Refresh Query"
   }
 }

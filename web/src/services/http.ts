@@ -18,6 +18,7 @@ import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
 import { Notify } from "quasar";
+import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
@@ -56,7 +57,8 @@ const http = ({ headers } = {} as any) => {
               !error.request.responseURL.includes("/auth/login")
             ) {
               store.dispatch("logout");
-              localStorage.clear();
+              useLocalCurrentUser("", true);
+              useLocalUserInfo("", true);
               sessionStorage.clear();
               window.location.reload();
             }
@@ -73,16 +75,17 @@ const http = ({ headers } = {} as any) => {
                 .get("/config/dex_refresh", {
                   //headers: { Authorization: `${refreshToken}` },
                 })
-               .then((res) => {           
-                   if (res.status === 200) {
-                      // Token refreshed successfully, retry the original request
-                      return instance.request(error.config);
-                    }         
+                .then((res) => {
+                  if (res.status === 200) {
+                    // Token refreshed successfully, retry the original request
+                    return instance.request(error.config);
+                  }
                 })
                 .catch((refreshError) => {
                   instance.get("/config/logout", {}).then((res) => {
                     store.dispatch("logout");
-                    localStorage.clear();
+                    useLocalCurrentUser("", true);
+                    useLocalUserInfo("", true);
                     sessionStorage.clear();
                     window.location.reload();
                     return Promise.reject(refreshError);
@@ -91,7 +94,8 @@ const http = ({ headers } = {} as any) => {
             } else {
               if (!error.request.responseURL.includes("/login")) {
                 store.dispatch("logout");
-                localStorage.clear();
+                useLocalCurrentUser("", true);
+                useLocalUserInfo("", true);
                 sessionStorage.clear();
                 window.location.reload();
               }

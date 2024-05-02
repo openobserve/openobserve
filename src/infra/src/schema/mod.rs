@@ -28,6 +28,8 @@ use crate::{
 };
 
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, bytes::Bytes>> =
+    Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
     Lazy::new(Default::default);
@@ -92,9 +94,20 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
-    let r = STREAM_SCHEMAS.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.clone());
+    if CONFIG.common.schema_cache_compress_enabled {
+        let r = STREAM_SCHEMAS_COMPRESSED.read().await;
+        if let Some(data) = r.get(cache_key) {
+            let schema_bytes = zstd::decode_all(data.as_ref())?;
+            let schemas: Vec<Vec<Schema>> = json::from_slice(&schema_bytes)?;
+            return Ok(schemas.into_iter().flatten().collect());
+        }
+        drop(r);
+    } else {
+        let r = STREAM_SCHEMAS.read().await;
+        if let Some(schemas) = r.get(cache_key) {
+            return Ok(schemas.clone());
+        }
+        drop(r);
     }
 
     let db = infra_db::get_db().await;
@@ -326,6 +339,7 @@ pub async fn merge(
                     // merge schema
                     let (is_schema_changed, field_datatype_delta, merged_fields) =
                         get_merge_schema_changes(latest_schema, &inferred_schema);
+
                     if !is_schema_changed {
                         tx.send(Some((latest_schema.clone(), field_datatype_delta)))
                             .unwrap();
@@ -333,7 +347,15 @@ pub async fn merge(
                     }
                     let metadata = latest_schema.metadata().clone();
                     let final_schema = Schema::new(merged_fields).with_metadata(metadata);
-                    let need_new_version = !field_datatype_delta.is_empty();
+
+                    // Casting of data to existing schema isnt new version, we remove records
+                    // with zo_cast metadata
+                    let schema_version_changes = field_datatype_delta
+                        .iter()
+                        .filter(|f| f.metadata().get("zo_cast").is_none())
+                        .collect::<Vec<_>>();
+                    let need_new_version = !schema_version_changes.is_empty();
+
                     if need_new_version && start_dt.is_some() {
                         // update old version end_dt
                         let mut metadata = latest_schema.metadata().clone();

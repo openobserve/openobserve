@@ -100,35 +100,33 @@ pub async fn report_request_usage_stats(
         });
     };
 
-    if event != UsageEvent::Ingestion {
-        usage.push(UsageData {
-            event,
-            day: now.day(),
-            hour: now.hour(),
-            month: now.month(),
-            year: now.year(),
-            event_time_hour: format!(
-                "{:04}{:02}{:02}{:02}",
-                now.year(),
-                now.month(),
-                now.day(),
-                now.hour()
-            ),
-            org_id: org_id.to_owned(),
-            request_body: request_body.to_owned(),
-            size: stats.size,
-            unit: "MB".to_owned(),
-            user_email,
-            response_time: stats.response_time,
-            num_records: stats.records,
-            stream_type,
-            stream_name: stream_name.to_owned(),
-            min_ts: stats.min_ts,
-            max_ts: stats.max_ts,
-            cached_ratio: stats.cached_ratio,
-            compressed_size: None,
-        });
-    };
+    usage.push(UsageData {
+        event,
+        day: now.day(),
+        hour: now.hour(),
+        month: now.month(),
+        year: now.year(),
+        event_time_hour: format!(
+            "{:04}{:02}{:02}{:02}",
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour()
+        ),
+        org_id: org_id.to_owned(),
+        request_body: request_body.to_owned(),
+        size: stats.size,
+        unit: "MB".to_owned(),
+        user_email,
+        response_time: stats.response_time,
+        num_records: stats.records,
+        stream_type,
+        stream_name: stream_name.to_owned(),
+        min_ts: stats.min_ts,
+        max_ts: stats.max_ts,
+        cached_ratio: stats.cached_ratio,
+        compressed_size: None,
+    });
     if !usage.is_empty() {
         publish_usage(usage).await;
     }
@@ -262,7 +260,11 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         && !CONFIG.common.usage_reporting_creds.is_empty()
     {
         let url = url::Url::parse(&CONFIG.common.usage_reporting_url).unwrap();
-        let creds = CONFIG.common.usage_reporting_creds.to_string();
+        let creds = if CONFIG.common.usage_reporting_creds.starts_with("Basic") {
+            CONFIG.common.usage_reporting_creds.to_string()
+        } else {
+            format!("Basic {}", &CONFIG.common.usage_reporting_creds)
+        };
         if let Err(e) = Client::builder()
             .build()
             .unwrap()

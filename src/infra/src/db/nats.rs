@@ -384,6 +384,62 @@ impl super::Db for NatsDb {
         Ok(result)
     }
 
+    async fn list_values_by_start_dt(
+        &self,
+        prefix: &str,
+        start_dt: Option<(i64, i64)>,
+    ) -> Result<Vec<(i64, Bytes)>> {
+        if start_dt.is_none() || start_dt == Some((0, 0)) {
+            let vals = self.list_values(prefix).await?;
+            return Ok(vals.into_iter().map(|v| (0, v)).collect());
+        }
+
+        let (min_dt, max_dt) = start_dt.unwrap();
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
+        let bucket = &bucket;
+        let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
+        let mut keys = keys
+            .into_iter()
+            .filter_map(|k| {
+                let key = key_decode(&k);
+                let start_dt = key
+                    .split('/')
+                    .last()
+                    .unwrap()
+                    .parse::<i64>()
+                    .unwrap_or_default();
+                if key.starts_with(new_key) && start_dt >= min_dt && start_dt <= max_dt {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        let keys_len = keys.len();
+        if keys_len == 0 {
+            return Ok(vec![]);
+        }
+        keys.sort();
+        let values = futures::stream::iter(keys)
+            .map(|key| async move {
+                let start_dt = key
+                    .split('/')
+                    .last()
+                    .unwrap()
+                    .parse::<i64>()
+                    .unwrap_or_default();
+                let encoded_key = key_encode(&key);
+                let value = bucket.get(&encoded_key).await?;
+                Ok::<Option<(i64, Bytes)>, Error>(value.map(|value| (start_dt, value)))
+            })
+            .buffer_unordered(min(keys_len, 10))
+            .try_collect::<Vec<Option<(i64, Bytes)>>>()
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        let result = values.into_iter().flatten().collect();
+        Ok(result)
+    }
+
     async fn count(&self, prefix: &str) -> Result<i64> {
         let keys = self.list_keys(prefix).await?;
         Ok(keys.len() as i64)

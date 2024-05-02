@@ -29,3 +29,4 @@ sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+zstd.workspace = true

@@ -209,7 +209,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let new_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Alert = match json::from_slice(&item_value) {
+        let alert: Alert = match json::from_slice(&item_value) {
             Ok(v) => v,
             Err(_) => {
                 // HACK: for old version, write it back to up
@@ -249,7 +249,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
         let mut cacher = STREAM_ALERTS.write().await;
         let group = cacher.entry(stream_key.to_string()).or_default();
-        group.push(json_val);
+        group.push(alert);
     }
     log::info!("Alerts Cached");
     Ok(())

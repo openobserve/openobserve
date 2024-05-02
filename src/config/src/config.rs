@@ -642,6 +642,8 @@ pub struct Common {
     pub report_user_password: String,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,
+    #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
+    pub schema_cache_compress_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -741,7 +743,7 @@ pub struct Limit {
     pub scheduler_watch_interval: u64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
-    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
+    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,

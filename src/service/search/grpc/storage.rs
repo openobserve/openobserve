@@ -57,6 +57,7 @@ pub async fn search(
     work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
+    log::info!("[trace_id {trace_id}] search->storage: enter");
     // fetch all schema versions, group files by version
     let schema_versions =
         match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
@@ -68,6 +69,13 @@ pub async fn search(
                 )));
             }
         };
+    log::info!(
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, get schema versions num {}",
+        &sql.org_id,
+        stream_type,
+        &sql.stream_name,
+        schema_versions.len()
+    );
     if schema_versions.is_empty() {
         return Ok((HashMap::new(), ScanStats::new()));
     }
