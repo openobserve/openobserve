@@ -56,7 +56,7 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
     
-    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/cloudwatch_logs/_kinesis_firehose
+    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
       store,

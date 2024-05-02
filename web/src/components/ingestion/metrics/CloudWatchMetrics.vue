@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         Click here</a
       >
-      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve.
+      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve. Please ensure to choose JSON as output format. 
       <p class="q-ml-lg text-italic" style="padding-right: 2px">Note: Output is available under Logs with stream name 'cloudwatch_metrics'.</p>
     </div>
   </div>
@@ -71,7 +71,7 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
     
-    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/cloudwatch_metrics/_kinesis_firehose
+    const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
       store,
