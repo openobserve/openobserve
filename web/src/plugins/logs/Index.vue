@@ -568,6 +568,7 @@ export default defineComponent({
                 }
               }
             }
+
             searchObj.data.query =
               `SELECT [FIELD_LIST]${selectFields} FROM "` +
               searchObj.data.stream.selectedStream.join(",") +
