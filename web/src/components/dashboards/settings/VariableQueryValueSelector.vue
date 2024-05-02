@@ -76,9 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
         <q-item v-bind="itemProps">
-          <q-item-section>
-            <q-item-label v-html="opt.label" />
-          </q-item-section>
           <q-item-section side v-if="variableItem.multiSelect">
             <q-checkbox
               :model-value="selected"
@@ -86,6 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ma-none"
               dense
             />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label v-html="opt.label" />
           </q-item-section>
         </q-item>
       </template>
