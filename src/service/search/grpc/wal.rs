@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
@@ -117,7 +117,7 @@ pub async fn search_parquet(
                 .insert(file.key.clone(), file.meta.clone());
             file
         })
-        .buffer_unordered(min(files_num, 10))
+        .buffer_unordered(CONFIG.limit.cpu_num)
         .collect::<Vec<FileKey>>()
         .await;
     for file in files_metadata {
@@ -145,16 +145,22 @@ pub async fn search_parquet(
     }
 
     // fetch all schema versions, group files by version
-    let schema_versions =
-        match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
-            Ok(versions) => versions,
-            Err(err) => {
-                log::error!("[trace_id {trace_id}] get schema error: {}", err);
-                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                    sql.stream_name.clone(),
-                )));
-            }
-        };
+    let schema_versions = match infra::schema::get_versions(
+        &sql.org_id,
+        &sql.stream_name,
+        stream_type,
+        sql.meta.time_range,
+    )
+    .await
+    {
+        Ok(versions) => versions,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
     if schema_versions.is_empty() {
         return Ok((HashMap::new(), ScanStats::new()));
     }
