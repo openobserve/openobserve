@@ -579,9 +579,11 @@ export default defineComponent({
                 )
                 .map((option: any) => option.value);
               currentVariable.value =
+                // If no option is available, set as the first value or if old value exists, set the old value
                 selectedValues.length > 0
                   ? selectedValues
-                  : oldVariableSelectedValues;
+                  : [currentVariable.options[0].value] ||
+                    oldVariableSelectedValues;
             } else {
               // If multiSelect is false, set the value as a single value from options which is selected
               currentVariable.value =
