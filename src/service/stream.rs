@@ -259,7 +259,7 @@ pub async fn delete_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let schema = infra::schema::get_versions(org_id, stream_name, stream_type)
+    let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();
     if schema.is_empty() {

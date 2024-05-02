@@ -472,8 +472,14 @@ async fn merge_files(
         return Ok((String::from(""), FileMeta::default(), retain_file_list));
     }
 
+    // get time range for these files
+    let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
+    let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
+
     // convert the file to the latest version of schema
-    let schema_versions = infra::schema::get_versions(org_id, stream_name, stream_type).await?;
+    let schema_versions =
+        infra::schema::get_versions(org_id, stream_name, stream_type, Some((min_ts, max_ts)))
+            .await?;
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields =

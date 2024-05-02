@@ -302,7 +302,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         mem_size += key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
-            mem_size += schema.size();
+            mem_size += schema.1.size();
         }
     }
     drop(r);

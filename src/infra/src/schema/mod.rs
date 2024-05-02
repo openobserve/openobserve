@@ -20,6 +20,7 @@ use config::{
     RwAHashMap, CONFIG,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -27,8 +28,9 @@ use crate::{
     errors::{DbError, Error},
 };
 
-pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, bytes::Bytes>> =
+pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
+    Lazy::new(Default::default);
+pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, Vec<(i64, bytes::Bytes)>>> =
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
@@ -90,22 +92,52 @@ pub async fn get_versions(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
 ) -> Result<Vec<Schema>, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
+    let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
     if CONFIG.common.schema_cache_compress_enabled {
         let r = STREAM_SCHEMAS_COMPRESSED.read().await;
-        if let Some(data) = r.get(cache_key) {
-            let schema_bytes = zstd::decode_all(data.as_ref())?;
-            let schemas: Vec<Vec<Schema>> = json::from_slice(&schema_bytes)?;
+        if let Some(versions) = r.get(cache_key) {
+            let versions = versions
+                .iter()
+                .filter_map(|(start_dt, data)| {
+                    if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                        Some(data.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            let schemas = futures::stream::iter(versions)
+                .map(|data| async move {
+                    let de_bytes = zstd::decode_all(data.as_ref())?;
+                    let mut schemas: Vec<Schema> = json::from_slice(&de_bytes)?;
+                    Ok::<Option<Schema>, Error>(schemas.pop())
+                })
+                .buffer_unordered(CONFIG.limit.cpu_num)
+                .try_collect::<Vec<Option<Schema>>>()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
             return Ok(schemas.into_iter().flatten().collect());
         }
         drop(r);
     } else {
         let r = STREAM_SCHEMAS.read().await;
-        if let Some(schemas) = r.get(cache_key) {
-            return Ok(schemas.clone());
+        if let Some(versions) = r.get(cache_key) {
+            let schemas = versions
+                .iter()
+                .filter_map(|(start_dt, data)| {
+                    if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                        Some(data.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            return Ok(schemas);
         }
         drop(r);
     }

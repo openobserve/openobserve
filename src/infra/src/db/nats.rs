@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::min,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
@@ -318,7 +317,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<(String, Option<Bytes>), Error>((key, value))
             })
-            .buffer_unordered(min(keys_len, 10))
+            .buffer_unordered(CONFIG.limit.cpu_num)
             .try_collect::<Vec<(String, Option<Bytes>)>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -376,7 +375,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<Option<Bytes>, Error>(value)
             })
-            .buffer_unordered(min(keys_len, 10))
+            .buffer_unordered(CONFIG.limit.cpu_num)
             .try_collect::<Vec<Option<Bytes>>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -432,7 +431,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<Option<(i64, Bytes)>, Error>(value.map(|value| (start_dt, value)))
             })
-            .buffer_unordered(min(keys_len, 10))
+            .buffer_unordered(CONFIG.limit.cpu_num)
             .try_collect::<Vec<Option<(i64, Bytes)>>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;

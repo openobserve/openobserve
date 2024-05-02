@@ -59,16 +59,22 @@ pub async fn search(
 ) -> super::SearchResult {
     log::info!("[trace_id {trace_id}] search->storage: enter");
     // fetch all schema versions, group files by version
-    let schema_versions =
-        match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
-            Ok(versions) => versions,
-            Err(err) => {
-                log::error!("[trace_id {trace_id}] get schema error: {}", err);
-                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                    sql.stream_name.clone(),
-                )));
-            }
-        };
+    let schema_versions = match infra::schema::get_versions(
+        &sql.org_id,
+        &sql.stream_name,
+        stream_type,
+        sql.meta.time_range,
+    )
+    .await
+    {
+        Ok(versions) => versions,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
     log::info!(
         "[trace_id {trace_id}] search->storage: stream {}/{}/{}, get schema versions num {}",
         &sql.org_id,
