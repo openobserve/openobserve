@@ -91,7 +91,8 @@ jobs:
             file: deploy/build/Dockerfile.pr.amd64
             context: .
             tags: |
-              public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+              public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
             push: true
             cache-from: type=gha
             cache-to: type=gha,mode=max
+            platforms: linux/amd64,linux/arm64
