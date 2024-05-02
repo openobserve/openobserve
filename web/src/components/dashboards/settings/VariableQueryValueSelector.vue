@@ -57,6 +57,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+      <template
+        v-if="variableItem.multiSelect && fieldsFilteredOptions.length > 0"
+      >
+        <q-item>
+          <q-item-section>
+            <q-item-label>Select All</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-checkbox
+              v-model="isAllSelected"
+              @update:model-value="toggleSelectAll"
+              dense
+            />
+          </q-item-section>
+        </q-item>
+        <q-separator />
+      </template>
       <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
         <q-item v-bind="itemProps">
           <q-item-section>
@@ -77,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch } from "vue";
+import { defineComponent, ref, toRef, watch, computed } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 
 export default defineComponent({
@@ -104,6 +121,30 @@ export default defineComponent({
       }
     );
 
+    // isAllSelected should be true if all options are selected and false otherwise
+    const isAllSelected = computed(() => {
+      return (
+        fieldsFilteredOptions.value.length > 0 &&
+        selectedValue.value.length === fieldsFilteredOptions.value.length
+      );
+    });
+
+    // Function to toggle select/deselect all options
+    const toggleSelectAll = (value: boolean) => {
+      console.log("toggleSelectAll", value);
+
+      if (value) {
+        selectedValue.value = fieldsFilteredOptions.value.map(
+          (option: any) => option.value
+        );
+        console.log("toggleSelectAll", selectedValue.value);
+      } else {
+        console.log("toggleSelectAll inside else", selectedValue.value);
+
+        selectedValue.value = [];
+      }
+    };
+
     // update selected value
     watch(selectedValue, () => {
       emit("update:modelValue", selectedValue.value);
@@ -113,6 +154,8 @@ export default defineComponent({
       selectedValue,
       fieldsFilterFn,
       fieldsFilteredOptions,
+      isAllSelected,
+      toggleSelectAll,
     };
   },
 });
