@@ -170,6 +170,7 @@ impl super::Db for PostgresDb {
             }
             return Err(e.into());
         };
+        let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
                 r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#
@@ -265,6 +266,7 @@ impl super::Db for PostgresDb {
 
         // new value
         if let Some((new_key, new_value, new_start_dt)) = new_value {
+            need_watch_dt = new_start_dt.unwrap_or_default();
             let (module, key1, key2) = super::parse_key(&new_key);
             if let Err(e) = sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
@@ -293,7 +295,7 @@ impl super::Db for PostgresDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(key, Bytes::from(""), true, start_dt)
+                .put(key, Bytes::from(need_watch_dt.to_string()), true, start_dt)
                 .await?;
         }
 

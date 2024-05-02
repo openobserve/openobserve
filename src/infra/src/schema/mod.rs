@@ -247,7 +247,7 @@ pub async fn set(
         let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
         if !last_schema.fields().is_empty() {
             let mut last_meta = last_schema.metadata().clone();
-            let created_at: i64 = last_meta.get("start_dt").unwrap().clone().parse().unwrap();
+            let start_dt: i64 = last_meta.get("start_dt").unwrap().clone().parse().unwrap();
             let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
             last_meta.insert("end_dt".to_string(), min_ts.to_string());
             let prev_schema = vec![last_schema.clone().with_metadata(last_meta)];
@@ -255,8 +255,8 @@ pub async fn set(
                 .put(
                     &key,
                     json::to_vec(&prev_schema).unwrap().into(),
-                    crate::db::NO_NEED_WATCH,
-                    Some(created_at),
+                    crate::db::NEED_WATCH,
+                    Some(start_dt),
                 )
                 .await;
         }
@@ -280,7 +280,7 @@ pub async fn set(
             .put(
                 &key,
                 json::to_vec(&new_schema).unwrap().into(),
-                infra_db::NEED_WATCH,
+                infra_db::NO_NEED_WATCH,
                 Some(min_ts),
             )
             .await;
