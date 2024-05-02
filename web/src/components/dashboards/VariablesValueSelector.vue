@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                   class="q-ma-none"
+                  dense
                 />
               </q-item-section>
             </q-item>
