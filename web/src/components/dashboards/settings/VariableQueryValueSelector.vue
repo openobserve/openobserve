@@ -59,17 +59,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template
         v-if="variableItem.multiSelect && fieldsFilteredOptions.length > 0"
+        v-slot:before-options
       >
         <q-item>
-          <q-item-section>
-            <q-item-label>Select All</q-item-label>
-          </q-item-section>
           <q-item-section side>
             <q-checkbox
               v-model="isAllSelected"
               @update:model-value="toggleSelectAll"
               dense
             />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label>Select All</q-item-label>
           </q-item-section>
         </q-item>
         <q-separator />
