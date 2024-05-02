@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hide-bottom="
           searchObj.data.stream.selectedStreamFields != undefined &&
           (searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
-          searchObj.data.stream.selectedStreamFields.length == 0)
+            searchObj.data.stream.selectedStreamFields.length == 0)
         "
       >
         <template #body-cell-name="props">
@@ -883,25 +883,21 @@ export default defineComponent({
 
           const localInterestingFields: any = useLocalInterestingFields();
 
-          let listOfFields: any = [];
-          let streamField: any = {};
-
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
           }
-          let fieldStreamAssociation: any = {};
-          for (streamField of searchObj.data.stream.selectedStreamFields) {
-            fieldStreamAssociation[streamField?.name] = streamField?.streams;
-          }
-          for (const field of searchObj.data.stream.interestingFieldList) {
-            if (fieldStreamAssociation[field].length > 0) {
-              for (const selectedStream of fieldStreamAssociation[field]) {
-                if (selectedStream != undefined) {
-                  localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
-                  ] = listOfFields;
-                }
+
+          if (field.streams.length > 0) {
+            let localFieldIndex = -1;
+            for (const selectedStream of field.streams) {
+              localFieldIndex = localStreamFields[
+                searchObj.organizationIdetifier + "_" + selectedStream
+              ].indexOf(field.name);
+              if (localFieldIndex > -1) {
+                localStreamFields[
+                  searchObj.organizationIdetifier + "_" + selectedStream
+                ].splice(localFieldIndex, 1);
               }
             }
           }
@@ -912,30 +908,30 @@ export default defineComponent({
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
         );
+
         if (index == -1 && field.name != "*") {
           searchObj.data.stream.interestingFieldList.push(field.name);
           const localInterestingFields: any = useLocalInterestingFields();
-
-          let listOfFields: any = [];
-          let streamField: any = {};
 
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
           }
-          let fieldStreamAssociation: any = {};
-          for (streamField of searchObj.data.stream.selectedStreamFields) {
-            fieldStreamAssociation[streamField?.name] = streamField?.streams;
-          }
-          for (const field of searchObj.data.stream.interestingFieldList) {
-            if (fieldStreamAssociation[field].length > 0) {
-              for (const selectedStream of fieldStreamAssociation[field]) {
-                if (selectedStream != undefined) {
-                  localStreamFields[
-                    searchObj.organizationIdetifier + "_" + selectedStream
-                  ] = listOfFields;
-                }
+
+          if (field.streams.length > 0) {
+            for (const selectedStream of field.streams) {
+              if (
+                localStreamFields[
+                  searchObj.organizationIdetifier + "_" + selectedStream
+                ] == undefined
+              ) {
+                localStreamFields[
+                  searchObj.organizationIdetifier + "_" + selectedStream
+                ] = [];
               }
+              localStreamFields[
+                searchObj.organizationIdetifier + "_" + selectedStream
+              ].push(field.name);
             }
           }
 
