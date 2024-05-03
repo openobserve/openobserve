@@ -17,7 +17,13 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
-use crate::common::{meta, meta::pipelines::PipeLine, utils::http::get_stream_type_from_request};
+use crate::{
+    common::{
+        meta::{self, pipelines::PipeLine},
+        utils::http::get_stream_type_from_request,
+    },
+    service::format_stream_name,
+};
 
 /// CreatePipeline
 #[utoipa::path(
@@ -58,6 +64,22 @@ pub async fn save_pipeline(
             );
         }
     };
+    if let Some(ref mut routing) = &mut pipeline.routing {
+        let keys_to_update: Vec<_> = routing.keys().cloned().collect();
+        for key in keys_to_update {
+            let value = routing.remove(&key).unwrap();
+            if value.is_empty() {
+                return Ok(
+                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!("Routing condition for {} is empty", key),
+                    )),
+                );
+            }
+            let formatted_key = format_stream_name(&key);
+            routing.insert(formatted_key, value);
+        }
+    }
     pipeline.stream_type = stream_type;
     crate::service::pipelines::save_pipeline(org_id, pipeline).await
 }
@@ -180,5 +202,22 @@ pub async fn update_pipeline(
     pipeline.name = name.to_string();
     pipeline.stream_name = stream_name;
     pipeline.stream_type = stream_type;
+
+    if let Some(ref mut routing) = &mut pipeline.routing {
+        let keys_to_update: Vec<_> = routing.keys().cloned().collect();
+        for key in keys_to_update {
+            let value = routing.remove(&key).unwrap();
+            if value.is_empty() {
+                return Ok(
+                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!("Routing condition for {} is empty", key),
+                    )),
+                );
+            }
+            let formatted_key = format_stream_name(&key);
+            routing.insert(formatted_key, value);
+        }
+    }
     crate::service::pipelines::update_pipeline(&org_id, name, pipeline).await
 }
