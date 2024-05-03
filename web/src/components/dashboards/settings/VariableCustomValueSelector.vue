@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ma-none"
             />
           </q-item-section>
-          <q-item-section>
+          <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
             <q-item-label>Select All</q-item-label>
           </q-item-section>
         </q-item>
@@ -120,10 +120,10 @@ export default defineComponent({
     });
 
     // Function to toggle select/deselect all options
-    const toggleSelectAll = (value: boolean) => {
-      console.log("toggleSelectAll", value);
+    const toggleSelectAll = () => {
+      console.log("toggleSelectAll", isAllSelected.value);
 
-      if (value) {
+      if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
           (option: any) => option.value
         );
