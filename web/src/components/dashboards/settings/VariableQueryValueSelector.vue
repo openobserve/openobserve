@@ -22,19 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       outlined
       dense
       v-model="selectedValue"
-      :display-value="
-        selectedValue
-          ? Array.isArray(selectedValue)
-            ? selectedValue.join(', ')
-            : selectedValue
-          : selectedValue || selectedValue == ''
-          ? selectedValue == ''
-            ? '<blank>'
-            : selectedValue
-          : !variableItem.isLoading
-          ? '(No Data Found)'
-          : ''
-      "
+      :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
       input-debounce="0"
@@ -49,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
+      @mouseenter="showTooltip = true"
+      @mouseleave="showTooltip = false"
     >
       <template v-slot:no-option>
         <q-item>
@@ -67,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="isAllSelected"
               @update:model-value="toggleSelectAll"
               dense
+              class="q-ma-none"
             />
           </q-item-section>
           <q-item-section>
@@ -91,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
+    <div v-if="showTooltip" class="tooltip" :data-tooltip="allValues"></div>
   </div>
 </template>
 
@@ -151,15 +143,71 @@ export default defineComponent({
       emit("update:modelValue", selectedValue.value);
     });
 
+    // Display the selected value
+    const displayValue = computed(() => {
+      if (selectedValue.value) {
+        if (Array.isArray(selectedValue.value)) {
+          if (selectedValue.value.length > 2) {
+            const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");
+            const remainingCount = selectedValue.value.length - 2;
+            return `${firstTwoValues} ...+${remainingCount} more`;
+          } else {
+            return selectedValue.value.join(", ");
+          }
+        } else if (selectedValue.value == "") {
+          return "<blank>";
+        } else {
+          return selectedValue.value;
+        }
+      } else if (!props.variableItem.isLoading) {
+        return "(No Data Found)";
+      } else {
+        return "";
+      }
+    });
+
+    const showTooltip = ref(false);
+
+    // on tooltip want to display all the value
+    const allValues = computed(() => {
+      if (Array.isArray(selectedValue.value)) {
+        return selectedValue.value.join(", ");
+      } else {
+        return selectedValue.value;
+      }
+    });
+
     return {
       selectedValue,
       fieldsFilterFn,
       fieldsFilteredOptions,
       isAllSelected,
       toggleSelectAll,
+      displayValue,
+      allValues,
+      showTooltip,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.tooltip {
+  position: absolute;
+  background-color: #000;
+  color: #fff;
+  padding: 5px;
+  border-radius: 5px;
+  z-index: 1;
+  white-space: nowrap;
+  display: none;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+}
+
+.q-select:hover + .tooltip {
+  display: block;
+}
+</style>
