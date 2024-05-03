@@ -99,19 +99,30 @@ pub async fn get_versions(
 
     let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
     if CONFIG.common.schema_cache_compress_enabled {
+        let mut last_schema_index = None;
         let r = STREAM_SCHEMAS_COMPRESSED.read().await;
         if let Some(versions) = r.get(cache_key) {
-            let versions = versions
-                .iter()
-                .filter_map(|(start_dt, data)| {
-                    if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
-                        Some(data.clone())
-                    } else {
-                        None
+            let mut compressed_schemas = Vec::new();
+
+            for (index, (start_dt, data)) in versions.iter().enumerate() {
+                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                    compressed_schemas.push(data.clone());
+                    if last_schema_index.is_none() {
+                        last_schema_index = Some(index);
                     }
-                })
-                .collect::<Vec<_>>();
-            let schemas = futures::stream::iter(versions)
+                }
+            }
+
+            if let Some(last_index) = last_schema_index {
+                if last_index > 0 {
+                    if let Some((_, data)) = versions.get(last_index - 1) {
+                        compressed_schemas.push(data.clone());
+                    }
+                }
+            } else {
+                compressed_schemas.push(versions.last().unwrap().1.clone());
+            }
+            let schemas = futures::stream::iter(compressed_schemas)
                 .map(|data| async move {
                     let de_bytes = zstd::decode_all(data.as_ref())?;
                     let mut schemas: Vec<Schema> = json::from_slice(&de_bytes)?;
@@ -125,18 +136,30 @@ pub async fn get_versions(
         }
         drop(r);
     } else {
+        let mut last_schema_index = None;
         let r = STREAM_SCHEMAS.read().await;
         if let Some(versions) = r.get(cache_key) {
-            let schemas = versions
-                .iter()
-                .filter_map(|(start_dt, data)| {
-                    if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
-                        Some(data.clone())
-                    } else {
-                        None
+            let mut schemas = Vec::new();
+
+            for (index, (start_dt, data)) in versions.iter().enumerate() {
+                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                    schemas.push(data.clone());
+                    if last_schema_index.is_none() {
+                        last_schema_index = Some(index);
                     }
-                })
-                .collect::<Vec<_>>();
+                }
+            }
+
+            if let Some(last_index) = last_schema_index {
+                if last_index > 0 {
+                    if let Some((_, data)) = versions.get(last_index - 1) {
+                        schemas.push(data.clone());
+                    }
+                }
+            } else {
+                schemas.push(versions.last().unwrap().1.clone());
+            }
+
             return Ok(schemas);
         }
         drop(r);
