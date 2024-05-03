@@ -136,7 +136,7 @@ const defaultObject = {
       loading: false,
       streamLists: <object[]>[],
       selectedStream: <any>[],
-      selectedStreamFields: <object[]>[],
+      selectedStreamFields: <any>[],
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
@@ -554,7 +554,7 @@ const useLogs = () => {
     return searchObj.data.filterErrMsg === "" ? true : false;
   };
 
-  function buildSearch() {
+  async function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
       searchObj.data.filterErrMsg = "";
@@ -584,7 +584,7 @@ const useLogs = () => {
       if (searchObj.data.stream.selectedStreamFields.length == 0) {
         const streamData: any = getStreams(
           searchObj.data.stream.selectedStream,
-          searchObj.data.stream.streamType || "logs",
+          true,
           true
         );
         searchObj.data.stream.selectedStreamFields = streamData.schema;
@@ -1249,7 +1249,7 @@ const useLogs = () => {
         return;
       }
 
-      const queryReq = buildSearch();
+      const queryReq: any = buildSearch();
       if (queryReq == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
       }
@@ -1777,6 +1777,9 @@ const useLogs = () => {
         const queryResult: {
           name: string;
           type: string;
+          ftsKey: string;
+          isSchemaField: boolean;
+          group: any;
         }[] = [];
         const timestampField = store.state.zoConfig.timestamp_column;
         const selectedStreamValues = searchObj.data.stream.selectedStream
@@ -1875,8 +1878,6 @@ const useLogs = () => {
 
               localInterestingFields.value = localStreamFields;
             }
-
-            console.log(JSON.stringify(searchObj.data.stream.interestingFieldList))
 
             if (
               selectedStreamValues.includes(stream.name) &&
