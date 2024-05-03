@@ -85,13 +85,13 @@ describe("Logs testcases", () => {
   // This is a test case to navigate to the logs page
   it("Navigate to the logs page", () => {
     // Visit the base URL
-    // cy.visit("/");
+    cy.visit("/");
     // // Trigger a mouseover   event on the logs menu link
-    // cy.get('[data-test="menu-link-/logs-item"]').trigger("mouseover");
+    cy.get('[data-test="menu-link-/logs-item"]').trigger("mouseover");
     // // Click on the logs menu link that contains the module log data
-    // cy.get('[data-test="menu-link-/logs-item"]')
-    //   .contains(logData.moduleLog)
-    //   .click();
+    cy.get('[data-test="menu-link-/logs-item"]')
+      .contains(logData.moduleLog)
+      .click();
   });
 
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
