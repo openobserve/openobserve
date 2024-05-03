@@ -1791,6 +1791,7 @@ export default defineComponent({
               );
               const streamNotExist = selectedStreams.filter(
                 (stream_str) => !streamValues.includes(stream_str)
+              );
 
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
@@ -1805,6 +1806,8 @@ export default defineComponent({
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
                   {
+                    name: "",
+                    function: searchObj.data.tempFunctionContent,
                   },
                   false
                 );
