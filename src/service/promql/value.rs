@@ -317,6 +317,11 @@ pub(crate) fn extrapolated_rate(
     offset: Duration,
     kind: ExtrapolationKind,
 ) -> Option<f64> {
+    if samples.len() < 2 {
+        // Not enough samples.
+        return None;
+    }
+
     let start = {
         let range_plus_offset = range
             .checked_add(offset)
@@ -340,10 +345,6 @@ pub(crate) fn extrapolated_rate(
     assert!(end > 0);
     assert!(start <= end);
 
-    if samples.len() < 2 {
-        // Not enough samples.
-        return None;
-    }
     let first = &samples[0];
     let last = &samples.last().unwrap();
 

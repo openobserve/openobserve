@@ -120,7 +120,7 @@ impl Engine {
                     Value::Vector(v) if v.len() == 1 => Value::Float(v[0].sample.value),
                     _ => rhs,
                 };
-                match (lhs.clone(), rhs.clone()) {
+                match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
                             token,
@@ -273,7 +273,7 @@ impl Engine {
         let start = eval_ts - self.ctx.lookback_delta;
 
         let mut offset_modifier: i64 = 0;
-        if let Some(offset) = selector.offset.clone() {
+        if let Some(offset) = selector.offset {
             match offset {
                 Offset::Pos(off) => {
                     offset_modifier = micros(off);
@@ -289,8 +289,10 @@ impl Engine {
             if let Some(last_value) = metric
                 .samples
                 .iter()
-                .map(|s| Sample::new(s.timestamp + offset_modifier, s.value))
-                .filter_map(|s| (start < s.timestamp && s.timestamp <= eval_ts).then_some(s.value))
+                .filter_map(|s| {
+                    let modified_ts = s.timestamp + offset_modifier;
+                    (start < modified_ts && modified_ts <= eval_ts).then_some(s.value)
+                })
                 .last()
             {
                 values.push(
@@ -353,7 +355,7 @@ impl Engine {
         // Start of the time window.
         let start = eval_ts - micros(range); // e.g. [5m]
         let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset.clone() {
+        if let Some(offset) = selector.offset {
             match offset {
                 Offset::Pos(offset) => {
                     offset_modifier = micros(offset);
@@ -415,8 +417,13 @@ impl Engine {
             .matchers
             .matchers
             .iter()
-            .filter(|mat| mat.op == MatchOp::Equal)
-            .map(|mat| (mat.name.as_str(), vec![mat.value.to_string()]))
+            .filter_map(|mat| {
+                if mat.op == MatchOp::Equal {
+                    Some((mat.name.as_str(), vec![mat.value.to_string()]))
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<(_, _)>>();
         let ctxs = self
             .ctx
@@ -916,7 +923,7 @@ async fn selector_load_data_from_datafusion(
         }
     };
 
-    let mut df_group = table.clone().filter(
+    let mut df_group = table.filter(
         col(&CONFIG.common.column_timestamp)
             .gt(lit(start))
             .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
