@@ -65,11 +65,15 @@ export const usePanelDataLoader = (
         JSON.stringify(
           variablesData.value?.values
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-            ?.filter((it: any) =>
-              panelSchema.value.queries
-                ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-                ?.includes(true)
-            )
+            ?.filter((it: any) => {
+              const regexForVariable = new RegExp(
+                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+              );
+
+              return panelSchema.value.queries
+                ?.map((q: any) => regexForVariable.test(q?.query))
+                ?.includes(true);
+            })
         )
       )
     : [];
@@ -438,28 +442,13 @@ export const usePanelDataLoader = (
         });
       }
       query = query.replaceAll(variableName, variableValue);
-      console.log("query---- fixed", query);
     });
 
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
         console.log("query---- variable usePanelDataLoader variable", variable);
 
-        const possibleTypes = ["csv", "pipe", "doublequote", "singlequote"];
-
-        let variableType = "";
-
-        possibleTypes.forEach((type) => {
-          if (query.includes(`:${type}`)) {
-            variableType = type;
-          }
-        });
-
-        const defaultVariableName = `$${variable.name}`;
-
-        const variableName = Array.isArray(variable.value)
-          ? `$${variable.name}:${variableType}`
-          : `$${variable.name}`;
+        const variableName = `$${variable.name}`;
         console.log("variableName", variableName);
 
         let variableValue = "";
@@ -468,48 +457,46 @@ export const usePanelDataLoader = (
           variable.value
         );
         if (Array.isArray(variable.value)) {
+          const possibleVariablesPlaceHolderTypes = [
+            {
+              placeHolder: `\${${variable.name}:csv}`,
+              value: variable.value.join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:pipe}`,
+              value: variable.value.join("|"),
+            },
+            {
+              placeHolder: `\${${variable.name}:doublequote}`,
+              value: variable.value.map((value: any) => `"${value}"`).join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:singlequote}`,
+              value: variable.value.map((value: any) => `'${value}'`).join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}}`,
+              value: variable.value.join(","),
+            },
+            {
+              placeHolder: `${variable.name}`,
+              value: variable.value.join(","),
+            },
+          ];
+
+          possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
+            query = query.replaceAll(
+              placeHolderObj.placeHolder,
+              placeHolderObj.value
+            );
+          });
+
           console.log(
             "query---- variable.value usePanelDataLoader inside if",
             variable.value
           );
 
-          if (variableType === "csv") {
-            console.log("---------------------- csv");
-
-            variableValue = variable.value.join(", ");
-            console.log("variableValue csv", variableValue);
-
-            query = query.replaceAll(variableName, variableValue);
-            console.log("query---- csv", query);
-          } else if (variableType === "pipe") {
-            console.log("---------------------- pipe");
-
-            variableValue = variable.value.join("|");
-            console.log("variableValue pipe", variableValue);
-            query = query.replaceAll(variableName, variableValue);
-            console.log("query---- pipe", query);
-          } else if (variableType === "doublequote") {
-            console.log("---------------------- doublequote");
-            variableValue = variable.value
-              .map((value: any) => `"${value}"`)
-              .join(",");
-            console.log("variableValue doublequote", variableValue);
-            query = query.replaceAll(variableName, variableValue);
-            console.log("query---- doublequote", query);
-          } else if (variableType === "singlequote") {
-            console.log("---------------------- singlequote");
-            variableValue = variable.value
-              .map((value: any) => `'${value}'`)
-              .join(",");
-            console.log("variableValue singlequote", variableValue);
-            query = query.replaceAll(variableName, variableValue);
-            console.log("query---- singlequote", query);
-          } else {
-            console.log("---------------------- csv else");
-            variableValue = variable.value.join(", ");
-            query = query.replaceAll(defaultVariableName, variableValue);
-            console.log("query---- csv", query);
-          }
+          console.log("query---- pipe", query);
         } else {
           console.log(
             "query---- variable.value usePanelDataLoader outside if",
@@ -689,11 +676,15 @@ export const usePanelDataLoader = (
   const getDependentVariablesData = () =>
     variablesData.value?.values
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-      ?.filter((it: any) =>
-        panelSchema.value.queries
-          ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-          ?.includes(true)
-      );
+      ?.filter((it: any) => {
+        const regexForVariable = new RegExp(
+          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+        );
+
+        return panelSchema.value.queries
+          ?.map((q: any) => regexForVariable.test(q?.query))
+          ?.includes(true);
+      });
 
   const getDynamicVariablesData = () => {
     const sqlQueryStreams =
