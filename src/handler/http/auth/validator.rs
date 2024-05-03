@@ -376,7 +376,7 @@ async fn oo_validator_internal(
         let credentials = String::from_utf8(decoded.into())
             .map_err(|_| ())
             .expect("Failed to decode base64 string");
-        let parts: Vec<&str> = credentials.split(':').collect();
+        let parts: Vec<&str> = credentials.splitn(2, ':').collect();
         if parts.len() != 2 {
             return Err((ErrorUnauthorized("Unauthorized Access"), req));
         }
