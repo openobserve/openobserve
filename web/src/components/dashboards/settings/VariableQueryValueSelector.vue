@@ -37,8 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
       :multiple="variableItem.multiSelect"
-      @mouseenter="showTooltip = true"
-      @mouseleave="showTooltip = false"
     >
       <template v-slot:no-option>
         <q-item>
@@ -82,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
-    <div v-if="showTooltip" class="tooltip" :data-tooltip="allValues"></div>
   </div>
 </template>
 
@@ -166,17 +163,6 @@ export default defineComponent({
       }
     });
 
-    const showTooltip = ref(false);
-
-    // on tooltip want to display all the value
-    const allValues = computed(() => {
-      if (Array.isArray(selectedValue.value)) {
-        return selectedValue.value.join(", ");
-      } else {
-        return selectedValue.value;
-      }
-    });
-
     return {
       selectedValue,
       fieldsFilterFn,
@@ -184,30 +170,9 @@ export default defineComponent({
       isAllSelected,
       toggleSelectAll,
       displayValue,
-      allValues,
-      showTooltip,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped>
-.tooltip {
-  position: absolute;
-  background-color: #000;
-  color: #fff;
-  padding: 5px;
-  border-radius: 5px;
-  z-index: 1;
-  white-space: nowrap;
-  display: none;
-}
-
-.tooltip::after {
-  content: attr(data-tooltip);
-}
-
-.q-select:hover + .tooltip {
-  display: block;
-}
-</style>
+<style lang="scss" scoped></style>
