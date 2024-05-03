@@ -281,7 +281,10 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     #[cfg(feature = "enterprise")]
     {
         let user_id = req.headers().get("user_id").unwrap();
-        if let Some(s_type) = &stream_type {
+        if let Some(mut s_type) = &stream_type {
+            if s_type.eq(&StreamType::Index) {
+                s_type = StreamType::Logs;
+            };
             if !s_type.eq(&StreamType::EnrichmentTables) && !s_type.eq(&StreamType::Metadata) {
                 match crate::handler::http::auth::validator::list_objects_for_user(
                     &org_id,
