@@ -553,7 +553,7 @@ const useLogs = () => {
     return searchObj.data.filterErrMsg === "" ? true : false;
   };
 
-  async function buildSearch() {
+  function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
       searchObj.data.filterErrMsg = "";
