@@ -554,7 +554,7 @@ const useLogs = () => {
     return searchObj.data.filterErrMsg === "" ? true : false;
   };
 
-  async function buildSearch() {
+  function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
       searchObj.data.filterErrMsg = "";
@@ -828,7 +828,8 @@ const useLogs = () => {
                   .selectedStreamFields) {
                   if (
                     streamField?.name == field &&
-                    streamField?.streams.indexOf(item) > -1
+                    streamField?.streams.indexOf(item) > -1 &&
+                    listOfFields.indexOf(field) == -1
                   ) {
                     listOfFields.push(field);
                   }
@@ -1392,7 +1393,7 @@ const useLogs = () => {
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Something went wrong.");
+      showErrorNotification(notificationMsg.value || "Something went wrong." + e);
       notificationMsg.value = "";
     }
   };

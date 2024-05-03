@@ -879,7 +879,7 @@ export default defineComponent({
         if (index > -1) {
           // only splice array when item is found
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
-          field.isInteresting = !isInterestingField;
+          field.isInterestingField = !isInterestingField;
 
           const localInterestingFields: any = useLocalInterestingFields();
 
@@ -912,6 +912,7 @@ export default defineComponent({
         if (index == -1 && field.name != "*") {
           searchObj.data.stream.interestingFieldList.push(field.name);
           const localInterestingFields: any = useLocalInterestingFields();
+          field.isInterestingField = !isInterestingField;
 
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
