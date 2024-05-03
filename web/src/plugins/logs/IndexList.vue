@@ -936,6 +936,13 @@ export default defineComponent({
           }
 
           useLocalInterestingFields(localStreamFields);
+        }
+      }
+    };
+
+    const sortedStreamFields = () => {
+      return searchObj.data.stream.selectedStreamFields.sort(
+        (a: any, b: any) => a.group - b.group
       );
     };
 
