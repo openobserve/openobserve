@@ -26,11 +26,22 @@
             dense
             v-bind:readonly="isUpdating"
             v-bind:disable="isUpdating"
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :rules="[
+              (val, rules) =>
+                !!val
+                  ? isValidStreamName ||
+                    `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                  : t('common.nameRequired'),
+            ]"
             tabindex="0"
             style="width: 480px"
-            error-message="Stream name already exists"
+            :error-message="
+              streamRoute.name && isValidStreamName
+                ? 'Stream name already exists'
+                : ''
+            "
             :error="!isValidName"
+            @update:model-value="validateStreamName"
           />
         </div>
 
@@ -86,7 +97,7 @@
   />
 </template>
 <script lang="ts" setup>
-import { onMounted, ref, type Ref } from "vue";
+import { computed, onMounted, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
@@ -223,6 +234,12 @@ const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
 
+const isValidStreamName = computed(() => {
+  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
+  // Check if the role name is valid
+  return roleNameRegex.test(streamRoute.value.name);
+});
+
 const updateStreamFields = async () => {
   let streamCols: any = [];
   const streams: any = await getStream(
@@ -280,15 +297,7 @@ const openCancelDialog = () => {
 const saveRouting = () => {
   isValidName.value = true;
 
-  if (!isUpdating.value)
-    Object.values(props.streamRoutes).forEach((route: any) => {
-      if (
-        route.name === streamRoute.value.name ||
-        route.name === props.streamName
-      ) {
-        isValidName.value = false;
-      }
-    });
+  if (!isUpdating.value) validateStreamName();
 
   if (!isValidName.value) {
     return;
@@ -323,7 +332,7 @@ const deleteRoute = () => {
       ...props.editingRoute,
       name: props.editingRoute.name,
     },
-    type: "streamRouting",
+    type: "streamRoute",
   });
 
   emit("delete:node", {
@@ -335,6 +344,18 @@ const deleteRoute = () => {
   });
 
   emit("cancel:hideform");
+};
+
+const validateStreamName = () => {
+  isValidName.value = true;
+  Object.values(props.streamRoutes).forEach((route: any) => {
+    if (
+      route.name === streamRoute.value.name ||
+      route.name === props.streamName
+    ) {
+      isValidName.value = false;
+    }
+  });
 };
 </script>
 
