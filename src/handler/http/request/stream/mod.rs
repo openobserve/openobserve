@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{RoutingCondition, StreamSettings, StreamType};
+use config::meta::stream::{StreamSettings, StreamType};
 
 use crate::{
     common::{
@@ -93,7 +93,7 @@ async fn schema(
 #[put("/{org_id}/streams/{stream_name}/settings")]
 async fn settings(
     path: web::Path<(String, String)>,
-    mut settings: web::Json<StreamSettings>,
+    settings: web::Json<StreamSettings>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
@@ -124,14 +124,6 @@ async fn settings(
             );
         }
     };
-    // if routing is provided format the key using format_stream_name
-    if let Some(ref mut routing_map) = settings.routing {
-        let new_routing: hashbrown::HashMap<String, Vec<RoutingCondition>> = routing_map
-            .drain()
-            .map(|(key, value)| (format_stream_name(&key), value))
-            .collect();
-        settings.routing = Some(new_routing);
-    }
 
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await

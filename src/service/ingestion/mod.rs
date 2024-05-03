@@ -48,7 +48,7 @@ use crate::{
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key, format_stream_name},
+    service::{db, format_partition_key},
 };
 
 pub mod grpc;
