@@ -65,56 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select
-          style="min-width: 150px"
-          outlined
-          dense
+        <VariableCustomValueSelector
           v-model="item.value"
-          :display-value="
-            item.value
-              ? Array.isArray(item.value)
-                ? item.value.join(', ')
-                : item.value
-              : !item.isLoading
-              ? '(No Options Available)'
-              : ''
-          "
-          :options="item.options"
-          map-options
-          stack-label
-          filled
-          borderless
-          :label="item.label || item.name"
-          option-value="value"
-          option-label="label"
-          emit-value
-          data-test="dashboard-variable-custom-selector"
+          :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
-          :multiple="item.multiSelect"
-        >
-          <template v-slot:no-option>
-            <q-item>
-              <q-item-section class="text-italic text-grey">
-                No Options Available
-              </q-item-section>
-            </q-item>
-          </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps">
-              <q-item-section side v-if="item.multiSelect">
-                <q-checkbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                  class="q-ma-none"
-                  dense
-                />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label v-html="opt.label" />
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
         <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
@@ -129,6 +84,7 @@ import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
+import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
@@ -147,6 +103,7 @@ export default defineComponent({
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
+    VariableCustomValueSelector,
   },
   setup(props: any, { emit }) {
     const instance = getCurrentInstance();
