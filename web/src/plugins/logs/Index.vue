@@ -915,11 +915,28 @@ export default defineComponent({
     quickMode(newVal) {
       if (newVal == true) {
         let field_list: string = "*";
-        if (this.searchObj.data.stream.interestingFieldList.length > 0) {
-          field_list =
-            this.searchObj.data.stream.interestingFieldList.join(",");
-        }
         if (this.searchObj.meta.sqlMode == true) {
+          if (this.searchObj.data.stream.interestingFieldList.length > 0) {
+            const listOfFields: any = [];
+            let streamField: any = {};
+            for (const field of this.searchObj.data.stream
+              .interestingFieldList) {
+              for (streamField of this.searchObj.data.stream
+                .selectedStreamFields) {
+                if (
+                  streamField?.name == field &&
+                  streamField?.streams.indexOf(
+                    this.searchObj.data.stream.selectedStream[0]
+                  ) > -1 &&
+                  listOfFields.indexOf(field) == -1
+                ) {
+                  listOfFields.push(field);
+                }
+              }
+            }
+            field_list = listOfFields.join(",");
+          }
+
           this.searchObj.data.query = this.searchObj.data.query.replace(
             /SELECT\s+(.*?)\s+FROM/i,
             (match, fields) => {
