@@ -34,7 +34,6 @@ use promql_parser::{
         MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr, VectorSelector,
     },
 };
-use rayon::prelude::*;
 
 use crate::{
     common::meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
@@ -77,7 +76,7 @@ impl Engine {
                 match val {
                     Value::Vector(v) => {
                         let out = v
-                            .par_iter()
+                            .iter()
                             .map(|instant| InstantValue {
                                 labels: instant.labels.without_metric_name(),
                                 sample: Sample {
@@ -370,7 +369,7 @@ impl Engine {
         for metric in metrics_cache {
             let samples = metric
                 .samples
-                .par_iter()
+                .iter()
                 .map(|s: &super::value::Sample| super::value::Sample {
                     timestamp: s.timestamp + offset_modifier,
                     value: s.value,
