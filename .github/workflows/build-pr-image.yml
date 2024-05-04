@@ -213,9 +213,11 @@ jobs:
             registry-type: public
         - name: Create manifests
           run: |
-            docker pull public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64 && \
-            docker pull public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64 && \
+            docker pull public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+            docker pull public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            sleep 5
             docker manifest create public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}} \
               --amend public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64 \
-              --amend public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64 && \ 
+              --amend public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            sleep 5
             docker manifest push public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
