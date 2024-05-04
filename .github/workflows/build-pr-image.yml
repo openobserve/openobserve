@@ -184,14 +184,35 @@ jobs:
     build:
       needs: [build_pr_image, build_pr_image_arm]
       runs-on: ubuntu-latest
-      - name: Clone the current repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+      steps:
+        - name: Clone the current repo
+          uses: actions/checkout@v4
+          with:
+            repository: ${{ github.event.pull_request.head.repo.full_name }}
+            ref: ${{ github.event.pull_request.head.ref || github.ref }}
+            fetch-depth: 0
+            fetch-tags: true
+        - name: Set GIT_TAG env
+          run: |
+            echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+            echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+        - name: Configure AWS Credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            aws-region: ${{ env.AWS_REGION }}
+            role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
+            role-session-name: GithubActionsSession
+  
+        - name: Login to Amazon ECR
+          id: login-ecr
+          uses: aws-actions/amazon-ecr-login@v2          
+          with:
+            registry-type: public
+        - name: Create manifests
+          run: |
+            docker pull public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64 && \
+            docker pull public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64 && \
+            docker manifest create public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}} \
+              --amend public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64 \
+              --amend public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64 && \ 
+            docker manifest push public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
