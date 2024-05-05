@@ -73,16 +73,30 @@ impl TaskQueueManager {
         }
     }
 
-    /// Finds or creates a new TaskQueue to send an IngestEntry.
+    /// Finds the first TaskQueue whose channel is not currently full.
     async fn send_task(&mut self, task: IngestEntry) -> Result<()> {
-        let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
-            return Err(anyhow::anyhow!(
-                "TaskQueueManager not able to find TaskQueue."
-            ));
+        let tq = match self.task_queues[self.round_robin_idx..]
+            .iter()
+            .chain(self.task_queues[..self.round_robin_idx].iter())
+            .find(|tq| !tq.channel_is_full())
+        {
+            Some(tq) => {
+                // need to make sure the not all workers shut down already
+                if tq.workers.running_worker_count().await == 0 {
+                    tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                }
+                tq
+            }
+            None => {
+                let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
+                    return Err(anyhow::anyhow!(
+                        "TaskQueueManager not able to find TaskQueue."
+                    ));
+                };
+                tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                tq
+            }
         };
-        if tq.workers.running_worker_count().await == 0 {
-            tq.workers.add_workers_by(MIN_WORKER_CNT).await;
-        }
         self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         tq.send_task(task).await
     }
@@ -140,6 +154,10 @@ impl TaskQueue {
             }
         }
         Ok(())
+    }
+
+    fn channel_is_full(&self) -> bool {
+        self.sender.capacity().unwrap() - self.sender.len() == 0
     }
 
     async fn shut_down(&self) {
