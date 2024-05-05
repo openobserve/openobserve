@@ -22,17 +22,19 @@ use actix_web::{
     http::header,
     put, web, HttpRequest, HttpResponse,
 };
+use arrow_schema::Schema;
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
     CONFIG, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{
     cache, file_list,
-    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST},
+    schema::{
+        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
+    },
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -94,6 +96,7 @@ struct ConfigResponse<'a> {
     rum: Rum,
     custom_logo_img: Option<String>,
     custom_hide_menus: String,
+    meta_org: String,
 }
 
 #[derive(Serialize)]
@@ -234,6 +237,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             api_version: CONFIG.rum.api_version.to_string(),
             insecure_http: CONFIG.rum.insecure_http,
         },
+        meta_org: CONFIG.common.usage_org.to_string(),
     }))
 }
 
@@ -298,8 +302,15 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         mem_size += key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
-            mem_size += schema.size();
+            mem_size += schema.1.size();
         }
+    }
+    drop(r);
+    let r = STREAM_SCHEMAS_COMPRESSED.read().await;
+    for (key, val) in r.iter() {
+        stream_num += 1;
+        mem_size += key.len();
+        mem_size += val.len();
     }
     drop(r);
     let r = STREAM_SCHEMAS_LATEST.read().await;

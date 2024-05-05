@@ -21,7 +21,10 @@ use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFI
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
-    schema::{unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS},
+    schema::{
+        unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST,
+        STREAM_SETTINGS,
+    },
 };
 #[cfg(feature = "enterprise")]
 use {
@@ -179,7 +182,7 @@ async fn list_stream_schemas(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Vec<StreamSchema> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     if r.is_empty() {
         return vec![];
     }
@@ -203,7 +206,7 @@ async fn list_stream_schemas(
                     stream_name,
                     stream_type,
                     schema: if fetch_schema {
-                        val.last().unwrap().clone()
+                        val.clone()
                     } else {
                         Schema::empty()
                     },
@@ -219,7 +222,7 @@ pub async fn list(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<Vec<StreamSchema>, anyhow::Error> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     if !r.is_empty() {
         drop(r);
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
@@ -307,34 +310,66 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     ev.key.to_string()
                 };
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let schema_versions = match db::list_values(&format!("{ev_key}/")).await {
-                    Ok(val) => val
-                        .iter()
-                        .flat_map(|v| json::from_slice::<Vec<Schema>>(v).unwrap())
-                        .collect::<Vec<Schema>>(),
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
+                let schema_versions =
+                    match db::list_values_by_start_dt(&format!("{ev_key}/"), None).await {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    };
                 if schema_versions.is_empty() {
                     continue;
                 }
-
-                let settings =
-                    unwrap_stream_settings(schema_versions.last().unwrap()).unwrap_or_default();
+                let latest_schema: Vec<Schema> =
+                    match json::from_slice(&schema_versions.last().unwrap().1) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
+                            continue;
+                        }
+                    };
+                if latest_schema.is_empty() {
+                    continue;
+                }
+                let latest_schema = latest_schema.last().unwrap();
+                let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.insert(
-                    item_key.to_string(),
-                    schema_versions.last().unwrap().clone(),
-                );
+                w.insert(item_key.to_string(), latest_schema.clone());
                 drop(w);
-                let mut sa = STREAM_SCHEMAS.write().await;
-                sa.insert(item_key.to_string(), schema_versions);
-                drop(sa);
+                if CONFIG.common.schema_cache_compress_enabled {
+                    let schema_versions = schema_versions
+                        .into_iter()
+                        .map(|(start_dt, data)| {
+                            let en_data = zstd::encode_all(data.as_ref(), 3).unwrap();
+                            (start_dt, en_data.into())
+                        })
+                        .collect::<Vec<_>>();
+                    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+                    w.insert(item_key.to_string(), schema_versions);
+                    w.shrink_to_fit();
+                    drop(w);
+                } else {
+                    let schema_versions = schema_versions
+                        .into_iter()
+                        .map(|(start_dt, data)| {
+                            (
+                                start_dt,
+                                json::from_slice::<Vec<Schema>>(&data)
+                                    .unwrap()
+                                    .pop()
+                                    .unwrap(),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let mut w = STREAM_SCHEMAS.write().await;
+                    w.insert(item_key.to_string(), schema_versions);
+                    w.shrink_to_fit();
+                    drop(w);
+                }
 
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -361,6 +396,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
                 let mut w = STREAM_SCHEMAS.write().await;
+                w.remove(item_key);
+                drop(w);
+                let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
                 w.remove(item_key);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
@@ -398,7 +436,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
     let items = db::list(db_key).await?;
-    let mut schemas: HashMap<String, Vec<(Bytes, i64)>> = HashMap::with_capacity(items.len());
+    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items.len());
     for (key, val) in items {
         let key = key.strip_prefix(db_key).unwrap();
         let columns = key.split('/').take(4).collect::<Vec<_>>();
@@ -406,40 +444,67 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let item_key = format!("{}/{}/{}", columns[0], columns[1], columns[2]);
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
-        entry.push((val, start_dt));
+        entry.push((start_dt, val));
     }
-    for (item_key, versions) in schemas.iter_mut() {
-        versions.sort_by(|a, b| a.1.cmp(&b.1));
-        let mut schema_versions = Vec::with_capacity(versions.len());
-        for (val, _) in versions.iter() {
-            let schema: Vec<Schema> = json::from_slice(val).map_err(|e| {
-                anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)
-            })?;
-            schema_versions.extend(schema);
-        }
+    let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+    for item_key in keys.iter() {
+        let Some(mut schema_versions) = schemas.remove(item_key) else {
+            continue;
+        };
         if schema_versions.is_empty() {
             continue;
         }
-        let settings = unwrap_stream_settings(schema_versions.last().unwrap()).unwrap_or_default();
+        schema_versions.sort_by(|a, b| a.0.cmp(&b.0));
+        let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().1)
+            .map_err(|e| {
+                anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)
+            })?;
+        if latest_schema.is_empty() {
+            continue;
+        }
+        let latest_schema = latest_schema.last().unwrap();
+        let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(
-            item_key.to_string(),
-            schema_versions.last().unwrap().clone(),
-        );
+        w.insert(item_key.to_string(), latest_schema.clone());
         drop(w);
-        let mut w = STREAM_SCHEMAS.write().await;
-        w.insert(item_key.to_string(), schema_versions);
-        drop(w);
+        if CONFIG.common.schema_cache_compress_enabled {
+            let schema_versions = schema_versions
+                .into_iter()
+                .map(|(start_dt, data)| {
+                    let en_data = zstd::encode_all(data.as_ref(), 3).unwrap();
+                    (start_dt, en_data.into())
+                })
+                .collect::<Vec<_>>();
+            let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+            w.insert(item_key.to_string(), schema_versions);
+            drop(w);
+        } else {
+            let schema_versions = schema_versions
+                .into_iter()
+                .map(|(start_dt, data)| {
+                    (
+                        start_dt,
+                        json::from_slice::<Vec<Schema>>(&data)
+                            .unwrap()
+                            .pop()
+                            .unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut w = STREAM_SCHEMAS.write().await;
+            w.insert(item_key.to_string(), schema_versions);
+            drop(w);
+        }
     }
     log::info!("Stream schemas Cached");
     Ok(())
 }
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     let mut tables = HashMap::new();
     for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {

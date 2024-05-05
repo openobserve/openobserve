@@ -18,7 +18,6 @@ use bytes::Bytes;
 use chrono::Duration;
 use config::CONFIG;
 use sqlx::Row;
-use tokio::time;
 
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
@@ -281,12 +280,13 @@ WHERE id IN (
     FROM scheduled_jobs
     WHERE status = $6 AND next_run_at <= $7 AND retries < $8 AND NOT (is_realtime = $9 AND is_silenced = $10)
     ORDER BY next_run_at
-    FOR UPDATE SKIP LOCKED
     LIMIT $11
+    FOR UPDATE
 )
 RETURNING *;"#;
 
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
+        let mut tx = pool.begin().await?;
+        let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
             .bind(TriggerModule::Alert)
@@ -298,8 +298,22 @@ RETURNING *;"#;
             .bind(true)
             .bind(false)
             .bind(concurrency)
-            .fetch_all(&pool)
-            .await?;
+            .fetch_all(&mut *tx)
+            .await
+        {
+            Ok(jobs) => jobs,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback pull scheduled_jobs error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit pull scheduled_jobs error: {}", e);
+            return Err(e.into());
+        }
         Ok(jobs)
     }
 
@@ -343,28 +357,14 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
-    async fn clean_complete(&self, interval: u64) {
-        let mut interval = time::interval(time::Duration::from_secs(interval));
+    async fn clean_complete(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        interval.tick().await; // trigger the first run
-        loop {
-            interval.tick().await;
-            let res =
-                sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
-                    .bind(TriggerStatus::Completed)
-                    .bind(CONFIG.limit.scheduler_max_retries)
-                    .execute(&pool)
-                    .await;
-
-            if res.is_err() {
-                log::error!(
-                    "[POSTGRES] error cleaning up completed and dead scheduled_jobs: {}",
-                    res.err().unwrap()
-                );
-            } else {
-                log::debug!("[SCHEDULER] clean up complete");
-            }
-        }
+        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
+            .bind(TriggerStatus::Completed)
+            .bind(CONFIG.limit.scheduler_max_retries)
+            .execute(&pool)
+            .await?;
+        Ok(())
     }
 
     /// Background job that watches for timeout of a job
@@ -373,34 +373,21 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// - calculate the current timestamp and difference from `start_time` of each record
     /// - Get the record ids with difference more than the given timeout
     /// - Update their status back to "Waiting" and increase their "retries" by 1
-    async fn watch_timeout(&self, interval: u64) {
-        let mut interval = time::interval(time::Duration::from_secs(interval));
+    async fn watch_timeout(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        interval.tick().await; // trigger the first run
-        loop {
-            interval.tick().await;
-            let now = chrono::Utc::now().timestamp_micros();
-            let res = sqlx::query(
-                r#"UPDATE scheduled_jobs
+        let now = chrono::Utc::now().timestamp_micros();
+        sqlx::query(
+            r#"UPDATE scheduled_jobs
 SET status = $1, retries = retries + 1
 WHERE status = $2 AND end_time <= $3;
                 "#,
-            )
-            .bind(TriggerStatus::Waiting)
-            .bind(TriggerStatus::Processing)
-            .bind(now)
-            .execute(&pool)
-            .await;
-
-            if res.is_err() {
-                log::error!(
-                    "[SCHEDULER] error during watching timeout jobs: {}",
-                    res.err().unwrap()
-                );
-            } else {
-                log::debug!("[SCHEDULER] watching timeout jobs run complete");
-            }
-        }
+        )
+        .bind(TriggerStatus::Waiting)
+        .bind(TriggerStatus::Processing)
+        .bind(now)
+        .execute(&pool)
+        .await?;
+        Ok(())
     }
 
     async fn len(&self) -> usize {

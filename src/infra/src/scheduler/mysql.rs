@@ -18,7 +18,6 @@ use bytes::Bytes;
 use chrono::Duration;
 use config::CONFIG;
 use sqlx::Row;
-use tokio::time;
 
 use super::{Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
@@ -280,8 +279,8 @@ FROM scheduled_jobs
 WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? AND is_silenced = ?)
 ORDER BY next_run_at
 LIMIT ?
-FOR UPDATE SKIP LOCKED;
-        "#,
+FOR UPDATE;
+            "#,
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
@@ -305,9 +304,15 @@ FOR UPDATE SKIP LOCKED;
             "scheduler pull: selected scheduled jobs for update: {}",
             job_ids.len()
         );
+        if job_ids.is_empty() {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback scheduler pull error: {}", e);
+                return Err(e.into());
+            }
+            return Ok(vec![]);
+        }
 
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
-
         if let Err(e) = sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, start_time = ?,
@@ -315,7 +320,7 @@ SET status = ?, start_time = ?,
         WHEN module = ? THEN ?
         ELSE ?
     END
-WHERE FIND_IN_SET(id, ?);
+WHERE id IN (?);
             "#,
         )
         .bind(TriggerStatus::Processing)
@@ -339,8 +344,8 @@ WHERE FIND_IN_SET(id, ?);
             return Err(e.into());
         }
 
-        let query = r#"SELECT * FROM scheduled_jobs WHERE FIND_IN_SET(id, ?);"#;
-
+        let query = r#"SELECT * FROM scheduled_jobs WHERE id IN (?);"#;
+        let pool = CLIENT.clone();
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
             .bind(job_ids.join(","))
             .fetch_all(&pool)
@@ -351,9 +356,8 @@ WHERE FIND_IN_SET(id, ?);
 
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT.clone();
-        let query = r#"
-SELECT * FROM scheduled_jobs
-WHERE org = ? AND module = ? AND module_key = ?;"#;
+        let query =
+            r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#;
         let job = match sqlx::query_as::<_, Trigger>(query)
             .bind(org)
             .bind(module.clone())
@@ -389,28 +393,14 @@ WHERE org = ? AND module = ? AND module_key = ?;"#;
 
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
-    async fn clean_complete(&self, interval: u64) {
-        let mut interval = time::interval(time::Duration::from_secs(interval));
+    async fn clean_complete(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        interval.tick().await; // trigger the first run
-        loop {
-            interval.tick().await;
-            let res =
-                sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
-                    .bind(TriggerStatus::Completed)
-                    .bind(CONFIG.limit.scheduler_max_retries)
-                    .execute(&pool)
-                    .await;
-
-            if res.is_err() {
-                log::error!(
-                    "[SCHEDULER] error cleaning up completed and dead jobs: {}",
-                    res.err().unwrap()
-                );
-            } else {
-                log::debug!("[SCHEDULER] clean up complete");
-            }
-        }
+        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
+            .bind(TriggerStatus::Completed)
+            .bind(CONFIG.limit.scheduler_max_retries)
+            .execute(&pool)
+            .await?;
+        Ok(())
     }
 
     /// Background job that watches for timeout of a job
@@ -419,34 +409,21 @@ WHERE org = ? AND module = ? AND module_key = ?;"#;
     /// - calculate the current timestamp and difference from `start_time` of each record
     /// - Get the record ids with difference more than the given timeout
     /// - Update their status back to "Waiting" and increase their "retries" by 1
-    async fn watch_timeout(&self, interval: u64) {
-        let mut interval = time::interval(time::Duration::from_secs(interval));
+    async fn watch_timeout(&self) -> Result<()> {
         let pool = CLIENT.clone();
-        interval.tick().await; // trigger the first run
-        loop {
-            interval.tick().await;
-            let now = chrono::Utc::now().timestamp_micros();
-            let res = sqlx::query(
-                r#"UPDATE scheduled_jobs
+        let now = chrono::Utc::now().timestamp_micros();
+        sqlx::query(
+            r#"UPDATE scheduled_jobs
 SET status = ?, retries = retries + 1
 WHERE status = ? AND end_time <= ?
                 "#,
-            )
-            .bind(TriggerStatus::Waiting)
-            .bind(TriggerStatus::Processing)
-            .bind(now)
-            .execute(&pool)
-            .await;
-
-            if res.is_err() {
-                log::error!(
-                    "[SCHEDULER] error during watching timeout jobs: {}",
-                    res.err().unwrap()
-                );
-            } else {
-                log::debug!("[SCHEDULER] watching timeout jobs run complete");
-            }
-        }
+        )
+        .bind(TriggerStatus::Waiting)
+        .bind(TriggerStatus::Processing)
+        .bind(now)
+        .execute(&pool)
+        .await?;
+        Ok(())
     }
 
     async fn len(&self) -> usize {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
@@ -37,6 +37,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
+use ingester::WAL_PARQUET_METADATA;
 use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
@@ -62,24 +63,17 @@ pub async fn search_parquet(
     work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
-    // fetch all schema versions, group files by version
-    let schema_versions =
-        match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
-            Ok(versions) => versions,
-            Err(err) => {
-                log::error!("[trace_id {trace_id}] get schema error: {}", err);
-                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                    sql.stream_name.clone(),
-                )));
-            }
-        };
-    if schema_versions.is_empty() {
-        return Ok((HashMap::new(), ScanStats::new()));
-    }
-    let schema_latest = schema_versions.last().unwrap();
-    let schema_latest_id = schema_versions.len() - 1;
+    let schema_latest = match infra::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
 
-    let stream_settings = unwrap_stream_settings(schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
@@ -104,15 +98,26 @@ pub async fn search_parquet(
     let mut new_files = Vec::with_capacity(files_num);
     let files_metadata = futures::stream::iter(files)
         .map(|file| async move {
+            let r = WAL_PARQUET_METADATA.read().await;
+            if let Some(meta) = r.get(file.key.as_str()) {
+                let mut file = file;
+                file.meta = meta.clone();
+                return file;
+            }
+            drop(r);
             let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();
             let mut file = file;
             file.meta = meta;
+            WAL_PARQUET_METADATA
+                .write()
+                .await
+                .insert(file.key.clone(), file.meta.clone());
             file
         })
-        .buffer_unordered(min(files_num, 10))
+        .buffer_unordered(CONFIG.limit.cpu_num)
         .collect::<Vec<FileKey>>()
         .await;
     for file in files_metadata {
@@ -138,6 +143,28 @@ pub async fn search_parquet(
         wal::release_files(&lock_files).await;
         return Ok((HashMap::new(), scan_stats));
     }
+
+    // fetch all schema versions, group files by version
+    let schema_versions = match infra::schema::get_versions(
+        &sql.org_id,
+        &sql.stream_name,
+        stream_type,
+        sql.meta.time_range,
+    )
+    .await
+    {
+        Ok(versions) => versions,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
+    if schema_versions.is_empty() {
+        return Ok((HashMap::new(), ScanStats::new()));
+    }
+    let schema_latest_id = schema_versions.len() - 1;
 
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());

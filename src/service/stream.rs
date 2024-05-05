@@ -26,7 +26,8 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     schema::{
-        unwrap_partition_time_level, unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SETTINGS,
+        unwrap_partition_time_level, unwrap_stream_settings, STREAM_SCHEMAS,
+        STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
 
@@ -258,7 +259,7 @@ pub async fn delete_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let schema = infra::schema::get_versions(org_id, stream_name, stream_type)
+    let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();
     if schema.is_empty() {
@@ -293,6 +294,12 @@ pub async fn delete_stream(
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut w = STREAM_SCHEMAS.write().await;
+    w.remove(&key);
+    drop(w);
+    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
+    w.remove(&key);
+    drop(w);
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.remove(&key);
     drop(w);
 

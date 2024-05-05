@@ -20,6 +20,7 @@ use config::{
     RwAHashMap, CONFIG,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -27,7 +28,10 @@ use crate::{
     errors::{DbError, Error},
 };
 
-pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
+    Lazy::new(Default::default);
+pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, Vec<(i64, bytes::Bytes)>>> =
+    Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
     Lazy::new(Default::default);
@@ -88,13 +92,77 @@ pub async fn get_versions(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    time_range: Option<(i64, i64)>,
 ) -> Result<Vec<Schema>, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
-    let r = STREAM_SCHEMAS.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.clone());
+    let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
+    if CONFIG.common.schema_cache_compress_enabled {
+        let mut last_schema_index = None;
+        let r = STREAM_SCHEMAS_COMPRESSED.read().await;
+        if let Some(versions) = r.get(cache_key) {
+            let mut compressed_schemas = Vec::new();
+
+            for (index, (start_dt, data)) in versions.iter().enumerate() {
+                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                    compressed_schemas.push(data.clone());
+                    if last_schema_index.is_none() {
+                        last_schema_index = Some(index);
+                    }
+                }
+            }
+
+            if let Some(last_index) = last_schema_index {
+                if last_index > 0 {
+                    if let Some((_, data)) = versions.get(last_index - 1) {
+                        compressed_schemas.push(data.clone());
+                    }
+                }
+            } else {
+                compressed_schemas.push(versions.last().unwrap().1.clone());
+            }
+            let schemas = futures::stream::iter(compressed_schemas)
+                .map(|data| async move {
+                    let de_bytes = zstd::decode_all(data.as_ref())?;
+                    let mut schemas: Vec<Schema> = json::from_slice(&de_bytes)?;
+                    Ok::<Option<Schema>, Error>(schemas.pop())
+                })
+                .buffer_unordered(CONFIG.limit.cpu_num)
+                .try_collect::<Vec<Option<Schema>>>()
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+            return Ok(schemas.into_iter().flatten().collect());
+        }
+        drop(r);
+    } else {
+        let mut last_schema_index = None;
+        let r = STREAM_SCHEMAS.read().await;
+        if let Some(versions) = r.get(cache_key) {
+            let mut schemas = Vec::new();
+
+            for (index, (start_dt, data)) in versions.iter().enumerate() {
+                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                    schemas.push(data.clone());
+                    if last_schema_index.is_none() {
+                        last_schema_index = Some(index);
+                    }
+                }
+            }
+
+            if let Some(last_index) = last_schema_index {
+                if last_index > 0 {
+                    if let Some((_, data)) = versions.get(last_index - 1) {
+                        schemas.push(data.clone());
+                    }
+                }
+            } else {
+                schemas.push(versions.last().unwrap().1.clone());
+            }
+
+            return Ok(schemas);
+        }
+        drop(r);
     }
 
     let db = infra_db::get_db().await;
@@ -326,6 +394,7 @@ pub async fn merge(
                     // merge schema
                     let (is_schema_changed, field_datatype_delta, merged_fields) =
                         get_merge_schema_changes(latest_schema, &inferred_schema);
+
                     if !is_schema_changed {
                         tx.send(Some((latest_schema.clone(), field_datatype_delta)))
                             .unwrap();
@@ -333,7 +402,15 @@ pub async fn merge(
                     }
                     let metadata = latest_schema.metadata().clone();
                     let final_schema = Schema::new(merged_fields).with_metadata(metadata);
-                    let need_new_version = !field_datatype_delta.is_empty();
+
+                    // Casting of data to existing schema isnt new version, we remove records
+                    // with zo_cast metadata
+                    let schema_version_changes = field_datatype_delta
+                        .iter()
+                        .filter(|f| f.metadata().get("zo_cast").is_none())
+                        .collect::<Vec<_>>();
+                    let need_new_version = !schema_version_changes.is_empty();
+
                     if need_new_version && start_dt.is_some() {
                         // update old version end_dt
                         let mut metadata = latest_schema.metadata().clone();

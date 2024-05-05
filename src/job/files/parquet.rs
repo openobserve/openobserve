@@ -38,6 +38,7 @@ use config::{
 use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
 use infra::{cache, storage};
+use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{
@@ -165,6 +166,8 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
                     e
                 );
             }
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file_key);
             continue;
         }
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
@@ -195,10 +198,7 @@ async fn move_files(
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] check deletion for partition: {}",
-        prefix
-    );
+    // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
@@ -221,15 +221,14 @@ async fn move_files(
                     e
                 );
             }
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
             PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] start processing for partition: {}",
-        prefix
-    );
+    // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
     let wal_dir = wal_dir.clone();
     // sort by created time
@@ -367,6 +366,8 @@ async fn move_files(
                     file.key,
                     e.to_string()
                 );
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // need release all the files
                 for file in files_with_size.iter() {
                     PROCESSING_FILES.write().await.remove(&file.key);

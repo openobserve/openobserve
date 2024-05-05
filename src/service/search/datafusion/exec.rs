@@ -930,9 +930,7 @@ pub async fn convert_parquet_file(
     );
 
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
-    let without_optimizer = select_wildcard
-        && CONFIG.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
+    let without_optimizer = select_wildcard;
 
     // query data
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
@@ -1045,6 +1043,8 @@ pub async fn merge_parquet_files(
     original_size: i64,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
+    let start = std::time::Instant::now();
+
     // query data
     let runtime_env = create_runtime_env(None)?;
     let session_config = create_session_config(&SearchType::Normal)?;
@@ -1124,10 +1124,7 @@ pub async fn merge_parquet_files(
     };
 
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
-    let without_optimizer = select_wildcard
-        && CONFIG.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields
-        && stream_type != StreamType::Index;
+    let without_optimizer = select_wildcard && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
     ctx.register_table("tbl", table.clone())?;
 
@@ -1185,6 +1182,11 @@ pub async fn merge_parquet_files(
     writer.close().await?;
     ctx.deregister_table("tbl")?;
     drop(ctx);
+
+    log::info!(
+        "merge_parquet_files took {:.3} seconds.",
+        start.elapsed().as_secs_f64()
+    );
 
     Ok((file_meta, schema))
 }

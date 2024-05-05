@@ -62,6 +62,7 @@ import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
 import config from "@/aws-exports";
+import useManagementRoutes from "./useManagementRoutes";
 
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -202,27 +203,7 @@ const useRoutes = () => {
         routeGuard(to, from, next);
       },
     },
-    {
-      path: "settings",
-      name: "settings",
-      component: Settings,
-      meta: {
-        keepAlive: true,
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-      children: [
-        {
-          path: "general",
-          name: "general",
-          component: () => import("@/components/settings/General.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-      ],
-    },
+    ...useManagementRoutes(),
     {
       path: "functions",
       name: "functions",

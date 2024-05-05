@@ -77,6 +77,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     let is_silenced = trigger.is_silenced;
 
     if is_realtime && is_silenced {
+        log::debug!(
+            "Realtime alert need wakeup, {}/{}",
+            org_id,
+            &trigger.module_key
+        );
         // wakeup the trigger
         let new_trigger = db::scheduler::Trigger {
             next_run_at: Utc::now().timestamp_micros(),
