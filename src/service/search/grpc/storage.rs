@@ -58,17 +58,26 @@ pub async fn search(
     timeout: u64,
 ) -> super::SearchResult {
     log::info!("[trace_id {trace_id}] search->storage: enter");
+    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     // fetch all schema versions, group files by version
-    let schema_versions =
-        match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
-            Ok(versions) => versions,
-            Err(err) => {
-                log::error!("[trace_id {trace_id}] get schema error: {}", err);
-                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                    sql.stream_name.clone(),
-                )));
-            }
-        };
+    let schema_versions = match infra::schema::get_versions(
+        &sql.org_id,
+        &sql.stream_name,
+        stream_type,
+        sql.meta.time_range,
+    )
+    .await
+    {
+        Ok(versions) => versions,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
     log::info!(
         "[trace_id {trace_id}] search->storage: stream {}/{}/{}, get schema versions num {}",
         &sql.org_id,
@@ -79,10 +88,9 @@ pub async fn search(
     if schema_versions.is_empty() {
         return Ok((HashMap::new(), ScanStats::new()));
     }
-    let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
