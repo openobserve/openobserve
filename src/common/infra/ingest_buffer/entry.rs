@@ -15,10 +15,11 @@
 
 use std::io::{Cursor, Read};
 
-use actix_web::web::Bytes;
+use actix_web::{web::Bytes, HttpResponse};
 use anyhow::{anyhow, Context, Result};
 use arrow::datatypes::ToByteSlice;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use config::utils::json;
 
 use crate::{common::meta::ingestion::IngestionRequest, service::logs};
 
@@ -60,6 +61,25 @@ impl IngestEntry {
             user_email,
             stream_name,
             body,
+        }
+    }
+
+    pub fn validate(&self) -> Option<HttpResponse> {
+        // check memtable
+        if let Err(e) = ingester::check_memtable_size() {
+            return Some(HttpResponse::ServiceUnavailable().json(e.to_string()));
+        }
+
+        match self.source {
+            IngestSource::JSON => {
+                if json::from_slice::<Vec<json::Value>>(&self.body).is_err_and(|_| {
+                    json::from_slice::<json::Value>(&self.body).is_err()
+                }) {
+                    return Some(HttpResponse::BadRequest().json("Invalid JSON format"))
+                }
+                None
+            },
+            _ => None
         }
     }
 

@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use actix_web::HttpResponse;
 use anyhow::Result;
 use async_channel::{bounded, Sender};
 use config::CONFIG;
@@ -38,7 +39,10 @@ pub(super) async fn init() -> Result<()> {
 }
 
 /// Sends a task to a TaskQueue based on stream name. To be called by server api endpoitns.
-pub async fn send_task(task: IngestEntry) -> Result<()> {
+pub async fn send_task(task: IngestEntry) -> HttpResponse {
+    if let Some(resp) = task.validate() {
+        return resp;
+    }
     let mut w = TQ_MANAGER.write().await;
     w.send_task(task).await
 }
@@ -73,9 +77,18 @@ impl TaskQueueManager {
         }
     }
 
-    async fn send_task(&mut self, task: IngestEntry) -> Result<()> {
-        let tq = self.find_tq_or_add_workers().await?;
-        tq.send_task(task).await
+    async fn send_task(&mut self, task: IngestEntry) -> HttpResponse {
+        let tq = match self.find_tq_or_add_workers().await {
+            Ok(tq) => tq,
+            Err(e) => {
+                log::error!("Error sending request to ingest buffer: {:?}", e);
+                return HttpResponse::InternalServerError().json(e.to_string());
+            }
+        };
+        match tq.send_task(task).await {
+            Ok(_) => HttpResponse::Ok().json("Request buffered. Waiting to be processed"),
+            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+        }
     }
 
     /// Finds the first TaskQueue whose channel is not currently full.
@@ -98,7 +111,7 @@ impl TaskQueueManager {
                 None => {
                     let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
                         return Err(anyhow::anyhow!(
-                            "TaskQueueManager not able to find TaskQueue."
+                            "TaskQueueManager not able to find any TaskQueue to buffer request"
                         ));
                     };
                     log::info!("All TaskQueue is full. Add workers or try again");
@@ -114,7 +127,6 @@ impl TaskQueueManager {
                         );
                         Some(tq)
                     } else {
-                        //
                         log::warn!(
                             "All TaskQueue busy with max number of workers allowed. Try finding again.",
                         );
@@ -124,8 +136,7 @@ impl TaskQueueManager {
             };
             self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         }
-        let tq = tq.unwrap();
-        Ok(tq)
+        Ok(tq.unwrap())
     }
 
     async fn terminal_all(&mut self) {

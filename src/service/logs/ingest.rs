@@ -65,12 +65,15 @@ pub async fn ingest(
     check_ingestion_allowed(org_id, Some(stream_name))?;
 
     // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Ok(IngestionResponse {
-            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
-            status: vec![],
-            error: Some(e.to_string()),
-        });
+    // already checked if ingest_buffer enabled
+    if !CONFIG.common.feature_ingest_buffer_enabled {
+        if let Err(e) = ingester::check_memtable_size() {
+            return Ok(IngestionResponse {
+                code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                status: vec![],
+                error: Some(e.to_string()),
+            });
+        }
     }
 
     let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())

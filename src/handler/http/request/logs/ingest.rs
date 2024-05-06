@@ -70,16 +70,7 @@ pub async fn bulk(
             None,
             body,
         );
-        match send_task(ingest_entry).await {
-            Ok(_) => HttpResponse::Ok().json("Acepted. Waiting to be processed"),
-            Err(e) => {
-                log::error!("Error sending request to ingest buffer: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        }
+        send_task(ingest_entry).await
     } else {
         match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
             Ok(v) => MetaHttpResponse::json(v),
@@ -131,16 +122,7 @@ pub async fn multi(
             Some(stream_name),
             body,
         );
-        match send_task(ingest_entry).await {
-            Ok(_) => HttpResponse::Ok().json("Acepted. Waiting to be processed"),
-            Err(e) => {
-                log::error!("Error sending request to ingest buffer: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        }
+        send_task(ingest_entry).await
     } else {
         match logs::ingest::ingest(
             &org_id,
@@ -202,16 +184,7 @@ pub async fn json(
             Some(stream_name),
             body,
         );
-        match send_task(ingest_entry).await {
-            Ok(_) => HttpResponse::Ok().json("Acepted. Waiting to be processed"),
-            Err(e) => {
-                log::error!("Error sending request to ingest buffer: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        }
+        send_task(ingest_entry).await
     } else {
         match logs::ingest::ingest(
             &org_id,
