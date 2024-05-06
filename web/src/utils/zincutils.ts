@@ -46,14 +46,16 @@ const useLocalStorage = (
       window.addEventListener("storage", read);
     });
 
-    window.addEventListener("unload", () => {
-      window.removeEventListener("storage", read);
-    });
+    // window.addEventListener("unload", () => {
+    //   alert('asd')
+    //   window.removeEventListener("storage", read);
+    // });
 
     // onMounted(() => {
     //   window.addEventListener("storage", read);
     // });
     // onUnmounted(() => {
+    //   alert("ad");
     //   window.removeEventListener("storage", read);
     // });
 
