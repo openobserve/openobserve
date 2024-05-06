@@ -98,7 +98,8 @@ describe("Logs Quickmode testcases", () => {
         '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
       )
       .click({ force: true });
-    cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click({force: true});
+    cy.wait(2000);
     cy.get('[data-test="logs-search-bar-query-editor"]').contains("_timestamp");
   });
   it("should display quick mode toggle button", () => {
