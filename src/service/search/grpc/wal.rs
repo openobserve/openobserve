@@ -122,6 +122,10 @@ pub async fn search_parquet(
         .await;
     for file in files_metadata {
         if let Some((min_ts, max_ts)) = sql.meta.time_range {
+            if file.meta.is_empty() {
+                wal::release_files(&[file.key.clone()]).await;
+                continue;
+            }
             if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
                 log::debug!(
                     "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{}]",
@@ -198,8 +202,6 @@ pub async fn search_parquet(
             ) {
                 Some(id) => id,
                 None => {
-                    // release all files
-                    wal::release_files(&lock_files).await;
                     log::error!(
                         "[trace_id {trace_id}] wal->parquet->search: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
                         &file.key,

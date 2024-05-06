@@ -21,6 +21,8 @@ use rust_embed_for_web::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "web/dist/"]
+#[gzip]
+#[br]
 struct WebAssets;
 
 #[route("/{path:.*}", method = "GET", method = "HEAD")]
@@ -37,7 +39,7 @@ pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileRespon
 
     WebAssets::get(path)
         .into_response()
-        .use_compression(Compress::Never)
+        .use_compression(Compress::IfPrecompressed)
 }
 
 #[cfg(test)]
