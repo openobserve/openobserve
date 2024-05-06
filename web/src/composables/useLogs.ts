@@ -101,7 +101,7 @@ const defaultObject = {
       : false,
     histogramDirtyFlag: false,
     sqlMode: false,
-    quickMode: true,
+    quickMode: false,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
@@ -199,6 +199,7 @@ const useLogs = () => {
   const notificationMsg = ref("");
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
+  searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
 
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
