@@ -489,9 +489,7 @@ export default defineComponent({
 
                 // no response hits found
                 // set value as empty string
-                currentVariable.value = Array.isArray(currentVariable.options)
-                  ? []
-                  : null;
+                currentVariable.value = currentVariable.multiSelect ? [] : null;
                 // set options as empty array
                 currentVariable.options = [];
 
