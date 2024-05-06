@@ -165,15 +165,8 @@ impl TraceListIndex {
             .unwrap();
         if db_schema.fields().is_empty() {
             let schema = self.schema.as_ref().clone();
-            if let Err(e) = db::schema::set(
-                org_id,
-                STREAM_NAME,
-                StreamType::Metadata,
-                &schema,
-                None,
-                false,
-            )
-            .await
+            if let Err(e) =
+                db::schema::merge(org_id, STREAM_NAME, StreamType::Metadata, &schema, None).await
             {
                 log::error!("[TraceListIndex] error while setting schema: {}", e);
             }

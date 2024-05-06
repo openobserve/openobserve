@@ -285,6 +285,7 @@ impl super::Db for SqliteDb {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
+        let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
                 r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#
@@ -374,6 +375,7 @@ impl super::Db for SqliteDb {
 
         // new value
         if let Some((new_key, new_value, new_start_dt)) = new_value.as_ref() {
+            need_watch_dt = new_start_dt.unwrap_or_default();
             let (module, key1, key2) = super::parse_key(new_key);
             if let Err(e) = sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
@@ -403,26 +405,26 @@ impl super::Db for SqliteDb {
 
         // event watch
         if need_watch {
-            if let Some(value) = value {
+            if value.is_some() {
                 if let Err(e) = CHANNEL
                     .watch_tx
                     .clone()
                     .send(Event::Put(EventData {
                         key: key.to_string(),
-                        value: Some(value),
+                        value: Some(Bytes::from(need_watch_dt.to_string())),
                     }))
                     .await
                 {
                     log::error!("[SQLITE] send event error: {}", e);
                 }
             }
-            if let Some((_, value, _)) = new_value {
+            if new_value.is_some() {
                 if let Err(e) = CHANNEL
                     .watch_tx
                     .clone()
                     .send(Event::Put(EventData {
                         key: key.to_string(),
-                        value: Some(value.clone()),
+                        value: Some(Bytes::from(need_watch_dt.to_string())),
                     }))
                     .await
                 {

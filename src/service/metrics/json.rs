@@ -114,13 +114,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                         json::to_string(&metadata).unwrap(),
                     );
                     schema = schema.with_metadata(extra_metadata);
-                    db::schema::set(
+                    db::schema::merge(
                         org_id,
                         &stream_name,
                         StreamType::Metrics,
                         &schema,
                         Some(chrono::Utc::now().timestamp_micros()),
-                        false,
                     )
                     .await?;
                 }
@@ -209,13 +208,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     json::to_string(&metadata).unwrap(),
                 );
                 schema = inferred_schema.with_metadata(extra_metadata);
-                db::schema::set(
+                db::schema::merge(
                     org_id,
                     &stream_name,
                     StreamType::Metrics,
                     &schema,
                     Some(timestamp),
-                    false,
                 )
                 .await?;
                 crate::common::utils::auth::set_ownership(

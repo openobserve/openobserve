@@ -132,7 +132,9 @@ pub async fn ingest(
             }
             (action, stream_name, doc_id) = ret.unwrap();
 
-            stream_name = format_stream_name(&stream_name);
+            if !CONFIG.common.skip_formatting_bulk_stream_name {
+                stream_name = format_stream_name(&stream_name);
+            }
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
