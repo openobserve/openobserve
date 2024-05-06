@@ -149,6 +149,7 @@ export default defineConfig({
         lodash: ["lodash-es", "lodash/lodash.js"],
         moment: ["moment", "moment-timezone"],
         "oo-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum", "@openobserve/rrweb-player"],
+        "vgl-nsp": ["vue3-grid-layout", "node-sql-parser"],
       },
     },
     outDir: path.resolve(__dirname, "dist"),
