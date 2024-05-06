@@ -97,18 +97,12 @@ describe("Logs Quickmode testcases", () => {
       .find(
         '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
       )
-      .click();
+      .click({ force: true });
+    cy.wait(2000);
     cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     cy.wait(2000);
-    let elementValue;
-
-cy.get('[data-test="logs-search-bar-query-editor"]').then(($element) => {
-    elementValue = $element.text(); // or $element.val() if it's an input element
-});
-
-// Outside of Cypress commands
-console.log("Element value:", elementValue);
     cy.get('[data-test="logs-search-bar-query-editor"]').contains("_timestamp");
+    cy.wait(2000);
   });
   it("should display quick mode toggle button", () => {
     cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').should(
@@ -171,7 +165,6 @@ console.log("Element value:", elementValue);
     cy.get(
       '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]:last'
     ).click({ force: true });
-    cy.wait(2000);
     cy.get('[data-test="logs-search-bar-query-editor"]').should(
       "not.contain",
       "kubernetes_pod_id"
