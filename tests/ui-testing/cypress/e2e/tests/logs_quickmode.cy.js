@@ -100,6 +100,14 @@ describe("Logs Quickmode testcases", () => {
       .click({ force: true });
     cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click({force: true});
     cy.wait(2000);
+    let elementValue;
+
+cy.get('[data-test="logs-search-bar-query-editor"]').then(($element) => {
+    elementValue = $element.text(); // or $element.val() if it's an input element
+});
+
+// Outside of Cypress commands
+console.log("Element value:", elementValue);
     cy.get('[data-test="logs-search-bar-query-editor"]').contains("_timestamp");
   });
   it("should display quick mode toggle button", () => {
