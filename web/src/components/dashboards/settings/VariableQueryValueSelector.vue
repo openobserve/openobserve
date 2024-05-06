@@ -143,20 +143,24 @@ export default defineComponent({
 
     // Display the selected value
     const displayValue = computed(() => {
-      if (!selectedValue.value || selectedValue.value.length === 0) {
-        return "(No Data Found)";
-      } else if (Array.isArray(selectedValue.value)) {
-        if (selectedValue.value.length > 2) {
-          const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");
-          const remainingCount = selectedValue.value.length - 2;
-          return `${firstTwoValues} ...+${remainingCount} more`;
+      if (selectedValue.value) {
+        if (Array.isArray(selectedValue.value)) {
+          if (selectedValue.value.length > 2) {
+            const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");
+            const remainingCount = selectedValue.value.length - 2;
+            return `${firstTwoValues} ...+${remainingCount} more`;
+          } else {
+            return selectedValue.value.join(", ");
+          }
+        } else if (selectedValue.value == "") {
+          return "<blank>";
         } else {
-          return selectedValue.value.join(", ");
+          return selectedValue.value;
         }
-      } else if (selectedValue.value === "") {
-        return "<blank>";
+      } else if (!props.variableItem.isLoading) {
+        return "(No Data Found)";
       } else {
-        return selectedValue.value;
+        return "";
       }
     });
 
