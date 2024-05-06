@@ -360,6 +360,7 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
+import FunctionIcon from "@/components/icons/FunctionIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -503,6 +504,12 @@ export default defineComponent({
         icon: "devices",
         link: "/rum/performance/overview",
         name: "rum",
+      },
+      {
+        title: t("menu.function"),
+        iconComponent: markRaw(FunctionIcon),
+        link: "/functions",
+        name: 'functions',
       },
       {
         title: t("menu.dashboard"),

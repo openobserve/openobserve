@@ -1,4 +1,4 @@
-import { ref, markRaw } from "vue";
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
@@ -26,12 +26,12 @@ const MainLayoutCloudMixin = {
       //   icon: "payment",
       //   link: "/billings",
       // });
-      linksList.value.splice(5, 0, {
-        title: t("menu.pipeline"),
-        iconComponent: markRaw(PipelineIcon),
-        link: "/pipeline",
-        name: "pipeline",
-      });
+      // linksList.value.splice(5, 0, {
+      //   title: t("menu.function"),
+      //   iconComponent: markRaw(FunctionIcon),
+      //   link: "/functions",
+      //   name: 'functions',
+      // });
       linksList.value.splice(10, 0, {
         title: t("menu.billings"),
         icon: "payments",
