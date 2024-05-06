@@ -97,8 +97,8 @@ describe("Logs Quickmode testcases", () => {
       .find(
         '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
       )
-      .click({ force: true });
-    cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click({force: true});
+      .click();
+    cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     cy.wait(2000);
     let elementValue;
 
