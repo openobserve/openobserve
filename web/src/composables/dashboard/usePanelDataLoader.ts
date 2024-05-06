@@ -460,7 +460,7 @@ export const usePanelDataLoader = (
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
-              value: variable.value.join(","),
+              value: variable.value.join(", "),
             },
             {
               placeHolder: `\${${variable.name}:pipe}`,
@@ -468,19 +468,19 @@ export const usePanelDataLoader = (
             },
             {
               placeHolder: `\${${variable.name}:doublequote}`,
-              value: variable.value.map((value: any) => `"${value}"`).join(","),
+              value: variable.value.map((value: any) => `"${value}"`).join(", "),
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,
-              value: variable.value.map((value: any) => `'${value}'`).join(","),
+              value: variable.value.map((value: any) => `'${value}'`).join(", "),
             },
             {
               placeHolder: `\${${variable.name}}`,
-              value: variable.value.join(","),
+              value: variable.value.join(", "),
             },
             {
               placeHolder: `${variable.name}`,
-              value: variable.value.join(","),
+              value: variable.value.join(", "),
             },
           ];
 
