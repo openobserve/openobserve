@@ -644,7 +644,7 @@ pub struct Common {
     pub all_fields_name: String,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
-    #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAMES", default = false)]
+    #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
     pub skip_formatting_bulk_stream_name: bool,
 }
 
