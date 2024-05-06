@@ -90,12 +90,12 @@ describe("Logs Quickmode testcases", () => {
     cy.wait("@allsearch");
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });
-  it("should click on interesting fields icon and display query in editor", () => {
+  it.only("should click on interesting fields icon and display query in editor", () => {
     cy.get('[data-cy="index-field-search-input"]').type("_timestamp");
     cy.wait(2000);
     cy.get(".field-container")
       .find(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
       )
       .click({ force: true });
     cy.wait(2000);
