@@ -95,7 +95,7 @@ describe("Logs Quickmode testcases", () => {
     cy.wait(2000);
     cy.get(".field-container")
       .find(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
       )
       .click({ force: true });
     cy.wait(2000);
