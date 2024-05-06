@@ -129,27 +129,35 @@ pub async fn delete_all(
             true,
         )
         .await?;
-        match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("[COMPACT] delete file failed: {}", e);
+        if CONFIG.compact.data_retention_history {
+            // only store the file_list into history, don't delete files
+            if let Err(e) = infra_file_list::batch_add_history(&files).await {
+                log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
+                return Err(e.into());
             }
-        }
-
-        // at the end, fetch a file list from s3 to guatantte there is no file
-        let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-        loop {
-            let files = storage::list(&prefix).await?;
-            if files.is_empty() {
-                break;
-            }
-            match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
+        } else {
+            match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("[COMPACT] delete file failed: {}", e);
                 }
             }
-            tokio::task::yield_now().await; // yield to other tasks
+
+            // at the end, fetch a file list from s3 to guatantte there is no file
+            let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
+            loop {
+                let files = storage::list(&prefix).await?;
+                if files.is_empty() {
+                    break;
+                }
+                match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!("[COMPACT] delete file failed: {}", e);
+                    }
+                }
+                tokio::task::yield_now().await; // yield to other tasks
+            }
         }
     }
 
@@ -249,33 +257,42 @@ pub async fn delete_by_date(
             true,
         )
         .await?;
-        match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("[COMPACT] delete file failed: {}", e);
+        if CONFIG.compact.data_retention_history {
+            // only store the file_list into history, don't delete files
+            if let Err(e) = infra_file_list::batch_add_history(&files).await {
+                log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
+                return Err(e.into());
             }
-        }
+        } else {
+            match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("[COMPACT] delete file failed: {}", e);
+                }
+            }
 
-        // at the end, fetch a file list from s3 to guatantte there is no file
-        while date_start < date_end {
-            let prefix = format!(
-                "files/{org_id}/{stream_type}/{stream_name}/{}/",
-                date_start.format("%Y/%m/%d")
-            );
-            loop {
-                let files = storage::list(&prefix).await?;
-                if files.is_empty() {
-                    break;
-                }
-                match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("[COMPACT] delete file failed: {}", e);
+            // at the end, fetch a file list from s3 to guatantte there is no file
+            while date_start < date_end {
+                let prefix = format!(
+                    "files/{org_id}/{stream_type}/{stream_name}/{}/",
+                    date_start.format("%Y/%m/%d")
+                );
+                loop {
+                    let files = storage::list(&prefix).await?;
+                    if files.is_empty() {
+                        break;
                     }
+                    match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("[COMPACT] delete file failed: {}", e);
+                        }
+                    }
+                    tokio::task::yield_now().await; // yield to other tasks
                 }
-                tokio::task::yield_now().await; // yield to other tasks
+                date_start += Duration::try_days(1).unwrap();
             }
-            date_start += Duration::try_days(1).unwrap();
         }
     }
 

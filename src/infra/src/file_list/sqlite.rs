@@ -51,37 +51,11 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        let (stream_key, date_key, file_name) =
-            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        match  sqlx::query(
-            r#"
-INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
-        "#,
-    )
-        .bind(org_id)
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .bind(false)
-        .bind(meta.min_ts)
-        .bind(meta.max_ts)
-        .bind(meta.records)
-        .bind(meta.original_size)
-        .bind(meta.compressed_size)
-        .execute(&*client)
-        .await {
-            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
-                  Ok(())
-            } else {
-                  Err(Error::Message(e.to_string()))
-            },
-            Err(e) =>  Err(e.into()),
-            Ok(_) => Ok(()),
-        }
+        self.inner_add("file_list", file, meta).await
+    }
+
+    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()> {
+        self.inner_add("file_list_history", file, meta).await
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
@@ -89,71 +63,11 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        if files.is_empty() {
-            return Ok(());
-        }
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let client = CLIENT_RW.clone();
-            let client = client.lock().await;
-            let mut tx = client.begin().await?;
-            let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                "INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)",
-            );
-            query_builder.push_values(files, |mut b, item| {
-                let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(&item.key).expect("parse file key failed");
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                b.push_bind(org_id)
-                    .push_bind(stream_key)
-                    .push_bind(date_key)
-                    .push_bind(file_name)
-                    .push_bind(false)
-                    .push_bind(item.meta.min_ts)
-                    .push_bind(item.meta.max_ts)
-                    .push_bind(item.meta.records)
-                    .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size);
-            });
-            let need_single_insert = match query_builder.build().execute(&mut *tx).await {
-                Ok(_) => false,
-                Err(sqlx::Error::Database(e)) => {
-                    if e.is_unique_violation() {
-                        true
-                    } else {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!("[SQLITE] rollback file_list batch add error: {}", e);
-                        }
-                        return Err(Error::Message(e.to_string()));
-                    }
-                }
-                Err(e) => {
-                    if let Err(e) = tx.rollback().await {
-                        log::error!("[SQLITE] rollback file_list batch add error: {}", e);
-                    }
-                    return Err(e.into());
-                }
-            };
-            if need_single_insert {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback file_list batch add error: {}", e);
-                    return Err(e.into());
-                }
-                // release lock
-                drop(client);
-                // add file one by one
-                for item in files {
-                    if let Err(e) = self.add(&item.key, &item.meta).await {
-                        log::error!("[SQLITE] single insert file_list add error: {}", e);
-                        return Err(e);
-                    }
-                }
-            } else if let Err(e) = tx.commit().await {
-                log::error!("[SQLITE] commit file_list batch add error: {}", e);
-                return Err(e.into());
-            }
-        }
-        Ok(())
+        self.inner_batch_add("file_list", files).await
+    }
+
+    async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
+        self.inner_batch_add("file_list_history", files).await
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
@@ -650,12 +564,137 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
     }
 }
 
+impl SqliteFileList {
+    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        match  sqlx::query(
+            format!(r#"
+INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+        "#).as_str(),
+    )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(false)
+        .bind(meta.min_ts)
+        .bind(meta.max_ts)
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
+        .execute(&*client)
+        .await {
+            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
+                  Ok(())
+            } else {
+                  Err(Error::Message(e.to_string()))
+            },
+            Err(e) =>  Err(e.into()),
+            Ok(_) => Ok(()),
+        }
+    }
+
+    async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        let chunks = files.chunks(100);
+        for files in chunks {
+            let client = CLIENT_RW.clone();
+            let client = client.lock().await;
+            let mut tx = client.begin().await?;
+            let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)").as_str(),
+            );
+            query_builder.push_values(files, |mut b, item| {
+                let (stream_key, date_key, file_name) =
+                    parse_file_key_columns(&item.key).expect("parse file key failed");
+                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+                b.push_bind(org_id)
+                    .push_bind(stream_key)
+                    .push_bind(date_key)
+                    .push_bind(file_name)
+                    .push_bind(false)
+                    .push_bind(item.meta.min_ts)
+                    .push_bind(item.meta.max_ts)
+                    .push_bind(item.meta.records)
+                    .push_bind(item.meta.original_size)
+                    .push_bind(item.meta.compressed_size);
+            });
+            let need_single_insert = match query_builder.build().execute(&mut *tx).await {
+                Ok(_) => false,
+                Err(sqlx::Error::Database(e)) => {
+                    if e.is_unique_violation() {
+                        true
+                    } else {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[SQLITE] rollback {table} batch add error: {}", e);
+                        }
+                        return Err(Error::Message(e.to_string()));
+                    }
+                }
+                Err(e) => {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!("[SQLITE] rollback {table} batch add error: {}", e);
+                    }
+                    return Err(e.into());
+                }
+            };
+            if need_single_insert {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback {table} batch add error: {}", e);
+                    return Err(e.into());
+                }
+                // release lock
+                drop(client);
+                // add file one by one
+                for item in files {
+                    if let Err(e) = self.inner_add(table, &item.key, &item.meta).await {
+                        log::error!("[SQLITE] single insert {table} add error: {}", e);
+                        return Err(e);
+                    }
+                }
+            } else if let Err(e) = tx.commit().await {
+                log::error!("[SQLITE] commit {table} batch add error: {}", e);
+                return Err(e.into());
+            }
+        }
+        Ok(())
+    }
+}
+
 pub async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
+(
+    id      INTEGER not null primary key autoincrement,
+    org     VARCHAR not null,
+    stream  VARCHAR not null,
+    date    VARCHAR not null,
+    file    VARCHAR not null,
+    deleted BOOLEAN default false not null,
+    min_ts   BIGINT not null,
+    max_ts   BIGINT not null,
+    records  BIGINT not null,
+    original_size   BIGINT not null,
+    compressed_size BIGINT not null
+);
+        "#,
+    )
+    .execute(&*client)
+    .await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS file_list_history
 (
     id      INTEGER not null primary key autoincrement,
     org     VARCHAR not null,
@@ -722,10 +761,18 @@ pub async fn create_table_index() -> Result<()> {
             "file_list",
             "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
-        // (
-        //     "file_list",
-        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream,
-        // date, file);", ),
+        (
+            "file_list_history",
+            "CREATE INDEX IF NOT EXISTS file_list_history_org_idx on file_list_history (org);",
+        ),
+        (
+            "file_list_history",
+            "CREATE INDEX IF NOT EXISTS file_list_history_stream_ts_idx on file_list_history (stream, min_ts, max_ts);",
+        ),
+        (
+            "file_list_history",
+            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_history_stream_file_idx on file_list_history (stream, date, file);",
+        ),
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",

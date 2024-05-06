@@ -110,6 +110,12 @@ pub struct FileMeta {
     pub compressed_size: i64,
 }
 
+impl FileMeta {
+    pub fn is_empty(&self) -> bool {
+        self.records == 0 && self.original_size == 0
+    }
+}
+
 impl From<&FileMeta> for Vec<u8> {
     fn from(value: &FileMeta) -> Vec<u8> {
         let mut bytes = [0; 40];

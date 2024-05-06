@@ -123,9 +123,7 @@ impl FileData {
         self.data.insert(file.to_string(), data_size);
         // write file into local disk
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        log::info!("[trace_id {trace_id}] create_dir_all file_path {file_path}: {:?} ", Path::new(&file_path).parent());
         fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
-        log::info!("[trace_id {trace_id}] put_file_contents {file_path} ");
         put_file_contents(&file_path, &data).await?;
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
@@ -219,12 +217,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
-        for file in FILES.iter() {
-            let root_dir = file.read().await.root_dir.clone();
-            let root_dir = Path::new(&root_dir).canonicalize().unwrap();
-            if let Err(e) = load(&root_dir, &root_dir).await {
-                log::error!("load disk cache error: {}", e);
-            }
+        let root_dir = FILES[0].read().await.root_dir.clone();
+        let root_dir = Path::new(&root_dir).canonicalize().unwrap();
+        if let Err(e) = load(&root_dir, &root_dir).await {
+            log::error!("load disk cache error: {}", e);
         }
         log::info!("Loading disk cache done, total files: {} ", len().await);
     });
@@ -408,9 +404,7 @@ pub async fn is_empty() -> bool {
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
-    log::info!("[trace_id {trace_id}] storage::get file {file} start");
     let data = storage::get(file).await?;
-    log::info!("[trace_id {trace_id}] storage::get file {file} done");
     if data.is_empty() {
         return Err(anyhow::anyhow!("file {} data size is zero", file));
     }
@@ -421,7 +415,6 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
             e
         ));
     };
-    log::info!("[trace_id {trace_id}] download::set file {file} done");
     Ok(())
 }
 
