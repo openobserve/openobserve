@@ -78,45 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :label="t('function.associatedWithStream')"
-              content-class="tab_content"
-            />
-
-            <q-route-tab
-              data-test="stream-pipelines-tab"
-              name="streamPipelines"
-              :to="{
-                name: 'pipelines',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.associatedWithStream')"
-              content-class="tab_content"
-            />
-
-            <q-route-tab
-              data-test="stream-pipelines-tab"
-              name="streamPipelines"
-              :to="{
-                name: 'pipelines',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('function.associatedWithStream')"
-              content-class="tab_content"
-            />
-
-            <q-route-tab
-              data-test="stream-pipelines-tab"
-              name="streamPipelines"
-              :to="{
-                name: 'pipelines',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
               :label="t('function.streamPipeline')"
               content-class="tab_content"
             />
