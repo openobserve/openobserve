@@ -52,7 +52,9 @@
     "type": "Type",
     "search": "Search",
     "expand": "Expand",
-    "date": "Date"
+    "date": "Date",
+    "description": "Description",
+    "cancelChanges": "Cancel Changes"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -137,7 +139,8 @@
     "rum": "Real User Monitoring",
     "settings": "Management",
     "iam": "IAM",
-    "report": "Reports"
+    "report": "Reports",
+    "pipeline": "Pipelines"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -377,6 +380,16 @@
     "indexType": "Index Type",
     "addField": "Add Field"
   },
+  "pipeline": {
+    "header": "Pipelines",
+    "create": "Create Pipeline",
+    "SelectParentNode": "Select Parent Node",
+    "SelectChildNode": "Select Child Node",
+    "deleteNode": "Delete",
+    "addPipeline": "Add Pipeline",
+    "deletePipeline": "Delete Pipeline",
+    "search": "Search Pipeline"
+  },
   "function": {
     "header": "Functions",
     "add": "Create new function",
@@ -410,7 +423,9 @@
     "uploadCSVFile": "Upload CSV File",
     "selectFunction": "Select Function",
     "appendData": "Append data to existing Enrichment Table",
-    "deleteAssociatedFunction": "Delete Associated Function"
+    "deleteAssociatedFunction": "Delete Associated Function",
+    "streamPipeline": "Stream Pipelines",
+    "streamRouting": "Stream Routing"
   },
   "confirmDialog": {
     "cancel": "Cancel",

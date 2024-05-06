@@ -109,7 +109,7 @@ pub struct FunctionList {
     pub list: Vec<Transform>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct StreamFunctionsList {
     pub list: Vec<StreamTransform>,
 }

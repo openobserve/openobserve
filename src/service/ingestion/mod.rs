@@ -38,7 +38,9 @@ use vrl::{
 use super::usage::publish_triggers_usage;
 use crate::{
     common::{
-        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS},
+        infra::config::{
+            REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
+        },
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
@@ -46,7 +48,7 @@ use crate::{
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key, format_stream_name},
+    service::{db, format_partition_key},
 };
 
 pub mod grpc;
@@ -126,12 +128,16 @@ pub async fn get_stream_functions<'a>(
         if stream_functions_map.contains_key(&key) {
             return;
         }
-        let mut _local_trans: Vec<StreamTransform> = vec![];
-        (_local_trans, *stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-            &stream.org_id,
-            &stream.stream_type,
-            &stream.stream_name,
-        );
+        //   let mut _local_trans: Vec<StreamTransform> = vec![];
+        // let local_stream_vrl_map;
+        let (_local_trans, local_stream_vrl_map) =
+            crate::service::ingestion::register_stream_functions(
+                &stream.org_id,
+                &stream.stream_type,
+                &stream.stream_name,
+            );
+        stream_vrl_map.extend(local_stream_vrl_map);
+
         stream_functions_map.insert(key, _local_trans);
     }
 }
@@ -488,24 +494,23 @@ pub async fn get_stream_routing(
     stream_params: StreamParams,
     stream_routing_map: &mut HashMap<String, Vec<Routing>>,
 ) {
-    let stream_settings = infra::schema::get_settings(
-        &stream_params.org_id,
-        &stream_params.stream_name,
-        stream_params.stream_type,
-    )
-    .await
-    .unwrap_or_default();
-    let res: Vec<Routing> = stream_settings
-        .routing
-        .unwrap_or_default()
-        .iter()
-        .map(|(k, v)| Routing {
-            destination: format_stream_name(k),
-            routing: v.clone(),
-        })
-        .collect();
+    if let Some(pipeline) = STREAM_PIPELINES.get(&format!(
+        "{}/{}/{}",
+        &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
+    )) {
+        let res: Vec<Routing> = pipeline
+            .routing
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| Routing {
+                destination: k.to_string(),
+                routing: v.clone(),
+            })
+            .collect();
 
-    stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+        stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+    }
 }
 
 pub async fn get_user_defined_schema(

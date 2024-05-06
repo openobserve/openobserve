@@ -57,6 +57,9 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
+const StreamRouting = () => import("@/components/functions/StreamRouting.vue");
+const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
+const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
@@ -205,8 +208,8 @@ const useRoutes = () => {
     },
     ...useManagementRoutes(),
     {
-      path: "functions",
-      name: "functions",
+      path: "pipeline",
+      name: "pipeline",
       component: Functions,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -232,6 +235,56 @@ const useRoutes = () => {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "pipelines",
+          name: "pipelines",
+          component: PipelinesList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "edit",
+              name: "pipelineEditor",
+              component: PipelineEditor,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ],
+        },
+        {
+          path: "pipelines",
+          name: "pipelines",
+          component: PipelinesList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "edit/pipeline",
+          name: "pipelineEditor",
+          component: PipelineEditor,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "pipelines",
+          name: "pipelines",
+          component: PipelinesList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "edit/pipeline",
+          name: "pipelineEditor",
+          component: PipelineEditor,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

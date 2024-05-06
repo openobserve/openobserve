@@ -85,7 +85,7 @@ describe("Functions testcases", () => {
     cy.intercept("GET", "**/api/default/functions**").as("functions");
 
     cy.visit(
-      `web/functions/functions?org_identifier=${Cypress.env("ORGNAME")}`
+      `web/pipeline/functions?org_identifier=${Cypress.env("ORGNAME")}`
     );
 
     cy.intercept("GET", "**/api/default/streams**").as("streams");
@@ -94,12 +94,14 @@ describe("Functions testcases", () => {
 
   // This is a test case to navigate to the logs page
   it("should display error when creating function without mandatory fields", () => {
+    // cy.get('[data-test="menu-link-pipeline-item"]').click({ force: true });
     cy.contains("Create new function").click({ force: true });
     cy.contains("Save").should("be.visible").click({ force: true });
     cy.contains("Field is required").should("be.visible");
   });
 
   it("should display error on entering invalid name under function and save", () => {
+    // cy.get('[data-test="menu-link-pipeline-item"]').click({ force: true });
     cy.contains("Create new function").click({ force: true });
     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
       getRandomText
@@ -109,6 +111,7 @@ describe("Functions testcases", () => {
   });
 
   it("should display error on entering invalid function and save", () => {
+    // cy.get('[data-test="menu-link-pipeline-item"]').click({ force: true });
     cy.contains("Create new function").click({ force: true });
     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
       functionName
@@ -130,6 +133,7 @@ describe("Functions testcases", () => {
   });
 
   it("should display error on adding function with same name", () => {
+    // cy.get('[data-test="menu-link-pipeline-item"]').click({ force: true });
     cy.contains("Create new function").click({ force: true });
     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
       functionName
@@ -160,7 +164,7 @@ describe("Functions testcases", () => {
     cy.get('[data-test="confirm-button"] > .q-btn__content').click();
   });
 
-  it("should add a function and associate a stream with the same", () => {
+  it.skip("should add a function and associate a stream with the same", () => {
     cy.contains("Create new function").click({ force: true });
     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
       functionName

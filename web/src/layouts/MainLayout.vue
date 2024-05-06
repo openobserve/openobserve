@@ -447,7 +447,7 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const excludeParentRedirect = [
-      "functions",
+      "pipeline",
       "functionList",
       "streamFunctions",
       "enrichmentTables",

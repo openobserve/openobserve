@@ -30,6 +30,7 @@ pub mod kv;
 pub mod metrics;
 pub mod ofga;
 pub mod organization;
+pub mod pipelines;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;

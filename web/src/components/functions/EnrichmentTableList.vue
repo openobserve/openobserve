@@ -406,7 +406,7 @@ export default defineComponent({
       );
       if (
         (newVal != oldVal || this.jsTransforms.value == undefined) &&
-        this.router.currentRoute.value.name == "functions"
+        this.router.currentRoute.value.name == "pipeline"
       ) {
         this.resultTotal = 0;
         this.jsTransforms = [];

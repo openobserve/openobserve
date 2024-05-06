@@ -446,7 +446,11 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(authz::fga::delete_role)
             .service(authz::fga::delete_group)
             .service(users::list_roles)
-            .service(clusters::list_clusters),
+            .service(clusters::list_clusters)
+            .service(pipelines::save_pipeline)
+            .service(pipelines::list_pipelines)
+            .service(pipelines::delete_pipeline)
+            .service(pipelines::update_pipeline),
     );
 }
 
