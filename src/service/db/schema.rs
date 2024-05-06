@@ -322,7 +322,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if schema_versions.is_empty() {
                     continue;
                 }
-                println!("got schema_versions: {:?}", schema_versions.len());
                 let latest_schema: Vec<Schema> =
                     match json::from_slice(&schema_versions.last().unwrap().1) {
                         Ok(val) => val,
