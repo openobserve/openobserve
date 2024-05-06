@@ -644,6 +644,8 @@ pub struct Common {
     pub all_fields_name: String,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
+    #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
+    pub skip_formatting_bulk_stream_name: bool,
 }
 
 #[derive(EnvConfig)]
@@ -745,6 +747,8 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
     pub query_optimization_num_fields: usize,
+    #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
+    pub quick_mode_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]

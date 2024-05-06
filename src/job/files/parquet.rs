@@ -580,13 +580,12 @@ pub(crate) async fn generate_index_on_ingester(
     .await;
 
     if !schema_chk.has_fields {
-        db::schema::set(
+        db::schema::merge(
             org_id,
             stream_name,
             StreamType::Index,
             idx_schema.as_ref(),
             Some(Utc::now().timestamp_micros()),
-            false,
         )
         .await
         .unwrap();
