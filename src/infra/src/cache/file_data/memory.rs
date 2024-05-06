@@ -19,15 +19,31 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::{metrics, RwHashMap, CONFIG};
+use config::{
+    metrics,
+    utils::hash::{gxhash, Sum32},
+    RwHashMap, CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use super::CacheStrategy;
 use crate::storage;
 
-static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
-static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(Default::default);
+static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
+    let mut files = Vec::with_capacity(CONFIG.memory_cache.bucket_num);
+    for _ in 0..CONFIG.memory_cache.bucket_num {
+        files.push(RwLock::new(FileData::new()));
+    }
+    files
+});
+static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
+    let mut datas = Vec::with_capacity(CONFIG.memory_cache.bucket_num);
+    for _ in 0..CONFIG.memory_cache.bucket_num {
+        datas.push(Default::default());
+    }
+    datas
+});
 
 pub struct FileData {
     max_size: usize,
@@ -62,7 +78,8 @@ impl FileData {
     }
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
-        let data = DATA.get(file)?;
+        let idx = get_bucket_idx(file);
+        let data = DATA[idx].get(file)?;
         Some(if let Some(range) = range {
             data.value().slice(range)
         } else {
@@ -79,7 +96,7 @@ impl FileData {
             );
             // cache is full, need release some space
             let need_release_size = min(
-                CONFIG.memory_cache.max_size,
+                self.max_size,
                 max(CONFIG.memory_cache.release_size, data_size * 100),
             );
             self.gc(trace_id, need_release_size).await?;
@@ -88,7 +105,8 @@ impl FileData {
         self.cur_size += data_size;
         self.data.insert(file.to_string(), data_size);
         // write file into cache
-        DATA.insert(file.to_string(), data);
+        let idx = get_bucket_idx(file);
+        DATA[idx].insert(file.to_string(), data);
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
@@ -120,7 +138,8 @@ impl FileData {
             }
             let (key, data_size) = item.unwrap();
             // move the file from memory to disk cache
-            if let Some((key, data)) = DATA.remove(&key) {
+            let idx = get_bucket_idx(&key);
+            if let Some((key, data)) = DATA[idx].remove(&key) {
                 _ = super::disk::set(trace_id, &key, data).await;
             }
             // metrics
@@ -139,7 +158,7 @@ impl FileData {
             }
         }
         self.cur_size -= release_size;
-        DATA.shrink_to_fit();
+        let _ = DATA.iter().map(|c| c.shrink_to_fit()).collect::<Vec<_>>();
         log::info!(
             "[trace_id {trace_id}] File memory cache gc done, released {} bytes",
             release_size
@@ -161,8 +180,9 @@ impl FileData {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    let files = FILES.read().await;
-    _ = files.get("", None).await;
+    for file in FILES.iter() {
+        _ = file.read().await.get("", None).await;
+    }
 
     tokio::task::spawn(async move {
         if CONFIG.memory_cache.gc_interval == 0 {
@@ -187,7 +207,8 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     if !CONFIG.memory_cache.enabled {
         return None;
     }
-    let files = FILES.read().await;
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
     files.get(file, range).await
 }
 
@@ -196,7 +217,8 @@ pub async fn exist(file: &str) -> bool {
     if !CONFIG.memory_cache.enabled {
         return false;
     }
-    let files = FILES.read().await;
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
     files.exist(file).await
 }
 
@@ -205,7 +227,8 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if !CONFIG.memory_cache.enabled {
         return Ok(());
     }
-    let mut files = FILES.write().await;
+    let idx = get_bucket_idx(file);
+    let mut files = FILES[idx].write().await;
     if files.exist(file).await {
         return Ok(());
     }
@@ -216,34 +239,54 @@ async fn gc() -> Result<(), anyhow::Error> {
     if !CONFIG.memory_cache.enabled {
         return Ok(());
     }
-    let files = FILES.read().await;
-    if files.cur_size + CONFIG.memory_cache.release_size < files.max_size {
-        drop(files);
-        return Ok(());
+
+    for file in FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + CONFIG.memory_cache.release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc("global", CONFIG.memory_cache.gc_size).await?;
+        drop(w);
     }
-    drop(files);
-    let mut files = FILES.write().await;
-    files.gc("global", CONFIG.memory_cache.gc_size).await?;
-    drop(files);
+
     Ok(())
 }
 
 #[inline]
 pub async fn stats() -> (usize, usize) {
-    let files = FILES.read().await;
-    files.size()
+    let mut total_size = 0;
+    let mut used_size = 0;
+    for file in FILES.iter() {
+        let r = file.read().await;
+        let (max_size, cur_size) = r.size();
+        total_size += max_size;
+        used_size += cur_size;
+    }
+    (total_size, used_size)
 }
 
 #[inline]
 pub async fn len() -> usize {
-    let files = FILES.read().await;
-    files.len()
+    let mut total = 0;
+    for file in FILES.iter() {
+        let r = file.read().await;
+        total += r.len();
+    }
+    total
 }
 
 #[inline]
 pub async fn is_empty() -> bool {
-    let files = FILES.read().await;
-    files.is_empty()
+    for file in FILES.iter() {
+        let r = file.read().await;
+        if !r.is_empty() {
+            return false;
+        }
+    }
+    true
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
@@ -259,6 +302,15 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         ));
     };
     Ok(())
+}
+
+fn get_bucket_idx(file: &str) -> usize {
+    if CONFIG.memory_cache.bucket_num <= 1 {
+        0
+    } else {
+        let h = gxhash::new().sum32(file);
+        (h as usize) % CONFIG.memory_cache.bucket_num
+    }
 }
 
 #[cfg(test)]
