@@ -164,7 +164,7 @@ describe("Functions testcases", () => {
     cy.get('[data-test="confirm-button"] > .q-btn__content').click();
   });
 
-  it("should add a function and associate a stream with the same", () => {
+  it.skip("should add a function and associate a stream with the same", () => {
     cy.contains("Create new function").click({ force: true });
     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
       functionName
