@@ -479,7 +479,7 @@ export const usePanelDataLoader = (
               value: variable.value.join(","),
             },
             {
-              placeHolder: `${variable.name}`,
+              placeHolder: `\$${variable.name}`,
               value: variable.value.join(","),
             },
           ];
