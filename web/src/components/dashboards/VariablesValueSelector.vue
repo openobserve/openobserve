@@ -484,9 +484,16 @@ export default defineComponent({
                 resolve(true);
                 break;
               } else {
+                console.log(
+                  "currentVariable variablesValueSelector------------------------",
+                  currentVariable
+                );
+
                 // no response hits found
                 // set value as empty string
-                currentVariable.value = null;
+                currentVariable.value = Array.isArray(currentVariable.options)
+                  ? []
+                  : null;
                 // set options as empty array
                 currentVariable.options = [];
 
