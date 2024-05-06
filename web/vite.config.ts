@@ -104,6 +104,7 @@ export default defineConfig({
   plugins: [
     vue({
       template: { transformAssetUrls },
+      
     }),
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
