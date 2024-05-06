@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mx-md q-my-md">
-    <div class="row items-center no-wrap">
+  <div>
+    <div class="add-function-header row items-center no-wrap">
       <div class="col">
         <div v-if="beingUpdated" class="text-h6">
           {{ t("function.updateTitle") }}
@@ -27,8 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
     <div>
-      <q-form ref="addJSTransformForm" @submit="onSubmit">
-        <div class="row q-pb-sm q-pt-md q-col-gutter-md">
+      <q-form id="addFunctionForm" ref="addJSTransformForm" @submit="onSubmit">
+        <div
+          class="add-function-name-input row q-pb-sm q-pt-md q-col-gutter-md"
+        >
           <q-input
             v-model="formData.name"
             :label="t('function.name')"
@@ -104,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
-        <div class="flex justify-center q-mt-lg">
+        <div class="add-function-actions flex justify-center q-mt-lg">
           <q-btn
             v-close-popup="true"
             class="q-mb-md text-bold"
@@ -292,9 +294,10 @@ end`;
         callTransform
           .then((res: { data: any }) => {
             const data = res.data;
+            const _formData: any = { ...formData.value };
             formData.value = { ...defaultValue() };
 
-            emit("update:list");
+            emit("update:list", _formData);
             addJSTransformForm.value.resetValidation();
             dismiss();
             $q.notify({

@@ -30,6 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             vertical
           >
             <q-route-tab
+              data-test="function-enrichment-table-tab"
+              name="enrichmentTables"
+              :to="{
+                name: 'enrichmentTables',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('function.enrichmentTables')"
+              content-class="tab_content"
+            />
+
+            <q-route-tab
+              data-test="function-stream-tab"
               default
               name="functions"
               :to="{
@@ -41,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.header')"
               content-class="tab_content"
             />
+
             <q-route-tab
               data-test="function-stream-tab"
               name="streamFunctions"
@@ -53,16 +68,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.associatedWithStream')"
               content-class="tab_content"
             />
+
             <q-route-tab
-              data-test="function-enrichment-table-tab"
-              name="enrichmentTables"
+              data-test="stream-pipelines-tab"
+              name="streamPipelines"
               :to="{
-                name: 'enrichmentTables',
+                name: 'pipelines',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :label="t('function.enrichmentTables')"
+              :label="t('function.associatedWithStream')"
+              content-class="tab_content"
+            />
+
+            <q-route-tab
+              data-test="stream-pipelines-tab"
+              name="streamPipelines"
+              :to="{
+                name: 'pipelines',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('function.associatedWithStream')"
+              content-class="tab_content"
+            />
+
+            <q-route-tab
+              data-test="stream-pipelines-tab"
+              name="streamPipelines"
+              :to="{
+                name: 'pipelines',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('function.associatedWithStream')"
+              content-class="tab_content"
+            />
+
+            <q-route-tab
+              data-test="stream-pipelines-tab"
+              name="streamPipelines"
+              :to="{
+                name: 'pipelines',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('function.streamPipeline')"
               content-class="tab_content"
             />
           </q-tabs>
@@ -103,7 +158,7 @@ export default defineComponent({
       (routeName) => {
         // This is added to redirect to functionList if the user is on functions route
         // This case happens when user clicks on functions from menu when he is already on functions page
-        if (routeName === "functions") redirectRoute();
+        if (routeName === "pipeline") redirectRoute();
       }
     );
 
@@ -111,7 +166,7 @@ export default defineComponent({
       redirectRoute();
     });
     const redirectRoute = () => {
-      if (router.currentRoute.value.name === "functions") {
+      if (router.currentRoute.value.name === "pipeline") {
         router.replace({
           name: "functionList",
           query: {
