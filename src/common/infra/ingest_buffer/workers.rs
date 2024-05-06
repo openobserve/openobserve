@@ -234,7 +234,7 @@ pub(super) async fn process_tasks_with_retries(
         }
     }
     log::info!(
-        "TaskQueue({tq_index})-Worker({worker_id}) succesfully ingested {} request(s).",
+        "TaskQueue({tq_index})-Worker({worker_id}) successfully ingested {} request(s).",
         tasks.len()
     );
 }

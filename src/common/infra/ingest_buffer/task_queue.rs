@@ -64,7 +64,7 @@ impl Default for TaskQueueManager {
 impl TaskQueueManager {
     fn new() -> Self {
         let mut task_queues = Vec::with_capacity(CONFIG.limit.ingest_buffer_queue_num);
-        for idx in 1..=CONFIG.limit.ingest_buffer_queue_num {
+        for idx in 0..CONFIG.limit.ingest_buffer_queue_num {
             task_queues.push(TaskQueue::new(DEFAULT_CHANNEL_CAP, idx));
         }
         Self {
@@ -73,32 +73,59 @@ impl TaskQueueManager {
         }
     }
 
-    /// Finds the first TaskQueue whose channel is not currently full.
     async fn send_task(&mut self, task: IngestEntry) -> Result<()> {
-        let tq = match self.task_queues[self.round_robin_idx..]
-            .iter()
-            .chain(self.task_queues[..self.round_robin_idx].iter())
-            .find(|tq| !tq.channel_is_full())
-        {
-            Some(tq) => {
-                // need to make sure the not all workers shut down already
-                if tq.workers.running_worker_count().await == 0 {
-                    tq.workers.add_workers_by(MIN_WORKER_CNT).await;
-                }
-                tq
-            }
-            None => {
-                let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
-                    return Err(anyhow::anyhow!(
-                        "TaskQueueManager not able to find TaskQueue."
-                    ));
-                };
-                tq.workers.add_workers_by(MIN_WORKER_CNT).await;
-                tq
-            }
-        };
-        self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
+        let tq = self.find_tq_or_add_workers().await?;
         tq.send_task(task).await
+    }
+
+    /// Finds the first TaskQueue whose channel is not currently full.
+    /// If all TaskQueues are busy, add more workers to a TaskQueue.
+    /// If all TaskQueues have reached max number of workers allowed, try again.
+    async fn find_tq_or_add_workers(&mut self) -> Result<&TaskQueue> {
+        let mut tq = None;
+        while tq.is_none() {
+            tq = match self.task_queues[self.round_robin_idx..]
+                .iter()
+                .chain(self.task_queues[..self.round_robin_idx].iter())
+                .find(|tq| !tq.channel_is_full())
+            {
+                Some(tq) => {
+                    if tq.workers.running_worker_count().await == 0 {
+                        tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                    }
+                    Some(tq)
+                }
+                None => {
+                    let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
+                        return Err(anyhow::anyhow!(
+                            "TaskQueueManager not able to find TaskQueue."
+                        ));
+                    };
+                    log::info!("All TaskQueue is full. Add workers or try again");
+                    // Try add more workers
+                    let added_worker_count = tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                    // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    if added_worker_count > 0 {
+                        log::info!(
+                            "TaskQueue({}) channel added {} new workers",
+                            self.round_robin_idx,
+                            added_worker_count
+                        );
+                        Some(tq)
+                    } else {
+                        //
+                        log::warn!(
+                            "All TaskQueue busy with max number of workers allowed. Try finding again.",
+                        );
+                        None
+                    }
+                }
+            };
+            self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
+        }
+        let tq = tq.unwrap();
+        Ok(tq)
     }
 
     async fn terminal_all(&mut self) {
@@ -136,22 +163,12 @@ impl TaskQueue {
         let mut exponential_delay = tokio::time::Duration::from_millis(500);
         while self.sender.try_send(task.clone()).is_err() {
             log::info!(
-                "TaskQueue({}) channel currently full. Attempt to add more workers",
+                "TaskQueue({}) waits {}/s",
                 self.workers.tq_index,
+                exponential_delay.as_secs()
             );
-            let added_worker_count = self.workers.add_workers_by(MIN_WORKER_CNT).await;
-            if added_worker_count > 0 {
-                log::info!(
-                    "TaskQueue({}) channel added {} new workers",
-                    self.workers.tq_index,
-                    added_worker_count
-                );
-                // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            } else {
-                tokio::time::sleep(exponential_delay).await;
-                exponential_delay *= 2; // Exponential backoff
-            }
+            tokio::time::sleep(exponential_delay).await;
+            exponential_delay *= 2; // Exponential backoff
         }
         Ok(())
     }
