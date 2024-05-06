@@ -149,6 +149,8 @@ export default defineComponent({
             const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
+          } else if (props.variableItem.options.length == 0) {
+            return "(No Data Found)";
           } else {
             return selectedValue.value.join(", ");
           }
