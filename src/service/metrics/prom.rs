@@ -31,7 +31,7 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::unwrap_partition_time_level,
+    schema::{unwrap_partition_time_level, update_setting},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -51,7 +51,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
+        schema::{check_for_schema, stream_schema_exists, SchemaCache},
         search as search_service,
         usage::report_request_usage_stats,
     },
@@ -115,7 +115,7 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        set_schema_metadata(org_id, &metric_name, StreamType::Metrics, &extra_metadata)
+        update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
             .await
             .unwrap();
     }

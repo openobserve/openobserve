@@ -21,19 +21,33 @@ use std::{
 
 use async_recursion::async_recursion;
 use bytes::Bytes;
-use config::{is_local_disk_storage, metrics, utils::asynchronism::file::*, CONFIG};
+use config::{
+    is_local_disk_storage, metrics,
+    utils::{
+        asynchronism::file::*,
+        hash::{gxhash, Sum32},
+    },
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
 use super::CacheStrategy;
 use crate::storage;
 
-static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
+static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
+    let mut files = Vec::with_capacity(CONFIG.disk_cache.bucket_num);
+    for _ in 0..CONFIG.disk_cache.bucket_num {
+        files.push(RwLock::new(FileData::new()));
+    }
+    files
+});
 
 pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
+    multi_dir: Vec<String>,
     data: CacheStrategy,
 }
 
@@ -60,6 +74,13 @@ impl FileData {
                 CONFIG.common.data_cache_dir,
                 storage::format_key("", true)
             ),
+            multi_dir: CONFIG
+                .disk_cache
+                .multi_dir
+                .split(',')
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.to_string())
+                .collect(),
             data: CacheStrategy::new(strategy),
         }
     }
@@ -69,7 +90,7 @@ impl FileData {
     }
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
-        let file_path = format!("{}{}", self.root_dir, file);
+        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         let data = match get_file_contents(&file_path).await {
             Ok(data) => Bytes::from(data),
             Err(_) => {
@@ -92,7 +113,7 @@ impl FileData {
             );
             // cache is full, need release some space
             let need_release_size = min(
-                CONFIG.disk_cache.max_size,
+                self.max_size,
                 max(CONFIG.disk_cache.release_size, data_size * 100),
             );
             self.gc(trace_id, need_release_size).await?;
@@ -101,7 +122,7 @@ impl FileData {
         self.cur_size += data_size;
         self.data.insert(file.to_string(), data_size);
         // write file into local disk
-        let file_path = format!("{}{}", self.root_dir, file);
+        let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
         put_file_contents(&file_path, &data).await?;
         // metrics
@@ -135,7 +156,12 @@ impl FileData {
             }
             let (key, data_size) = item.unwrap();
             // delete file from local disk
-            let file_path = format!("{}{}", self.root_dir, key);
+            let file_path = format!(
+                "{}{}{}",
+                self.root_dir,
+                self.choose_multi_dir(key.as_str()),
+                key
+            );
             fs::remove_file(&file_path).await?;
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
@@ -160,6 +186,16 @@ impl FileData {
         Ok(())
     }
 
+    fn choose_multi_dir(&self, file: &str) -> String {
+        if self.multi_dir.is_empty() {
+            return "".to_string();
+        }
+
+        let h = gxhash::new().sum32(file);
+        let index = h % (self.multi_dir.len() as u32);
+        format!("{}/", self.multi_dir.get(index as usize).unwrap())
+    }
+
     fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
@@ -174,11 +210,14 @@ impl FileData {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    let root_dir = FILES.read().await.root_dir.clone();
-    std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    for file in FILES.iter() {
+        let root_dir = file.read().await.root_dir.clone();
+        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    }
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
+        let root_dir = FILES[0].read().await.root_dir.clone();
         let root_dir = Path::new(&root_dir).canonicalize().unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
@@ -209,7 +248,8 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     if !CONFIG.disk_cache.enabled {
         return None;
     }
-    let files = FILES.read().await;
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
     files.get(file, range).await
 }
 
@@ -218,7 +258,8 @@ pub async fn exist(file: &str) -> bool {
     if !CONFIG.disk_cache.enabled {
         return false;
     }
-    let files = FILES.read().await;
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
     files.exist(file).await
 }
 
@@ -227,7 +268,8 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
-    let mut files = FILES.write().await;
+    let idx = get_bucket_idx(file);
+    let mut files = FILES[idx].write().await;
     if files.exist(file).await {
         return Ok(());
     }
@@ -269,14 +311,23 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         }
                     };
                     let data_size = meta.len() as usize;
-                    let file_key = fp
+                    let mut file_key = fp
                         .strip_prefix(root_dir)
                         .unwrap()
                         .to_str()
                         .unwrap()
                         .replace('\\', "/");
+
+                    if !CONFIG.disk_cache.multi_dir.is_empty() {
+                        file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
+                    }
+                    // check file already exists
+                    if exist(&file_key).await {
+                        continue;
+                    }
                     // write into cache
-                    let mut w = FILES.write().await;
+                    let idx = get_bucket_idx(&file_key);
+                    let mut w = FILES[idx].write().await;
                     w.cur_size += data_size;
                     w.data.insert(file_key.clone(), data_size);
                     let total = w.len();
@@ -304,34 +355,52 @@ async fn gc() -> Result<(), anyhow::Error> {
     if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
-    let files = FILES.read().await;
-    if files.cur_size + CONFIG.disk_cache.release_size < files.max_size {
-        drop(files);
-        return Ok(());
+    for file in FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + CONFIG.disk_cache.release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc("global", CONFIG.disk_cache.gc_size).await?;
+        drop(w);
     }
-    drop(files);
-    let mut files = FILES.write().await;
-    files.gc("global", CONFIG.disk_cache.gc_size).await?;
-    drop(files);
     Ok(())
 }
 
 #[inline]
 pub async fn stats() -> (usize, usize) {
-    let files = FILES.read().await;
-    files.size()
+    let mut total_size = 0;
+    let mut used_size = 0;
+    for file in FILES.iter() {
+        let r = file.read().await;
+        let (max_size, cur_size) = r.size();
+        total_size += max_size;
+        used_size += cur_size;
+    }
+    (total_size, used_size)
 }
 
 #[inline]
 pub async fn len() -> usize {
-    let files = FILES.read().await;
-    files.len()
+    let mut total = 0;
+    for file in FILES.iter() {
+        let r = file.read().await;
+        total += r.len();
+    }
+    total
 }
 
 #[inline]
 pub async fn is_empty() -> bool {
-    let files = FILES.read().await;
-    files.is_empty()
+    for file in FILES.iter() {
+        let r = file.read().await;
+        if !r.is_empty() {
+            return false;
+        }
+    }
+    true
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
@@ -347,6 +416,15 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         ));
     };
     Ok(())
+}
+
+fn get_bucket_idx(file: &str) -> usize {
+    if CONFIG.disk_cache.bucket_num <= 1 {
+        0
+    } else {
+        let h = gxhash::new().sum32(file);
+        (h as usize) % CONFIG.disk_cache.bucket_num
+    }
 }
 
 #[cfg(test)]
@@ -471,5 +549,36 @@ mod tests {
         assert!(file_data.exist(file_key2).await);
         // get first key, should get error
         assert!(!file_data.exist(file_key1).await);
+    }
+
+    #[tokio::test]
+    async fn test_multi_dir() {
+        let multi_dir: Vec<String> = "dir1 , dir2 , dir3"
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.to_string())
+            .collect();
+
+        let trace_id = "session_123";
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(CONFIG.disk_cache.max_size, "lru");
+        file_data.multi_dir = multi_dir;
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let content = Bytes::from("Some text");
+
+        file_data
+            .set(trace_id, file_key, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key).await);
+
+        file_data
+            .set(trace_id, file_key, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key).await);
+        assert!(file_data.size().0 > 0);
+
+        assert_eq!(file_data.get(&file_key, None).await, Some(content))
     }
 }

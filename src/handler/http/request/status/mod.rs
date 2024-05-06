@@ -79,7 +79,6 @@ struct ConfigResponse<'a> {
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
-    lua_fn_enabled: bool,
     sql_base64_enabled: bool,
     timestamp_column: String,
     syslog_enabled: bool,
@@ -97,6 +96,7 @@ struct ConfigResponse<'a> {
     custom_logo_img: Option<String>,
     custom_hide_menus: String,
     meta_org: String,
+    quick_mode_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -209,7 +209,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .collect(),
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
-        lua_fn_enabled: false,
         sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,
         timestamp_column: CONFIG.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
@@ -238,6 +237,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             insecure_http: CONFIG.rum.insecure_http,
         },
         meta_org: CONFIG.common.usage_org.to_string(),
+        quick_mode_enabled: CONFIG.limit.quick_mode_enabled,
     }))
 }
 

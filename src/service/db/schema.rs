@@ -40,41 +40,6 @@ use crate::{
     service::{db, enrichment::StreamTable},
 };
 
-pub async fn set(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    schema: &Schema,
-    min_ts: Option<i64>,
-    new_version: bool,
-) -> Result<(), anyhow::Error> {
-    infra::schema::set(
-        org_id,
-        stream_name,
-        stream_type,
-        schema,
-        min_ts,
-        new_version,
-    )
-    .await?;
-
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        let key = mk_key(org_id, stream_type, stream_name);
-        o2_enterprise::enterprise::super_cluster::queue::put(
-            &key,
-            json::to_vec(&schema).unwrap().into(),
-            infra::db::NEED_WATCH,
-            min_ts,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
-
-    Ok(())
-}
-
 pub async fn merge(
     org_id: &str,
     stream_name: &str,
@@ -309,9 +274,45 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     ev.key.to_string()
                 };
+
                 let item_key = ev_key.strip_prefix(key).unwrap();
+                let r = STREAM_SCHEMAS_LATEST.read().await;
+                let prev_schema_start_dt = if let Some(schema) = r.get(&item_key.to_owned()) {
+                    schema
+                        .metadata()
+                        .get("start_dt")
+                        .unwrap_or(&"0".to_string())
+                        .parse::<i64>()
+                        .unwrap()
+                } else {
+                    0
+                };
+                drop(r);
+
+                let ts_range = match ev.value {
+                    Some(val) => {
+                        let start_dt = match String::from_utf8(val.to_vec()) {
+                            Ok(date_string) => {
+                                if date_string.is_empty() {
+                                    0
+                                } else {
+                                    date_string.parse::<i64>().unwrap_or(0)
+                                }
+                            }
+                            Err(_) => 0,
+                        };
+
+                        if start_dt > 0 {
+                            Some((prev_schema_start_dt, start_dt))
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                };
+
                 let schema_versions =
-                    match db::list_values_by_start_dt(&format!("{ev_key}/"), None).await {
+                    match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
                         Ok(val) => val,
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
@@ -349,7 +350,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         })
                         .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
-                    w.insert(item_key.to_string(), schema_versions);
+                    w.entry(item_key.to_string())
+                        .and_modify(|existing_vec| {
+                            let _ = existing_vec.pop();
+                            existing_vec.extend(schema_versions.clone())
+                        })
+                        .or_insert(schema_versions);
                     w.shrink_to_fit();
                     drop(w);
                 } else {
@@ -366,7 +372,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         })
                         .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS.write().await;
-                    w.insert(item_key.to_string(), schema_versions);
+                    w.entry(item_key.to_string())
+                        .and_modify(|existing_vec| {
+                            let _ = existing_vec.pop();
+                            existing_vec.extend(schema_versions.clone())
+                        })
+                        .or_insert(schema_versions);
                     w.shrink_to_fit();
                     drop(w);
                 }

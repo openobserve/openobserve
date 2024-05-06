@@ -80,6 +80,13 @@ describe("Logs Quickmode testcases", () => {
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
     applyQueryButton();
+    cy.wait(2000);
+    cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').then(($el) => {
+      if ($el.find('.q-toggle__inner--falsy').length > 0) {
+        cy.wrap($el).click({ force: true });
+      }
+    });
+    // cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').click({force:true})
     cy.wait("@allsearch");
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });

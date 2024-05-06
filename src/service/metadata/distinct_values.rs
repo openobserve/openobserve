@@ -203,13 +203,12 @@ impl Metadata for DistinctValues {
                 .unwrap();
             if db_schema.fields().is_empty() {
                 let schema = schema.as_ref().clone();
-                if let Err(e) = service::db::schema::set(
+                if let Err(e) = service::db::schema::merge(
                     &org_id,
                     STREAM_NAME,
                     StreamType::Metadata,
                     &schema,
                     None,
-                    false,
                 )
                 .await
                 {
