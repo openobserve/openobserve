@@ -917,7 +917,7 @@ describe("Logs testcases", () => {
     logstests.clickSavedOkButton();
     cy.wait(4000);
     cy.wait("@functions");
-    logstests.clickFunctionsViaMenu();
+    cy.get('[data-test="menu-link-pipeline-item"]').click({ force: true });
     cy.wait(4000);
     cy.get("tbody")
       .should("be.visible")
