@@ -22,8 +22,6 @@ let { parentRoutes, homeChildRoutes } = userRoutes();
 
 const envRoutes: any = useOSRoutes();
 
-// parentRoutes = parentRoutes.concat(envRoutes.parentRoutes);
-// homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
 parentRoutes = mergeRoutes(parentRoutes, envRoutes.parentRoutes);
 homeChildRoutes = mergeRoutes(homeChildRoutes, envRoutes.homeChildRoutes);
 
