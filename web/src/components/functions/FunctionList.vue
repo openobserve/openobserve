@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
+        class="q-pa-sm"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
       />
