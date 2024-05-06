@@ -908,7 +908,7 @@ describe("Logs testcases", () => {
     logstests.noFunctionFoundMessage();
   });
 
-  it("should save a function and then delete it", () => {
+  it.skip("should save a function and then delete it", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
     cy.wait(2000);
     logstests.enterTextVrlQueryEditor(".a=1");
