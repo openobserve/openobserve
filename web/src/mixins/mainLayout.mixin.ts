@@ -1,8 +1,7 @@
-import { markRaw, onActivated, onMounted } from "vue";
+import { onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 import { getImageURL } from "@/utils/zincutils";
-import FunctionIcon from "@/components/icons/FunctionIcon.vue";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -14,12 +13,12 @@ const MainLayoutOpenSourceMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
-      linksList.value.splice(5, 0, {
-        title: t("menu.pipeline"),
-        iconComponent: markRaw(FunctionIcon),
-        link: "/pipeline",
-        name: "pipeline",
-      });
+      // linksList.value.splice(5, 0, {
+      //   title: t("menu.function"),
+      //   iconComponent: markRaw(FunctionIcon),
+      //   link: "/functions",
+      //   name: "functions",
+      // });
 
       return linksList.value;
     };
