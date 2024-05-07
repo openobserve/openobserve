@@ -296,7 +296,7 @@ async fn move_files(
             for file in files_with_size.iter() {
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
-            return Err(e);
+            return Err(e.into());
         }
     };
 
