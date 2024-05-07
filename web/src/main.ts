@@ -34,27 +34,6 @@ import { openobserveLogs } from "@openobserve/browser-logs";
 const app = createApp(App);
 const router = createRouter(store);
 
-// Lazy load modules as needed
-(async () => {
-  const [
-    analyticsModule,
-    monacoEditorModule,
-    echartsModule,
-    lodashModule,
-    momentModule,
-    ooRumModule,
-    nspModule,
-  ] = await Promise.all([
-    import(/* webpackChunkName: "o2cs-analytics" */ "rudder-sdk-js"),
-    import(/* webpackChunkName: "o2cs-monaco-editor" */ "monaco-editor"),
-    import(/* webpackChunkName: "o2cs-echarts" */ "echarts"),
-    import(/* webpackChunkName: "lodash" */ "lodash-es"),
-    import(/* webpackChunkName: "o2cs-moment" */ "moment"),
-    import(/* webpackChunkName: "o2cs-oo-rum" */ "@openobserve/browser-logs"),
-    import(/* webpackChunkName: "o2cs-nsp" */ "node-sql-parser"),
-  ]);
-})();
-
 app
   .use(Quasar, {
     plugins: {

@@ -65,7 +65,7 @@ const enterpriseResolverPlugin = {
 function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
-    enforce: "pre",
+    enforce: "post",
     resolveId(id) {
       if (id === "monaco-editor") {
         return {
@@ -143,7 +143,7 @@ export default defineConfig({
       ],
       manualChunks: {
         "o2cs-analytics": ["rudder-sdk-js"],
-        "o2cs-monaco-editor": ["monaco-editor"],
+        "o2cs-monaco-editor": ["monaco-editor/esm/vs/editor/editor.api"],
         "o2cs-echarts": ["echarts"],
         lodash: ["lodash-es", "lodash/lodash.js"],
         "o2cs-moment": ["moment", "moment-timezone"],
@@ -153,7 +153,7 @@ export default defineConfig({
           "@openobserve/rrweb-player",
         ],
         "vgl": ["vue3-grid-layout"],
-        "o2cs-nsp": ["node-sql-parser"],
+        "o2cs-nsp": ["node-sql-parser/build/mysql"],
       },
       output: {
         chunkFileNames: ({ name }) => {
