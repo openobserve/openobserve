@@ -543,10 +543,15 @@ pub async fn delete_fields(
     Ok(())
 }
 
-pub async fn delete(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<()> {
+pub async fn delete(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    start_dt: Option<i64>,
+) -> Result<()> {
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let db = infra_db::get_db().await;
-    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, start_dt).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting schema: {}", e);

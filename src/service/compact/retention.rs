@@ -246,6 +246,23 @@ pub async fn delete_by_date(
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, time_range).await?;
 
+    // archive old schema versions
+    let mut schema_versions =
+        infra::schema::get_versions(org_id, stream_name, stream_type, Some(time_range)).await?;
+    // pop last version, it's the current version
+    schema_versions.pop();
+    for schema in schema_versions {
+        let start_dt: i64 = match schema.metadata().get("start_dt") {
+            Some(v) => v.parse().unwrap_or_default(),
+            None => 0,
+        };
+        if start_dt == 0 {
+            continue;
+        }
+        infra::schema::history::create(org_id, stream_type, stream_name, start_dt, schema).await?;
+        infra::schema::delete(org_id, stream_type, stream_name, Some(start_dt)).await?;
+    }
+
     // update stream stats retention time
     let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let mut min_ts = if time_range.1 > BASE_TIME.timestamp_micros() {
