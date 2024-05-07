@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                      :options="['=', '!=']"
+                      :options="['=', '!=', 'IN']"
                     />
                     <CommonAutoComplete
                       v-model="filter.value"

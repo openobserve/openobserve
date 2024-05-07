@@ -382,10 +382,23 @@ export default defineComponent({
                   variable.isVariableLoadingPending === false
                 ) {
                   // replace it's value in the query if it is dependent on query context
-                  queryContext = queryContext.replace(
-                    `$${variable.name}`,
-                    variable.value
-                  );
+
+                  if (Array.isArray(variable.value)) {
+                    const arrayValues = variable.value
+                      .map((value: any) => {
+                        return `'${value}'`;
+                      })
+                      .join(", ");
+                    queryContext = queryContext.replace(
+                      `'$${variable.name}'`,
+                      `(${arrayValues})`
+                    );
+                  } else {
+                    queryContext = queryContext.replace(
+                      `$${variable.name}`,
+                      variable.value
+                    );
+                  }
                 }
                 // above condition not matched, means variable is not loaded
                 // so, check if it is dependent on query context
