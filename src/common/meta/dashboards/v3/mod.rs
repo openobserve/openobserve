@@ -249,7 +249,8 @@ pub struct Variables {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DateTimeOptions {
-    pub type: String,
+    #[serde(rename = "type")]
+    pub typee: String,
     pub relative_time_period: String,
     pub start_time: i64,
     pub end_time: i64,
