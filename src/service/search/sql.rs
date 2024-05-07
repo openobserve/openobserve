@@ -114,9 +114,13 @@ impl Display for SqlMode {
 impl Sql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
-        let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
         let stream_type = StreamType::from(req.stream_type.as_str());
+
+        let mut req_time_range = (req_query.start_time, req_query.end_time);
+        if req_time_range.1 == 0 {
+            req_time_range.1 = chrono::Utc::now().timestamp_micros();
+        }
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
