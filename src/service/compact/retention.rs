@@ -135,29 +135,6 @@ pub async fn delete_all(
                 log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
                 return Err(e.into());
             }
-        } else {
-            match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("[COMPACT] delete file failed: {}", e);
-                }
-            }
-
-            // at the end, fetch a file list from s3 to guatantte there is no file
-            let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-            loop {
-                let files = storage::list(&prefix).await?;
-                if files.is_empty() {
-                    break;
-                }
-                match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("[COMPACT] delete file failed: {}", e);
-                    }
-                }
-                tokio::task::yield_now().await; // yield to other tasks
-            }
         }
     }
 
@@ -263,36 +240,6 @@ pub async fn delete_by_date(
                 log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
                 return Err(e.into());
             }
-        } else {
-            match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("[COMPACT] delete file failed: {}", e);
-                }
-            }
-
-            // at the end, fetch a file list from s3 to guatantte there is no file
-            while date_start < date_end {
-                let prefix = format!(
-                    "files/{org_id}/{stream_type}/{stream_name}/{}/",
-                    date_start.format("%Y/%m/%d")
-                );
-                loop {
-                    let files = storage::list(&prefix).await?;
-                    if files.is_empty() {
-                        break;
-                    }
-                    match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
-                    {
-                        Ok(_) => {}
-                        Err(e) => {
-                            log::error!("[COMPACT] delete file failed: {}", e);
-                        }
-                    }
-                    tokio::task::yield_now().await; // yield to other tasks
-                }
-                date_start += Duration::try_days(1).unwrap();
-            }
         }
     }
 
@@ -372,7 +319,7 @@ async fn delete_from_file_list(
     }
 
     // write file list to storage
-    write_file_list(file_list_days, hours_files).await?;
+    write_file_list(org_id, file_list_days, hours_files).await?;
 
     // update stream stats
     if stream_stats.doc_num != 0 {
@@ -390,17 +337,19 @@ async fn delete_from_file_list(
 }
 
 async fn write_file_list(
+    org_id: &str,
     file_list_days: HashSet<String>,
     hours_files: HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     if CONFIG.common.meta_store_external {
-        write_file_list_db_only(hours_files).await
+        write_file_list_db_only(org_id, hours_files).await
     } else {
-        write_file_list_s3(file_list_days, hours_files).await
+        write_file_list_s3(org_id, file_list_days, hours_files).await
     }
 }
 
 async fn write_file_list_db_only(
+    org_id: &str,
     hours_files: HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     for (_key, events) in hours_files {
@@ -417,7 +366,17 @@ async fn write_file_list_db_only(
         // set to external db
         // retry 5 times
         let mut success = false;
+        let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
+            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
+            {
+                log::error!(
+                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
             if let Err(e) = infra_file_list::batch_add(&put_items).await {
                 log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -444,6 +403,7 @@ async fn write_file_list_db_only(
 }
 
 async fn write_file_list_s3(
+    org_id: &str,
     file_list_days: HashSet<String>,
     hours_files: HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
@@ -458,6 +418,26 @@ async fn write_file_list_s3(
         }
         let compressed_bytes = buf.finish().unwrap();
         storage::put(&new_file_list_key, compressed_bytes.into()).await?;
+
+        // write deleted files into file_list_deleted
+        let del_items = events
+            .iter()
+            .filter(|v| v.deleted)
+            .map(|v| v.key.clone())
+            .collect::<Vec<_>>();
+        if !del_items.is_empty() {
+            let deleted_file_list_key = format!(
+                "file_list_deleted/{org_id}/{}/{}.json.zst",
+                Utc::now().format("%Y/%m/%d/%H"),
+                ider::generate()
+            );
+            let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+            for file in del_items.iter() {
+                buf.write_all((file.to_owned() + "\n").as_bytes())?;
+            }
+            let compressed_bytes = buf.finish().unwrap();
+            storage::put(&deleted_file_list_key, compressed_bytes.into()).await?;
+        }
 
         // set to local cache & send broadcast
         // retry 5 times
