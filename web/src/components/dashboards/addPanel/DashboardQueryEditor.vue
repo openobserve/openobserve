@@ -795,7 +795,6 @@ export default defineComponent({
           if(/\$(\w+|\{\w+\})/.test(currentQuery)){
             currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10")
           }
-          console.log("currentQuery",currentQuery)
 
           dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
         } catch (e) {

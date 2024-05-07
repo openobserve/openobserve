@@ -41,9 +41,9 @@ export const usePanelDataLoader = (
   forceLoad: any
 ) => {
   const log = (...args: any[]) => {
-    if (true) {
-      console.log(panelSchema?.value?.title + ": ", ...args);
-    }
+    // if (true) {
+    //   console.log(panelSchema?.value?.title + ": ", ...args);
+    // }
   };
 
   const state = reactive({
@@ -77,8 +77,6 @@ export const usePanelDataLoader = (
         )
       )
     : [];
-
-  console.log("currentDependentVariablesData", currentDependentVariablesData);
 
   // console.log(
   //   "variablesData.value currentAdHocVariablesData",
@@ -274,11 +272,9 @@ export const usePanelDataLoader = (
         };
       } else {
         // Call search API
-        console.log("panelSchema", panelSchema.value);
 
         // Get the page type from the first query in the panel schema
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
-        console.log("pageType", pageType);
 
         const sqlqueryPromise = panelSchema.value.queries?.map(
           async (it: any) => {
@@ -428,7 +424,6 @@ export const usePanelDataLoader = (
         value: `${formateRateInterval(__rate_interval)}`,
       },
     ];
-    console.log("query---- fixedVariables", fixedVariables);
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
@@ -446,16 +441,9 @@ export const usePanelDataLoader = (
 
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
-        console.log("query---- variable usePanelDataLoader variable", variable);
-
         const variableName = `$${variable.name}`;
-        console.log("variableName", variableName);
 
         let variableValue = "";
-        console.log(
-          "query---- variable.value usePanelDataLoader",
-          variable.value
-        );
         if (Array.isArray(variable.value)) {
           const possibleVariablesPlaceHolderTypes = [
             {
@@ -490,19 +478,7 @@ export const usePanelDataLoader = (
               placeHolderObj.value
             );
           });
-
-          console.log(
-            "query---- variable.value usePanelDataLoader inside if",
-            variable.value
-          );
-
-          console.log("query---- pipe", query);
         } else {
-          console.log(
-            "query---- variable.value usePanelDataLoader outside if",
-            variable.value
-          );
-
           variableValue = variable.value === null ? "" : variable.value;
           if (query.includes(variableName)) {
             metadata.push({
@@ -512,7 +488,6 @@ export const usePanelDataLoader = (
             });
           }
           query = query.replaceAll(variableName, variableValue);
-          console.log("query----", query);
         }
       });
 
@@ -708,10 +683,6 @@ export const usePanelDataLoader = (
   const updateCurrentDependentVariablesData = (
     newDependentVariablesData: any
   ) => {
-    console.log(
-      "isAllRegularVariablesValuesSameWith updateCurrentDependentVariablesData: newDependentVariablesData",
-      newDependentVariablesData
-    );
     currentDependentVariablesData = JSON.parse(
       JSON.stringify(newDependentVariablesData)
     );
@@ -750,18 +721,6 @@ export const usePanelDataLoader = (
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find(
         (it2: any) => it2.name == it.name
-      );
-      console.log(
-        "isAllRegularVariablesValuesSameWith: oldValue",
-        JSON.stringify(oldValue)
-      );
-      console.log(
-        "isAllRegularVariablesValuesSameWith: it",
-        JSON.stringify(it)
-      );
-      console.log(
-        "isAllRegularVariablesValuesSameWith: return value: ",
-        it.value == oldValue?.value && oldValue?.value != ""
       );
       // return it.value == oldValue?.value && oldValue?.value != "";
       return it.multiSelect
@@ -925,16 +884,7 @@ export const usePanelDataLoader = (
       const isAllRegularVariablesValuesSame =
         isAllRegularVariablesValuesSameWith(newDependentVariablesData);
 
-      console.log(
-        "isAllRegularVariablesValuesSameWith Step4: 2: regular variables has same old value, returning false--",
-        isAllRegularVariablesValuesSame
-      );
-
       if (isAllRegularVariablesValuesSame) {
-        console.log(
-          "isAllRegularVariablesValuesSameWith Step4: 2: regular variables has same old value, returning false"
-        );
-
         log("Step4: 2: regular variables has same old value, returning false");
         return false;
       }
