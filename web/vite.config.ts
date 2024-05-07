@@ -143,7 +143,7 @@ export default defineConfig({
       ],
       manualChunks: {
         "o2cs-analytics": ["rudder-sdk-js"],
-        "o2cs-monaco-editor": ["monaco-editor"],
+        "o2cs-monaco-editor": ["monaco-editor/esm/vs/editor/editor.api"],
         "o2cs-echarts": ["echarts"],
         lodash: ["lodash-es", "lodash/lodash.js"],
         "o2cs-moment": ["moment", "moment-timezone"],
