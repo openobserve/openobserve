@@ -504,7 +504,8 @@ impl super::Db for MysqlDb {
 
         let (min_dt, max_dt) = start_dt.unwrap();
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, value AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
