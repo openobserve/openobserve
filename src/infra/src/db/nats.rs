@@ -268,11 +268,21 @@ impl super::Db for NatsDb {
         key: &str,
         with_prefix: bool,
         _need_watch: bool,
-        _start_dt: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        let with_prefix = if start_dt.is_some() {
+            false
+        } else {
+            with_prefix
+        };
+        let new_key = if start_dt.is_some() {
+            format!("{}/{}", new_key, start_dt.unwrap())
+        } else {
+            new_key.to_string()
+        };
         if !with_prefix {
-            let key = key_encode(new_key);
+            let key = key_encode(&new_key);
             bucket.purge(key).await?;
             return Ok(());
         }
@@ -280,7 +290,7 @@ impl super::Db for NatsDb {
         let mut keys = bucket.keys().await?.boxed();
         while let Some(key) = keys.try_next().await? {
             let decoded_key = key_decode(&key);
-            if decoded_key.starts_with(new_key) {
+            if decoded_key.starts_with(&new_key) {
                 del_keys.push(key);
             }
         }

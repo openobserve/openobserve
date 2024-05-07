@@ -25,11 +25,11 @@ pub mod storage;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     db::init().await?;
-    db::create_table().await?;
     cache::init().await?;
     file_list::create_table().await?;
     queue::init().await?;
     scheduler::init().await?;
+    schema::init().await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())

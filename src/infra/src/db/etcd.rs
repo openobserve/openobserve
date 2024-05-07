@@ -215,9 +215,12 @@ impl super::Db for Etcd {
         key: &str,
         with_prefix: bool,
         _need_watch: bool,
-        _start_dt: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()> {
-        let key = format!("{}{}", self.prefix, key);
+        let mut key = format!("{}{}", self.prefix, key);
+        if start_dt.is_some() {
+            key = format!("{}/{}", key, start_dt.unwrap());
+        }
         let mut client = get_etcd_client().await.clone();
         let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
         let _ = client.delete(key.as_str(), opt).await?.deleted();
