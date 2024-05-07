@@ -72,10 +72,10 @@ impl TaskQueueManager {
     fn new() -> Self {
         let channel_size = CONFIG.limit.ingest_buffer_size / 2;
         let ingest_buffer_queue_num =
-            channel_size / CONFIG.limit.ingest_buffer_threshold / DEFAULT_CHANNEL_CAP;
+            channel_size / (CONFIG.limit.ingest_buffer_threshold * 3 / 2) / DEFAULT_CHANNEL_CAP;
         let mut task_queues = Vec::with_capacity(ingest_buffer_queue_num);
         for idx in 0..ingest_buffer_queue_num {
-            task_queues.push(TaskQueue::new(DEFAULT_CHANNEL_CAP, idx));
+            task_queues.push(TaskQueue::new(idx));
         }
         Self {
             round_robin_idx: 0,
@@ -112,7 +112,9 @@ impl TaskQueueManager {
             {
                 Some(tq) => {
                     if tq.workers.running_worker_count().await == 0 {
-                        tq.workers.add_workers_by(MIN_WORKER_CNT, max_worker_count).await;
+                        tq.workers
+                            .add_workers_by(MIN_WORKER_CNT, max_worker_count)
+                            .await;
                     }
                     Some(tq)
                 }
@@ -163,8 +165,8 @@ struct TaskQueue {
 }
 
 impl TaskQueue {
-    pub fn new(channel_cap: usize, tq_index: usize) -> Self {
-        let (sender, receiver) = bounded::<IngestEntry>(channel_cap);
+    pub fn new(tq_index: usize) -> Self {
+        let (sender, receiver) = bounded::<IngestEntry>(DEFAULT_CHANNEL_CAP);
         let workers = Arc::new(Workers::new(MIN_WORKER_CNT, tq_index, Arc::new(receiver)));
         Self {
             sender: Arc::new(sender),

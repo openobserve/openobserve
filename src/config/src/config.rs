@@ -1331,14 +1331,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // ingest_buffer size check
     if cfg.common.feature_ingest_buffer_enabled {
         if cfg.limit.ingest_buffer_size == 0 {
-            cfg.limit.ingest_buffer_size = mem_total / 10; // 10 %
+            cfg.limit.ingest_buffer_size = mem_total / 20; // 5 %
         } else {
             cfg.limit.ingest_buffer_size *= 1024 * 1024;
         }
         if cfg.limit.ingest_buffer_threshold == 0 {
-            cfg.limit.ingest_buffer_size = 5 * 1024 * 1024; // 5mb
+            cfg.limit.ingest_buffer_threshold = 5 * 1024 * 1024; // 5mb
         } else {
-            cfg.limit.ingest_buffer_size *= 1024 * 1024;
+            cfg.limit.ingest_buffer_threshold *= 1024 * 1024;
         }
     }
 

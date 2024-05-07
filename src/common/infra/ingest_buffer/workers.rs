@@ -30,8 +30,6 @@ type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<Result<()>>;
 
 // REVIEW: static ok or env variables?
-// // Upper bound of worker count to control excessive memory usage
-// static MAX_WORKER_CNT: usize = 10;
 /// seconds between each pull for a worker
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
 /// max idle time in seconds before shut down
