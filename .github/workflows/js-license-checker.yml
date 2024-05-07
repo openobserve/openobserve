@@ -20,7 +20,7 @@ jobs:
       - name: Check licenses
         uses: tangro/actions-license-check@v1.0.14
         with:
-          allowed-licenses: 'MIT; ISC; Apache-2.0; BSD; MPL-2.0; Unlicense; CC-BY-4.0; Artistic-2.0; UNLICENSED'
+          allowed-licenses: 'MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_CONTEXT: ${{ toJson(github) }}
