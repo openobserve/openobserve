@@ -455,9 +455,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::multi_streams::_search_partition_multi)
             .service(search::multi_streams::around_multi)
             .service(pipelines::update_pipeline),
-            .service(search::multi_streams::search_multi)
-            .service(search::multi_streams::_search_partition_multi)
-            .service(search::multi_streams::around_multi),
     );
 }
 
