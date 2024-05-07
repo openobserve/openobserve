@@ -66,9 +66,15 @@ impl Default for TaskQueueManager {
 }
 
 impl TaskQueueManager {
+    /// Constructs and configures TaskQueues as Ingest Buffer based on CONFIG
+    /// ingest_buffer_size = sum(channels) + sum(workers) // (half & half)
+    /// sum(channels) = (channel_cap * queue_number) * ingest_buffer_threshold
     fn new() -> Self {
-        let mut task_queues = Vec::with_capacity(CONFIG.limit.ingest_buffer_queue_num);
-        for idx in 0..CONFIG.limit.ingest_buffer_queue_num {
+        let channel_size = CONFIG.limit.ingest_buffer_size / 2;
+        let ingest_buffer_queue_num =
+            channel_size / CONFIG.limit.ingest_buffer_threshold / DEFAULT_CHANNEL_CAP;
+        let mut task_queues = Vec::with_capacity(ingest_buffer_queue_num);
+        for idx in 0..ingest_buffer_queue_num {
             task_queues.push(TaskQueue::new(DEFAULT_CHANNEL_CAP, idx));
         }
         Self {
@@ -95,6 +101,8 @@ impl TaskQueueManager {
     /// If all TaskQueues are busy, add more workers to a TaskQueue.
     /// If all TaskQueues have reached max number of workers allowed, try again.
     async fn find_tq_or_add_workers(&mut self) -> Result<&TaskQueue> {
+        let max_worker_count = CONFIG.limit.ingest_buffer_size / 2 // total worker size
+            / (CONFIG.limit.ingest_buffer_threshold * DEFAULT_CHANNEL_CAP); // size of each channel's workers
         let mut tq = None;
         while tq.is_none() {
             tq = match self.task_queues[self.round_robin_idx..]
@@ -104,7 +112,7 @@ impl TaskQueueManager {
             {
                 Some(tq) => {
                     if tq.workers.running_worker_count().await == 0 {
-                        tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                        tq.workers.add_workers_by(MIN_WORKER_CNT, max_worker_count).await;
                     }
                     Some(tq)
                 }
@@ -116,7 +124,10 @@ impl TaskQueueManager {
                     };
                     log::info!("All TaskQueue is full. Add workers or try again");
                     // Try add more workers
-                    let added_worker_count = tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                    let added_worker_count = tq
+                        .workers
+                        .add_workers_by(MIN_WORKER_CNT, max_worker_count)
+                        .await;
                     // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                     if added_worker_count > 0 {

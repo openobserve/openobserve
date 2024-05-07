@@ -731,8 +731,10 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,
-    #[env_config(name = "ZO_INGEST_BUFFER_QUEUE_NUM", default = 5)]
-    pub ingest_buffer_queue_num: usize,
+    #[env_config(name = "ZO_INGEST_BUFFER_SIZE", default = 0)] // size in mb, default: 10% of total
+    pub ingest_buffer_size: usize,
+    #[env_config(name = "ZO_INGEST_BUFFER_THRESHOLD", default = 5)] // size in mb
+    pub ingest_buffer_threshold: usize,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1096,11 +1098,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.req_cols_per_record_limit = 1000;
     }
 
-    // check ingest_buffer_queue_num > 0 if feature enabled
-    if cfg.common.feature_ingest_buffer_enabled && cfg.limit.ingest_buffer_queue_num == 0 {
-        cfg.limit.ingest_buffer_queue_num = 5;
-    }
-
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
         cfg.limit.max_file_size_on_disk = 64 * 1024 * 1024; // 64MB
@@ -1329,6 +1326,20 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.mem_table_max_size = mem_total / 2; // 50%
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
+    }
+
+    // ingest_buffer size check
+    if cfg.common.feature_ingest_buffer_enabled {
+        if cfg.limit.ingest_buffer_size == 0 {
+            cfg.limit.ingest_buffer_size = mem_total / 10; // 10 %
+        } else {
+            cfg.limit.ingest_buffer_size *= 1024 * 1024;
+        }
+        if cfg.limit.ingest_buffer_threshold == 0 {
+            cfg.limit.ingest_buffer_size = 5 * 1024 * 1024; // 5mb
+        } else {
+            cfg.limit.ingest_buffer_size *= 1024 * 1024;
+        }
     }
 
     // check query settings
