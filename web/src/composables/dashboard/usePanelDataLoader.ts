@@ -473,6 +473,13 @@ export const usePanelDataLoader = (
           ];
 
           possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
+            if (query.includes(placeHolderObj.placeHolder)) {
+              metadata.push({
+                type: "variable",
+                name: variable.name,
+                value: placeHolderObj.value,
+              });
+            }
             query = query.replaceAll(
               placeHolderObj.placeHolder,
               placeHolderObj.value
