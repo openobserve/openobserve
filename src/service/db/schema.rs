@@ -322,14 +322,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if schema_versions.is_empty() {
                     continue;
                 }
-                let latest_schema: Vec<Schema> =
-                    match json::from_slice(&schema_versions.last().unwrap().1) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
-                            continue;
-                        }
-                    };
+                let schema_data = schema_versions.last().unwrap().1.as_ref();
+                let latest_schema: Vec<Schema> = match json::from_slice(schema_data) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
+                        continue;
+                    }
+                };
                 if latest_schema.is_empty() {
                     continue;
                 }
