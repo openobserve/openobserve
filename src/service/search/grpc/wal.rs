@@ -91,7 +91,7 @@ pub async fn search_parquet(
     }
 
     let mut scan_stats = ScanStats::new();
-    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
+    let mut lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // get file metadata to build file_list
     let files_num = files.len();
@@ -124,6 +124,7 @@ pub async fn search_parquet(
         if let Some((min_ts, max_ts)) = sql.meta.time_range {
             if file.meta.is_empty() {
                 wal::release_files(&[file.key.clone()]).await;
+                lock_files.retain(|f| f != &file.key);
                 continue;
             }
             if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
@@ -134,6 +135,7 @@ pub async fn search_parquet(
                     file.meta.max_ts
                 );
                 wal::release_files(&[file.key.clone()]).await;
+                lock_files.retain(|f| f != &file.key);
                 continue;
             }
         }

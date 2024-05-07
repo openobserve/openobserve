@@ -59,7 +59,7 @@ impl super::SchemaHistory for SqliteSchemaHistory {
         let client = client.lock().await;
         match sqlx::query(
             r#"
-INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, schema)
+INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
     VALUES ($1, $2, $3, $4, $5);
         "#,
         )
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS schema_history
     stream_type  VARCHAR not null,
     stream_name  VARCHAR not null,
     start_dt     INTEGER not null,
-    schema       TEXT not null
+    value        TEXT not null
 );
         "#,
     )

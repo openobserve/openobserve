@@ -58,7 +58,7 @@ impl super::SchemaHistory for PostgresSchemaHistory {
         let pool = CLIENT.clone();
         match sqlx::query(
             r#"
-INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, schema)
+INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
     VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT DO NOTHING;
             "#,
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS schema_history
     stream_type  VARCHAR(32)  not null,
     stream_name  VARCHAR(256) not null,
     start_dt     BIGINT not null,
-    schema       TEXT not null
+    value        TEXT not null
 );
         "#,
     )
