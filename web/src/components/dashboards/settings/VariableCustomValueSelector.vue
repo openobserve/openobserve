@@ -93,8 +93,6 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    console.log("props", props);
-
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -122,16 +120,11 @@ export default defineComponent({
 
     // Function to toggle select/deselect all options
     const toggleSelectAll = () => {
-      console.log("toggleSelectAll", isAllSelected.value);
-
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
           (option: any) => option.value
         );
-        console.log("toggleSelectAll", selectedValue.value);
       } else {
-        console.log("toggleSelectAll inside else", selectedValue.value);
-
         selectedValue.value = [];
       }
     };

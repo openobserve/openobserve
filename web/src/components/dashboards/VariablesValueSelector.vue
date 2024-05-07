@@ -113,7 +113,6 @@ export default defineComponent({
       isVariablesLoading: false,
       values: [],
     });
-    console.log("variablesData", variablesData);
     // variables dependency graph
     let variablesDependencyGraph: any = {};
 
@@ -165,8 +164,6 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: true,
         };
-        console.log("variableData variablesValueSelector", variableData);
-
         // need to use initial value
         // also, constant type variable should not be updated
         if (item.type != "constant") {
@@ -351,10 +348,6 @@ export default defineComponent({
 
         switch (currentVariable.type) {
           case "query_values": {
-            console.log(
-              "currentVariable variablesValueSelector",
-              currentVariable
-            );
             try {
               // set loading as true
               currentVariable.isLoading = true;
@@ -458,10 +451,6 @@ export default defineComponent({
                     ? oldVariablesData[currentVariable.name]
                     : [oldVariablesData[currentVariable.name]];
                 }
-                console.log(
-                  "oldVariableSelectedValues query_values",
-                  oldVariableSelectedValues
-                );
 
                 // if the old value exists in the dropdown, set the old value; otherwise, set the first value of the dropdown; otherwise, set a blank string value
                 if (
@@ -497,11 +486,6 @@ export default defineComponent({
                 resolve(true);
                 break;
               } else {
-                console.log(
-                  "currentVariable variablesValueSelector------------------------",
-                  currentVariable
-                );
-
                 // no response hits found
                 // set value as empty string
                 currentVariable.value = currentVariable.multiSelect ? [] : null;
@@ -532,11 +516,6 @@ export default defineComponent({
           }
           case "custom": {
             currentVariable.options = currentVariable?.options;
-
-            console.log(
-              "currentVariable variablesValueSelector",
-              currentVariable
-            );
 
             // Check if the old value exists and set it
             let oldVariableSelectedValues: any = [];

@@ -473,7 +473,6 @@ export default defineComponent({
       options: [],
       multiSelect: false,
     });
-    console.log("variableData addSetting", variableData);
 
     const filterCycleError: any = ref("");
 
