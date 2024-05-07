@@ -229,10 +229,7 @@
                 searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
-                style="
-                  width: auto !important;
-                  padding-top: 3px !important;
-                "
+                style="width: auto !important; padding-top: 3px !important"
               ></CommonAutoComplete>
 
               <q-icon
@@ -381,6 +378,9 @@ export default defineComponent({
       // get tab list
       await getDashboardList();
       await getTabList();
+
+      // get variables list
+      await getvariableNames();
     });
 
     // on folder change, reset dashboard and tab values
@@ -592,10 +592,19 @@ export default defineComponent({
 
     const variableNamesFn = ref([]);
 
-    watch(drilldownData.value, async (newData) => {
-      if (newData.data.folder && newData.data.dashboard) {
+    const getvariableNames = async () => {
+      if (
+        drilldownData.value.data.folder &&
+        drilldownData.value.data.dashboard
+      ) {
+        console.log(
+          "inside",
+          drilldownData.value.data.folder,
+          drilldownData.value.data.dashboard
+        );
+
         const folder = store.state.organizationData.folders.find(
-          (folder: any) => folder.name === newData.data.folder
+          (folder: any) => folder.name === drilldownData.value.data.folder
         );
 
         const allDashboardData = await getAllDashboardsByFolderId(
@@ -603,10 +612,13 @@ export default defineComponent({
           folder.folderId
         );
         const dashboardData = allDashboardData.find(
-          (dashboard: any) => dashboard.title === newData.data.dashboard
+          (dashboard: any) =>
+            dashboard.title === drilldownData.value.data.dashboard
         );
 
         if (dashboardData) {
+          console.log("dashboardData", dashboardData.variables.list);
+
           const optionsList = dashboardData.variables.list.map(
             (variable: any) => ({
               label: variable.name,
@@ -617,6 +629,14 @@ export default defineComponent({
         } else {
           variableNamesFn.value = [];
         }
+      }
+    };
+
+    watch(drilldownData.value, async (newData) => {
+      if (newData.data.folder && newData.data.dashboard) {
+        console.log("changed", newData.data.folder, newData.data.dashboard);
+
+        await getvariableNames();
       } else {
         variableNamesFn.value = [];
       }
