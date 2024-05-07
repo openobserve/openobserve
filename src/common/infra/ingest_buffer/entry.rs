@@ -15,11 +15,10 @@
 
 use std::io::{Cursor, Read};
 
-use actix_web::{web::Bytes, HttpResponse};
+use actix_web::web::Bytes;
 use anyhow::{anyhow, Context, Result};
 use arrow::datatypes::ToByteSlice;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::utils::json;
 
 use crate::{common::meta::ingestion::IngestionRequest, service::logs};
 
@@ -42,6 +41,7 @@ pub struct IngestEntry {
     pub org_id: String,
     pub user_email: String,
     pub stream_name: Option<String>,
+    pub content_length: usize,
     pub body: Bytes,
 }
 
@@ -52,35 +52,27 @@ impl IngestEntry {
         org_id: String,
         user_email: String,
         stream_name: Option<String>,
+        content_length: usize,
         body: Bytes,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let entry = Self {
             source,
             thread_id,
             org_id,
             user_email,
             stream_name,
+            content_length,
             body,
-        }
+        };
+        entry.validate()?;
+        Ok(entry)
     }
 
-    pub fn validate(&self) -> Option<HttpResponse> {
-        // check memtable
-        if let Err(e) = ingester::check_memtable_size() {
-            return Some(HttpResponse::ServiceUnavailable().json(e.to_string()));
+    pub fn validate(&self) -> Result<()> {
+        if self.content_length != self.body.len() {
+            return Err(anyhow!("Invalid request. Inconsistent body content length"));
         }
-
-        match self.source {
-            IngestSource::JSON => {
-                if json::from_slice::<Vec<json::Value>>(&self.body).is_err_and(|_| {
-                    json::from_slice::<json::Value>(&self.body).is_err()
-                }) {
-                    return Some(HttpResponse::BadRequest().json("Invalid JSON format"))
-                }
-                None
-            },
-            _ => None
-        }
+        Ok(())
     }
 
     /// Calls Ingester to ingest data stored in self based on sources.
@@ -121,6 +113,7 @@ impl IngestEntry {
     }
 
     pub fn into_bytes(&self) -> Result<Vec<u8>> {
+        self.validate()?;
         let mut buf = Vec::new();
 
         let source = u8::from(&self.source);
@@ -155,7 +148,7 @@ impl IngestEntry {
         };
 
         let body = self.body.to_byte_slice();
-        buf.write_u32::<BigEndian>(body.len() as u32)
+        buf.write_u32::<BigEndian>(self.content_length as u32)
             .context("IngestEntry::into_bytes() failed at <body>")?;
         buf.extend_from_slice(body);
 
@@ -217,23 +210,25 @@ impl IngestEntry {
             )
         };
 
-        let body_len = cursor
+        let content_length = cursor
             .read_u32::<BigEndian>()
-            .context("IngestEntry::from_bytes() failed at reading <body_len>")?;
-        let mut body = vec![0; body_len as usize];
+            .context("IngestEntry::from_bytes() failed at reading <content_length>")?
+            as usize;
+        let mut body = vec![0; content_length];
         cursor
             .read_exact(&mut body)
             .context("IngestEntry::from_bytes() failed at reading <body>")?;
         let body = Bytes::from(body);
 
-        Ok(Self {
+        IngestEntry::new(
             source,
             thread_id,
             org_id,
             user_email,
             stream_name,
+            content_length,
             body,
-        })
+        )
     }
 }
 
@@ -281,13 +276,19 @@ mod tests {
 
     #[test]
     fn test_entry_w_stream_name_serialization() {
+        let body = Bytes::from_static(
+            b"\"kubernetes.annotations.kubectl.kubernetes.io/default-container\": \"prometheus\"",
+        );
         let entry = IngestEntry::new(
-            IngestSource::JSON, 
-            0, 
-            "default".to_string(), 
-            "root@example.com".to_string(), 
-            Some("default".to_string()), 
-        Bytes::from_static(b"\"kubernetes.annotations.kubectl.kubernetes.io/default-container\": \"prometheus\""));
+            IngestSource::JSON,
+            0,
+            "default".to_string(),
+            "root@example.com".to_string(),
+            Some("default".to_string()),
+            body.len(),
+            body,
+        )
+        .unwrap();
 
         let entry_bytes = entry.into_bytes().unwrap();
         let entry_decoded = IngestEntry::from_bytes(&entry_bytes).unwrap();
@@ -296,14 +297,19 @@ mod tests {
 
     #[test]
     fn test_entry_wo_stream_name_serialization() {
+        let body = Bytes::from_static(
+            b"\"kubernetes.annotations.kubectl.kubernetes.io/default-container\": \"prometheus\"",
+        );
         let entry = IngestEntry::new(
-            IngestSource::JSON, 
-            0, 
-            "default".to_string(), 
-            "root@example.com".to_string(), 
-            None, 
-        Bytes::from_static(b"\"kubernetes.annotations.kubectl.kubernetes.io/default-container\": \"prometheus\""));
-
+            IngestSource::JSON,
+            0,
+            "default".to_string(),
+            "root@example.com".to_string(),
+            None,
+            body.len(),
+            body,
+        )
+        .unwrap();
         let entry_bytes = entry.into_bytes().unwrap();
         let entry_decoded = IngestEntry::from_bytes(&entry_bytes).unwrap();
         assert_eq!(entry, entry_decoded);

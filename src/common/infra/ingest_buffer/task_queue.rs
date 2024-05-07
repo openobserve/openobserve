@@ -40,8 +40,9 @@ pub(super) async fn init() -> Result<()> {
 
 /// Sends a task to a TaskQueue based on stream name. To be called by server api endpoitns.
 pub async fn send_task(task: IngestEntry) -> HttpResponse {
-    if let Some(resp) = task.validate() {
-        return resp;
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return HttpResponse::ServiceUnavailable().json(e.to_string());
     }
     let mut w = TQ_MANAGER.write().await;
     w.send_task(task).await

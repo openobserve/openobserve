@@ -61,28 +61,44 @@ pub async fn bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(if CONFIG.common.feature_ingest_buffer_enabled {
-        let ingest_entry = IngestEntry::new(
-            IngestSource::Bulk,
-            **thread_id,
-            org_id,
-            user_email.to_string(),
-            None,
-            body,
-        );
-        send_task(ingest_entry).await
-    } else {
-        match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+    let content_length = match in_req.headers().get("content-length") {
+        None => 0,
+        Some(content_length) => content_length
+            .to_str()
+            .unwrap_or("0")
+            .parse::<usize>()
+            .unwrap_or(0),
+    };
+
+    Ok(
+        if CONFIG.common.feature_ingest_buffer_enabled
+            && content_length > CONFIG.limit.ingest_buffer_threshold
+        {
+            match IngestEntry::new(
+                IngestSource::Bulk,
+                **thread_id,
+                org_id,
+                user_email.to_string(),
+                None,
+                content_length,
+                body,
+            ) {
+                Ok(ingest_entry) => send_task(ingest_entry).await,
+                Err(e) => HttpResponse::BadRequest().json(e.to_string()),
             }
-        }
-    })
+        } else {
+            match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
+                Ok(v) => MetaHttpResponse::json(v),
+                Err(e) => {
+                    log::error!("Error processing request: {:?}", e);
+                    HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        e.to_string(),
+                    ))
+                }
+            }
+        },
+    )
 }
 
 /// _multi ingestion API
@@ -112,40 +128,55 @@ pub async fn multi(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let content_length = match in_req.headers().get("content-length") {
+        None => 0,
+        Some(content_length) => content_length
+            .to_str()
+            .unwrap_or("0")
+            .parse::<usize>()
+            .unwrap_or(0),
+    };
 
-    Ok(if CONFIG.common.feature_ingest_buffer_enabled {
-        let ingest_entry = IngestEntry::new(
-            IngestSource::Multi,
-            **thread_id,
-            org_id,
-            user_email.to_string(),
-            Some(stream_name),
-            body,
-        );
-        send_task(ingest_entry).await
-    } else {
-        match logs::ingest::ingest(
-            &org_id,
-            &stream_name,
-            IngestionRequest::Multi(&body),
-            **thread_id,
-            user_email,
-        )
-        .await
+    Ok(
+        if CONFIG.common.feature_ingest_buffer_enabled
+            && content_length >= CONFIG.limit.ingest_buffer_threshold
         {
-            Ok(v) => match v.code {
-                503 => HttpResponse::ServiceUnavailable().json(v),
-                _ => MetaHttpResponse::json(v),
-            },
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+            match IngestEntry::new(
+                IngestSource::Multi,
+                **thread_id,
+                org_id,
+                user_email.to_string(),
+                Some(stream_name),
+                content_length,
+                body,
+            ) {
+                Ok(ingest_entry) => send_task(ingest_entry).await,
+                Err(e) => HttpResponse::BadRequest().json(e.to_string()),
             }
-        }
-    })
+        } else {
+            match logs::ingest::ingest(
+                &org_id,
+                &stream_name,
+                IngestionRequest::Multi(&body),
+                **thread_id,
+                user_email,
+            )
+            .await
+            {
+                Ok(v) => match v.code {
+                    503 => HttpResponse::ServiceUnavailable().json(v),
+                    _ => MetaHttpResponse::json(v),
+                },
+                Err(e) => {
+                    log::error!("Error processing request: {:?}", e);
+                    HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        e.to_string(),
+                    ))
+                }
+            }
+        },
+    )
 }
 
 /// _json ingestion API
@@ -175,39 +206,54 @@ pub async fn json(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(if CONFIG.common.feature_ingest_buffer_enabled {
-        let ingest_entry = IngestEntry::new(
-            IngestSource::JSON,
-            **thread_id,
-            org_id,
-            user_email.to_string(),
-            Some(stream_name),
-            body,
-        );
-        send_task(ingest_entry).await
-    } else {
-        match logs::ingest::ingest(
-            &org_id,
-            &stream_name,
-            IngestionRequest::JSON(&body),
-            **thread_id,
-            user_email,
-        )
-        .await
+    let content_length = match in_req.headers().get("content-length") {
+        None => 0,
+        Some(content_length) => content_length
+            .to_str()
+            .unwrap_or("0")
+            .parse::<usize>()
+            .unwrap_or(0),
+    };
+    Ok(
+        if CONFIG.common.feature_ingest_buffer_enabled
+            && content_length >= CONFIG.limit.ingest_buffer_threshold
         {
-            Ok(v) => match v.code {
-                503 => HttpResponse::ServiceUnavailable().json(v),
-                _ => MetaHttpResponse::json(v),
-            },
-            Err(e) => {
-                log::error!("Error processing request: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+            match IngestEntry::new(
+                IngestSource::JSON,
+                **thread_id,
+                org_id,
+                user_email.to_string(),
+                Some(stream_name),
+                content_length,
+                body,
+            ) {
+                Ok(ingest_entry) => send_task(ingest_entry).await,
+                Err(e) => HttpResponse::BadRequest().json(e.to_string()),
             }
-        }
-    })
+        } else {
+            match logs::ingest::ingest(
+                &org_id,
+                &stream_name,
+                IngestionRequest::JSON(&body),
+                **thread_id,
+                user_email,
+            )
+            .await
+            {
+                Ok(v) => match v.code {
+                    503 => HttpResponse::ServiceUnavailable().json(v),
+                    _ => MetaHttpResponse::json(v),
+                },
+                Err(e) => {
+                    log::error!("Error processing request: {:?}", e);
+                    HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        e.to_string(),
+                    ))
+                }
+            }
+        },
+    )
 }
 
 /// _kinesis_firehose ingestion API
