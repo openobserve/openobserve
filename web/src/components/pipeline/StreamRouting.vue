@@ -4,7 +4,9 @@
     class="full-width full-height"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">Routing</div>
+    <div class="stream-routing-title q-pb-sm q-pl-md">
+      {{ t("pipeline.routing") }}
+    </div>
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
@@ -57,7 +59,7 @@
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
-            data-test="add-report-cancel-btn"
+            data-test="stream-routing-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
@@ -76,7 +78,7 @@
           />
           <q-btn
             v-if="isUpdating"
-            data-test="associate-function-delete-btn"
+            data-test="stream-routing-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"

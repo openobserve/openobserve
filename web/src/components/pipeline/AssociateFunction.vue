@@ -4,7 +4,9 @@
     class="full-width full-height"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">Associate Function</div>
+    <div class="stream-routing-title q-pb-sm q-pl-md">
+      {{ t("pipeline.associateFunction") }}
+    </div>
     <q-separator />
     <div v-if="loading">
       <q-spinner
@@ -21,6 +23,7 @@
     </div>
     <div v-else class="stream-routing-container full-width full-height q-pa-md">
       <q-toggle
+        data-test="create-function-toggle"
         class="q-mb-sm"
         :label="isUpdating ? 'Edit function' : 'Create new function'"
         v-model="createNewFunction"
@@ -32,7 +35,7 @@
           style="padding-top: 0px"
         >
           <div
-            data-test="add-alert-stream-type-select"
+            data-test="associate-function-select-function-input"
             class="alert-stream-type o2-input q-mr-sm full-width"
             style="padding-top: 0"
           >
@@ -95,7 +98,7 @@
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
-            data-test="add-report-cancel-btn"
+            data-test="associate-function-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
@@ -104,7 +107,7 @@
             @click="openCancelDialog"
           />
           <q-btn
-            data-test="add-report-save-btn"
+            data-test="associate-function-save-btn"
             :label="t('alerts.save')"
             class="text-bold no-border q-ml-md"
             color="secondary"

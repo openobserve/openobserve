@@ -2,7 +2,7 @@
   <div class="flex justify-between items-center q-pb-sm">
     <div class="flex items-center">
       <div
-        data-test="add-alert-back-btn"
+        data-test="add-pipeline-back-btn"
         class="flex justify-center items-center q-mr-md cursor-pointer"
         style="
           border: 1.5px solid;
@@ -20,7 +20,7 @@
 
     <div class="flex justify-end">
       <q-btn
-        data-test="add-report-save-btn"
+        data-test="add-pipeline-save-btn"
         label="Cancel"
         class="text-bold border q-ml-md"
         padding="sm xl"
@@ -29,7 +29,7 @@
       />
 
       <q-btn
-        data-test="add-report-save-btn"
+        data-test="add-pipeline-save-btn"
         label="Save"
         class="text-bold no-border q-ml-md"
         color="secondary"
@@ -44,19 +44,30 @@
 
   <div class="flex q-mt-md">
     <div class="nodes-drag-container q-pr-md">
-      <div class="text-bold q-mb-sm q-mx-sm">Nodes</div>
+      <div
+        data-test="pipeline-editor-nodes-list-title"
+        class="text-bold q-mb-sm q-mx-sm"
+      >
+        {{ t("pipeline.nodes") }}
+      </div>
 
       <q-separator class="q-mb-md" />
 
       <template v-for="nodeType in nodeTypes" :key="nodeType.value">
         <div
+          :data-test="`pipeline-editor-${nodeType.value}-node`"
           :id="nodeType.value + '_node'"
           :draggable="true"
           @dragstart="(ev) => onNodeDragStart(ev, nodeType.value)"
           class="flex items-center node-type-row q-mt-sm q-mx-sm"
         >
           <img width="30" :src="symbolMapping[nodeType.value]" />
-          <div class="q-px-sm">{{ nodeType.label }}</div>
+          <div
+            :data-test="`pipeline-editor-${nodeType.value}-node-title`"
+            class="q-px-sm"
+          >
+            {{ nodeType.label }}
+          </div>
         </div>
       </template>
     </div>
@@ -69,12 +80,13 @@
       <div
         class="q-pl-sm q-pt-xs"
         :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'"
+        data-test="pipeline-editor-execution-note"
       >
         Note: During execution of pipeline, routes will get executed before
         functions
       </div>
       <ChartRenderer
-        data-test="logs-search-result-bar-chart"
+        data-test="pipeline-editor-pipeline-chart"
         :data="plotChart"
         render-type="svg"
         style="height: calc(100vh - 165px)"
