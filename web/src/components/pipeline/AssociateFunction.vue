@@ -169,7 +169,7 @@ interface StreamRoute {
 const props = defineProps({
   defaultOrder: {
     type: Number,
-    required: true,
+    required: false,
     default: 1,
   },
   functionData: {
