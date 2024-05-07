@@ -29,6 +29,10 @@ use super::{entry::IngestEntry, workers::Workers};
 static MIN_WORKER_CNT: usize = 3;
 /// max # of requests could be held in channel.
 static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more workers
+/// Max acceptable latency between a request is accepted and searchable
+static SEARCHABLE_LATENCY: u64 = 60;
+/// Estimated time in seconds it takes to ingest a 5mb request in seconds
+static ESTIMATED_INGEST_PROCESS_TIME: u64 = 2; // TODO(taiming): run test to get ingest latency based on size
 
 /// A global hash map that maps stream of a TaskQueue instance.
 static TQ_MANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
@@ -58,6 +62,8 @@ pub async fn shut_down() {
 struct TaskQueueManager {
     round_robin_idx: usize,
     task_queues: Vec<TaskQueue>,
+    max_workers_cnt: usize,
+    estimated_ingest_entry_size: usize,
 }
 
 impl Default for TaskQueueManager {
@@ -68,23 +74,41 @@ impl Default for TaskQueueManager {
 
 impl TaskQueueManager {
     /// Constructs and configures TaskQueues as Ingest Buffer based on CONFIG
-    /// ingest_buffer_size = sum(channels) + sum(workers) // (half & half)
-    /// sum(channels) = (channel_cap * queue_number) * ingest_buffer_threshold
+    /// ingest_buffer_size = (size of channel + size of workers) * num_of_queues
+    /// size of channel = channel_cap * estimated ingest entry size
     fn new() -> Self {
-        let channel_size = CONFIG.limit.ingest_buffer_size / 2;
-        let ingest_buffer_queue_num =
-            channel_size / (CONFIG.limit.ingest_buffer_threshold * 3 / 2) / DEFAULT_CHANNEL_CAP;
-        let mut task_queues = Vec::with_capacity(ingest_buffer_queue_num);
-        for idx in 0..ingest_buffer_queue_num {
+        // TODO(taiming): Fine tune estimation calculation
+        let estimated_ingest_entry_size = if CONFIG.limit.ingest_buffer_threshold != 0 {
+            CONFIG.limit.ingest_buffer_threshold
+        } else {
+            5 * 1024 * 1024 // 5mb
+        };
+        let max_workers_cnt = (CONFIG.limit.ingest_buffer_size
+            / CONFIG.limit.ingest_buffer_queue_cnt
+            / (DEFAULT_CHANNEL_CAP * estimated_ingest_entry_size))
+            - 1; // channel takes 1, the rest is workers
+        let mut task_queues = Vec::with_capacity(CONFIG.limit.ingest_buffer_queue_cnt);
+        for idx in 0..CONFIG.limit.ingest_buffer_queue_cnt {
             task_queues.push(TaskQueue::new(idx));
         }
         Self {
             round_robin_idx: 0,
             task_queues,
+            max_workers_cnt,
+            estimated_ingest_entry_size,
         }
     }
 
     async fn send_task(&mut self, task: IngestEntry) -> HttpResponse {
+        // Update estimated_ingest_entry_size.
+        self.estimated_ingest_entry_size =
+            (self.estimated_ingest_entry_size * (DEFAULT_CHANNEL_CAP - 1) / DEFAULT_CHANNEL_CAP)
+                + (task.content_length / DEFAULT_CHANNEL_CAP);
+        log::warn!(
+            "TL: running_avg: {}, curr_task: {}",
+            self.estimated_ingest_entry_size,
+            task.content_length
+        );
         let tq = match self.find_tq_or_add_workers().await {
             Ok(tq) => tq,
             Err(e) => {
@@ -102,10 +126,10 @@ impl TaskQueueManager {
     /// If all TaskQueues are busy, add more workers to a TaskQueue.
     /// If all TaskQueues have reached max number of workers allowed, try again.
     async fn find_tq_or_add_workers(&mut self) -> Result<&TaskQueue> {
-        let max_worker_count = CONFIG.limit.ingest_buffer_size / 2 // total worker size
-            / (CONFIG.limit.ingest_buffer_threshold * DEFAULT_CHANNEL_CAP); // size of each channel's workers
+        let curr_estimated_wait_time = self.estimated_ingest_entry_size / (5 * 1024 * 1024);
+        let time = std::time::Instant::now();
         let mut tq = None;
-        while tq.is_none() {
+        while tq.is_none() && time.elapsed().as_secs() <= SEARCHABLE_LATENCY {
             tq = match self.task_queues[self.round_robin_idx..]
                 .iter()
                 .chain(self.task_queues[..self.round_robin_idx].iter())
@@ -114,10 +138,22 @@ impl TaskQueueManager {
                 Some(tq) => {
                     if tq.workers.running_worker_count().await == 0 {
                         tq.workers
-                            .add_workers_by(MIN_WORKER_CNT, max_worker_count)
+                            .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
                             .await;
                     }
-                    Some(tq)
+                    // make sure the latency is within constraint
+                    let estimated_wait_time = (tq.sender.len() * curr_estimated_wait_time) as u64
+                        * ESTIMATED_INGEST_PROCESS_TIME;
+                    log::warn!(
+                        "TL: buffered task count: {}, estimated wait time: {}",
+                        tq.sender.len(),
+                        estimated_wait_time
+                    );
+                    if time.elapsed().as_secs() + estimated_wait_time > SEARCHABLE_LATENCY {
+                        None
+                    } else {
+                        Some(tq)
+                    }
                 }
                 None => {
                     let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
@@ -129,7 +165,7 @@ impl TaskQueueManager {
                     // Try add more workers
                     let added_worker_count = tq
                         .workers
-                        .add_workers_by(MIN_WORKER_CNT, max_worker_count)
+                        .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
                         .await;
                     // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -150,7 +186,7 @@ impl TaskQueueManager {
             };
             self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         }
-        Ok(tq.unwrap())
+        tq.ok_or(anyhow::anyhow!("Ingestion latency reached. Unable to find TaskQueue to buffer request. Please try again"))
     }
 
     async fn terminal_all(&mut self) {

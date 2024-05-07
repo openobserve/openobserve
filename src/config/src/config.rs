@@ -731,8 +731,10 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,
-    #[env_config(name = "ZO_INGEST_BUFFER_SIZE", default = 0)] // size in mb, default: 10% of total
+    #[env_config(name = "ZO_INGEST_BUFFER_SIZE", default = 0)] // size in mb, default: 5% of total
     pub ingest_buffer_size: usize,
+    #[env_config(name = "ZO_INGEST_BUFFER_QUEUE_CNT", default = 10)] // number of queues as buffer
+    pub ingest_buffer_queue_cnt: usize,
     #[env_config(name = "ZO_INGEST_BUFFER_THRESHOLD", default = 5)] // size in mb
     pub ingest_buffer_threshold: usize,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
@@ -1331,13 +1333,23 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // ingest_buffer size check
     if cfg.common.feature_ingest_buffer_enabled {
         if cfg.limit.ingest_buffer_size == 0 {
-            cfg.limit.ingest_buffer_size = mem_total / 20; // 5 %
+            cfg.limit.ingest_buffer_size = mem_total / 10; // 10%
         } else {
             cfg.limit.ingest_buffer_size *= 1024 * 1024;
         }
-        if cfg.limit.ingest_buffer_threshold == 0 {
-            cfg.limit.ingest_buffer_threshold = 5 * 1024 * 1024; // 5mb
-        } else {
+        if cfg.limit.ingest_buffer_size >= mem_total / 2 {
+            if cfg.limit.ingest_buffer_size >= mem_total * (8 / 10) {
+                return Err(anyhow::anyhow!(
+                    "Ingest buffer allowed memory usage currenty set as {}% of total avail. memory. Please consider lower it w/ ENV ZO_INGEST_BUFFER_SIZE",
+                    (cfg.limit.ingest_buffer_size / mem_total) * 100
+                ));
+            }
+            log::warn!(
+                "Ingest buffer allowed memory usage set to be {}% of total avail. memory. Please consider lower it w/ ENV ZO_INGEST_BUFFER_SIZE",
+                (cfg.limit.ingest_buffer_size / mem_total) * 100
+            );
+        }
+        if cfg.limit.ingest_buffer_threshold != 0 {
             cfg.limit.ingest_buffer_threshold *= 1024 * 1024;
         }
     }
