@@ -649,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ></q-checkbox>
                               </q-item-section>
                               <q-item-section>
-                                <HTMLRenderer :html-content="opt" />
+                                <SanitizedHtmlRenderer :html-content="opt" />
                               </q-item-section>
                             </q-item>
                           </template>
@@ -699,11 +699,11 @@ import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import HTMLRenderer from "../panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
-  components: { SortByBtnGrp, CommonAutoComplete, HTMLRenderer },
+  components: { SortByBtnGrp, CommonAutoComplete, SanitizedHtmlRenderer },
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

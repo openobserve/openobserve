@@ -851,7 +851,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ></q-checkbox>
                               </q-item-section>
                               <q-item-section>
-                                <HTMLRenderer :html-content="opt" />
+                                <SanitizedHtmlRenderer :html-content="opt" />
                               </q-item-section>
                             </q-item>
                           </template>
@@ -906,7 +906,7 @@ import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import HTMLRenderer from "../panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -916,7 +916,7 @@ export default defineComponent({
     HistogramIntervalDropDown,
     DashboardSankeyChartBuilder,
     CommonAutoComplete,
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   props: ["dashboardData"],
   setup(props) {
