@@ -215,7 +215,7 @@
           >
             <div
               style="display: flex; gap: 10px; margin-bottom: 10px"
-              :key="variableNamesFn?.toString()"
+              :key="JSON.stringify(variableNamesFn ?? {})"
             >
               <CommonAutoComplete
                 placeholder="Name"
@@ -597,12 +597,6 @@ export default defineComponent({
         drilldownData.value.data.folder &&
         drilldownData.value.data.dashboard
       ) {
-        console.log(
-          "inside",
-          drilldownData.value.data.folder,
-          drilldownData.value.data.dashboard
-        );
-
         const folder = store.state.organizationData.folders.find(
           (folder: any) => folder.name === drilldownData.value.data.folder
         );
@@ -617,8 +611,6 @@ export default defineComponent({
         );
 
         if (dashboardData) {
-          console.log("dashboardData", dashboardData.variables.list);
-
           const optionsList = dashboardData.variables.list.map(
             (variable: any) => ({
               label: variable.name,
@@ -634,8 +626,6 @@ export default defineComponent({
 
     watch(drilldownData.value, async (newData) => {
       if (newData.data.folder && newData.data.dashboard) {
-        console.log("changed", newData.data.folder, newData.data.dashboard);
-
         await getvariableNames();
       } else {
         variableNamesFn.value = [];
