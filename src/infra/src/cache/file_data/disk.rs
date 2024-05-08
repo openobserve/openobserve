@@ -123,7 +123,10 @@ impl FileData {
         self.data.insert(file.to_string(), data_size);
         // write file into local disk
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        log::info!("[trace_id {trace_id}] create_dir_all file_path {file_path}: {:?} ", Path::new(&file_path).parent());
+        log::info!(
+            "[trace_id {trace_id}] create_dir_all file_path {file_path}: {:?} ",
+            Path::new(&file_path).parent()
+        );
         fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
         log::info!("[trace_id {trace_id}] put_file_contents {file_path} ");
         put_file_contents(&file_path, &data).await?;
