@@ -129,7 +129,8 @@ export default defineComponent({
       relativeTimePeriod: "15m",
       valueType: "relative",
     });
-
+    console.log("dateTimeValue", dateTimeValue.value);
+    
     const getDashboardData = async () => {
       const data = await getDashboard(
         store,
@@ -144,16 +145,17 @@ export default defineComponent({
         data.variables?.showDynamicFilters ?? false;
 
       dateTimeValue.value = {
-        startTime: data.dateTime.startTime,
-        endTime: data.dateTime.endTime,
-        relativeTimePeriod: data.dateTime.relativeTimePeriod,
-        valueType: data.dateTime.type,
+        startTime: data?.dateTime?.startTime,
+        endTime: data?.dateTime?.endTime,
+        relativeTimePeriod: data?.dateTime?.relativeTimePeriod,
+        valueType: data?.dateTime?.type,
       };
     };
     onMounted(async () => {
       await getDashboardData();
     });
-
+    console.log("------------dateTimeValue", dateTimeValue.value);
+    
     const saveDashboardApi = useLoading(async () => {
       try {
         // get the latest dashboard data and update the title and description
@@ -179,14 +181,15 @@ export default defineComponent({
         } else {
           data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
         }
-
+        console.log("---------------", data);
+        
         data.dateTime = {
           startTime: dateTimeValue?.value?.startTime,
           endTime: dateTimeValue?.value?.endTime,
           relativeTimePeriod: dateTimeValue?.value?.relativeTimePeriod,
           type: dateTimeValue?.value?.valueType,
         };
-        console.log("saveDashboardApi", data);
+        console.log("saveDashboardApi----------", data);
 
         // now lets save it
         await updateDashboard(
@@ -196,7 +199,6 @@ export default defineComponent({
           data,
           route?.query?.folder ?? "default"
         );
-        console.log("saveDashboardApi", data);
 
         $q.notify({
           type: "positive",
@@ -207,9 +209,7 @@ export default defineComponent({
       } catch (error: any) {
         $q.notify({
           type: "negative",
-          message:
-            error?.message ??
-            "Dashboard updation failed",
+          message: error?.message ?? "Dashboard updation failed",
           timeout: 2000,
         });
       }
@@ -220,7 +220,8 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
-
+        console.log("valid", valid);
+        
         saveDashboardApi.execute().catch((err: any) => {
           $q.notify({
             type: "negative",
