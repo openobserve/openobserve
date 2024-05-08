@@ -8,6 +8,7 @@ test.describe.configure({ mode: 'parallel' });
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
+      console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -97,6 +98,15 @@ test.describe("Logs Quickmode testcases", () => {
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await selectStreamAndStreamTypeForLogs(page,logData.Stream);
     await applyQueryButton(page);
+    await page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+    // Get the toggle button element
+    const toggleButton = await page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
+    // Evaluate the class attribute to determine if the toggle is in the off state
+    const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+    // If the toggle is switched off, click on it to switch it on
+    if (isSwitchedOff) {
+        await toggleButton.click();
+    }
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
   test("should click on interesting fields icon and display query in editor", async ({
