@@ -40,7 +40,10 @@ use crate::{
             http::{get_stream_type_from_request, RequestHeaderExtractor},
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, sql::RE_ONLY_SELECT},
+        usage::report_request_usage_stats,
+    },
 };
 
 pub mod job;
@@ -872,12 +875,12 @@ async fn values_v1(
         None => None,
         Some(v) => match base64::decode_url(v) {
             Err(_) => None,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                Some(v)
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                Some(sql)
             }
         },
     };
@@ -887,6 +890,16 @@ async fn values_v1(
         // We don't need query_context now
         query_context = None;
     }
+
+    // if it is select *, replace to select _timestamp
+    if RE_ONLY_SELECT.is_match(&query_sql) {
+        query_sql = RE_ONLY_SELECT
+            .replace(
+                &query_sql,
+                format!("SELECT {} ", CONFIG.common.column_timestamp).as_str(),
+            )
+            .to_string()
+    };
 
     let size = query
         .get("size")
