@@ -17,6 +17,7 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080
+  INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
@@ -82,6 +83,7 @@ jobs:
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
           echo "ZO_ROOT_USER_PASSWORD"=${ZO_ROOT_USER_PASSWORD} >> .env
           echo "ZO_BASE_URL"=${ZO_BASE_URL} >> .env
+          echo "INGESTION_URL"=${INGESTION_URL} >> .env
           echo "ORGNAME"=${ORGNAME} >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
