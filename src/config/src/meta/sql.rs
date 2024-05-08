@@ -360,7 +360,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
             if !time_max.is_empty() {
                 time_max.iter().max().unwrap().to_owned()
             } else {
-                chrono::Utc::now().timestamp_micros()
+                0
             }
         };
         Ok(Some((time_min, time_max)))

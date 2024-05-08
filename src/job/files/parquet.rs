@@ -296,7 +296,7 @@ async fn move_files(
             for file in files_with_size.iter() {
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -374,6 +374,9 @@ async fn move_files(
                 }
                 return Ok(());
             }
+
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
 
             // remove the file from processing set
             // log::debug!("Processing files deleted: {:?}", file.key);
