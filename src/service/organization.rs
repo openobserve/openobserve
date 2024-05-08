@@ -32,7 +32,6 @@ use crate::{
     service::{db, stream::get_streams},
 };
 
-#[tracing::instrument]
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let functions = db::functions::list(org_id).await.unwrap();
@@ -61,7 +60,6 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     }
 }
 
-#[tracing::instrument]
 pub async fn get_passcode(
     org_id: Option<&str>,
     user_id: &str,
@@ -75,7 +73,6 @@ pub async fn get_passcode(
     })
 }
 
-#[tracing::instrument]
 pub async fn get_rum_token(
     org_id: Option<&str>,
     user_id: &str,
@@ -89,7 +86,6 @@ pub async fn get_rum_token(
     })
 }
 
-#[tracing::instrument]
 pub async fn update_rum_token(
     org_id: Option<&str>,
     user_id: &str,
@@ -101,7 +97,6 @@ pub async fn update_rum_token(
     }
 }
 
-#[tracing::instrument]
 pub async fn update_passcode(
     org_id: Option<&str>,
     user_id: &str,
@@ -113,7 +108,6 @@ pub async fn update_passcode(
     }
 }
 
-#[tracing::instrument]
 async fn update_passcode_inner(
     org_id: Option<&str>,
     user_id: &str,
@@ -198,7 +192,6 @@ async fn update_passcode_inner(
     Ok(ret)
 }
 
-#[tracing::instrument]
 pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
     match db::organization::set(org).await {
         Ok(_) => Ok(org.clone()),

@@ -29,7 +29,7 @@ use {o2_enterprise::enterprise::common::infra::config::O2_CONFIG, std::io::Error
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = HashMap<String, Vec<String>>),
     )
 )]
 #[get("/clusters")]
