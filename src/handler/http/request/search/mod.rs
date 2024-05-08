@@ -425,12 +425,12 @@ pub async fn around(
         None => default_sql,
         Some(v) => match base64::decode_url(v) {
             Err(_) => default_sql,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(&org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                if uses_fn { v } else { default_sql }
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                sql
             }
         },
     };
@@ -857,7 +857,10 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!("SELECT * FROM \"{stream_name}\"");
+    let default_sql = format!(
+        "SELECT {} FROM \"{stream_name}\"",
+        CONFIG.common.column_timestamp
+    );
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
