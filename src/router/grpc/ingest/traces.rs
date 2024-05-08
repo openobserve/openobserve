@@ -60,10 +60,18 @@ impl TraceService for TraceServer {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)
         });
-        client
+        let msg = request.get_ref().clone();
+        match client
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
             .export(request)
             .await
+        {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                log::error!("export trace error : {:?}, status: {e}", msg);
+                Err(e)
+            }
+        }
     }
 }
