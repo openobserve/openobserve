@@ -150,6 +150,13 @@ async fn process_job(
         }
 
         while let Ok(req) = receiver.try_recv() {
+            if let Err(e) = req.validate() {
+                log::warn!(
+                    "TaskQueue({tq_index})-Worker({worker_id}) received an invalid request {:?}. Skip.",
+                    e
+                );
+                continue;
+            }
             pending_tasks.push(req);
         }
 
@@ -200,6 +207,7 @@ pub(super) async fn process_tasks_with_retries(
     tasks: &Vec<IngestEntry>,
     retry_count: i32,
 ) {
+    let mut succeed = 0;
     for task in tasks {
         match task.ingest().await {
             Ok(mut retry) => {
@@ -221,6 +229,7 @@ pub(super) async fn process_tasks_with_retries(
                         continue;
                     }
                 }
+                succeed += 1;
             }
             Err(e) => {
                 log::error!(
@@ -232,7 +241,8 @@ pub(super) async fn process_tasks_with_retries(
         }
     }
     log::info!(
-        "TaskQueue({tq_index})-Worker({worker_id}) successfully ingested {} request(s).",
+        "TaskQueue({tq_index})-Worker({worker_id}) successfully ingested {}/{} request(s).",
+        succeed,
         tasks.len()
     );
 }
