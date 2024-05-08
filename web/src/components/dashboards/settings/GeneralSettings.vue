@@ -43,6 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
         />
+        <DateTimePickerDashboard
+          v-show="store.state.printMode === false"
+          ref="dateTimePicker"
+          class="dashboard-icons q-ml-sm"
+          size="sm"
+          :initialTimezone="initialTimezone"
+          v-model="dateTimeValue"
+        />
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
@@ -74,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, type Ref } from "vue";
+import { defineComponent, onMounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { reactive } from "vue";
@@ -83,11 +91,13 @@ import { useRoute } from "vue-router";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useLoading } from "@/composables/useLoading";
 import { useQuasar } from "quasar";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 
 export default defineComponent({
   name: "GeneralSettings",
   components: {
     DashboardHeader,
+    DateTimePickerDashboard,
   },
   emits: ["save"],
   setup(props, { emit }) {
@@ -98,11 +108,26 @@ export default defineComponent({
 
     const addDashboardForm: Ref<any> = ref(null);
     const closeBtn: Ref<any> = ref(null);
+    // initial timezone, which will come from the route query
+    const initialTimezone: any = ref(route.query.timezone ?? null);
 
     const dashboardData = reactive({
       title: "",
       description: "",
       showDynamicFilters: true,
+      dateTime: {
+        startTime: null,
+        endTime: null,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      },
+    });
+
+    const dateTimeValue = ref({
+      startTime: null,
+      endTime: null,
+      relativeTimePeriod: "15m",
+      valueType: "relative",
     });
 
     const getDashboardData = async () => {
@@ -111,11 +136,19 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
+      console.log("getDashboardData", data);
 
       dashboardData.title = data.title;
       dashboardData.description = data.description;
       dashboardData.showDynamicFilters =
         data.variables?.showDynamicFilters ?? false;
+
+      dateTimeValue.value = {
+        startTime: data.dateTime.startTime,
+        endTime: data.dateTime.endTime,
+        relativeTimePeriod: data.dateTime.relativeTimePeriod,
+        valueType: data.dateTime.type,
+      };
     };
     onMounted(async () => {
       await getDashboardData();
@@ -147,6 +180,14 @@ export default defineComponent({
           data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
         }
 
+        data.dateTime = {
+          startTime: dateTimeValue?.value?.startTime,
+          endTime: dateTimeValue?.value?.endTime,
+          relativeTimePeriod: dateTimeValue?.value?.relativeTimePeriod,
+          type: dateTimeValue?.value?.valueType,
+        };
+        console.log("saveDashboardApi", data);
+
         // now lets save it
         await updateDashboard(
           store,
@@ -155,6 +196,7 @@ export default defineComponent({
           data,
           route?.query?.folder ?? "default"
         );
+        console.log("saveDashboardApi", data);
 
         $q.notify({
           type: "positive",
@@ -198,7 +240,15 @@ export default defineComponent({
       saveDashboardApi,
       onSubmit,
       closeBtn,
+      initialTimezone,
+      dateTimeValue,
     };
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.dashboard-icons {
+  height: 30px;
+}
+</style>

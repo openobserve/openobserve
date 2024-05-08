@@ -184,6 +184,12 @@ export default defineComponent({
               list: [],
               showDynamicFilters: true,
             },
+            dateTime: {
+              startTime: null,
+              endTime: null,
+              relativeTimePeriod: "15m",
+              type: "relative",
+            },
             role: "",
             owner: store.state.userInfo.name,
             created: new Date().toISOString(),
@@ -197,11 +203,14 @@ export default defineComponent({
             version: 3,
           };
 
+          console.log(baseObj, "baseObj");
+
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
             baseObj,
             selectedFolder.value.value ?? "default"
           );
+          console.log(callDashboard, "callDashboard");
         }
         try {
           const res = await callDashboard;
