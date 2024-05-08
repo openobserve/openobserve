@@ -511,7 +511,8 @@ pub(crate) async fn list_objects_for_user(
 ) -> Result<Option<Vec<String>>, Error> {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
-    if !is_root_user(user_id) && O2_CONFIG.openfga.list_only_permitted {
+    if !is_root_user(user_id) && O2_CONFIG.openfga.enabled && O2_CONFIG.openfga.list_only_permitted
+    {
         match crate::handler::http::auth::validator::list_objects(user_id, permission, object_type)
             .await
         {
