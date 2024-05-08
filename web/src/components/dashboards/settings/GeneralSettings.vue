@@ -43,14 +43,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
         />
-        <DateTimePickerDashboard
-          v-show="store.state.printMode === false"
-          ref="dateTimePicker"
-          class="dashboard-icons q-ml-sm"
-          size="sm"
-          :initialTimezone="initialTimezone"
-          v-model="dateTimeValue"
-        />
+        <div v-if="dateTimeValue">
+          <DateTimePickerDashboard
+            v-show="store.state.printMode === false"
+            ref="dateTimePicker"
+            class="dashboard-icons q-ml-sm"
+            size="sm"
+            :initialTimezone="initialTimezone"
+            v-model="dateTimeValue"
+          />{{ dateTimeValue }}
+        </div>
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
@@ -123,14 +125,7 @@ export default defineComponent({
       },
     });
 
-    const dateTimeValue = ref({
-      startTime: null,
-      endTime: null,
-      relativeTimePeriod: "15m",
-      valueType: "relative",
-    });
-    console.log("dateTimeValue", dateTimeValue.value);
-    
+    let dateTimeValue: Ref<any> | null = ref(null);
     const getDashboardData = async () => {
       const data = await getDashboard(
         store,
