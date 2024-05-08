@@ -15,7 +15,7 @@
 
 use std::{
     fs::{create_dir_all, remove_file, File, OpenOptions},
-    io::{BufReader, Read, Write},
+    io::{Read, Write},
     path::PathBuf,
 };
 
@@ -61,20 +61,21 @@ pub(super) async fn persist_job(
 pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>) -> Result<()> {
     create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
     if let Some(tasks) = tasks {
-        let mut f = OpenOptions::new()
+        let f = OpenOptions::new()
                     .write(true)
                     .create(true)
                     .truncate(true) // always overwrite
                     .open(path)
                     .context("Failed to open file")?;
 
+        let mut buf = zstd::Encoder::new(f, 3)?;
+
         for task in tasks {
             let bytes = task.into_bytes()?;
-            f.write_all(&bytes)?;
-            f.write_u8(DELIMITER)?;
+            buf.write_all(&bytes)?;
+            buf.write_u8(DELIMITER)?;
         }
-
-        f.sync_all().context("Failed to sync file")?;
+        buf.finish().context("Failed to sync file")?;
     } else {
         _ = remove_file(path);
     }
@@ -128,7 +129,7 @@ pub(super) fn build_file_path(tq_index: usize, worker_id: &str) -> PathBuf {
 
 fn decode_from_wal_file(wal_file: &PathBuf) -> Result<Option<Vec<IngestEntry>>> {
     let f = File::open(wal_file)?;
-    let mut f = BufReader::new(f);
+    let mut f = zstd::Decoder::new(f)?;
     let mut entries = vec![];
     let mut buffer = Vec::new();
 

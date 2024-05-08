@@ -54,7 +54,6 @@ impl IngestEntry {
         org_id: String,
         user_email: String,
         stream_name: Option<String>,
-        // timestamp: Option<i64>,
         content_length: usize,
         body: Bytes,
     ) -> Result<Self> {
