@@ -208,7 +208,7 @@ impl Metadata for DistinctValues {
                     STREAM_NAME,
                     StreamType::Metadata,
                     &schema,
-                    None,
+                    Some(timestamp),
                 )
                 .await
                 {
