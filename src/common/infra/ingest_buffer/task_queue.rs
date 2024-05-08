@@ -32,7 +32,7 @@ static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more worke
 /// Max acceptable latency between a request is accepted and searchable
 static SEARCHABLE_LATENCY: u64 = 60;
 /// Estimated time in seconds it takes to ingest a 5mb request in seconds
-static ESTIMATED_INGEST_PROCESS_TIME: u64 = 2; // TODO(taiming): run test to get ingest latency based on size
+static ESTIMATED_INGEST_PROCESS_TIME: usize = 2; // TODO(taiming): run test to get better ingest latency based on size
 
 /// A global hash map that maps stream of a TaskQueue instance.
 static TQ_MANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
@@ -100,21 +100,14 @@ impl TaskQueueManager {
     }
 
     async fn send_task(&mut self, task: IngestEntry) -> HttpResponse {
-        // Update estimated_ingest_entry_size.
+        // Update estimated_ingest_entry_size ("online" average)
         self.estimated_ingest_entry_size =
             (self.estimated_ingest_entry_size * (DEFAULT_CHANNEL_CAP - 1) / DEFAULT_CHANNEL_CAP)
                 + (task.content_length / DEFAULT_CHANNEL_CAP);
-        log::warn!(
-            "TL: running_avg: {}, curr_task: {}",
-            self.estimated_ingest_entry_size,
-            task.content_length
-        );
-        let tq = match self.find_tq_or_add_workers().await {
-            Ok(tq) => tq,
-            Err(e) => {
-                log::error!("Error sending request to ingest buffer: {:?}", e);
-                return HttpResponse::InternalServerError().json(e.to_string());
-            }
+        let Some(tq) = self.find_tq_or_add_workers().await else {
+            log::warn!("Buffer fully loaded & max ingestion latency reached");
+            return HttpResponse::InternalServerError()
+                .json("IngestBuffer currently full and maximum buffered ingestion latency reached. Please try again later");
         };
         match tq.send_task(task).await {
             Ok(_) => HttpResponse::Ok().json("Request buffered. Waiting to be processed"),
@@ -125,11 +118,17 @@ impl TaskQueueManager {
     /// Finds the first TaskQueue whose channel is not currently full.
     /// If all TaskQueues are busy, add more workers to a TaskQueue.
     /// If all TaskQueues have reached max number of workers allowed, try again.
-    async fn find_tq_or_add_workers(&mut self) -> Result<&TaskQueue> {
-        let curr_estimated_wait_time = self.estimated_ingest_entry_size / (5 * 1024 * 1024);
+    async fn find_tq_or_add_workers(&mut self) -> Option<&TaskQueue> {
+        // estimates the wait time for a particular queue based on # of tasks in that queue
+        let mut estimated_wait_time = 0;
+        let wait_time_estimate_factor =
+            (self.estimated_ingest_entry_size / (5 * 1024 * 1024)) * ESTIMATED_INGEST_PROCESS_TIME;
+
         let time = std::time::Instant::now();
         let mut tq = None;
-        while tq.is_none() && time.elapsed().as_secs() <= SEARCHABLE_LATENCY {
+        while tq.is_none()
+            && time.elapsed().as_secs() + estimated_wait_time as u64 <= SEARCHABLE_LATENCY
+        {
             tq = match self.task_queues[self.round_robin_idx..]
                 .iter()
                 .chain(self.task_queues[..self.round_robin_idx].iter())
@@ -141,26 +140,18 @@ impl TaskQueueManager {
                             .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
                             .await;
                     }
-                    // make sure the latency is within constraint
-                    let estimated_wait_time = (tq.sender.len() * curr_estimated_wait_time) as u64
-                        * ESTIMATED_INGEST_PROCESS_TIME;
-                    log::warn!(
-                        "TL: buffered task count: {}, estimated wait time: {}",
-                        tq.sender.len(),
-                        estimated_wait_time
-                    );
-                    if time.elapsed().as_secs() + estimated_wait_time > SEARCHABLE_LATENCY {
-                        None
+                    // update wait_time based on length
+                    estimated_wait_time = tq.sender.len() * wait_time_estimate_factor;
+                    if time.elapsed().as_secs() + estimated_wait_time as u64 > SEARCHABLE_LATENCY {
+                        None // would've waited too long, try another queue
                     } else {
                         Some(tq)
                     }
                 }
                 None => {
-                    let Some(tq) = self.task_queues.get(self.round_robin_idx) else {
-                        return Err(anyhow::anyhow!(
-                            "TaskQueueManager not able to find any TaskQueue to buffer request"
-                        ));
-                    };
+                    // update wait_time with fully loaded queue time
+                    estimated_wait_time = DEFAULT_CHANNEL_CAP * wait_time_estimate_factor;
+                    let tq = self.task_queues.get(self.round_robin_idx).unwrap();
                     log::info!("All TaskQueue is full. Add workers or try again");
                     // Try add more workers
                     let added_worker_count = tq
@@ -186,7 +177,7 @@ impl TaskQueueManager {
             };
             self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         }
-        tq.ok_or(anyhow::anyhow!("Ingestion latency reached. Unable to find TaskQueue to buffer request. Please try again"))
+        tq
     }
 
     async fn terminal_all(&mut self) {
