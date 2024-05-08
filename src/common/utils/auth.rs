@@ -322,7 +322,7 @@ impl FromRequest for AuthExtractor {
                     Some(token) => {
                         format!("Bearer {}", *token)
                     }
-                    None => format!("session {}", access_token),
+                    None => access_token,
                 }
             } else {
                 format!("Bearer {}", access_token)
