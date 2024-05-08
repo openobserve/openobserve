@@ -69,7 +69,7 @@ impl TraceService for TraceServer {
         {
             Ok(res) => Ok(res),
             Err(e) => {
-                log::error!("export trace error : {:?}, status: {e}", msg);
+                log::error!("export trace msg: {:?}, status: {e}", msg);
                 Err(e)
             }
         }
