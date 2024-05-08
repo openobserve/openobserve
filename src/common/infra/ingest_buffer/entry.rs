@@ -19,6 +19,7 @@ use actix_web::web::Bytes;
 use anyhow::{anyhow, Context, Result};
 use arrow::datatypes::ToByteSlice;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use chrono::Utc;
 
 use crate::{common::meta::ingestion::IngestionRequest, service::logs};
 
@@ -41,6 +42,7 @@ pub struct IngestEntry {
     pub org_id: String,
     pub user_email: String,
     pub stream_name: Option<String>,
+    pub timestamp: i64,
     pub content_length: usize,
     pub body: Bytes,
 }
@@ -52,15 +54,18 @@ impl IngestEntry {
         org_id: String,
         user_email: String,
         stream_name: Option<String>,
+        // timestamp: Option<i64>,
         content_length: usize,
         body: Bytes,
     ) -> Result<Self> {
+        let timestamp = Utc::now().timestamp_micros();
         let entry = Self {
             source,
             thread_id,
             org_id,
             user_email,
             stream_name,
+            timestamp,
             content_length,
             body,
         };
@@ -106,6 +111,7 @@ impl IngestEntry {
             in_req,
             self.thread_id,
             &self.user_email,
+            Some(self.timestamp)
         )
         .await
         // Mark 503 as retries
@@ -146,6 +152,9 @@ impl IngestEntry {
                 buf.extend_from_slice(stream_name);
             }
         };
+
+        buf.write_i64::<BigEndian>(self.timestamp)
+            .context("IngestEntry::into_bytes() failed at <timestamp>")?;
 
         let body = self.body.to_byte_slice();
         buf.write_u32::<BigEndian>(self.content_length as u32)
@@ -210,6 +219,10 @@ impl IngestEntry {
             )
         };
 
+        let timestamp = cursor
+            .read_i64::<BigEndian>()
+            .context("IngestEntry::from_bytes() failed at reading <timestamp>")?;
+
         let content_length = cursor
             .read_u32::<BigEndian>()
             .context("IngestEntry::from_bytes() failed at reading <content_length>")?
@@ -219,8 +232,7 @@ impl IngestEntry {
             .read_exact(&mut body)
             .context("IngestEntry::from_bytes() failed at reading <body>")?;
         let body = Bytes::from(body);
-
-        IngestEntry::new(
+        let mut entry = IngestEntry::new(
             source,
             thread_id,
             org_id,
@@ -229,6 +241,9 @@ impl IngestEntry {
             content_length,
             body,
         )
+        .context("IngestEntry::from_bytes() failed at validating the entry")?;
+        entry.timestamp = timestamp;
+        Ok(entry)
     }
 }
 

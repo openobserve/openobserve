@@ -160,6 +160,7 @@ pub async fn multi(
                 IngestionRequest::Multi(&body),
                 **thread_id,
                 user_email,
+                None,
             )
             .await
             {
@@ -237,6 +238,7 @@ pub async fn json(
                 IngestionRequest::JSON(&body),
                 **thread_id,
                 user_email,
+                None,
             )
             .await
             {
@@ -294,6 +296,7 @@ pub async fn handle_kinesis_request(
             IngestionRequest::KinesisFH(&post_data.into_inner()),
             **thread_id,
             user_email,
+            None,
         )
         .await
         {
@@ -330,6 +333,7 @@ pub async fn handle_gcp_request(
             IngestionRequest::GCP(&post_data.into_inner()),
             **thread_id,
             user_email,
+            None,
         )
         .await
         {

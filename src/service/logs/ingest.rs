@@ -56,6 +56,7 @@ pub async fn ingest(
     in_req: IngestionRequest<'_>,
     thread_id: usize,
     user_email: &str,
+    timestamp: Option<i64>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     // check stream
@@ -161,7 +162,7 @@ pub async fn ingest(
             json::Value::Object(val) => val,
             _ => unreachable!(),
         };
-        if let Err(e) = handle_timestamp(&mut local_val, min_ts) {
+        if let Err(e) = handle_timestamp(&mut local_val, min_ts, timestamp) {
             stream_status.status.failed += 1;
             stream_status.status.error = e.to_string();
             continue;
@@ -308,6 +309,7 @@ pub fn apply_functions<'a>(
 pub fn handle_timestamp(
     local_val: &mut json::Map<String, json::Value>,
     min_ts: i64,
+    timestamp: Option<i64>,
 ) -> Result<(), anyhow::Error> {
     // handle timestamp
     let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
@@ -315,7 +317,10 @@ pub fn handle_timestamp(
             Ok(t) => t,
             Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
         },
-        None => Utc::now().timestamp_micros(),
+        None => match timestamp {
+            Some(ts) => ts,
+            None => Utc::now().timestamp_micros(),
+        },
     };
     // check ingestion time
     if timestamp < min_ts {

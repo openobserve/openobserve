@@ -1338,7 +1338,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.limit.ingest_buffer_size *= 1024 * 1024;
         }
         if cfg.limit.ingest_buffer_size >= mem_total / 2 {
-            if cfg.limit.ingest_buffer_size >= mem_total * (8 / 10) {
+            if cfg.limit.ingest_buffer_size >= mem_total * 8 / 10 {
                 return Err(anyhow::anyhow!(
                     "Ingest buffer allowed memory usage currenty set as {}% of total avail. memory. Please consider lower it w/ ENV ZO_INGEST_BUFFER_SIZE",
                     (cfg.limit.ingest_buffer_size / mem_total) * 100
