@@ -251,8 +251,11 @@ pub struct Variables {
 pub struct DateTimeOptions {
     #[serde(rename = "type")]
     pub typee: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub relative_time_period: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_time: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: i64,
 }
 
