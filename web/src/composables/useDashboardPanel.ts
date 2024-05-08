@@ -139,11 +139,20 @@ const getDefaultDashboardPanelData: any = () => ({
   },
 });
 
-let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
+let dashboardPanelDataObj: any = reactive({
+  dashboard: { ...getDefaultDashboardPanelData() },
+});
 
-const useDashboardPanelData = () => {
+const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const $q = useQuasar();
+
+  // Initialize the state for this page key if it doesn't already exist
+  if (!dashboardPanelDataObj[pageKey]) {
+    dashboardPanelDataObj[pageKey] = { ...getDefaultDashboardPanelData() };
+  }
+
+  const dashboardPanelData = dashboardPanelDataObj[pageKey];
 
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;

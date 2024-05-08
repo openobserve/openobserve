@@ -133,6 +133,7 @@ import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
+import { inject } from "vue";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -170,8 +171,12 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     let parser: any;
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
-      useDashboardPanelData();
+      useDashboardPanelData(dashboardPanelDataPageKey);
     // default selected date will be absolute time
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);

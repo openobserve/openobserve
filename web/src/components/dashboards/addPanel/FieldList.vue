@@ -446,12 +446,18 @@ import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
+import { inject } from "vue";
 
 export default defineComponent({
   name: "FieldList",
   props: ["selectedXAxisValue", "selectedYAxisValue", "editMode"],
   emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
   setup(props) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -480,7 +486,7 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
 
     const onDragEnd = () => {
@@ -776,7 +782,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .metric-explore-metric-icon {
   min-width: 28px !important;
   padding-right: 8px !important;

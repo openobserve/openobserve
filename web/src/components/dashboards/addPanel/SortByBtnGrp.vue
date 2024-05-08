@@ -28,6 +28,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { defineComponent } from "vue";
 import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
+import { inject } from "vue";
 
 export default defineComponent({
   name: "SortByBtnGrp",
@@ -39,7 +40,13 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { dashboardPanelData } = useDashboardPanelData();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
 
     const updateSortOption = (value: any) => {
       props.fieldObj.sortBy = value;
