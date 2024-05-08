@@ -170,6 +170,7 @@ async fn search_in_cluster(
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {

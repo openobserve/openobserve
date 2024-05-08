@@ -52,6 +52,7 @@ pub async fn ingest(
         .map_err(|_| Error::msg("invalid token".to_string()))?;
     let channel = Channel::from_shared(node_addr)
         .unwrap()
+        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
         .connect()
         .await
         .map_err(|err| {

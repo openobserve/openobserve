@@ -305,6 +305,7 @@ pub async fn search(
         hits: hits_buf,
         aggs: aggs_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
+        is_partial: false,
     };
 
     Ok(result)
