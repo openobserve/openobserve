@@ -25,8 +25,10 @@ use once_cell::sync::Lazy;
 
 use crate::{
     db as infra_db,
-    errors::{DbError, Error},
+    errors::{DbError, Error, Result},
 };
+
+pub mod history;
 
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
@@ -37,15 +39,16 @@ pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
     Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
 
+pub async fn init() -> Result<()> {
+    history::init().await?;
+    Ok(())
+}
+
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
 }
 
-pub async fn get(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<Schema, anyhow::Error> {
+pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
@@ -62,7 +65,7 @@ pub async fn get_from_db(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-) -> Result<Schema, anyhow::Error> {
+) -> Result<Schema> {
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
@@ -70,11 +73,11 @@ pub async fn get_from_db(
             if let Error::DbError(DbError::KeyNotExists(_)) = e {
                 Schema::empty()
             } else {
-                return Err(anyhow::anyhow!("Error getting schema: {}", e));
+                return Err(Error::Message(format!("Error getting schema: {e}")));
             }
         }
         Ok(v) => {
-            let schemas: Result<Vec<Schema>, _> = json::from_slice(&v);
+            let schemas: Result<Vec<Schema>> = json::from_slice(&v).map_err(|e| e.into());
             if let Ok(mut schemas) = schemas {
                 if schemas.is_empty() {
                     Schema::empty()
@@ -93,7 +96,7 @@ pub async fn get_versions(
     stream_name: &str,
     stream_type: StreamType,
     time_range: Option<(i64, i64)>,
-) -> Result<Vec<Schema>, anyhow::Error> {
+) -> Result<Vec<Schema>> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
@@ -175,11 +178,13 @@ pub async fn get_versions(
             if let Error::DbError(DbError::KeyNotExists(_)) = e {
                 vec![]
             } else {
-                return Err(anyhow::anyhow!("Error getting schema versions: {}", e));
+                return Err(Error::Message(format!(
+                    "Error getting schema versions: {e}",
+                )));
             }
         }
         Ok(v) => {
-            let schemas: Result<Vec<Schema>, _> = json::from_slice(&v);
+            let schemas: Result<Vec<Schema>> = json::from_slice(&v).map_err(|e| e.into());
             if let Ok(schemas) = schemas {
                 schemas
             } else {
@@ -243,7 +248,7 @@ pub async fn merge(
     stream_type: StreamType,
     schema: &Schema,
     min_ts: Option<i64>,
-) -> Result<Option<(Schema, Vec<Field>)>, anyhow::Error> {
+) -> Result<Option<(Schema, Vec<Field>)>> {
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
     #[cfg(feature = "enterprise")]
@@ -363,7 +368,7 @@ pub async fn merge(
         .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    Ok(rx.await?)
+    rx.await.map_err(|e| Error::Message(e.to_string()))
 }
 
 pub async fn update_setting(
@@ -371,7 +376,7 @@ pub async fn update_setting(
     stream_name: &str,
     stream_type: StreamType,
     metadata: std::collections::HashMap<String, String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
     #[cfg(feature = "enterprise")]
     let key_for_update = key.clone();
@@ -448,7 +453,7 @@ pub async fn delete_fields(
     stream_name: &str,
     stream_type: StreamType,
     deleted_fields: Vec<String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
     #[cfg(feature = "enterprise")]
     let key_for_update = key.clone();
@@ -540,16 +545,17 @@ pub async fn delete_fields(
 
 pub async fn delete(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
-) -> Result<(), anyhow::Error> {
+    stream_name: &str,
+    start_dt: Option<i64>,
+) -> Result<()> {
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let db = infra_db::get_db().await;
-    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, start_dt).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting schema: {}", e);
-            return Err(anyhow::anyhow!("Error deleting schema: {}", e));
+            return Err(Error::Message(format!("Error deleting schema: {e}")));
         }
     }
     Ok(())

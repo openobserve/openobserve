@@ -122,7 +122,7 @@ pub async fn delete(
     stream_type: Option<StreamType>,
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    infra::schema::delete(org_id, stream_name, stream_type).await?;
+    infra::schema::delete(org_id, stream_type, stream_name, None).await?;
 
     // super cluster
     #[cfg(feature = "enterprise")]
@@ -322,14 +322,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if schema_versions.is_empty() {
                     continue;
                 }
-                let latest_schema: Vec<Schema> =
-                    match json::from_slice(&schema_versions.last().unwrap().1) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
-                            continue;
-                        }
-                    };
+                let schema_data = schema_versions.last().unwrap().1.as_ref();
+                let latest_schema: Vec<Schema> = match json::from_slice(schema_data) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
+                        continue;
+                    }
+                };
                 if latest_schema.is_empty() {
                     continue;
                 }
@@ -406,6 +406,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = columns[0];
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
+                let start_dt = match columns.get(3) {
+                    Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
+                    None => 0,
+                };
+                if start_dt > 0 {
+                    // delete only one version
+                    continue;
+                }
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
                 drop(w);

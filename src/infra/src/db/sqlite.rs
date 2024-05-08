@@ -445,12 +445,22 @@ impl super::Db for SqliteDb {
     ) -> Result<()> {
         // event watch
         if need_watch {
+            let with_prefix = if start_dt.is_some() {
+                false
+            } else {
+                with_prefix
+            };
+            let new_key = if start_dt.is_some() {
+                format!("{}/{}", key, start_dt.unwrap())
+            } else {
+                key.to_string()
+            };
             // find all keys then send event
             let items = if with_prefix {
                 let db = super::get_db().await;
                 db.list_keys(key).await?
             } else {
-                vec![key.to_string()]
+                vec![new_key.to_string()]
             };
             let tx = CHANNEL.watch_tx.clone();
             tokio::task::spawn(async move {

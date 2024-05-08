@@ -52,6 +52,7 @@ pub async fn get_super_cluster() -> &'static Box<dyn Db> {
 
 pub async fn init() -> Result<()> {
     etcd::init().await;
+    create_table().await?;
     Ok(())
 }
 
