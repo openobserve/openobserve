@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       Result not found.
                     </div>
-                    <HTMLRenderer
+                    <SanitizedHtmlRenderer
                       data-test="logs-search-error-message"
                       :htmlContent="searchObj.data.errorMsg"
                     />
@@ -138,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info"
-color="primary" size="md" /> Select a
+                    <q-icon name="info" color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -158,8 +157,7 @@ color="primary" size="md" /> Select a
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -176,8 +174,7 @@ color="primary" size="md" />
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -236,7 +233,7 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
-import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -244,7 +241,7 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {

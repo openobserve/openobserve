@@ -543,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="condition"
                         class="q-pa-none"
                       >
-                        <div class="flex column" style="height: 220px;">
+                        <div class="flex column" style="height: 220px">
                           <q-select
                             dense
                             filled
@@ -649,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ></q-checkbox>
                               </q-item-section>
                               <q-item-section>
-                                <div v-html="opt"></div>
+                                <SanitizedHtmlRenderer :html-content="opt" />
                               </q-item-section>
                             </q-item>
                           </template>
@@ -699,10 +699,11 @@ import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "DashboardMapQueryBuilder",
-  components: { SortByBtnGrp, CommonAutoComplete },
+  components: { SortByBtnGrp, CommonAutoComplete, SanitizedHtmlRenderer },
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

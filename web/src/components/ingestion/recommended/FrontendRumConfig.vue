@@ -22,14 +22,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator class="q-my-sm"></q-separator>
 
-      <HTMLRenderer class="text-subtitle1 q-mt-xs" :htmlContent="npmStep1" />
+      <SanitizedHtmlRenderer
+        class="text-subtitle1 q-mt-xs"
+        :htmlContent="npmStep1"
+      />
 
       <copy-content
         content="npm i @openobserve/browser-rum @openobserve/browser-logs"
       ></copy-content>
 
       <br />
-      <HTMLRenderer class="text-subtitle1 q-mt-xs" :htmlContent="npmStep2" />
+      <SanitizedHtmlRenderer
+        class="text-subtitle1 q-mt-xs"
+        :htmlContent="npmStep2"
+      />
       <CopyContent
         :key="displayConfiguration"
         :content="initConfiguration"
@@ -48,13 +54,13 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { getImageURL, maskText } from "../../../utils/zincutils";
 import CopyContent from "../../CopyContent.vue";
-import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "rum-web-page",
   components: {
     CopyContent,
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   props: {
     currOrgIdentifier: {

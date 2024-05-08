@@ -388,7 +388,10 @@
     "deleteNode": "Delete",
     "addPipeline": "Add Pipeline",
     "deletePipeline": "Delete Pipeline",
-    "search": "Search Pipeline"
+    "search": "Search Pipeline",
+    "routing": "Routing",
+    "nodes": "Nodes",
+    "associateFunction": "Associate Function"
   },
   "function": {
     "header": "Functions",

@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <h5 class="text-center">
-              <HTMLRenderer
+              <SanitizedHtmlRenderer
                 data-test="logs-search-error-message"
                 :htmlContent="searchObj.data.errorMsg"
               />
@@ -279,7 +279,7 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import useStreams from "@/composables/useStreams";
-import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -291,7 +291,7 @@ export default defineComponent({
     AddToDashboard,
     SyntaxGuideMetrics,
     PanelSchemaRenderer,
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   methods: {
     searchData() {
