@@ -254,9 +254,9 @@ pub struct DateTimeOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relative_time_period: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub start_time: Option<i64>,
+    pub start_time: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_time: Option<i64>,
+    pub end_time: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
