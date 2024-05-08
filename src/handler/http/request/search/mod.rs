@@ -857,7 +857,10 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!("SELECT _timestamp FROM \"{stream_name}\"");
+    let default_sql = format!(
+        "SELECT {} FROM \"{stream_name}\"",
+        CONFIG.common.column_timestamp
+    );
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
