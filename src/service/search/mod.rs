@@ -107,9 +107,12 @@ pub async fn search(
     }
 
     #[cfg(feature = "enterprise")]
+    let req_regions = req.regions.clone();
+    #[cfg(feature = "enterprise")]
     let req_clusters = req.clusters.clone();
     #[cfg(feature = "enterprise")]
-    let local_cluster_search = !req_clusters.is_empty()
+    let local_cluster_search = req_regions == vec!["local"]
+        && !req_clusters.is_empty()
         && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -121,7 +124,7 @@ pub async fn search(
     let res = {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req, req_clusters).await
+            cluster::super_cluster::search(req, req_regions, req_clusters).await
         } else {
             cluster::http::search(req).await
         }
@@ -280,6 +283,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -428,6 +432,7 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {

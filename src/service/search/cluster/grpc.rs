@@ -49,7 +49,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     );
 
     // handle query function
-    let (merge_results, scan_stats, inverted_index_count, _) =
+    let (merge_results, scan_stats, inverted_index_count, _, is_partial) =
         super::search(&trace_id, sql.clone(), req).await?;
 
     // final result
@@ -115,6 +115,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
         hits: hits_buf,
         aggs: aggs_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
+        is_partial,
     };
 
     Ok(result)
