@@ -89,6 +89,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             query,
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };
@@ -148,6 +149,7 @@ async fn get_last_stats(
         query,
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout: 0,
     };

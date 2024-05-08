@@ -5,11 +5,11 @@
   >
     <q-form @submit="savePipeline">
       <div class="flex justify-between items-center q-px-md q-py-sm">
-        <div data-test="add-role-section-title" style="font-size: 18px">
+        <div data-test="add-pipeline-section-title" style="font-size: 18px">
           {{ t("pipeline.addPipeline") }}
         </div>
         <q-icon
-          data-test="add-role-close-dialog-btn"
+          data-test="add-pipeline-close-dialog-btn"
           name="cancel"
           class="cursor-pointer"
           size="20px"
@@ -21,7 +21,7 @@
 
       <div class="q-px-md">
         <div
-          data-test="add-alert-name-input"
+          data-test="add-pipeline-name-input"
           class="alert-name-input o2-input"
           style="padding-top: 12px"
         >
@@ -49,7 +49,7 @@
           />
         </div>
         <div
-          data-test="add-alert-name-input"
+          data-test="add-pipeline-description-input"
           class="alert-name-input o2-input q-mb-sm"
         >
           <q-input
@@ -67,7 +67,7 @@
           />
         </div>
         <div
-          data-test="add-alert-stream-type-select"
+          data-test="add-pipeline-stream-type-select"
           class="alert-stream-type o2-input q-mr-sm q-mb-sm"
           style="padding-top: 0"
         >
@@ -93,7 +93,7 @@
           />
         </div>
         <div
-          data-test="add-alert-stream-select"
+          data-test="add-pipeline-stream-select"
           class="o2-input"
           style="padding-top: 0"
         >
@@ -125,7 +125,7 @@
 
       <div class="flex justify-start q-mt-lg q-px-md">
         <q-btn
-          data-test="add-alert-cancel-btn"
+          data-test="add-pipeline-cancel-btn"
           :v-close-popup="true"
           class="q-mb-md text-bold"
           :label="t('alerts.cancel')"
@@ -134,7 +134,7 @@
           no-caps
         />
         <q-btn
-          data-test="add-alert-submit-btn"
+          data-test="add-pipeline-submit-btn"
           :label="t('alerts.save')"
           class="q-mb-md text-bold no-border q-ml-md"
           color="secondary"

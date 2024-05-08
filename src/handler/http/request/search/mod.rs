@@ -40,7 +40,10 @@ use crate::{
             http::{get_stream_type_from_request, RequestHeaderExtractor},
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, sql::RE_ONLY_SELECT},
+        usage::report_request_usage_stats,
+    },
 };
 
 pub mod job;
@@ -425,12 +428,12 @@ pub async fn around(
         None => default_sql,
         Some(v) => match base64::decode_url(v) {
             Err(_) => default_sql,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(&org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                if uses_fn { v } else { default_sql }
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                sql
             }
         },
     };
@@ -487,9 +490,11 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
+            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout,
     };
@@ -565,9 +570,11 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
+            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout,
     };
@@ -853,7 +860,10 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!("SELECT * FROM \"{stream_name}\"");
+    let default_sql = format!(
+        "SELECT {} FROM \"{stream_name}\"",
+        CONFIG.common.column_timestamp
+    );
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -869,12 +879,12 @@ async fn values_v1(
         None => None,
         Some(v) => match base64::decode_url(v) {
             Err(_) => None,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                Some(v)
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                Some(sql)
             }
         },
     };
@@ -884,6 +894,16 @@ async fn values_v1(
         // We don't need query_context now
         query_context = None;
     }
+
+    // if it is select *, replace to select _timestamp
+    if RE_ONLY_SELECT.is_match(&query_sql) {
+        query_sql = RE_ONLY_SELECT
+            .replace(
+                &query_sql,
+                format!("SELECT {} ", CONFIG.common.column_timestamp).as_str(),
+            )
+            .to_string()
+    };
 
     let size = query
         .get("size")
@@ -937,9 +957,11 @@ async fn values_v1(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
+            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout,
     };
@@ -1165,9 +1187,11 @@ async fn values_v2(
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout,
     };

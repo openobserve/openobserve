@@ -2,7 +2,7 @@
   <div v-if="currentRouteName === 'pipelines'">
     <div class="full-wdith">
       <q-table
-        data-test="alert-list-table"
+        data-test="pipeline-list-table"
         ref="qTable"
         :rows="pipelines"
         :columns="columns"
@@ -18,7 +18,7 @@
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              :data-test="`pipeline-list-${props.row.name}-udpate-pipeline`"
               icon="edit"
               class="q-ml-xs"
               padding="sm"
@@ -30,7 +30,7 @@
               @click="editPipeline(props.row)"
             ></q-btn>
             <q-btn
-              :data-test="`alert-list-${props.row.name}-delete-alert`"
+              :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
               :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
@@ -53,11 +53,11 @@
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title" data-test="alerts-list-title">
+          <div class="q-table__title" data-test="pipeline-list-title">
             {{ t("pipeline.header") }}
           </div>
           <q-input
-            data-test="alert-list-search-input"
+            data-test="pipeline-list-search-input"
             v-model="filterQuery"
             borderless
             filled
@@ -70,7 +70,7 @@
             </template>
           </q-input>
           <q-btn
-            data-test="alert-list-add-alert-btn"
+            data-test="pipeline-list-add-pipeline-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
             color="secondary"

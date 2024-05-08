@@ -33,7 +33,6 @@ use lettre::{
     AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
-use reqwest::Client;
 use sysinfo::{DiskExt, SystemExt};
 
 use crate::{
@@ -165,7 +164,7 @@ pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::def
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
-        Client::builder()
+        reqwest::Client::builder()
             .connect_timeout(Duration::new(10, 0))
             .build()
             .unwrap(),
@@ -420,6 +419,8 @@ pub struct Grpc {
         help = "Max grpc message size in MB, default is 16 MB"
     )]
     pub max_message_size: usize,
+    #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
+    pub connect_timeout: u64,
 }
 
 #[derive(EnvConfig)]

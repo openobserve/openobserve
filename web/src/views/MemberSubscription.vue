@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       Error while processing member subscription request.<br /><br />
     </div>
 
-    <HTMLRenderer
+    <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
       class="subscription_message"
@@ -59,12 +59,12 @@ import {
 } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
-import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "PageUser",
   components: {
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   data() {
     return {
