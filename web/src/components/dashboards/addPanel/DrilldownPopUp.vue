@@ -291,7 +291,7 @@
 </template>
 
 <script lang="ts">
-import { reactive, ref, toRef } from "vue";
+import { inject, reactive, ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -334,7 +334,13 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const { dashboardPanelData } = useDashboardPanelData();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
 
     const getDefaultDrilldownData = () => ({
       name: "",

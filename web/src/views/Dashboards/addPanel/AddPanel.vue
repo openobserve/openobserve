@@ -369,6 +369,8 @@ export default defineComponent({
     CustomMarkdownEditor,
   },
   setup(props) {
+    provide("dashboardPanelDataPageKey", "dashboard");
+
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref({});
@@ -382,7 +384,7 @@ export default defineComponent({
       promqlMode,
       resetDashboardPanelData,
       resetAggregationFunction,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData("dashboard");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);

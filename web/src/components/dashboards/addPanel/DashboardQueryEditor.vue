@@ -164,6 +164,7 @@ import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import { inject } from "vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -182,13 +183,17 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
     const {
       dashboardPanelData,
       promqlMode,
       updateXYFieldsOnCustomQueryChange,
       addQuery,
       removeQuery,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
     let parser: any;
 
