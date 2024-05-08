@@ -120,15 +120,12 @@ impl TaskQueueManager {
     /// If all TaskQueues have reached max number of workers allowed, try again.
     async fn find_tq_or_add_workers(&mut self) -> Option<&TaskQueue> {
         // estimates the wait time for a particular queue based on # of tasks in that queue
-        let mut estimated_wait_time = 0;
         let wait_time_estimate_factor =
             (self.estimated_ingest_entry_size / (5 * 1024 * 1024)) * ESTIMATED_INGEST_PROCESS_TIME;
 
         let time = std::time::Instant::now();
         let mut tq = None;
-        while tq.is_none()
-            && time.elapsed().as_secs() + estimated_wait_time as u64 <= SEARCHABLE_LATENCY
-        {
+        while tq.is_none() && time.elapsed().as_secs() <= SEARCHABLE_LATENCY {
             tq = match self.task_queues[self.round_robin_idx..]
                 .iter()
                 .chain(self.task_queues[..self.round_robin_idx].iter())
@@ -140,19 +137,19 @@ impl TaskQueueManager {
                             .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
                             .await;
                     }
-                    // update wait_time based on length
-                    estimated_wait_time = tq.sender.len() * wait_time_estimate_factor;
-                    if time.elapsed().as_secs() + estimated_wait_time as u64 > SEARCHABLE_LATENCY {
+                    // estimate this queue's wait time and compare w/ allowed latency
+                    let current_queue_wait_time =
+                        (tq.sender.len() * wait_time_estimate_factor) as u64;
+                    if time.elapsed().as_secs() + current_queue_wait_time as u64
+                        > SEARCHABLE_LATENCY
+                    {
                         None // would've waited too long, try another queue
                     } else {
                         Some(tq)
                     }
                 }
                 None => {
-                    // update wait_time with fully loaded queue time
-                    estimated_wait_time = DEFAULT_CHANNEL_CAP * wait_time_estimate_factor;
                     let tq = self.task_queues.get(self.round_robin_idx).unwrap();
-                    log::info!("All TaskQueue is full. Add workers or try again");
                     // Try add more workers
                     let added_worker_count = tq
                         .workers
@@ -162,7 +159,7 @@ impl TaskQueueManager {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                     if added_worker_count > 0 {
                         log::info!(
-                            "TaskQueue({}) channel added {} new workers",
+                            "All TaskQueue is full. Added {} new workers to TaskQueue({})",
                             self.round_robin_idx,
                             added_worker_count
                         );
