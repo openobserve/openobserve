@@ -458,9 +458,11 @@ impl QueryCondition {
                 query_context: None,
                 query_fn: None,
                 skip_wal: false,
+                is_partial: false,
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };

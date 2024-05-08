@@ -63,6 +63,7 @@ pub async fn search(
     ScanStats,
     Option<u64>,
     usize,
+    bool,
 )> {
     let start = std::time::Instant::now();
 
@@ -471,6 +472,7 @@ pub async fn search(
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -534,22 +536,25 @@ pub async fn search(
     }
 
     let mut results = Vec::new();
+    let mut succeed = 0;
+    let mut last_error = None;
     for task in tasks {
         match task.await {
             Ok(res) => match res {
-                Ok(res) => results.push(res),
+                Ok(res) => {
+                    succeed += 1;
+                    results.push(res);
+                }
                 Err(err) => {
-                    // search done, release lock
-                    #[cfg(not(feature = "enterprise"))]
-                    dist_lock::unlock(&locker).await?;
-                    #[cfg(feature = "enterprise")]
-                    work_group
-                        .as_ref()
-                        .unwrap()
-                        .done(trace_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                    return Err(err);
+                    results.push((
+                        Node::default(),
+                        cluster_rpc::SearchResponse {
+                            is_partial: true,
+                            ..Default::default()
+                        },
+                    ));
+                    log::error!("[trace_id {trace_id}] search->grpc: node search error: {err}");
+                    last_error = Some(err);
                 }
             },
             Err(e) => {
@@ -569,8 +574,13 @@ pub async fn search(
             }
         }
     }
+    if succeed == 0 {
+        if let Some(err) = last_error {
+            return Err(err);
+        }
+    }
 
-    let (merge_batches, scan_stats) =
+    let (merge_batches, scan_stats, is_partial) =
         match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
             Ok(v) => v,
             Err(e) => {
@@ -600,7 +610,13 @@ pub async fn search(
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
-    Ok((merge_batches, scan_stats, inverted_index_count, took_wait))
+    Ok((
+        merge_batches,
+        scan_stats,
+        inverted_index_count,
+        took_wait,
+        is_partial,
+    ))
 }
 
 async fn merge_grpc_result(
@@ -608,11 +624,16 @@ async fn merge_grpc_result(
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
     is_final_phase: bool,
-) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats)> {
+) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, bool)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let mut is_partial = false;
     for (node, resp) in results {
+        if resp.is_partial {
+            is_partial = true;
+            continue;
+        }
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
         // handle hits
         let value = batches.entry("query".to_string()).or_default();
@@ -719,7 +740,7 @@ async fn merge_grpc_result(
 
         merge_batches.insert(name, merge_batch);
     }
-    Ok((merge_batches, scan_stats))
+    Ok((merge_batches, scan_stats, is_partial))
 }
 
 #[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]

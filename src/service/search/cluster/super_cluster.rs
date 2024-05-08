@@ -28,6 +28,7 @@ use crate::common::meta::functions::VRLResultResolver;
 
 pub async fn search(
     mut req: cluster_rpc::SearchRequest,
+    req_regions: Vec<String>,
     req_clusters: Vec<String>,
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
@@ -49,14 +50,14 @@ pub async fn search(
 
     // handle query function
     let (_took, grpc_results) =
-        o2_enterprise::enterprise::super_cluster::search(req, req_clusters).await?;
+        o2_enterprise::enterprise::super_cluster::search(req, req_regions, req_clusters).await?;
 
     // handle query function
     let grpc_results = grpc_results
         .into_iter()
         .map(|v| (Node::default(), v))
         .collect();
-    let (merge_batches, scan_stats) =
+    let (merge_batches, scan_stats, is_partial) =
         super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
 
     // final result
@@ -180,6 +181,7 @@ pub async fn search(
 
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);
+    result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, 0);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);

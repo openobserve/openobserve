@@ -50,7 +50,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (merge_batches, scan_stats, inverted_index_count, took_wait) =
+    let (merge_batches, scan_stats, inverted_index_count, took_wait, is_partial) =
         super::search(&trace_id, sql.clone(), req).await?;
 
     // final result
@@ -185,6 +185,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     } else {
         result.set_total(total);
     }
+    result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);

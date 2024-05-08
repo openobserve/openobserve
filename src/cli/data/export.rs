@@ -53,12 +53,14 @@ impl Context for Export {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            is_partial: false,
         };
 
         let req = search::Request {
             query,
             aggs: HashMap::new(),
             encoding: search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };

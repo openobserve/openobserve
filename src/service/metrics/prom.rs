@@ -616,6 +616,7 @@ pub(crate) async fn get_series(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout: 0,
     };
@@ -759,6 +760,7 @@ pub(crate) async fn get_label_values(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout: 0,
     };

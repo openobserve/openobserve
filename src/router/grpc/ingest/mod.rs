@@ -37,6 +37,7 @@ pub(crate) async fn get_ingester_channel() -> Result<Channel, tonic::Status> {
     // cache miss, connect to ingester
     let channel = Channel::from_shared(grpc_addr.clone())
         .unwrap()
+        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
         .connect()
         .await
         .map_err(|err| {

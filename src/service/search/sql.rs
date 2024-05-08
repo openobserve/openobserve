@@ -1004,12 +1004,14 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            is_partial: false,
         };
 
         let req: config::meta::search::Request = config::meta::search::Request {
             query,
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };
@@ -1114,11 +1116,13 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                is_partial: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
                 clusters: vec![],
                 timeout: 0,
             };
@@ -1236,11 +1240,13 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                is_partial: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
                 clusters: vec![],
                 timeout: 0,
             };

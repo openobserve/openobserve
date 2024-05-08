@@ -176,9 +176,9 @@ async fn proxy(
     path: web::Path<PathParamProxyURL>,
     req: HttpRequest,
 ) -> actix_web::Result<HttpResponse> {
-    let client = reqwest::Client::new();
+    let client = awc::Client::new();
     let method = req.method().clone();
-    let forwarded_resp = client
+    let mut forwarded_resp = client
         .request(method, &path.target_url)
         .send()
         .await
@@ -187,7 +187,7 @@ async fn proxy(
         })?;
 
     let status = forwarded_resp.status().as_u16();
-    let body = forwarded_resp.bytes().await.map_err(|e| {
+    let body = forwarded_resp.body().await.map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
     })?;
 
