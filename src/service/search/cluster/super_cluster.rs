@@ -115,6 +115,8 @@ pub async fn search(
                                 fields: program.fields.clone(),
                             },
                             &json::Value::Object(hit.clone()),
+                            &sql.org_id,
+                            &sql.stream_name,
                         );
                         (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                     })
