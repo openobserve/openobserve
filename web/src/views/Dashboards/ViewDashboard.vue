@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
+              v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
@@ -341,6 +342,7 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
+      console.log("currentDashboardData.data", currentDashboardData.data);
 
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
@@ -360,6 +362,35 @@ export default defineComponent({
       ) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
+      }
+
+      const currentDataTime = {
+        type: currentDashboardData.data?.dateTime?.type,
+        start: currentDashboardData.data?.dateTime?.startTime / 1000,
+        end: currentDashboardData.data?.dateTime?.endTime / 1000,
+        relativeTimePeriod:
+          currentDashboardData.data?.dateTime.relativeTimePeriod,
+      };
+
+      if (!((route.query.from && route.query.to) || route.query.period)) {
+        if (currentDataTime.type === "relative") {
+          console.log(
+            "inside else",
+            currentDataTime,
+            JSON.parse(JSON.stringify(selectedDate.value)),
+            route.query.from,
+            route.query.to,
+            route.query.period
+          );
+          dateTimePicker.value?.setRelativeDate(
+            currentDataTime.relativeTimePeriod
+          );
+        } else {
+          dateTimePicker.value?.setCustomDate(
+            currentDataTime.type,
+            currentDataTime
+          );
+        }
       }
     };
 
@@ -406,6 +437,8 @@ export default defineComponent({
     });
 
     const getQueryParamsForDuration = (data: any) => {
+      console.log("getQueryParamsForDuration", data);
+
       if (data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
