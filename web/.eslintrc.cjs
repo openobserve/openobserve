@@ -33,6 +33,7 @@ module.exports = {
         endOfLine: "auto",
       },
     ],
+    "no-unused-imports": "error",
   },
   parserOptions: {
     ecmaVersion: "latest",

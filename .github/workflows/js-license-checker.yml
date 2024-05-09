@@ -18,9 +18,9 @@ jobs:
       - name: Build frontend code
         run: cd web && npm install && npm run build
       - name: Check licenses
-        uses: tangro/actions-license-check@v1.0.14
-        with:
-          allowed-licenses: 'MIT; ISC; Apache-2.0; BSD; MPL-2.0; Unlicense; CC-BY-4.0; Artistic-2.0; UNLICENSED'
+        run: |
+          npm install -g license-checker
+          cd web && npx -q --yes license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_CONTEXT: ${{ toJson(github) }}

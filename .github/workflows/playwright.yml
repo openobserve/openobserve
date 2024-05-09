@@ -1,0 +1,100 @@
+name: Playwright UI Tests
+
+on:
+  push:
+    branches:
+      - "main"
+    # paths:
+    #   - "web/**"
+  pull_request:
+    branches:
+      - "*"
+    # paths:
+    #   - "web/**"
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080
+  INGESTION_URL: http://localhost:5080
+  ORGNAME: default
+  ZO_QUICK_MODE_NUM_FIELDS: 5
+  ZO_QUICK_MODE_STRATEGY : first
+
+
+jobs:
+  ui_integration_tests:
+    name: playwright_ui_integration_tests
+    runs-on: 
+      labels: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chrome]
+        testfilename: 
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js"]
+       
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-03-02
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      
+      - name: Build frontend code
+        run: cd web && npm install && npm run build
+      
+      - name: Build and run binary
+        run: cargo build --features mimalloc
+        
+      - name: Start OpenObserve
+        run: target/debug/openobserve &
+
+      - name: Wait for start
+        run: sleep 10
+
+      - name: Ensure we are getting a reply from the server
+        run: curl http://localhost:5080/web/login
+
+      - uses: actions/setup-node@v4
+        with:
+            node-version: lts/*
+      - name: Install dependencies and run ui-tests
+        run: |
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD"=${ZO_ROOT_USER_PASSWORD} >> .env
+          echo "ZO_BASE_URL"=${ZO_BASE_URL} >> .env
+          echo "INGESTION_URL"=${INGESTION_URL} >> .env
+          echo "ORGNAME"=${ORGNAME} >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+            name: playwright-report
+            path: playwright-report/
+            retention-days: 30
+
+
+ 

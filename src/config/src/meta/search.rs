@@ -119,8 +119,6 @@ pub struct Query {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
-    #[serde(default)]
-    pub is_partial: bool,
 }
 
 fn default_size() -> usize {
@@ -144,7 +142,6 @@ impl Default for Query {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
-            is_partial: false,
         }
     }
 }
@@ -317,6 +314,10 @@ pub struct SearchPartitionRequest {
     pub sql_mode: String,
     pub start_time: i64,
     pub end_time: i64,
+    #[serde(default)]
+    pub regions: Vec<String>,
+    #[serde(default)]
+    pub clusters: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -550,7 +551,6 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
-                is_partial: false,
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),

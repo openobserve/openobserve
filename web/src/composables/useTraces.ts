@@ -15,7 +15,6 @@
 
 import { reactive } from "vue";
 import { useLocalTraceFilterField } from "@/utils/zincutils";
-import { cloneDeep } from "lodash-es";
 
 const defaultObject = {
   organizationIdetifier: "",

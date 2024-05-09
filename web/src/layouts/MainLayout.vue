@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <img
             class="appLogo"
+            loading="eager"
             :src="
               store?.state?.theme == 'dark'
                 ? getImageURL('images/common/open_observe_logo_2.svg')
@@ -69,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
+            loading="eager"
             :src="
               store?.state?.theme == 'dark'
                 ? getImageURL('images/common/open_observe_logo_2.svg')
