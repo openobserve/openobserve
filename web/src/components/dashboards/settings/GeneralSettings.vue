@@ -125,7 +125,7 @@ export default defineComponent({
       },
     });
 
-    let dateTimeValue: Ref<any> | null = ref(null);
+    let dateTimeValue: any = ref(null);
     const getDashboardData = async () => {
       const data = await getDashboard(
         store,
@@ -150,7 +150,7 @@ export default defineComponent({
       await getDashboardData();
     });
     console.log("------------dateTimeValue", dateTimeValue.value);
-    
+
     const saveDashboardApi = useLoading(async () => {
       try {
         // get the latest dashboard data and update the title and description
@@ -177,7 +177,7 @@ export default defineComponent({
           data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
         }
         console.log("---------------", data);
-        
+
         data.dateTime = {
           startTime: dateTimeValue?.value?.startTime,
           endTime: dateTimeValue?.value?.endTime,
@@ -216,7 +216,7 @@ export default defineComponent({
           return false;
         }
         console.log("valid", valid);
-        
+
         saveDashboardApi.execute().catch((err: any) => {
           $q.notify({
             type: "negative",
