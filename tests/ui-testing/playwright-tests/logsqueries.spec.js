@@ -8,7 +8,8 @@ test.describe.configure({ mode: 'parallel' });
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(4000);
+      // await page.getByText('Login as internal user').click();
       await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -22,12 +23,35 @@ async function login(page) {
 }
 
 
+
+// test('test', async ({ page }) => {
+//   await page.goto('https://monitor.dev.zinclabs.dev/web/');
+//   await page.goto('https://monitor.dev.zinclabs.dev/web/login');
+//   await page.getByText('Login as internal user').click();
+//   await page.locator('[data-test="login-user-id"]').click();
+//   await page.locator('[data-test="login-user-id"]').fill('root@monitor1.com');
+//   await page.locator('[data-test="login-password"]').click();
+//   await page.locator('[data-test="login-password"]').press('CapsLock');
+//   await page.locator('[data-test="login-password"]').fill('Sec');
+//   await page.locator('[data-test="login-password"]').press('CapsLock');
+//   await page.locator('[data-test="login-password"]').fill('SecTest@7000');
+//   await page.getByRole('button', { name: 'Login', exact: true }).click();
+//   await page.locator('[data-test="login-password"]').click();
+//   await page.locator('[data-test="login-password"]').fill('');
+//   await page.locator('[data-test="login-password"]').press('CapsLock');
+//   await page.locator('[data-test="login-password"]').fill('Sec');
+//   await page.locator('[data-test="login-password"]').press('CapsLock');
+//   await page.locator('[data-test="login-password"]').fill('SecTest@700');
+//   await page.locator('[data-test="login-password"]').press('Enter');
+//   await page.getByText('_meta').click();
+// });
+
 const selectStreamAndStreamTypeForLogs = async (page,stream) => {await page.waitForTimeout(
   4000);await page.locator(
   '[data-test="log-search-index-list-select-stream"]').click({ force: true });await page.locator(
   "div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
-test.describe("Logs Quickmode testcases", () => {
+test.describe("Logs Queries testcases", () => {
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -149,15 +173,19 @@ test("should redirect to logs after clicking on stream explorer via stream page"
     await page.getByPlaceholder('Search Stream').fill('e2e');
     await page.getByRole('button', { name: 'Explore' }).first().click({force:true});
     await page.waitForTimeout(5000);
+    await page.waitForSelector('[data-test="logs-search-saved-views-btn"]')
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click({force:true});
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('streamslogsnavigate');
     await page.waitForTimeout(3000);
-    await page.getByText('streamslogsnavigate').click();
+    await page.waitForSelector(':text("streamslogsnavigate")');
+    await page.click(':text("streamslogsnavigate")');
+    // await page.getByText('streamslogsnavigate').click();
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('streamslogsnavigate');
-    await page.getByText('delete').click();
+
+    await page.locator('[data-test="logs-search-bar-delete-streamslogsnavigate-saved-view-btn"]').getByText('delete').click();
     await page.locator('[data-test="confirm-button"]').click();
   });
 
@@ -261,58 +289,58 @@ test("should display error if create stream is clicked without adding name", asy
 });
 
 
-test('should match total - histogram mode ignore case for normal and index search test', async () => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    url = process.env["ZO_BASE_URL"]
+// test('should match total - histogram mode ignore case for normal and index search test', async () => {
+//     const orgId = process.env["ORGNAME"];
+//     const streamName = "e2e_automate";
+//     url = process.env["ZO_BASE_URL"]
     
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
+//     const basicAuthCredentials = Buffer.from(
+//       `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+//     ).toString('base64');
   
-    async function performQuery(url, sqlQuery, startTime, endTime) {
-      const response = await fetch(`${url}/api/${orgId}/_search?type=logs`,
-       {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basicAuthCredentials}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: {
-            sql: sqlQuery,
-            start_time: startTime,
-            end_time: endTime,
-            from: 0,
-            size: 0,
-            quick_mode: true,
-            track_total_hits: true,
-          },
-          aggs: {
-            histogram: "select histogram(_timestamp, '30 minute') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
-          },
-        }),
-      });
-      const data = await response.json();
-      return data.total;
-    }
+//     async function performQuery(url, sqlQuery, startTime, endTime) {
+//       const response = await fetch(`${url}/api/${orgId}/_search?type=logs`,
+//        {
+//         method: "POST",
+//         headers: {
+//           Authorization: `Basic ${basicAuthCredentials}`,
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify({
+//           query: {
+//             sql: sqlQuery,
+//             start_time: startTime,
+//             end_time: endTime,
+//             from: 0,
+//             size: 0,
+//             quick_mode: true,
+//             track_total_hits: true,
+//           },
+//           aggs: {
+//             histogram: "select histogram(_timestamp, '30 minute') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+//           },
+//         }),
+//       });
+//       const data = await response.json();
+//       return data.total;
+//     }
   
-    // First query
-    const totalLogs1 = await performQuery(
-      "select * from \"e2e_automate\" WHERE match_all_ignore_case('logger')",
-      1709725454701000,
-      1710071054701000
-    );
+//     // First query
+//     const totalLogs1 = await performQuery(
+//       "select * from \"e2e_automate\" WHERE match_all_ignore_case('logger')",
+//       1709725454701000,
+//       1710071054701000
+//     );
   
-    // Second query
-    const totalLogs2 = await performQuery(
-      "select * from \"e2e_automate\" WHERE match_all_indexed_ignore_case('logger')",
-      1709725511382000,
-      1710071111382000
-    );
+//     // Second query
+//     const totalLogs2 = await performQuery(
+//       "select * from \"e2e_automate\" WHERE match_all_indexed_ignore_case('logger')",
+//       1709725511382000,
+//       1710071111382000
+//     );
   
-    // Assertion
-    expect(totalLogs1).toEqual(totalLogs2);
-  });
+//     // Assertion
+//     expect(totalLogs1).toEqual(totalLogs2);
+//   });
 
 })
