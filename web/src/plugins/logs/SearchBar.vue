@@ -271,7 +271,7 @@ color="grey" size="xs" />
           size="32px"
         />
         <q-btn-group
-          class="q-ml-sm no-outline q-pa-none no-border float-left q-mr-sm"
+          class="no-outline q-pa-none no-border float-left q-mr-xs"
           :disable="!searchObj.meta.toggleFunction"
         >
           <q-btn-dropdown
@@ -324,23 +324,24 @@ color="grey" size="xs" />
           class="no-outline q-pa-none no-border"
           v-if="
             config.isEnterprise == 'true' &&
-            Object.keys(store.state.regionInfo).length > 0 &&
-            store.state.zoConfig.super_cluster_enabled
+              Object.keys(store.state.regionInfo).length > 0 &&
+              store.state.zoConfig.super_cluster_enabled
           "
         >
           <q-btn-dropdown
             data-test="logs-search-bar-region-btn"
             class="q-mr-xs region-dropdown-btn q-px-xs"
-            size="sm"
-            icon="hub"
             :title="t('search.regionTitle')"
+            label="Region"
           >
             <q-list class="region-dropdown-list">
-              <q-item class="q-pa-sm" clickable
-v-close-popup v-for="item in Object.keys(
-                    store.state.regionInfo
-                  )"
-                  :key="'region-key-' + item">
+              <q-item
+                class="q-pa-sm"
+                clickable
+                v-close-popup
+                v-for="item in Object.keys(store.state.regionInfo)"
+                :key="'region-key-' + item"
+              >
                 <q-item-section
                   class="full-width"
                   @click.stop="
@@ -368,7 +369,7 @@ v-close-popup v-for="item in Object.keys(
         <q-btn-group class="no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-bar-reset-function-btn"
-            class="q-mr-sm download-logs-btn q-px-xs"
+            class="q-mr-xs download-logs-btn q-px-xs"
             size="sm"
             icon="download"
             :title="t('search.exportLogs')"
@@ -406,7 +407,7 @@ clickable v-close-popup>
         </q-btn-group>
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-sm download-logs-btn q-px-sm"
+          class="q-mr-xs download-logs-btn q-px-sm"
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
@@ -427,10 +428,10 @@ clickable v-close-popup>
             @on:timezone-change="updateTimezone"
           />
         </div>
-        <div class="search-time float-left q-mr-sm">
+        <div class="search-time float-left q-mr-xs">
           <div class="flex">
             <auto-refresh-interval
-              class="q-mr-sm q-px-none logs-auto-refresh-interval"
+              class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
               @update:model-value="onRefreshIntervalUpdate"
             />
@@ -2628,7 +2629,7 @@ export default defineComponent({
   }
 
   .search-button {
-    min-width: 96px;
+    min-width: 70px;
     line-height: 29px;
     font-weight: bold;
     text-transform: initial;
@@ -2771,6 +2772,25 @@ export default defineComponent({
 .favorite-label {
   line-height: 24px !important;
   font-weight: bold !important;
+}
+
+.region-dropdown-btn {
+  text-transform: capitalize;
+  font-weight: 600;
+  font-size: 12px;
+  padding-left: 8px;
+  height: 23px;
+  padding-top: 3px;
+
+  .q-btn-dropdown__arrow {
+    margin-left: 0px !important;
+  }
+}
+
+.download-logs-btn {
+  .q-btn-dropdown__arrow {
+    margin-left: 0px !important;
+  }
 }
 
 .region-dropdown-list {
