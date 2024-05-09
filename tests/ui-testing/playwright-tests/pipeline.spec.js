@@ -116,7 +116,6 @@ test.describe("Pipeline testcases", () => {
   });
 
   test('should close Add pipeline UI on clicking close icon', async ({ page }) => {
-    await page.goto('https://monitor.dev.zinclabs.dev/web/');
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
