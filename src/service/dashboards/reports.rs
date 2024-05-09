@@ -24,6 +24,7 @@ use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
 };
+use reqwest::Client;
 
 use crate::{
     common::{
@@ -235,17 +236,50 @@ impl Report {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
 
-        // Currently only one `ReportDashboard` can be captured and sent
-        let dashboard = &self.dashboards[0];
-        let report = generate_report(
-            dashboard,
-            &self.org_id,
-            &CONFIG.common.report_user_name,
-            &CONFIG.common.report_user_password,
-            &self.timezone,
-        )
-        .await?;
-        self.send_email(&report.0, report.1).await
+        if !CONFIG.common.local_mode {
+            if CONFIG.common.report_server_url.is_empty() {
+                return Err(anyhow::anyhow!("Report server url not specified"));
+            }
+
+            let url = url::Url::parse(&CONFIG.common.report_server_url).unwrap();
+            match Client::builder()
+                .build()
+                .unwrap()
+                .post(url)
+                .query(&[("timezone", &self.timezone)])
+                .header("Content-Type", "application/json")
+                // .header(reqwest::header::AUTHORIZATION, creds)
+                // .json(&report_data)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        return Err(anyhow::anyhow!(
+                            "report send error status: {}, err: {:?}",
+                            resp.status(),
+                            resp.bytes().await
+                        ));
+                    }
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("Error contacting report server: {e}"));
+                }
+            }
+            Ok(())
+        } else {
+            // Currently only one `ReportDashboard` can be captured and sent
+            let dashboard = &self.dashboards[0];
+            let report = generate_report(
+                dashboard,
+                &self.org_id,
+                &CONFIG.common.report_user_name,
+                &CONFIG.common.report_user_password,
+                &self.timezone,
+            )
+            .await?;
+            self.send_email(&report.0, report.1).await
+        }
     }
 
     /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
