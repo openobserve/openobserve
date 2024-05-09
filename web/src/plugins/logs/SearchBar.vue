@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-md"
+          class="q-pr-sm q-pl-xs reset-filters q-ml-xs"
           @click="resetFilters"
         />
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         ></syntax-guide>
-        <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
+        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
