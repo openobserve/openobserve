@@ -8,6 +8,7 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
+  // await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -453,7 +454,8 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="saved-function-name-input"]').click();
     await page.locator('[data-test="saved-function-name-input"]').fill('e2efunction');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
-    await page.locator('[data-test="menu-link-\\/functions-item"]').click();
+    // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByPlaceholder('Search Function').click();
     await page.getByPlaceholder('Search Function').fill('e2e');
     await page.getByRole('button', { name: 'Delete Function' }).click();

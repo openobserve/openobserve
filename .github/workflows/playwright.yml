@@ -31,7 +31,9 @@ jobs:
     strategy:
       matrix:
         browser: [chrome]
-        testfilename: ["logsquickmode.spec.js"]
+        testfilename: 
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js"]
+       
     steps:
       - name: Remove unused tools
         run: |

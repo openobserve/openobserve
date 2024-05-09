@@ -8,6 +8,7 @@ const folderName = `Folder ${Date.now()}`
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
+      // await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -203,6 +204,7 @@ test('should create a function and then delete it', async ({ page }) => {
   await page.locator('[data-test="saved-function-name-input"]').fill('e2eautomatefunctions');
   await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
   await page.waitForTimeout(2000)
+  // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click(); 
   await page.getByPlaceholder('Search Function').click();
   await page.getByPlaceholder('Search Function').fill('e2eautomatefunctions');
@@ -212,7 +214,8 @@ test('should create a function and then delete it', async ({ page }) => {
 
 
 test('should create functions via functions page and delete it', async ({ page }) => {
-  await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+  // await page.locator('[data-test="menu-link-\\/functions-item"]').click();
+ await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
   await page.getByRole('button', { name: 'Create new function' }).click();
   await page.getByLabel('Name').click();
   await page.getByLabel('Name').fill('sanitytest');
@@ -272,34 +275,6 @@ test('should create and delete dashboard', async ({ page }) => {
 });
 
 
-// test('should create and edit folder ', async ({ page }) => {
-//   await page.goto('https://alpha1.dev.zinclabs.dev/web/');
-//   await page.goto('https://alpha1.dev.zinclabs.dev/web/login');
-//   await page.locator('[data-test="login-user-id"]').click();
-//   await page.locator('[data-test="login-user-id"]').fill('e2e.testing@example.com');
-//   await page.locator('[data-test="login-password"]').click();
-//   await page.locator('[data-test="login-password"]').fill('12345678');
-//   await page.locator('[data-test="login-password"]').press('Enter');
-//   await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-//   await page.locator('[data-test="dashboard-add"]').click();
-//   await page.locator('[data-test="add-dashboard-name"]').click();
-//   await page.locator('[data-test="add-dashboard-name"]').fill('folder ');
-//   await page.locator('[data-test="add-dashboard-name"]').press('CapsLock');
-//   await page.locator('[data-test="add-dashboard-name"]').fill('folder A');
-//   await page.locator('[data-test="dashboard-add-submit"]').click();
-//   await page.locator('[data-test="dashboard-back-btn"]').click();
-//   await page.locator('[data-test="dashboard-new-folder-btn"]').click();
-//   await page.locator('[data-test="dashboard-folder-add-name"]').click();
-//   await page.locator('[data-test="dashboard-folder-add-name"]').press('CapsLock');
-//   await page.locator('[data-test="dashboard-folder-add-name"]').fill('Folder ');
-//   await page.locator('[data-test="dashboard-folder-add-name"]').press('CapsLock');
-//   await page.locator('[data-test="dashboard-folder-add-name"]').fill('Folder A');
-//   await page.locator('[data-test="dashboard-folder-add-save"]').click();
-//   await page.locator('[data-test="dashboard-folder-tab-7193554605697941549"] [data-test="dashboard-edit-folder-icon"] svg').click();
-//   await page.locator('[data-test="dashboard-folder-add-description"]').click();
-//   await page.locator('[data-test="dashboard-folder-add-description"]').fill('Test');
-//   await page.locator('[data-test="dashboard-folder-add-save"]').click();
-// });
 const randomFolderName = `Folder${Math.floor(Math.random() * 1000)}`;
 test('should create delete folder', async ({ page }) => {
  
