@@ -376,7 +376,7 @@ export default defineComponent({
 
               const filterConditions =
                 currentVariable?.query_data?.filter ?? [];
-              let dummyQuery = `SELECT * FROM '${currentVariable?.query_data?.stream}'`;
+              let dummyQuery = `SELECT ${store.state.zoConfig.timestamp_column || "_timestamp"} FROM '${currentVariable?.query_data?.stream}'`;
               const constructedFilter = filterConditions.map(
                 (condition: any) => ({
                   name: condition.name,
