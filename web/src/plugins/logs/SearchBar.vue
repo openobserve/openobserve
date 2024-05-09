@@ -320,52 +320,6 @@ color="grey" size="xs" />
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn-group
-          class="no-outline q-pa-none no-border"
-          v-if="
-            config.isEnterprise == 'true' &&
-              Object.keys(store.state.regionInfo).length > 0 &&
-              store.state.zoConfig.super_cluster_enabled
-          "
-        >
-          <q-btn-dropdown
-            data-test="logs-search-bar-region-btn"
-            class="q-mr-xs region-dropdown-btn q-px-xs"
-            :title="t('search.regionTitle')"
-            label="Region"
-          >
-            <q-list class="region-dropdown-list">
-              <q-item
-                class="q-pa-sm"
-                clickable
-                v-close-popup
-                v-for="item in Object.keys(store.state.regionInfo)"
-                :key="'region-key-' + item"
-              >
-                <q-item-section
-                  class="full-width"
-                  @click.stop="
-                    handleRegionsSelection(
-                      item,
-                      searchObj.meta.regions.includes(item)
-                    )
-                  "
-                >
-                  <q-icon
-                    size="xs"
-                    :name="
-                      searchObj.meta.regions.includes(item)
-                        ? 'check_circle'
-                        : 'check_circle_outline'
-                    "
-                    class="float-left"
-                  ></q-icon>
-                  <q-item-label>{{ item }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-        </q-btn-group>
         <q-btn-group class="no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-bar-reset-function-btn"
@@ -435,6 +389,53 @@ clickable v-close-popup>
               v-model="searchObj.meta.refreshInterval"
               @update:model-value="onRefreshIntervalUpdate"
             />
+            <q-btn-group
+              class="no-outline q-pa-none no-border"
+              v-if="
+                config.isEnterprise == 'true' &&
+                Object.keys(store.state.regionInfo).length > 0 &&
+                store.state.zoConfig.super_cluster_enabled
+              "
+            >
+              <q-btn-dropdown
+                data-test="logs-search-bar-region-btn"
+                class="q-mr-xs region-dropdown-btn q-px-xs"
+                :title="t('search.regionTitle')"
+                label="Region"
+              >
+                <q-list class="region-dropdown-list">
+                  <q-item
+                    class="q-pa-sm"
+                    clickable
+                    v-close-popup
+                    v-for="item in Object.keys(store.state.regionInfo)"
+                    :key="'region-key-' + item"
+                  >
+                    <q-item-section
+                      class="full-width"
+                      @click.stop="
+                        handleRegionsSelection(
+                          item,
+                          searchObj.meta.regions.includes(item)
+                        )
+                      "
+                    >
+                      <q-icon
+                        size="xs"
+                        :name="
+                          searchObj.meta.regions.includes(item)
+                            ? 'check_circle'
+                            : 'check_circle_outline'
+                        "
+                        class="float-left"
+                      ></q-icon>
+                      <q-item-label>{{ item }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-btn-dropdown>
+            </q-btn-group>
+
             <!-- <q-separator vertical inset /> -->
             <q-btn
               data-test="logs-search-bar-refresh-btn"
@@ -2779,7 +2780,7 @@ export default defineComponent({
   font-weight: 600;
   font-size: 12px;
   padding-left: 8px;
-  height: 23px;
+  height: 30px;
   padding-top: 3px;
 
   .q-btn-dropdown__arrow {
