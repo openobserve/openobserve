@@ -320,7 +320,52 @@ color="grey" size="xs" />
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
+        <q-btn-group
+          class="no-outline q-pa-none no-border"
+          v-if="
+            config.isEnterprise == 'true' &&
+            Object.keys(store.state.regionInfo).length > 0 &&
+            store.state.zoConfig.super_cluster_enabled
+          "
+        >
+          <q-btn-dropdown
+            data-test="logs-search-bar-region-btn"
+            class="q-mr-xs region-dropdown-btn q-px-xs"
+            size="sm"
+            icon="hub"
+            :title="t('search.regionTitle')"
+          >
+            <q-list class="region-dropdown-list">
+              <q-item class="q-pa-sm" clickable
+v-close-popup>
+                <q-item-section
+                  v-close-popup
+                  v-for="(item, i) in Object.keys(
+                    store.state.regionInfo
+                  ).entries()"
+                  :key="'region-key-' + i"
+                  @click.stop="
+                    handleRegionsSelection(
+                      item,
+                      searchObj.meta.regions.includes(item)
+                    )
+                  "
+                >
+                  <q-icon
+                    :name="
+                      searchObj.meta.regions.includes(item)
+                        ? 'check_circle'
+                        : 'check_circle_outline'
+                    "
+                    class="float-left"
+                  ></q-icon>
+                  <q-item-label>{{ item }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+        </q-btn-group>
+        <q-btn-group class="no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-bar-reset-function-btn"
             class="q-mr-sm download-logs-btn q-px-xs"
@@ -2196,6 +2241,17 @@ export default defineComponent({
       return filtered;
     };
 
+    const handleRegionsSelection = (item, isSelected) => {
+      if (isSelected) {
+        const index = searchObj.meta.regions.indexOf(item);
+        if (index > -1) {
+          searchObj.meta.regions.splice(index, 1);
+        }
+      } else {
+        searchObj.meta.regions.push(item);
+      }
+    };
+
     return {
       t,
       store,
@@ -2262,6 +2318,8 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       filterSavedViewFn,
+      config,
+      handleRegionsSelection,
     };
   },
   computed: {
@@ -2713,5 +2771,18 @@ export default defineComponent({
 .favorite-label {
   line-height: 24px !important;
   font-weight: bold !important;
+}
+
+.region-dropdown-list {
+  min-width: 150px;
+
+  .q-item__section {
+    display: inline-block;
+  }
+
+  .q-item__label {
+    margin-left: 5px;
+    text-transform: capitalize;
+  }
 }
 </style>

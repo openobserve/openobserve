@@ -665,6 +665,7 @@ export default defineComponent({
             query_context: query_context,
             query_fn: query_fn,
             type: searchObj.data.stream.streamType,
+            regions: searchObj.meta.regions.join(","),
           })
           .then((res: any) => {
             if (res.data.hits.length) {
