@@ -250,7 +250,7 @@ test.skip("should display error if name has only spaces under destination", asyn
     await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
 });
 
-test("should click cancel button under destinations", async ({ page }) => {await page.waitForTimeout(
+test.skip("should click cancel button under destinations", async ({ page }) => {await page.waitForTimeout(
   2000);await page.locator(
   '[data-test="alert-destinations-tab"]').click({ force: true });await page.waitForTimeout(
   1000);

@@ -153,7 +153,7 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test('should add pipeline', async ({ page }) => {
+  test('should add function to pipeline', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
     await page.locator('[data-test="stream-pipelines-tab"]').click();
@@ -202,6 +202,58 @@ test.describe("Pipeline testcases", () => {
   await page.getByLabel('Name').fill(randomFunctionName);
   await page.locator('[data-test="associate-function-save-btn"]').click();
   await page.locator('#q-notify').getByRole('alert').click();
+  });
+
+
+
+  test('should display error when no name added while adding function to pipeline', async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.getByRole('main').locator('div').filter({ hasText: 'Enrichment TablesFunctionsStream AssociationStream' }).first().click();
+    await page.locator('[data-test="stream-pipelines-tab"]').click();
+    await page.locator('[data-test="pipeline-list-add-pipeline-btn"]').click();
+    await page.locator('[data-test="add-pipeline-name-input"]').getByLabel('Name *').click();
+    await page.locator('[data-test="add-pipeline-name-input"]').getByLabel('Name *').fill(randomPipelineName);
+    await page.waitForSelector('.alert-stream-type > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native');
+    await page.locator('.alert-stream-type > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
+    await page.waitForTimeout(2000);
+    await page.getByRole('option', { name: 'Logs' }).locator('div').nth(2).click({force:true});
+    await page.waitForTimeout(2000);
+    // await page.waitForSelector('[data-test="Stream Name *"]')
+    await page.getByLabel('Stream Name *').click();
+    // await page.waitForSelector(':text("e2e_automate")')
+    await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
+    await page.locator('[data-test="add-pipeline-submit-btn"]').click();
+    await page.waitForTimeout(2000)
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
+    await page.waitForTimeout(2000)
+
+  // Locate the function node and pipeline chart
+  const functionNode = await page.waitForSelector('[data-test="pipeline-editor-function-node"]');
+  const pipelineChart = await page.waitForSelector('[data-test="pipeline-editor-pipeline-chart"]');
+
+  // Get the bounding boxes of both elements
+  await page.waitForTimeout(2000)
+  const functionNodeBoundingBox = await functionNode.boundingBox();
+  const pipelineChartBoundingBox = await pipelineChart.boundingBox();
+
+  // Calculate the center coordinates of the function node
+  const functionNodeCenterX = functionNodeBoundingBox.x + functionNodeBoundingBox.width / 2;
+  const functionNodeCenterY = functionNodeBoundingBox.y + functionNodeBoundingBox.height / 2;
+
+  // Calculate the center coordinates of the pipeline chart
+  const pipelineChartCenterX = pipelineChartBoundingBox.x + pipelineChartBoundingBox.width / 2;
+  const pipelineChartCenterY = pipelineChartBoundingBox.y + pipelineChartBoundingBox.height / 2;
+
+  // Simulate the drag-and-drop operation
+  await page.mouse.move(functionNodeCenterX, functionNodeCenterY);
+  await page.mouse.down();
+  await page.mouse.move(pipelineChartCenterX, pipelineChartCenterY);
+  await page.mouse.up();
+  await page.waitForTimeout(2000)
+  await page.locator('[data-test="associate-function-save-btn"]').click();
+  await page.getByText('Function is already associated').click();
+
+
   });
 
 
