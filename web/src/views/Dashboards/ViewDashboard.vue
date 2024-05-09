@@ -332,7 +332,7 @@ export default defineComponent({
     });
     // ======= [END] default variable values
 
-    onActivated(async () => {
+    onMounted(async () => {
       await loadDashboard();
     });
 
@@ -364,32 +364,24 @@ export default defineComponent({
         variablesData.values = [];
       }
 
-      const currentDataTime = {
-        type: currentDashboardData.data?.dateTime?.type,
-        start: currentDashboardData.data?.dateTime?.startTime / 1000,
-        end: currentDashboardData.data?.dateTime?.endTime / 1000,
-        relativeTimePeriod:
-          currentDashboardData.data?.dateTime.relativeTimePeriod,
-      };
-
       if (!((route.query.from && route.query.to) || route.query.period)) {
-        if (currentDataTime.type === "relative") {
-          console.log(
-            "inside else",
-            currentDataTime,
-            JSON.parse(JSON.stringify(selectedDate.value)),
-            route.query.from,
-            route.query.to,
-            route.query.period
-          );
+        if (
+          (currentDashboardData.data?.dateTime?.type ?? "relative") ===
+          "relative"
+        ) {
           dateTimePicker.value?.setRelativeDate(
-            currentDataTime.relativeTimePeriod
+            currentDashboardData.data?.dateTime?.relativeTimePeriod ?? "15m"
           );
         } else {
-          dateTimePicker.value?.setCustomDate(
-            currentDataTime.type,
-            currentDataTime
+          console.log(
+            "currentDashboardData.data?.dateTime?.startTime",
+            currentDashboardData.data?.dateTime?.startTime
           );
+
+          dateTimePicker.value?.setCustomDate("absolute", {
+            start: currentDashboardData.data?.dateTime?.startTime / 1000,
+            end: currentDashboardData.data?.dateTime?.endTime / 1000,
+          });
         }
       }
     };
@@ -500,7 +492,7 @@ export default defineComponent({
     };
 
     // ------- work with query params ----------
-    onActivated(async () => {
+    onMounted(async () => {
       const params = route.query;
 
       if (params.refresh) {
@@ -679,7 +671,7 @@ export default defineComponent({
       document.removeEventListener("fullscreenchange", onFullscreenChange);
     });
 
-    onActivated(() => {
+    onMounted(() => {
       isFullscreen.value = false;
     });
 

@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
-          />{{ dateTimeValue }}
+          />{{ dateTimeValue }} initial: {{ initialTimezone }}
         </div>
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
@@ -111,7 +111,8 @@ export default defineComponent({
     const addDashboardForm: Ref<any> = ref(null);
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
-    const initialTimezone: any = ref(route.query.timezone ?? null);
+    const initialTimezone: any = ref(store.state.timezone ?? null);
+    console.log("initialTimezone", initialTimezone);
 
     const dashboardData = reactive({
       title: "",
@@ -145,11 +146,11 @@ export default defineComponent({
         relativeTimePeriod: data?.dateTime?.relativeTimePeriod,
         valueType: data?.dateTime?.type,
       };
+      console.log("------------dateTimeValue", dateTimeValue.value);
     };
     onMounted(async () => {
       await getDashboardData();
     });
-    console.log("------------dateTimeValue", dateTimeValue.value);
 
     const saveDashboardApi = useLoading(async () => {
       try {

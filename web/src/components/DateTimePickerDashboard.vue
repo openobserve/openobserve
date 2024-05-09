@@ -90,7 +90,7 @@ export default defineComponent({
         const periodUnits = ["m", "h", "d", "w", "M"];
 
         if (periodUnits.includes(periodUnit) && periodValue) {
-          dateTimePicker.value.setRelativeDate(periodUnit, periodValue);
+          dateTimePicker.value.setRelativeDate(periodUnit, +periodValue);
         }
       }
     };
