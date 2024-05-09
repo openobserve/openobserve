@@ -38,6 +38,7 @@ jobs:
         - "logsqueries.spec.js"
         - "sanity.spec.js"
         - "functions.spec.js"
+        - "pipeline.spec.js"
     steps:
       - name: Remove unused tools
         run: |
