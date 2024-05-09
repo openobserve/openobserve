@@ -354,7 +354,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 is_schema_changed = true;
             }
             Some(idx) => {
-                if !defined_schema_fields.contains(&item_name) {
+                if !defined_schema_fields.contains(item_name) {
                     println!("field {} is not in defined_schema_fields", item_name);
                     continue;
                 }
