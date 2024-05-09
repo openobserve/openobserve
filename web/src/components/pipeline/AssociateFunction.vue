@@ -282,7 +282,6 @@ const openDeleteDialog = () => {
 };
 
 const saveFunction = () => {
-  console.log("saveFunction");
   functionExists.value = true;
 
   if (
@@ -302,8 +301,6 @@ const saveFunction = () => {
     });
     emit("cancel:hideform");
   }
-
-  emit("cancel:hideform");
 };
 
 const onFunctionCreation = async (_function: any) => {
