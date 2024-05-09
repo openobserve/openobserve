@@ -141,7 +141,6 @@ pub async fn delete(
     Ok(())
 }
 
-#[tracing::instrument]
 async fn list_stream_schemas(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -181,7 +180,6 @@ async fn list_stream_schemas(
         .collect()
 }
 
-#[tracing::instrument(name = "db:schema:list")]
 pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
