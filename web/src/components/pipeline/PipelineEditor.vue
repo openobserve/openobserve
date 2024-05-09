@@ -328,6 +328,22 @@ const getPipeline = () => {
         (pipeline: Pipeline) => pipeline.name === route.query.name
       );
 
+      if (!_pipeline) {
+        q.notify({
+          message: "Pipeline not found",
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        });
+        router.replace({
+          name: "pipelines",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+
       pipeline.value = {
         ..._pipeline,
         functions: _pipeline?.functions?.list || [],
