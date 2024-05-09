@@ -337,13 +337,12 @@ color="grey" size="xs" />
           >
             <q-list class="region-dropdown-list">
               <q-item class="q-pa-sm" clickable
-v-close-popup>
-                <q-item-section
-                  v-close-popup
-                  v-for="(item, i) in Object.keys(
+v-close-popup v-for="item in Object.keys(
                     store.state.regionInfo
-                  ).entries()"
-                  :key="'region-key-' + i"
+                  )"
+                  :key="'region-key-' + item">
+                <q-item-section
+                  class="full-width"
                   @click.stop="
                     handleRegionsSelection(
                       item,
@@ -352,6 +351,7 @@ v-close-popup>
                   "
                 >
                   <q-icon
+                    size="xs"
                     :name="
                       searchObj.meta.regions.includes(item)
                         ? 'check_circle'
@@ -2781,8 +2781,9 @@ export default defineComponent({
   }
 
   .q-item__label {
-    margin-left: 5px;
+    margin-left: 20px;
     text-transform: capitalize;
+    margin-top: 2px;
   }
 }
 </style>
