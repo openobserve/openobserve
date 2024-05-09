@@ -328,6 +328,7 @@ pub async fn traces_json(
                             &local_trans,
                             value,
                             &stream_vrl_map,
+                            org_id,
                             &traces_stream_name,
                             &mut runtime,
                         )

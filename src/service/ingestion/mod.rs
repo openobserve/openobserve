@@ -87,7 +87,13 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row: &Value) -> Value {
+pub fn apply_vrl_fn(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: &Value,
+    org_id: &str,
+    stream_name: &str,
+) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(row),
@@ -104,12 +110,22 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row:
         Ok(res) => match res.try_into() {
             Ok(val) => val,
             Err(err) => {
-                log::error!("Returning original row , got error from vrl {:?}", err);
+                log::error!(
+                    "{}/{} vrl failed at processing result {:?}. Returning original row.",
+                    org_id,
+                    stream_name,
+                    err,
+                );
                 row.clone()
             }
         },
         Err(err) => {
-            log::error!("Returning original row , got error from vrl {:?}", err);
+            log::error!(
+                "{}/{} vrl runtime failed at getting result {:?}. Returning original row.",
+                org_id,
+                stream_name,
+                err,
+            );
             row.clone()
         }
     }
@@ -341,6 +357,7 @@ pub fn apply_stream_functions(
     local_trans: &[StreamTransform],
     mut value: Value,
     stream_vrl_map: &HashMap<String, VRLResultResolver>,
+    org_id: &str,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value> {
@@ -348,7 +365,7 @@ pub fn apply_stream_functions(
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
-            value = apply_vrl_fn(runtime, vrl_runtime, &value);
+            value = apply_vrl_fn(runtime, vrl_runtime, &value, org_id, stream_name);
         }
     }
     flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)

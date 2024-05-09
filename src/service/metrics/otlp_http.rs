@@ -370,6 +370,7 @@ pub async fn metrics_json_handler(
                                 &local_trans,
                                 rec,
                                 &stream_vrl_map,
+                                org_id,
                                 local_metric_name,
                                 &mut runtime,
                             )

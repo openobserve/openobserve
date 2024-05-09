@@ -386,6 +386,7 @@ async fn exec_query(
             sql.query_fn.clone().unwrap(),
             &batches_ref,
             &sql.org_id,
+            &sql.stream_name,
             sql.stream_type,
         ) {
             Err(err) => {
@@ -1375,10 +1376,11 @@ fn handle_query_fn(
     query_fn: String,
     batches: &[&RecordBatch],
     org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
     match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_name, stream_type),
         Err(err) => Err(DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
             err
@@ -1390,6 +1392,7 @@ fn apply_query_fn(
     query_fn_src: String,
     in_batch: Vec<json::Map<String, json::Value>>,
     org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
     use vector_enrichment::TableRegistry;
@@ -1411,6 +1414,8 @@ fn apply_query_fn(
                             fields: program.fields.clone(),
                         },
                         &json::Value::Object(hit.clone()),
+                        org_id,
+                        stream_name,
                     );
                     (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                 })

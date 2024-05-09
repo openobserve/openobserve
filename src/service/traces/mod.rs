@@ -272,6 +272,7 @@ pub async fn handle_trace_request(
                         &local_trans,
                         value,
                         &stream_vrl_map,
+                        org_id,
                         &traces_stream_name,
                         &mut runtime,
                     )

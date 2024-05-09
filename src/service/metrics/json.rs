@@ -365,6 +365,7 @@ fn apply_func(
         &local_tans,
         value,
         &stream_vrl_map,
+        org_id,
         metric_name,
         runtime,
     )

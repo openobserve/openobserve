@@ -310,6 +310,7 @@ pub async fn remote_write(
                 &local_trans,
                 value,
                 &stream_vrl_map,
+                org_id,
                 &metric_name,
                 &mut runtime,
             )?;
