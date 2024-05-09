@@ -18,10 +18,8 @@ import { ref } from "vue";
 import { DateTime } from "luxon";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
-import streamService from "@/services/stream";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import billings from "@/services/billings";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 
@@ -46,14 +44,16 @@ const useLocalStorage = (
       window.addEventListener("storage", read);
     });
 
-    window.addEventListener("unload", () => {
-      window.removeEventListener("storage", read);
-    });
+    // window.addEventListener("unload", () => {
+    //   alert('asd')
+    //   window.removeEventListener("storage", read);
+    // });
 
     // onMounted(() => {
     //   window.addEventListener("storage", read);
     // });
     // onUnmounted(() => {
+    //   alert("ad");
     //   window.removeEventListener("storage", read);
     // });
 

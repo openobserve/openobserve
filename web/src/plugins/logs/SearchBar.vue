@@ -778,7 +778,7 @@ import {
   onDeactivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { onBeforeRouteUpdate, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
 
@@ -794,10 +794,7 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import search from "../../services/search";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import stream from "@/services/stream";
-import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import {
   mergeDeep,
