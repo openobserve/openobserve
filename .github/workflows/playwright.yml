@@ -36,6 +36,8 @@ jobs:
         - "alerts.spec.js"
         - "logspage.spec.js"
         - "logsqueries.spec.js"
+        - "sanity.spec.js"
+        - "functions.spec.js"
     steps:
       - name: Remove unused tools
         run: |
