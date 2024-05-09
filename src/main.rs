@@ -357,10 +357,14 @@ fn init_router_grpc_server(
         .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
     let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
     let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
 
     tokio::task::spawn(async move {
         log::info!("starting gRPC server at {}", gaddr);
