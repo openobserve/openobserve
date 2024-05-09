@@ -45,7 +45,6 @@ const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
     "Function is associated with streams, please remove association from streams before deleting:";
 
-#[tracing::instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -66,12 +65,12 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
-            return Ok(
+            Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                     error.to_string(),
                 )),
-            );
+            )
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
 
@@ -132,7 +131,6 @@ pub async fn update_function(
     )))
 }
 
-#[tracing::instrument]
 pub async fn list_functions(
     org_id: String,
     permitted: Option<Vec<String>>,
@@ -160,7 +158,6 @@ pub async fn list_functions(
     }
 }
 
-#[tracing::instrument]
 pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
@@ -209,7 +206,6 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     }
 }
 
-#[tracing::instrument]
 pub async fn list_stream_functions(
     org_id: &str,
     stream_type: StreamType,
@@ -223,10 +219,9 @@ pub async fn list_stream_functions(
     }
 }
 
-#[tracing::instrument]
 pub async fn delete_stream_function(
     org_id: &str,
-    stream_type: StreamType,
+    _stream_type: StreamType,
     stream_name: &str,
     fn_name: &str,
 ) -> Result<HttpResponse, Error> {
@@ -273,7 +268,6 @@ pub async fn delete_stream_function(
     }
 }
 
-#[tracing::instrument]
 pub async fn add_function_to_stream(
     org_id: &str,
     stream_type: StreamType,
