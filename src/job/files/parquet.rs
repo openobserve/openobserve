@@ -151,7 +151,11 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
             continue;
         }
 
-        let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
+        let parquet_meta = if let Some(meta) = WAL_PARQUET_METADATA.read().await.get(&file_key) {
+            meta.clone()
+        } else if let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await {
+            parquet_meta
+        } else {
             continue;
         };
         if parquet_meta.eq(&FileMeta::default()) {
@@ -228,6 +232,30 @@ async fn move_files(
         return Ok(());
     }
 
+    log::debug!(
+        "[INGESTER:JOB:{thread_id}] get schema for partition: {}",
+        prefix
+    );
+
+    // get latest schema
+    let latest_schema = match infra::schema::get(&org_id, &stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::error!(
+                "[INGESTER:JOB:{thread_id}] Failed to get latest schema for stream [{}/{}/{}]: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                e
+            );
+            // need release all the files
+            for file in files.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Err(e.into());
+        }
+    };
+
     // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
     let wal_dir = wal_dir.clone();
@@ -244,6 +272,8 @@ async fn move_files(
             CONFIG.limit.max_file_size_on_disk as i64,
             CONFIG.compact.max_file_size as i64,
         )
+        && (CONFIG.limit.file_move_fields_limit == 0
+            || latest_schema.fields().len() < CONFIG.limit.file_move_fields_limit)
     {
         let mut has_expired_files = false;
         // not enough files to upload, check if some files are too old
@@ -275,30 +305,6 @@ async fn move_files(
             return Ok(());
         }
     }
-
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] get schema for partition: {}",
-        prefix
-    );
-
-    // get latest schema
-    let latest_schema = match infra::schema::get(&org_id, &stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(e) => {
-            log::error!(
-                "[INGESTER:JOB:{thread_id}] Failed to get latest schema for stream [{}/{}/{}]: {}",
-                &org_id,
-                stream_type,
-                &stream_name,
-                e
-            );
-            // need release all the files
-            for file in files_with_size.iter() {
-                PROCESSING_FILES.write().await.remove(&file.key);
-            }
-            return Err(e.into());
-        }
-    };
 
     log::debug!(
         "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
