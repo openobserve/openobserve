@@ -32,10 +32,8 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-        - "logsquickmode.spec.js"
-        # - "logspage.spec.js"
-        # - "sanity.spec.js"
-        - "pipeline.spec.js"
+         ["logsquickmode.spec.js", "logs.spec.js", "logspage.spec.js", "sanity.spec.js", "pipeline.spec.js"]
+       
     steps:
       - name: Remove unused tools
         run: |
