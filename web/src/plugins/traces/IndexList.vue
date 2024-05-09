@@ -192,7 +192,7 @@ import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 import streamService from "@/services/stream";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { watch } from "vue";
