@@ -13,7 +13,7 @@
           name="cancel"
           class="cursor-pointer"
           size="20px"
-          :v-close-popup="true"
+          v-close-popup="true"
         />
       </div>
 
@@ -126,7 +126,7 @@
       <div class="flex justify-start q-mt-lg q-px-md">
         <q-btn
           data-test="add-pipeline-cancel-btn"
-          :v-close-popup="true"
+          v-close-popup="true"
           class="q-mb-md text-bold"
           :label="t('alerts.cancel')"
           text-color="light-text"
