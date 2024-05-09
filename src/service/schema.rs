@@ -22,6 +22,7 @@ use config::{
     CONFIG,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
+use infra::schema::unwrap_stream_settings;
 use serde_json::{Map, Value};
 
 use crate::{
@@ -171,6 +172,8 @@ pub async fn check_for_schema(
             }
         }
     }
+
+    println!("schema: {:?}", inferred_schema);
 
     // slow path
     let ret = handle_diff_schema(
@@ -336,6 +339,12 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
+    let meta = unwrap_stream_settings(schema.schema());
+    let defined_schema_fields = match meta {
+        Some(meta) => meta.defined_schema_fields.unwrap_or(vec![]),
+        None => vec![],
+    };
+
     for item in inferred_schema.fields.iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
@@ -345,6 +354,10 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 is_schema_changed = true;
             }
             Some(idx) => {
+                if !defined_schema_fields.contains(&item_name) {
+                    println!("field {} is not in defined_schema_fields", item_name);
+                    continue;
+                }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {
                     if !CONFIG.common.widening_schema_evolution {
