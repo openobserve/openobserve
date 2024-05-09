@@ -67,7 +67,12 @@ impl TraceService for TraceServer {
             .export(request)
             .await
         {
-            Ok(res) => Ok(res),
+            Ok(res) => {
+                if res.get_ref().partial_success.is_some() {
+                    log::error!("export trace msg: {:?}, response: {:?}", msg, res.get_ref());
+                }
+                Ok(res)
+            }
             Err(e) => {
                 log::error!("export trace msg: {:?}, status: {e}", msg);
                 Err(e)
