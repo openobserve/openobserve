@@ -350,6 +350,7 @@ pub async fn search(
         ("stream_name" = String, Path, description = "stream_name name"),
         ("key" = i64, Query, description = "around key"),
         ("size" = i64, Query, description = "around size"),
+        ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -442,6 +443,12 @@ pub async fn around(
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
 
+    let regions = query.get("regions").map_or("", |v| v.as_str());
+    let regions = regions
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -490,11 +497,10 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions: regions.clone(),
         clusters: vec![],
         timeout,
     };
@@ -570,11 +576,10 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout,
     };
@@ -709,6 +714,7 @@ pub async fn around(
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
+        ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -921,6 +927,12 @@ async fn values_v1(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
+    let regions = query.get("regions").map_or("", |v| v.as_str());
+    let regions = regions
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -957,11 +969,10 @@ async fn values_v1(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout,
     };
@@ -1151,6 +1162,12 @@ async fn values_v2(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
+    let regions = query.get("regions").map_or("", |v| v.as_str());
+    let regions = regions
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -1187,11 +1204,10 @@ async fn values_v2(
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout,
     };
