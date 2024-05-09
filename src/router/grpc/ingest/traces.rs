@@ -60,7 +60,7 @@ impl TraceService for TraceServer {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)
         });
-        let msg = request.get_ref().clone();
+
         match client
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
@@ -70,15 +70,14 @@ impl TraceService for TraceServer {
             Ok(res) => {
                 if res.get_ref().partial_success.is_some() {
                     log::error!(
-                        "export trace partial_success: {:?}, response: {:?}",
-                        msg,
+                        "export trace partial_success, response: {:?}",
                         res.get_ref()
                     );
                 }
                 Ok(res)
             }
             Err(e) => {
-                log::error!("export trace msg: {:?}, status: {e}", msg);
+                log::error!("export trace status: {e}");
                 Err(e)
             }
         }

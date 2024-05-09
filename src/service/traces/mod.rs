@@ -190,7 +190,6 @@ pub async fn handle_trace_request(
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
-                let debug_span = span.clone();
                 let span_id: String = SpanId::from_bytes(
                     span.span_id
                         .try_into()
@@ -376,7 +375,6 @@ pub async fn handle_trace_request(
                 hour_buf.records_size += record_size;
 
                 if timestamp < min_ts.try_into().unwrap() {
-                    log::warn!("span is rejectd : {:?}", debug_span);
                     partial_success.rejected_spans += 1;
                     continue;
                 }
