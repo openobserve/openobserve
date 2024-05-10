@@ -2241,7 +2241,7 @@ const useLogs = () => {
     }
   };
 
-  function extractTimestamps(period) {
+  function extractTimestamps(period: string) {
     const currentTime = new Date();
     let fromTimestamp, toTimestamp;
 
