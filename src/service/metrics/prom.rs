@@ -31,7 +31,7 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{unwrap_partition_time_level, update_setting},
+    schema::{unwrap_partition_time_level, update_setting, SchemaCache},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -51,7 +51,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        schema::{check_for_schema, stream_schema_exists, SchemaCache},
+        schema::{check_for_schema, stream_schema_exists},
         search as search_service,
         usage::report_request_usage_stats,
     },

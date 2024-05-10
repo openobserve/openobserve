@@ -37,7 +37,7 @@ use config::{
 };
 use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
-use infra::{cache, storage};
+use infra::{cache, schema::SchemaCache, storage};
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
@@ -51,7 +51,6 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
-        schema::SchemaCache,
         search::datafusion::{
             exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
         },

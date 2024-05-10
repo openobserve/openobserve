@@ -29,15 +29,12 @@ use config::{
     },
     CONFIG,
 };
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{ingestion::TriggerAlertData, schema::get_invalid_schema_start_dt};
 use crate::{
     common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
-    service::{
-        ingestion::get_wal_time_key,
-        schema::{check_for_schema, SchemaCache},
-    },
+    service::{ingestion::get_wal_time_key, schema::check_for_schema},
 };
 
 pub mod bulk;
@@ -467,7 +464,7 @@ pub fn refactor_map(
     defined_schema_keys: &HashSet<String>,
 ) -> Map<String, Value> {
     let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
-    let mut non_schema_map = Vec::with_capacity(1024);
+    let mut non_schema_map = Vec::with_capacity(1024); // 1KB
 
     let mut has_elements = false;
     non_schema_map.write_all(b"{").unwrap();
