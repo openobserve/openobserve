@@ -1688,6 +1688,7 @@ export default defineComponent({
               // }
               delete extractedObj.data.stream.streamLists;
               delete searchObj.data.stream.selectedStream;
+              delete searchObj.meta.regions;
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
                 searchObj.data.stream.functions;
