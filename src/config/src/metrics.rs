@@ -540,6 +540,40 @@ pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static SPAN_CALLS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new("span_calls", "span calls total")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[
+            "organization",
+            "stream",
+            "service_name",
+            "operation_name",
+            "status_code",
+            "span_kind",
+        ],
+    )
+    .expect("Metric created")
+});
+
+pub static SPAN_DURATION_MILLISECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("span_duration_milliseconds", "span duration milliseconds")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[
+            "organization",
+            "stream",
+            "service_name",
+            "operation_name",
+            "status_code",
+            "span_kind",
+        ],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry

@@ -259,7 +259,7 @@ pub async fn handle_trace_request(
                     //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
                 };
-
+                // let span_status_for_metrics = local_val.span_status.clone();
                 let value: json::Value = json::to_value(local_val).unwrap();
 
                 // JSON Flattening
@@ -378,6 +378,29 @@ pub async fn handle_trace_request(
                     partial_success.rejected_spans += 1;
                     continue;
                 }
+
+                // record span metrics
+                // metrics::SPAN_CALLS
+                //     .with_label_values(&[
+                //         org_id,
+                //         &traces_stream_name,
+                //         &service_name,
+                //         &span.name,
+                //         &span_status_for_metrics,
+                //         &span.kind.to_string(),
+                //     ])
+                //     .inc();
+
+                // metrics::SPAN_DURATION_MILLISECONDS
+                //     .with_label_values(&[
+                //         org_id,
+                //         &traces_stream_name,
+                //         &service_name,
+                //         &span.name,
+                //         &span_status_for_metrics,
+                //         &span.kind.to_string(),
+                //     ])
+                //     .observe((end_time - start_time) as f64 / 1000.0);
             }
         }
     }

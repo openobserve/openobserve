@@ -61,23 +61,25 @@ impl TraceService for TraceServer {
             Ok(req)
         });
 
+        let req_size = std::mem::size_of_val(&request);
+        let start = std::time::Instant::now();
         match client
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
+            .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+            .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
             .export(request)
             .await
         {
             Ok(res) => {
                 if res.get_ref().partial_success.is_some() {
-                    log::error!(
-                        "export trace partial_success response: {:?}",
-                        res.get_ref()
-                    );
+                    log::error!("export trace partial_success response:{:?}", res.get_ref());
                 }
                 Ok(res)
             }
             Err(e) => {
-                log::error!("export trace status: {e}");
+                let time = start.elapsed().as_secs_f64();
+                log::error!("export trace size: {req_size}, status: {e}, elapsed: {time}");
                 Err(e)
             }
         }
