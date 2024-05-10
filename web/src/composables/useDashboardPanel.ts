@@ -845,7 +845,7 @@ const useDashboardPanelData = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: 10,
+      size: 100,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
@@ -889,7 +889,7 @@ const useDashboardPanelData = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: 10,
+      size: 100,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,

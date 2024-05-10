@@ -775,11 +775,28 @@ export default defineComponent({
 
         // Get the parsed query
         try {
-          dashboardPanelData.meta.parsedQuery = parser.astify(
-            dashboardPanelData.data.queries[
+          let currentQuery = dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].query
-          );
+          
+           // replace variables with dummy values to verify query is correct or not
+          if(/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:csv}/g, "1,2")
+          }
+          if(/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:singlequote}/g, "'1','2'")
+          }
+          if(/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:doublequote}/g, '"1","2"')
+          }
+          if(/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:pipe}/g, "1|2")
+          }
+          if(/\$(\w+|\{\w+\})/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10")
+          }
+
+          dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
         } catch (e) {
           // exit as there is an invalid query
           dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
