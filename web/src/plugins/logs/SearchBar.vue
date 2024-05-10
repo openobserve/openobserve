@@ -247,6 +247,7 @@ color="grey" size="xs" />
           </q-btn-dropdown>
         </q-btn-group>
         <q-toggle
+          v-if="store.state.zoConfig.quick_mode_enabled"
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
           :label="t('search.quickModeLabel')"

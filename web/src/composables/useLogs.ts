@@ -201,8 +201,6 @@ const useLogs = () => {
   const notificationMsg = ref("");
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
-  searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
-
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -799,7 +797,8 @@ const useLogs = () => {
 
       if (
         config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
+        store.state.zoConfig.super_cluster_enabled &&
+        queryReq.query.hasOwnProperty("regions")
       ) {
         partitionQueryReq["regions"] = queryReq.query.regions;
       }
