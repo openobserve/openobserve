@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rows="indexData.schema"
               :columns="columns"
               :row-key="(row) => 'tr_' + row.name"
-              :filter="filterField"
+              :filter="`${filterField}@${activeTab}`"
               :filter-method="filterFieldFn"
               :pagination="{ rowsPerPage }"
               class="q-table"
@@ -172,21 +172,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
             >
               <template #top-right>
-                <q-input
-                  data-test="schema-field-search-input"
-                  v-model="filterField"
-                  data-cy="schema-index-field-search-input"
-                  filled
-                  borderless
-                  dense
-                  clearable
-                  debounce="1"
-                  :placeholder="t('search.searchField')"
-                >
-                  <template #prepend>
-                    <q-icon name="search" />
-                  </template>
-                </q-input>
+                <div class="flex justify-between items-center full-width">
+                  <div>
+                    <app-tabs
+                      v-if="isSchemaEvolutionEnabled"
+                      class="schema-fields-tabs"
+                      style="
+                        border: 1px solid #8a8a8a;
+                        border-radius: 4px;
+                        overflow: hidden;
+                      "
+                      data-test="schema-fields-tabs"
+                      :tabs="tabs"
+                      :active-tab="activeTab"
+                      @update:active-tab="updateActiveTab"
+                    />
+                  </div>
+
+                  <q-input
+                    data-test="schema-field-search-input"
+                    v-model="filterField"
+                    data-cy="schema-index-field-search-input"
+                    filled
+                    borderless
+                    dense
+                    clearable
+                    debounce="1"
+                    :placeholder="t('search.searchField')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" />
+                    </template>
+                  </q-input>
+                </div>
               </template>
               <template v-slot:body-cell-delete="props">
                 <q-td class="text-center">
@@ -255,13 +273,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
 
                       <q-btn
-                        v-if="indexData.defined_schema_fields.length"
+                        v-if="
+                          isSchemaEvolutionEnabled && deleteFieldList.length
+                        "
                         data-test="schema-add-field-button"
                         class="q-my-sm no-border text-bold q-ml-md"
-                        :label="t('logStream.addField')"
+                        :label="
+                          activeTab === 'schemaFields'
+                            ? t('logStream.removeSchemaField')
+                            : t('logStream.addSchemaField')
+                        "
                         padding="sm md"
                         color="secondary"
                         no-caps
+                        v-bind:disable="!deleteFieldList.length"
                         @click="scrollToAddFields"
                       />
 
@@ -307,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onBeforeMount, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
@@ -319,6 +344,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
 import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 const defaultValue: any = () => {
   return {
@@ -326,6 +352,7 @@ const defaultValue: any = () => {
     schema: [],
     stats: {},
     defaultFts: false,
+    defined_schema_fields: [],
   };
 };
 
@@ -341,6 +368,7 @@ export default defineComponent({
   components: {
     ConfirmDialog,
     StreamFieldsInputs,
+    AppTabs,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -358,6 +386,24 @@ export default defineComponent({
     const filterField = ref("");
     const router = useRouter();
     const newSchemaFields = ref([]);
+    const activeTab = ref("allFields");
+
+    const hasUserDefinedSchema = computed(() => {
+      return !!indexData.value.defined_schema_fields?.length;
+    });
+
+    const tabs = computed(() => [
+      {
+        value: "allFields",
+        label: "All Fields",
+        disabled: false,
+      },
+      {
+        value: "schemaFields",
+        label: "User Defined Schema",
+        disabled: !hasUserDefinedSchema.value,
+      },
+    ]);
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
@@ -373,6 +419,10 @@ export default defineComponent({
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
+    });
+
+    const isSchemaEvolutionEnabled = computed(() => {
+      return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
     const addDeleteField = (schema: any) => {
@@ -748,22 +798,38 @@ export default defineComponent({
     };
 
     const filterFieldFn = (rows: any, terms: any) => {
+      console.log(terms, terms.split("@"));
+      let [field, fieldType] = terms.split("@");
+
+      console.log(field, fieldType);
       var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+
+      field = field.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (fieldType === "schemaFields") {
+          if (indexData.value.defined_schema_fields.includes(rows[i]["name"])) {
+            if (!field) {
+              filtered.push(rows[i]);
+            } else {
+              if (rows[i]["name"].toLowerCase().includes(field)) {
+                filtered.push(rows[i]);
+              }
+            }
+          }
+        } else {
+          if (rows[i]["name"].toLowerCase().includes(field)) {
             filtered.push(rows[i]);
           }
         }
       }
+
       return filtered;
     };
 
     const columns = [
       {
         name: "delete",
-        label: t("logStream.deleteActionLabel"),
+        label: "",
         align: "center",
         sortable: false,
       },
@@ -807,6 +873,10 @@ export default defineComponent({
       }
     };
 
+    const updateActiveTab = (tab) => {
+      activeTab.value = tab;
+    };
+
     return {
       t,
       q,
@@ -840,6 +910,11 @@ export default defineComponent({
       removeSchemaField,
       newSchemaFields,
       scrollToAddFields,
+      tabs,
+      activeTab,
+      updateActiveTab,
+      hasUserDefinedSchema,
+      isSchemaEvolutionEnabled,
     };
   },
   created() {
@@ -991,6 +1066,29 @@ export default defineComponent({
         text-wrap: nowrap;
         display: inline-block;
       }
+    }
+  }
+}
+// background:
+//             activeTab.value === "allFields" ? "#5960B2 !important" : "",
+// color: activeTab.value === "allFields" ? "#ffffff !important" : "",
+
+.indexDetailsContainer {
+  .q-table__control {
+    width: 100%;
+  }
+}
+
+.schema-fields-tabs {
+  height: fit-content;
+  .rum-tab {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
     }
   }
 }
