@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{BufRead, BufReader},
     sync::Arc,
 };
@@ -112,7 +112,7 @@ pub async fn ingest(
 
     let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
 
-    let mut user_defined_schema_map: HashMap<String, Vec<String>> = HashMap::new();
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -296,7 +296,7 @@ pub async fn ingest(
             };
 
             if let Some(fields) = user_defined_schema_map.get(&stream_name) {
-                crate::service::logs::refactor_map(&mut local_val, fields);
+                local_val = crate::service::logs::refactor_map(&local_val, fields);
             }
 
             // set _id
