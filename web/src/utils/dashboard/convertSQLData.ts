@@ -99,16 +99,6 @@ export const convertSQLData = (
 
     let result = keyArrays[key] || [];
 
-    // when the key is not available in the data that is not show the default value
-    const field = panelSchema.queries[0].fields?.x.find(
-      (it: any) =>
-        it.aggregationFunction == "histogram" &&
-        it.column == store.state.zoConfig.timestamp_column
-    );
-    if (field && field.alias == key) {
-      // now we have the format, convert that format
-      result = result.map((it: any) => new Date(it + "Z").getTime());
-    }
     return result;
   };
 
@@ -482,11 +472,6 @@ export const convertSQLData = (
           ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
 
-        // create a trace based on second xAxis's unique values
-        // queryData who has the xaxis[0] key.
-        const xAxisUniqueValue = Array.from(
-          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-        );
         options.series = yAxisKeys
           .map((yAxis: any) => {
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
@@ -504,7 +489,7 @@ export const convertSQLData = (
                 ...defaultSeriesProps,
                 // config to connect null values
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
-                data: xAxisUniqueValue.map(
+                data: options.xAxis[0].data.map(
                   (it: any) =>
                     data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
                     null
@@ -805,18 +790,13 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
-      // queryData who has the xaxis[0] key.
-      const xAxisUniqueValue = Array.from(
-        new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-      );
-
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
         const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
-          data: xAxisUniqueValue.map(
+          data: options.xAxis[0].data.map(
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
                 yAxisKeys[0]
@@ -1013,17 +993,13 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
-      // get the unique value of the first xAxis's key
-      const xAxisUniqueValue = Array.from(
-        new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-      );
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
         const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
-          data: xAxisUniqueValue.map(
+          data: options.xAxis[0].data.map(
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
                 yAxisKeys[0]
@@ -1266,16 +1242,10 @@ export const convertSQLData = (
         // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            store.state.timezone != "UTC"
-              ? utcToZonedTime(
-                  Number.isInteger(options?.xAxis[0]?.data[index])
-                    ? options?.xAxis[0]?.data[index]
-                    : new Date(options?.xAxis[0]?.data[index]).getTime(),
-                  store.state.timezone
-                )
-              : new Date(options?.xAxis[0]?.data[index])
-                  .toISOString()
-                  .slice(0, -1),
+            utcToZonedTime(
+              new Date(options.xAxis[0].data[index] + "Z").getTime(),
+              store.state.timezone
+            ),
             it ?? null,
           ]);
         } else if (timestampField) {
@@ -1407,12 +1377,10 @@ export const convertSQLData = (
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            store.state.timezone != "UTC"
-              ? utcToZonedTime(
-                  new Date(options.xAxis[0].data[index] + "Z").getTime(),
-                  store.state.timezone
-                )
-              : new Date(options.xAxis[0].data[index]).getTime(),
+            utcToZonedTime(
+              new Date(options.xAxis[0].data[index] + "Z").getTime(),
+              store.state.timezone
+            ),
             it ?? null,
           ]);
         } else if (isTimeStampData) {
