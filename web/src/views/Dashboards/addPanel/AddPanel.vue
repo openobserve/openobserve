@@ -326,6 +326,7 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
+import utcToZonedTime from "date-fns-tz/utcToZonedTime";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -516,8 +517,14 @@ export default defineComponent({
           );
 
           dateTimePickerRef.value?.setCustomDate("absolute", {
-            start: currentDashboardData.data?.dateTime?.startTime / 1000,
-            end: currentDashboardData.data?.dateTime?.endTime / 1000,
+            start: utcToZonedTime(
+              currentDashboardData.data?.dateTime?.startTime / 1000,
+              store.state.timezone
+            ),
+            end: utcToZonedTime(
+              currentDashboardData.data?.dateTime?.endTime / 1000,
+              store.state.timezone
+            ),
           });
         }
       }
