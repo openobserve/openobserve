@@ -407,7 +407,7 @@ export default defineComponent({
           selectedDate.value = {
             valueType: "relative",
             relativeTimePeriod:
-              currentDashboardData.data?.dateTime.relativeTimePeriod ?? "15m",
+              currentDashboardData.data?.dateTime?.relativeTimePeriod ?? "15m",
           };
         } else {
           // else, dashboard will have absolute time settings
