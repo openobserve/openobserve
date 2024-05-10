@@ -49,6 +49,7 @@ import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
+import config from "@/aws-exports";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -118,6 +119,7 @@ const defaultObject = {
     scrollInfo: {},
     flagWrapContent: false,
     pageType: "logs", // 'logs' or 'stream
+    regions: [],
   },
   data: {
     query: <any>"",
@@ -486,6 +488,13 @@ const useLogs = () => {
         },
       };
 
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled
+      ) {
+        req["regions"] = searchObj.meta.regions;
+      }
+
       if (searchObj.data.stream.selectedStreamFields.length == 0) {
         const streamData: any = getStream(
           searchObj.data.stream.selectedStream.value,
@@ -787,6 +796,13 @@ const useLogs = () => {
         end_time: queryReq.query.end_time,
         sql_mode: searchObj.meta.sqlMode ? "full" : "context",
       };
+
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled
+      ) {
+        partitionQueryReq["regions"] = queryReq.query.regions;
+      }
 
       await searchService
         .partition({
@@ -1992,6 +2008,7 @@ const useLogs = () => {
           query_context: query_context,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,
+          regions: searchObj.meta.regions.join(","),
         })
         .then((res) => {
           searchObj.loading = false;
@@ -2435,6 +2452,12 @@ const useLogs = () => {
     return modifiedSql;
   }
 
+  const getRegionInfo = () => {
+    searchService.get_regions().then((res) => {
+      store.dispatch("setRegionInfo", res.data);
+    });
+  };
+
   return {
     searchObj,
     getStreams,
@@ -2468,6 +2491,7 @@ const useLogs = () => {
     getHistogramQueryData,
     fnParsedSQL,
     addOrderByToQuery,
+    getRegionInfo,
   };
 };
 
