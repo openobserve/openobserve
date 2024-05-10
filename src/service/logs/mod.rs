@@ -150,14 +150,14 @@ pub fn cast_to_schema_v1(
     value: &mut Map<String, Value>,
     schema_map: &HashMap<&String, &DataType>,
 ) -> Result<(), anyhow::Error> {
-    let mut parse_error = String::new();
+    let mut errors = Vec::new();
     for (field_name, data_type) in schema_map {
-        let field_name_str = field_name.to_owned().to_owned();
-        let Some(val) = value.get(&field_name_str) else {
+        let field_name_str = *field_name;
+        let Some(val) = value.get_mut(field_name_str) else {
             continue;
         };
         if val.is_null() {
-            value.insert(field_name_str, Value::Null);
+            *val = Value::Null;
             continue;
         }
         match data_type {
@@ -165,25 +165,22 @@ pub fn cast_to_schema_v1(
                 if val.is_string() {
                     continue;
                 }
-                value.insert(field_name_str, Value::String(get_string_value(val)));
+                *val = Value::String(get_string_value(val));
             }
             DataType::Int64 | DataType::Int32 | DataType::Int16 | DataType::Int8 => {
                 if val.is_i64() {
                     continue;
                 }
                 if val.is_boolean() {
-                    value.insert(
-                        field_name_str,
-                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
-                    );
+                    *val = Value::Number(bool_to_serde_json_number(val.as_bool().unwrap()));
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<i64>() {
-                    Ok(val) => {
-                        value.insert(field_name_str, Value::Number(val.into()));
+                let local_val = get_string_value(val);
+                match local_val.parse::<i64>() {
+                    Ok(local_val) => {
+                        *val = Value::Number(local_val.into());
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((field_name_str, *data_type)),
                 };
             }
             DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
@@ -191,18 +188,16 @@ pub fn cast_to_schema_v1(
                     continue;
                 }
                 if val.is_boolean() {
-                    value.insert(
-                        field_name_str,
-                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
-                    );
+                    *val = Value::Number(bool_to_serde_json_number(val.as_bool().unwrap()));
+
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<u64>() {
-                    Ok(val) => {
-                        value.insert(field_name_str, Value::Number(val.into()));
+                let local_val = get_string_value(val);
+                match local_val.parse::<u64>() {
+                    Ok(local_val) => {
+                        *val = Value::Number(local_val.into());
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((field_name_str, *data_type)),
                 };
             }
             DataType::Float64 | DataType::Float32 | DataType::Float16 => {
@@ -210,40 +205,39 @@ pub fn cast_to_schema_v1(
                     continue;
                 }
                 if val.is_boolean() {
-                    value.insert(
-                        field_name_str,
-                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
-                    );
+                    *val = Value::Number(bool_to_serde_json_number(val.as_bool().unwrap()));
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<f64>() {
-                    Ok(val) => {
-                        value.insert(
-                            field_name_str,
-                            Value::Number(serde_json::Number::from_f64(val).unwrap()),
-                        );
+                let local_val = get_string_value(val);
+                match local_val.parse::<f64>() {
+                    Ok(local_val) => {
+                        *val = Value::Number(serde_json::Number::from_f64(local_val).unwrap());
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((field_name_str, *data_type)),
                 };
             }
             DataType::Boolean => {
                 if val.is_boolean() {
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<bool>() {
-                    Ok(val) => {
-                        value.insert(field_name_str, Value::Bool(val));
+                let local_val: String = get_string_value(val);
+                match local_val.parse::<bool>() {
+                    Ok(local_val) => {
+                        *val = Value::Bool(local_val);
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((field_name_str, *data_type)),
                 };
             }
-            _ => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+            _ => errors.push((field_name_str, *data_type)),
         };
     }
-    if !parse_error.is_empty() {
-        Err(anyhow::Error::msg(parse_error))
+    if !errors.is_empty() {
+        let error_message = errors
+            .iter()
+            .map(|(field, dt)| format!("Failed to cast Field: {}, DataType: {:?}", field, dt))
+            .collect::<Vec<_>>()
+            .join(", ");
+        Err(anyhow::Error::msg(error_message))
     } else {
         Ok(())
     }
@@ -386,13 +380,6 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
         "Failed to cast {} to type {} ",
         field.name(),
         field.data_type()
-    ));
-}
-
-fn set_parsing_error_v1(parse_error: &mut String, field_name: &str, field_data_type: &DataType) {
-    parse_error.push_str(&format!(
-        "Failed to cast {} to type {} ",
-        field_name, field_data_type
     ));
 }
 
