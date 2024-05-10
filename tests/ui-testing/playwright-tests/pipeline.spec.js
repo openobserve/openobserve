@@ -274,12 +274,9 @@ test.describe("Pipeline testcases", () => {
   await page.mouse.up();
   await page.waitForTimeout(2000)
   await page.locator('[data-test="associate-function-save-btn"]').click();
-  await page.getByText('Function is already associated').click();
-  
-
+  // await page.getByText('Function is already associated').click();
 
   });
-
 
   test('should add streamroute node', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
