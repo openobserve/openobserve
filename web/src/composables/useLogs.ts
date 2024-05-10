@@ -706,12 +706,12 @@ const useLogs = () => {
 
       // in case of sql mode or disable histogram to get total records we need to set track_total_hits to true
       // because histogram query will not be executed
-      if (
-        searchObj.data.resultGrid.currentPage == 1 &&
-        (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
-      ) {
-        req.query.track_total_hits = true;
-      }
+      // if (
+      //   searchObj.data.resultGrid.currentPage == 1 &&
+      //   (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
+      // ) {
+      //   req.query.track_total_hits = true;
+      // }
 
       if (
         searchObj.data.resultGrid.currentPage > 1 ||
@@ -1185,6 +1185,9 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
+          if (queryReq.query.from == 0) {
+            await getPageCount(queryReq);
+          }
           console.log("Histogram is not available for aggregation queries.");
         }
       } else {
@@ -1242,23 +1245,91 @@ const useLogs = () => {
     }
   };
 
+  const getPageCount = async (queryReq: any) => {
+    return new Promise((resolve, reject) => {
+      queryReq.query.size = 0;
+      queryReq.query.track_total_hits = true;
+      searchService
+        .search({
+          org_identifier: searchObj.organizationIdetifier,
+          query: queryReq,
+          page_type: searchObj.data.stream.streamType,
+        })
+        .then(async (res) => {
+          // check for total records update for the partition and update pagination accordingly
+          // searchObj.data.queryResults.partitionDetail.partitions.forEach(
+          //   (item: any, index: number) => {
+          for (const [
+            index,
+            item,
+          ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+            if (
+              (searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] == -1 ||
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] < res.data.total
+               ) &&
+              queryReq.query.start_time == item[0]
+            ) {
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] = res.data.total;
+            }
+          }
+
+          let regeratePaginationFlag = false;
+          if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
+            regeratePaginationFlag = true;
+          }
+          // if total records in partition is greate than recordsPerPage then we need to update pagination
+          // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+          refreshPartitionPagination(regeratePaginationFlag);
+          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          resolve(true);
+        })
+        .catch((err) => {
+          searchObj.loading = false;
+          if (err.response != undefined) {
+            searchObj.data.errorMsg = err.response.data.error;
+          } else {
+            searchObj.data.errorMsg = err.message;
+          }
+
+          const customMessage = logsErrorMessage(err?.response?.data.code);
+          searchObj.data.errorCode = err?.response?.data.code;
+
+          if (customMessage != "") {
+            searchObj.data.errorMsg = t(customMessage);
+          }
+
+          if (err?.response?.data?.code == 429) {
+            notificationMsg.value = err.response.data.message;
+            searchObj.data.errorMsg = err.response.data.message;
+          }
+          reject(false);
+        });
+    });
+  };
+
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false
   ) => {
     return new Promise((resolve, reject) => {
-      // set track_total_hits true for first request of partition to get total records in partition
-      // it will be used to send pagination request
-      if (queryReq.query.from == 0) {
-        queryReq.query.track_total_hits = true;
-      } else if (
-        searchObj.data.queryResults.partitionDetail.partitionTotal[
-          searchObj.data.resultGrid.currentPage - 1
-        ] > -1 &&
-        queryReq.query.hasOwnProperty("track_total_hits")
-      ) {
-        delete queryReq.query.track_total_hits;
-      }
+      // // set track_total_hits true for first request of partition to get total records in partition
+      // // it will be used to send pagination request
+      // if (queryReq.query.from == 0) {
+      //   queryReq.query.track_total_hits = true;
+      // } else if (
+      //   searchObj.data.queryResults.partitionDetail.partitionTotal[
+      //     searchObj.data.resultGrid.currentPage - 1
+      //   ] > -1 &&
+      //   queryReq.query.hasOwnProperty("track_total_hits")
+      // ) {
+      //   delete queryReq.query.track_total_hits;
+      // }
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL: any = fnParsedSQL();
@@ -1394,18 +1465,18 @@ const useLogs = () => {
 
           // disabled histogram case, generate histogram histogram title
           // also calculate the total based on the partitions total
-          if (
-            searchObj.meta.showHistogram == false ||
-            searchObj.meta.sqlMode == true
-          ) {
-            searchObj.data.queryResults.total = 0;
-            for (const totalNumber of searchObj.data.queryResults
-              .partitionDetail.partitionTotal) {
-              if (totalNumber > 0) {
-                searchObj.data.queryResults.total += totalNumber;
-              }
-            }
-          }
+          // if (
+          //   searchObj.meta.showHistogram == false ||
+          //   searchObj.meta.sqlMode == true
+          // ) {
+          //   searchObj.data.queryResults.total = 0;
+          //   for (const totalNumber of searchObj.data.queryResults
+          //     .partitionDetail.partitionTotal) {
+          //     if (totalNumber > 0) {
+          //       searchObj.data.queryResults.total += totalNumber;
+          //     }
+          //   }
+          // }
           searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
           searchObj.data.functionError = "";
@@ -1485,7 +1556,35 @@ const useLogs = () => {
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
-            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
+
+            for (const [
+              index,
+              item,
+            ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+              if (
+                (searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] == -1 ||
+                searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] < res.data.total) &&
+                queryReq.query.start_time == item[0]
+              ) {
+                searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] = res.data.total;
+              }
+            }
+  
+            let regeratePaginationFlag = false;
+            if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
+              regeratePaginationFlag = true;
+            }
+            // if total records in partition is greate than recordsPerPage then we need to update pagination
+            // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+            refreshPartitionPagination(regeratePaginationFlag);
+
+            searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
             dismiss();
             resolve(true);
