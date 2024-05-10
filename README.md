@@ -197,3 +197,4 @@ Easiest way to get support is to join the [Slack channel](https://short.openobse
 ### 📱 Join our WeChat Group
 
 <img src="./screenshots/wechat_qr.jpg" width="300">
+
