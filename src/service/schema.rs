@@ -203,8 +203,6 @@ pub async fn check_for_schema(
         }
     }
 
-    println!("schema: {:?}", inferred_schema);
-
     // slow path
     let ret = handle_diff_schema(
         org_id,

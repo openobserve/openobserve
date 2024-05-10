@@ -153,7 +153,6 @@ pub fn cast_to_schema_v1(
     let mut parse_error = String::new();
     for (field_name, data_type) in schema_map {
         let field_name_str = field_name.to_owned().to_owned();
-        // let field_name = field_name_str.to_owned();
         let Some(val) = value.get(&field_name_str) else {
             continue;
         };
