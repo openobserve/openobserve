@@ -444,7 +444,6 @@ export default defineComponent({
     });
 
     onBeforeMount(async () => {
-      searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
       searchObj.loading = true;
       searchObj.meta.pageType = "logs";
       if (
