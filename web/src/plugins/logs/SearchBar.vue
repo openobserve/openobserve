@@ -425,7 +425,7 @@ clickable v-close-popup>
                         :name="
                           searchObj.meta.regions.includes(item)
                             ? 'check_circle'
-                            : 'check_circle_outline'
+                            : 'radio_button_unchecked'
                         "
                         class="float-left"
                       ></q-icon>
