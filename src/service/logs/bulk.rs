@@ -298,7 +298,7 @@ pub async fn ingest(
             };
 
             if let Some(fields) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::service::logs::refactor_map(&local_val, fields);
+                local_val = crate::service::logs::refactor_map(local_val, fields);
             }
 
             // set _id

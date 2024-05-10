@@ -57,6 +57,15 @@ pub fn get_string_value(value: &Value) -> String {
     }
 }
 
+pub fn pickup_string_value(val: Value) -> String {
+    match val {
+        Value::String(v) => v,
+        Value::Number(v) => v.to_string(),
+        Value::Bool(v) => v.to_string(),
+        _ => val.to_string(),
+    }
+}
+
 pub fn estimate_json_bytes(val: &Value) -> usize {
     let mut size = 0;
     match val {

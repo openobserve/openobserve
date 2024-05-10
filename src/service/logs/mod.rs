@@ -15,6 +15,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    io::Write,
     sync::Arc,
 };
 
@@ -23,7 +24,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
     utils::{
-        json::{estimate_json_bytes, get_string_value, Map, Value},
+        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -434,25 +435,38 @@ struct StreamMeta<'a> {
 }
 
 pub fn refactor_map(
-    original_map: &Map<String, Value>,
+    original_map: Map<String, Value>,
     defined_schema_keys: &HashSet<String>,
 ) -> Map<String, Value> {
-    let mut new_map = Map::new();
-    let mut non_schema_map = HashMap::new();
+    let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
+    let mut non_schema_map = Vec::with_capacity(1024);
 
-    for (key, value) in original_map.iter() {
-        if defined_schema_keys.contains(key) {
-            new_map.insert(key.clone(), value.clone());
+    let mut has_elements = false;
+    non_schema_map.write_all(b"{").unwrap();
+    for (key, value) in original_map {
+        if defined_schema_keys.contains(&key) {
+            new_map.insert(key, value);
         } else {
-            non_schema_map.insert(key.clone(), get_string_value(value));
+            if has_elements {
+                non_schema_map.write_all(b",").unwrap();
+            } else {
+                has_elements = true;
+            }
+            non_schema_map.write_all(b"\"").unwrap();
+            non_schema_map.write_all(key.as_bytes()).unwrap();
+            non_schema_map.write_all(b"\":\"").unwrap();
+            non_schema_map
+                .write_all(pickup_string_value(value).as_bytes())
+                .unwrap();
+            non_schema_map.write_all(b"\"").unwrap();
         }
     }
+    non_schema_map.write_all(b"}").unwrap();
 
-    if !non_schema_map.is_empty() {
-        let non_schema_json = serde_json::to_string(&non_schema_map).unwrap_or_default();
+    if has_elements {
         new_map.insert(
             CONFIG.common.all_fields_name.to_string(),
-            Value::String(non_schema_json),
+            Value::String(String::from_utf8(non_schema_map).unwrap()),
         );
     }
 
