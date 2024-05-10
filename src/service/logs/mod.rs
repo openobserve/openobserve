@@ -24,7 +24,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
+        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Number, Value},
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -155,15 +155,13 @@ pub fn cast_to_schema_v1(
     schema_map: &HashMap<&String, &DataType>,
 ) -> Result<(), anyhow::Error> {
     let mut errors = Vec::new();
-    for (field_name, data_type) in schema_map {
-        let field_name_str = *field_name;
-        let Some(val) = value.get_mut(field_name_str) else {
-            continue;
-        };
+    for (key, val) in value.iter_mut() {
         if val.is_null() {
-            *val = Value::Null;
             continue;
         }
+        let Some(data_type) = schema_map.get(key) else {
+            continue;
+        };
         match data_type {
             DataType::Utf8 => {
                 if val.is_string() {
@@ -175,41 +173,64 @@ pub fn cast_to_schema_v1(
                 if val.is_i64() {
                     continue;
                 }
+                if val.is_u64() {
+                    continue;
+                }
+                if val.is_f64() {
+                    *val = Value::Number((val.as_f64().unwrap() as i64).into());
+                    continue;
+                }
                 if val.is_boolean() {
-                    *val = Value::Number(bool_to_serde_json_number(val.as_bool().unwrap()));
+                    *val = Value::Number((val.as_bool().unwrap() as i64).into());
                     continue;
                 }
                 let local_val = get_string_value(val);
                 match local_val.parse::<i64>() {
-                    Ok(local_val) => {
-                        *val = Value::Number(local_val.into());
+                    Ok(v) => {
+                        *val = Value::Number(v.into());
                     }
-                    Err(_) => errors.push((field_name_str, *data_type)),
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
             DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
+                if val.is_i64() {
+                    continue;
+                }
                 if val.is_u64() {
                     continue;
                 }
+                if val.is_f64() {
+                    *val = Value::Number((val.as_f64().unwrap() as u64).into());
+                    continue;
+                }
                 if val.is_boolean() {
-                    *val = Value::Number(bool_to_serde_json_number(val.as_bool().unwrap()));
-
+                    *val = Value::Number((val.as_bool().unwrap() as u64).into());
                     continue;
                 }
                 let local_val = get_string_value(val);
                 match local_val.parse::<u64>() {
-                    Ok(local_val) => {
-                        *val = Value::Number(local_val.into());
+                    Ok(v) => {
+                        *val = Value::Number(v.into());
                     }
-                    Err(_) => errors.push((field_name_str, *data_type)),
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
             DataType::Float64 | DataType::Float32 | DataType::Float16 => {
                 if val.is_f64() {
                     continue;
                 }
+                if val.is_i64() {
+                    *val = Value::Number(Number::from_f64(val.as_i64().unwrap() as f64).unwrap());
+                    continue;
+                }
+                if val.is_u64() {
+                    *val = Value::Number(Number::from_f64(val.as_u64().unwrap() as f64).unwrap());
+                    continue;
+                }
                 if val.is_boolean() {
-                    *val = Value::Number(bool_to_serde_json_number(val.as_bool().unwrap()));
+                    *val = Value::Number(
+                        Number::from_f64((val.as_bool().unwrap() as i64) as f64).unwrap(),
+                    );
                     continue;
                 }
                 let local_val = get_string_value(val);
@@ -217,11 +238,23 @@ pub fn cast_to_schema_v1(
                     Ok(local_val) => {
                         *val = Value::Number(serde_json::Number::from_f64(local_val).unwrap());
                     }
-                    Err(_) => errors.push((field_name_str, *data_type)),
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
             DataType::Boolean => {
                 if val.is_boolean() {
+                    continue;
+                }
+                if val.is_i64() {
+                    *val = Value::Bool(val.as_i64().unwrap() > 0);
+                    continue;
+                }
+                if val.is_u64() {
+                    *val = Value::Bool(val.as_u64().unwrap() > 0);
+                    continue;
+                }
+                if val.is_f64() {
+                    *val = Value::Bool(val.as_f64().unwrap() > 0.0);
                     continue;
                 }
                 let local_val: String = get_string_value(val);
@@ -229,10 +262,10 @@ pub fn cast_to_schema_v1(
                     Ok(local_val) => {
                         *val = Value::Bool(local_val);
                     }
-                    Err(_) => errors.push((field_name_str, *data_type)),
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
-            _ => errors.push((field_name_str, *data_type)),
+            _ => errors.push((key, *data_type)),
         };
     }
     if !errors.is_empty() {
@@ -419,11 +452,6 @@ async fn add_record(
     let record_value = Value::Object(record_val.clone());
     hour_buf.records.push(Arc::new(record_value));
     Ok(())
-}
-
-fn bool_to_serde_json_number(value: bool) -> serde_json::Number {
-    let num = value as i64;
-    serde_json::Number::from(num)
 }
 
 struct StreamMeta<'a> {
