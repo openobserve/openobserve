@@ -234,6 +234,7 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import moment from "moment-timezone";
+import utcToZonedTime from "date-fns-tz/utcToZonedTime";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -379,8 +380,14 @@ export default defineComponent({
           );
 
           dateTimePicker.value?.setCustomDate("absolute", {
-            start: currentDashboardData.data?.dateTime?.startTime / 1000,
-            end: currentDashboardData.data?.dateTime?.endTime / 1000,
+            start: utcToZonedTime(
+              currentDashboardData.data?.dateTime?.startTime / 1000,
+              store.state.timezone
+            ),
+            end: utcToZonedTime(
+              currentDashboardData.data?.dateTime?.endTime / 1000,
+              store.state.timezone
+            )
           });
         }
       }
