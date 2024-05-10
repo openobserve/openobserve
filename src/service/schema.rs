@@ -149,9 +149,39 @@ pub async fn check_for_schema(
             let inferred_schema = if field_datatype_delta.is_empty() {
                 inferred_schema
             } else {
-                let schema_latest = stream_schema_map.get(stream_name).unwrap();
-                inferred_schema.cloned_from(schema_latest.schema())
+                inferred_schema.cloned_from(schema.schema())
             };
+            // check defined_schema_fields
+            let meta = unwrap_stream_settings(schema.schema());
+            let mut defined_schema_fields = match meta {
+                Some(meta) => meta.defined_schema_fields.unwrap_or(vec![]),
+                None => vec![],
+            };
+            let mut fields = Vec::with_capacity(defined_schema_fields.len() + 2);
+            let inferred_schema = if !defined_schema_fields.is_empty() {
+                defined_schema_fields.extend(vec![
+                    CONFIG.common.column_timestamp.to_string(),
+                    CONFIG.common.all_fields_name.to_string(),
+                ]);
+                for field in defined_schema_fields {
+                    if let Some(f) = schema.fields_map().get(&field) {
+                        fields.push(schema.schema().fields()[*f].clone());
+                    }
+                }
+                Schema::new_with_metadata(fields, schema.schema().metadata().clone())
+            } else {
+                inferred_schema
+            };
+            let fields_map = inferred_schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect();
+            stream_schema_map.insert(
+                stream_name.to_string(),
+                SchemaCache::new(inferred_schema.clone(), fields_map),
+            );
             return Ok((
                 SchemaEvolution {
                     schema_compatible: true,
@@ -355,7 +385,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
             }
             Some(idx) => {
                 if !defined_schema_fields.contains(item_name) {
-                    println!("field {} is not in defined_schema_fields", item_name);
+                    // println!("field {} is not in defined_schema_fields", item_name);
                     continue;
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
