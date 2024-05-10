@@ -110,7 +110,8 @@
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search Saved View",
     "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist.",
-    "noFieldFound": "No fields found for selected stream"
+    "noFieldFound": "No fields found for selected stream",
+    "regionTitle": "Select Region"
   },
   "menu": {
     "home": "Home",
