@@ -32,7 +32,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
     BLOCKED_STREAMS, CONFIG, DISTINCT_FIELDS,
 };
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{add_record, cast_to_schema_v1, StreamMeta};
 use crate::{
@@ -49,9 +49,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{
-            get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists, SchemaCache,
-        },
+        schema::{get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };

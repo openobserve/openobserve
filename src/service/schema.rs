@@ -17,12 +17,13 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
-    meta::stream::StreamType,
+    meta::stream::{StreamSettings, StreamType},
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     CONFIG,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
-use infra::schema::unwrap_stream_settings;
+use hashbrown::HashSet;
+use infra::schema::{get_settings, unwrap_stream_settings, SchemaCache};
 use serde_json::{Map, Value};
 
 use crate::{
@@ -53,35 +54,6 @@ pub(crate) fn get_request_columns_limit_error(
     )
 }
 
-pub struct SchemaCache {
-    schema: Schema,
-    fields_map: HashMap<String, usize>,
-    hash_key: String,
-}
-
-impl SchemaCache {
-    pub fn new(schema: Schema, fields_map: HashMap<String, usize>) -> Self {
-        let hash_key = schema.hash_key();
-        Self {
-            schema,
-            fields_map,
-            hash_key,
-        }
-    }
-
-    pub fn hash_key(&self) -> &str {
-        &self.hash_key
-    }
-
-    pub fn schema(&self) -> &Schema {
-        &self.schema
-    }
-
-    pub fn fields_map(&self) -> &HashMap<String, usize> {
-        &self.fields_map
-    }
-}
-
 pub async fn check_for_schema(
     org_id: &str,
     stream_name: &str,
@@ -91,19 +63,10 @@ pub async fn check_for_schema(
     record_ts: i64,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
-        let schema = infra::schema::get(org_id, stream_name, stream_type)
-            .await
-            .unwrap();
-        let fields_map = schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(i, f)| (f.name().to_owned(), i))
-            .collect();
-        stream_schema_map.insert(
-            stream_name.to_string(),
-            SchemaCache::new(schema, fields_map),
-        );
+        let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+        let stream_setting = get_settings(org_id, stream_name, stream_type).await;
+        let schema = generate_schema_for_defined_schema_fields(schema, stream_setting);
+        stream_schema_map.insert(stream_name.to_string(), schema);
     }
     let schema = stream_schema_map.get(stream_name).unwrap();
     if !schema.schema().fields().is_empty() && CONFIG.common.skip_schema_validation {
@@ -119,7 +82,7 @@ pub async fn check_for_schema(
 
     // get infer schema
     let value_iter = record_val.into_iter();
-    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
+    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type)?;
 
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
@@ -145,55 +108,18 @@ pub async fn check_for_schema(
         let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
-            // generate new schema
-            let inferred_schema = if field_datatype_delta.is_empty() {
-                inferred_schema
-            } else {
-                inferred_schema.cloned_from(schema.schema())
-            };
-            // check defined_schema_fields
-            let meta = unwrap_stream_settings(schema.schema());
-            let mut defined_schema_fields = match meta {
-                Some(meta) => meta.defined_schema_fields.unwrap_or(vec![]),
-                None => vec![],
-            };
-            let mut fields = Vec::with_capacity(defined_schema_fields.len() + 2);
-            let inferred_schema = if !defined_schema_fields.is_empty() {
-                defined_schema_fields.extend(vec![
-                    CONFIG.common.column_timestamp.to_string(),
-                    CONFIG.common.all_fields_name.to_string(),
-                ]);
-                for field in defined_schema_fields {
-                    if let Some(f) = schema.fields_map().get(&field) {
-                        fields.push(schema.schema().fields()[*f].clone());
-                    }
-                }
-                Schema::new_with_metadata(fields, schema.schema().metadata().clone())
-            } else {
-                inferred_schema
-            };
-            let fields_map = inferred_schema
-                .fields()
-                .iter()
-                .enumerate()
-                .map(|(i, f)| (f.name().to_owned(), i))
-                .collect();
-            stream_schema_map.insert(
-                stream_name.to_string(),
-                SchemaCache::new(inferred_schema.clone(), fields_map),
-            );
             return Ok((
                 SchemaEvolution {
                     schema_compatible: true,
                     is_schema_changed: false,
                     types_delta: Some(field_datatype_delta),
                 },
-                Some(inferred_schema),
+                Some(schema.schema().clone()),
             ));
         }
         if !field_datatype_delta.is_empty() {
             // check if the min_ts < current_version_created_at, if yes, discard the data
-            let schema_metadata = schema.schema.metadata();
+            let schema_metadata = schema.schema().metadata();
             if let Some(start_dt) = schema_metadata.get("start_dt") {
                 let created_at = start_dt.parse().unwrap_or_default();
                 if record_ts <= created_at {
@@ -270,15 +196,9 @@ async fn handle_diff_schema(
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
         metadata.insert("created_at".to_string(), record_ts.to_string());
-        let fields_map = inferred_schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(i, f)| (f.name().to_owned(), i))
-            .collect();
         stream_schema_map.insert(
             stream_name.to_string(),
-            SchemaCache::new(inferred_schema.clone().with_metadata(metadata), fields_map),
+            SchemaCache::new(inferred_schema.clone().with_metadata(metadata)),
         );
     }
 
@@ -344,23 +264,54 @@ async fn handle_diff_schema(
         .await;
     }
 
-    let fields_map = final_schema
-        .fields()
-        .iter()
-        .enumerate()
-        .map(|(i, f)| (f.name().to_owned(), i))
-        .collect();
+    // check defined_schema_fields
+    let stream_setting = get_settings(org_id, stream_name, stream_type).await;
+    let final_schema = SchemaCache::new(final_schema);
+    let final_schema = generate_schema_for_defined_schema_fields(final_schema, stream_setting);
+
     // update thread cache
-    stream_schema_map.insert(
-        stream_name.to_string(),
-        SchemaCache::new(final_schema, fields_map),
-    );
+    stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Ok(Some(SchemaEvolution {
         schema_compatible: true,
         is_schema_changed: true,
         types_delta: Some(field_datatype_delta),
     }))
+}
+
+// if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
+// then we will use defined_schema_fields
+fn generate_schema_for_defined_schema_fields(
+    schema: SchemaCache,
+    stream_setting: Option<StreamSettings>,
+) -> SchemaCache {
+    let defined_schema_fields = match stream_setting {
+        Some(v) => v.defined_schema_fields.unwrap_or(vec![]),
+        None => vec![],
+    };
+    if defined_schema_fields.is_empty()
+        || schema.fields_map().len() < defined_schema_fields.len() + 10
+    {
+        return schema;
+    }
+
+    let mut defined_schema_fields: HashSet<_> = defined_schema_fields.iter().collect();
+    if !defined_schema_fields.contains(&CONFIG.common.column_timestamp) {
+        defined_schema_fields.insert(&CONFIG.common.column_timestamp);
+    }
+    if !defined_schema_fields.contains(&CONFIG.common.all_fields_name) {
+        defined_schema_fields.insert(&CONFIG.common.all_fields_name);
+    }
+    let mut fields = Vec::with_capacity(defined_schema_fields.len());
+    for field in defined_schema_fields {
+        if let Some(f) = schema.fields_map().get(field) {
+            fields.push(schema.schema().fields()[*f].clone());
+        }
+    }
+    SchemaCache::new(Schema::new_with_metadata(
+        fields,
+        schema.schema().metadata().clone(),
+    ))
 }
 
 fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
@@ -427,16 +378,8 @@ pub async fn stream_schema_exists(
             let schema = infra::schema::get(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let fields_map = schema
-                .fields()
-                .iter()
-                .enumerate()
-                .map(|(i, f)| (f.name().to_owned(), i))
-                .collect();
-            stream_schema_map.insert(
-                stream_name.to_string(),
-                SchemaCache::new(schema.clone(), fields_map),
-            );
+
+            stream_schema_map.insert(stream_name.to_string(), SchemaCache::new(schema.clone()));
             schema
         }
     };
@@ -477,16 +420,8 @@ mod tests {
             Field::new("_timestamp", DataType::Int64, false),
         ]);
         let mut map: HashMap<String, SchemaCache> = HashMap::new();
-        let fields_map = schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(i, f)| (f.name().to_owned(), i))
-            .collect();
-        map.insert(
-            stream_name.to_string(),
-            SchemaCache::new(schema, fields_map),
-        );
+
+        map.insert(stream_name.to_string(), SchemaCache::new(schema));
         let result = check_for_schema(
             org_name,
             stream_name,

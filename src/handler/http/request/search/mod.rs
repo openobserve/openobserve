@@ -981,7 +981,7 @@ async fn values_v1(
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let schema = if let Some(schema) = r.get(&key) {
-        schema.clone()
+        schema.schema().clone()
     } else {
         arrow_schema::Schema::empty()
     };

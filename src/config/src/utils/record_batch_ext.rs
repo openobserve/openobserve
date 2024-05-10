@@ -77,8 +77,7 @@ pub fn convert_json_to_record_batch(
     let mut record_keys = HashSet::with_capacity(max_keys);
     for record in data.iter() {
         record_keys.clear();
-        let record = record.as_object().unwrap();
-        for (k, v) in record {
+        for (k, v) in record.as_object().unwrap() {
             record_keys.insert(k);
             let res = builders.get_mut(k);
             // where the value is null, the key maybe not exists in the schema
