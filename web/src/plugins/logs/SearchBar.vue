@@ -1689,8 +1689,8 @@ export default defineComponent({
               delete extractedObj.data.stream.streamLists;
               delete searchObj.data.stream.selectedStream;
               delete searchObj.meta.regions;
-              if(extractedObj.meta.hasOwnProperty("regions")) {
-                searchObj.meta.regions = extractedObj.meta.regions;
+              if (extractedObj.meta.hasOwnProperty("regions")) {
+                searchObj.meta["regions"] = extractedObj.meta.regions;
               }
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
