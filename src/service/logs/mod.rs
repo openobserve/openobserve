@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
@@ -430,24 +433,30 @@ struct StreamMeta<'a> {
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
-pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &[String]) {
+pub fn refactor_map(
+    original_map: &Map<String, Value>,
+    defined_schema_keys: &HashSet<String>,
+) -> Map<String, Value> {
+    let mut new_map = Map::new();
     let mut non_schema_map = HashMap::new();
 
     for (key, value) in original_map.iter() {
-        if !defined_schema_keys.contains(key) {
+        if defined_schema_keys.contains(key) {
+            new_map.insert(key.clone(), value.clone());
+        } else {
             non_schema_map.insert(key.clone(), get_string_value(value));
         }
     }
 
-    original_map.retain(|key, _| defined_schema_keys.contains(key));
-
     if !non_schema_map.is_empty() {
         let non_schema_json = serde_json::to_string(&non_schema_map).unwrap_or_default();
-        original_map.insert(
+        new_map.insert(
             CONFIG.common.all_fields_name.to_string(),
             Value::String(non_schema_json),
         );
     }
+
+    new_map
 }
 
 #[cfg(test)]
