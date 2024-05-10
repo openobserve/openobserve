@@ -502,7 +502,7 @@ test.describe("Logs UI testcases", () => {
    
   });
 
-  test('test', async ({ page }) => {
+  test('should display bar chart when histogram toggle is on', async ({ page }) => {
     await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
     await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('code');
     await page.waitForTimeout(4000);
@@ -520,4 +520,26 @@ test.describe("Logs UI testcases", () => {
     });
     await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
   });
+
+  test('should display search around in histogram mode', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+    
+  });
+  
+  // test('should display search around in SQL mode', async ({ page }) => {
+  //   await page.waitForTimeout(1000);
+  //   await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+  //   await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+  //   await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+  //   // const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+  //   // const isVisible = await element.isVisible();
+  //   // expect(isVisible).toBeTruthy();
+  //   await page.locator('[data-test="logs-search-error-message"]').click();
+    
+  // });
 });
