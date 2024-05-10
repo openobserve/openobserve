@@ -207,6 +207,14 @@ impl FromRequest for AuthExtractor {
                     .map_or(path_columns[1], |model| model.key),
                 path_columns[0]
             )
+        } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+            format!(
+                "{}:{org_id}/{}",
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
+                path_columns[2]
+            )
         } else if url_len == 3 {
             if path_columns[2].starts_with("alerts")
                 || path_columns[2].starts_with("templates")
