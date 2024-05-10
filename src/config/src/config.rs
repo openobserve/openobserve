@@ -649,6 +649,8 @@ pub struct Common {
     pub schema_cache_compress_enabled: bool,
     #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
     pub skip_formatting_bulk_stream_name: bool,
+    #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
+    pub bulk_api_response_errors_only: bool,
 }
 
 #[derive(EnvConfig)]

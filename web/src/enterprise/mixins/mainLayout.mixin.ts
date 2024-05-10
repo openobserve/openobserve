@@ -7,7 +7,7 @@ import { getUserInfo, getImageURL } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
-import FunctionIcon from "@/components/icons/FunctionIcon.vue";
+import PipelineIcon from "@/components/icons/PipelineIcon.vue";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -27,10 +27,10 @@ const MainLayoutCloudMixin = {
       //   link: "/billings",
       // });
       linksList.value.splice(5, 0, {
-        title: t("menu.function"),
-        iconComponent: markRaw(FunctionIcon),
-        link: "/functions",
-        name: 'functions',
+        title: t("menu.pipeline"),
+        iconComponent: markRaw(PipelineIcon),
+        link: "/pipeline",
+        name: "pipeline",
       });
       linksList.value.splice(10, 0, {
         title: t("menu.billings"),

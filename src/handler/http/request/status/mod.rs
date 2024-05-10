@@ -87,6 +87,7 @@ struct ConfigResponse<'a> {
     sso_enabled: bool,
     native_login_enabled: bool,
     rbac_enabled: bool,
+    super_cluster_enabled: bool,
     query_on_stream_selection: bool,
     show_stream_stats_doc_num: bool,
     custom_logo_text: String,
@@ -166,10 +167,17 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
+
     #[cfg(feature = "enterprise")]
     let rbac_enabled = O2_CONFIG.openfga.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let super_cluster_enabled = O2_CONFIG.super_cluster.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster_enabled = false;
+
     #[cfg(feature = "enterprise")]
     let custom_logo_text = match get_logo_text().await {
         Some(data) => data,
@@ -217,6 +225,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
+        super_cluster_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
         show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
         custom_logo_text,

@@ -322,7 +322,7 @@ import DashboardQueryEditor from "../../../components/dashboards/addPanel/Dashbo
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
-import _ from "lodash-es";
+import { isEqual } from "lodash-es";
 import { provide } from "vue";
 
 const ConfigPanel = defineAsyncComponent(() => {
@@ -517,7 +517,7 @@ export default defineComponent({
       //check that is it addpanel initial call
       if (isInitailDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata
-      return !_.isEqual(chartData.value, dashboardPanelData.data);
+      return !isEqual(chartData.value, dashboardPanelData.data);
     });
 
     watch(isOutDated, () => {

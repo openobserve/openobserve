@@ -3,7 +3,7 @@
     <div class="full-wdith">
       <q-table
         data-test="pipeline-list-table"
-        ref="qTable"
+        ref="qTableRef"
         :rows="pipelines"
         :columns="columns"
         row-key="name"
@@ -139,7 +139,7 @@ interface Pipeline {
 const { t } = useI18n();
 const router = useRouter();
 
-// const qTable: any = ref(null);
+const qTableRef: any = ref({});
 
 const q = useQuasar();
 
@@ -176,7 +176,7 @@ const pagination: any = ref({
 const changePagination = (val: { label: string; value: any }) => {
   selectedPerPage.value = val.value;
   pagination.value.rowsPerPage = val.value;
-  // qTable.value?.setPagination(pagination.value);
+  qTableRef.value?.setPagination(pagination.value);
 };
 
 const currentRouteName = computed(() => {
