@@ -44,10 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
         />
         <div v-if="dateTimeValue">
+          <label>Default Duration</label>
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons q-ml-sm"
+            class="dashboard-icons q-mt-sm"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
