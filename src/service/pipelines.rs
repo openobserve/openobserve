@@ -111,11 +111,11 @@ pub async fn list_pipelines(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("pipeline:{}", pipeline.name))
+                    .contains(&format!("logs:{}", pipeline.stream_name))
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("pipeline:{}", org_id))
+                    .contains(&format!("logs:{}", org_id))
             {
                 let fn_list = STREAM_FUNCTIONS
                     .get(&format!(
