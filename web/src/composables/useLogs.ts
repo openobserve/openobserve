@@ -1574,7 +1574,6 @@ const useLogs = () => {
                 ] = res.data.total;
               }
             }
-
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
