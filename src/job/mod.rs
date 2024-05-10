@@ -111,7 +111,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "enterprise")]
-    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
+        || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE)
+    {
         tokio::task::spawn(async move { db::session::watch().await });
     }
 
