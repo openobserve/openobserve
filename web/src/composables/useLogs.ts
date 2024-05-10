@@ -1181,14 +1181,14 @@ const useLogs = () => {
               timezone: "",
             },
             errorCode: 0,
-            errorMsg: "Histogram is not available for aggregation queries.",
+            errorMsg:
+              "Histogram is not available for aggregation/limit queries.",
             errorDetail: "",
           };
         } else {
           if (queryReq.query.from == 0) {
             await getPageCount(queryReq);
           }
-          console.log("Histogram is not available for aggregation queries.");
         }
       } else {
         searchObj.loading = false;
@@ -1267,10 +1267,9 @@ const useLogs = () => {
               (searchObj.data.queryResults.partitionDetail.partitionTotal[
                 index
               ] == -1 ||
-              searchObj.data.queryResults.partitionDetail.partitionTotal[
-                index
-              ] < res.data.total
-               ) &&
+                searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] < res.data.total) &&
               queryReq.query.start_time == item[0]
             ) {
               searchObj.data.queryResults.partitionDetail.partitionTotal[
@@ -1565,9 +1564,9 @@ const useLogs = () => {
                 (searchObj.data.queryResults.partitionDetail.partitionTotal[
                   index
                 ] == -1 ||
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] < res.data.total) &&
+                  searchObj.data.queryResults.partitionDetail.partitionTotal[
+                    index
+                  ] < res.data.total) &&
                 queryReq.query.start_time == item[0]
               ) {
                 searchObj.data.queryResults.partitionDetail.partitionTotal[
@@ -1575,7 +1574,7 @@ const useLogs = () => {
                 ] = res.data.total;
               }
             }
-  
+
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
@@ -1965,8 +1964,11 @@ const useLogs = () => {
     const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
+
+    let totalCount = searchObj.data.queryResults.total;
     if (searchObj.meta.resultGrid.showPagination == false) {
       endCount = searchObj.data.queryResults.hits.length;
+      totalCount = searchObj.data.queryResults.hits.length;
     } else {
       endCount = Math.min(
         startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
@@ -1979,7 +1981,7 @@ const useLogs = () => {
       " to " +
       endCount +
       " out of " +
-      searchObj.data.queryResults.total.toLocaleString() +
+      totalCount.toLocaleString() +
       " events in " +
       searchObj.data.queryResults.took +
       " ms. (Scan Size: " +
@@ -2040,24 +2042,26 @@ const useLogs = () => {
       const query = searchObj.data.query;
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL: any = parser.astify(query);
+        //removing this change as datafusion not supporting *, _timestamp. It was working but now throwing error.
         //hack add time stamp column to parsedSQL if not already added
-        if (
-          !(parsedSQL.columns === "*") &&
-          parsedSQL.columns.filter(
-            (e: any) => e.expr.column === store.state.zoConfig.timestamp_column
-          ).length === 0
-        ) {
-          const ts_col = {
-            expr: {
-              type: "column_ref",
-              table: null,
-              column: store.state.zoConfig.timestamp_column,
-            },
-            as: null,
-          };
-          parsedSQL.columns.push(ts_col);
-        }
+        // if (
+        //   !(parsedSQL.columns === "*") &&
+        //   parsedSQL.columns.filter(
+        //     (e: any) => e.expr.column === store.state.zoConfig.timestamp_column
+        //   ).length === 0
+        // ) {
+        //   const ts_col = {
+        //     expr: {
+        //       type: "column_ref",
+        //       table: null,
+        //       column: store.state.zoConfig.timestamp_column,
+        //     },
+        //     as: null,
+        //   };
+        //   parsedSQL.columns.push(ts_col);
+        // }
         parsedSQL.where = null;
+        console.log(query_context);
         query_context = b64EncodeUnicode(
           parser.sqlify(parsedSQL).replace(/`/g, '"')
         );
@@ -2237,6 +2241,44 @@ const useLogs = () => {
     }
   };
 
+  function extractTimestamps(period) {
+    const currentTime = new Date();
+    let fromTimestamp, toTimestamp;
+
+    switch (period.slice(-1)) {
+      case "m":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
+      case "h":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 3600000; // 1 hour = 3600000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
+      case "d":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 86400000; // 1 day = 86400000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
+      case "w":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 604800000; // 1 week = 604800000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
+      case "M":
+        const currentMonth = currentTime.getMonth();
+        const currentYear = currentTime.getFullYear();
+        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        const fromDate = new Date(prevYear, prevMonth, 1);
+        fromTimestamp = fromDate.getTime();
+        toTimestamp = currentTime.getTime();
+        break;
+      default:
+        console.error("Invalid period format!");
+        return;
+    }
+
+    return { from: fromTimestamp, to: toTimestamp };
+  }
+
   const restoreUrlQueryParams = async () => {
     searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
@@ -2244,6 +2286,12 @@ const useLogs = () => {
       searchObj.shouldIgnoreWatcher = false;
       return;
     }
+    if (queryParams.period && (!queryParams.from || !queryParams.to)) {
+      const periodDateTime: any = extractTimestamps(queryParams.period);
+      queryParams.from = periodDateTime.from;
+      queryParams.to = periodDateTime.to;
+    }
+
     const date = {
       startTime: queryParams.from,
       endTime: queryParams.to,
