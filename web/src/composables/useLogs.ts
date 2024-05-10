@@ -2071,6 +2071,7 @@ const useLogs = () => {
         //   parsedSQL.columns.push(ts_col);
         // }
         parsedSQL.where = null;
+        console.log(query_context);
         query_context = b64EncodeUnicode(
           parser.sqlify(parsedSQL).replace(/`/g, '"')
         );
