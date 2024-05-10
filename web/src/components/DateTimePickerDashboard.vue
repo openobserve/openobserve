@@ -80,27 +80,11 @@ export default defineComponent({
       dateTimePicker.value.setCustomDate(type, dateObj);
     };
 
-    const setRelativeDate = (period: string) => {
-      const periodString = period?.match(/(\d+)([mhdwM])/);
-
-      if (periodString) {
-        const periodValue = periodString[1];
-        const periodUnit = periodString[2];
-
-        const periodUnits = ["m", "h", "d", "w", "M"];
-
-        if (periodUnits.includes(periodUnit) && periodValue) {
-          dateTimePicker.value.setRelativeDate(periodUnit, +periodValue);
-        }
-      }
-    };
-
     return {
       updateDateTime,
       refresh,
       dateTimePicker,
       setCustomDate,
-      setRelativeDate,
     };
   },
 });
