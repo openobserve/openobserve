@@ -72,9 +72,10 @@ pub async fn handle_trace_request(
     request: ExportTraceServiceRequest,
     is_grpc: bool,
     in_stream_name: Option<&str>,
+    session_id: &str,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-
+    log::info!("[{session_id}] start handle_trace_request");
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -118,6 +119,7 @@ pub async fn handle_trace_request(
         &mut traces_schema_map,
     )
     .await;
+    log::info!("[{session_id}] start stream_schema_exists done");
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
@@ -136,7 +138,7 @@ pub async fn handle_trace_request(
     if partition_keys.is_empty() {
         partition_keys.push(StreamPartition::new("service_name"));
     }
-
+    log::info!("[{session_id}] Start get stream alerts");
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
         &[StreamParams {
@@ -148,7 +150,7 @@ pub async fn handle_trace_request(
     )
     .await;
     // End get stream alert
-
+    log::info!("[{session_id}] Start Register Transforms for stream");
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
@@ -168,6 +170,7 @@ pub async fn handle_trace_request(
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     let mut trace_index = Vec::with_capacity(res_spans.len());
+    log::info!("[{session_id}] Start handle res_spans loop");
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let resource = res_span.resource.unwrap();
@@ -404,7 +407,7 @@ pub async fn handle_trace_request(
             }
         }
     }
-
+    log::info!("[{session_id}] write data to wal");
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
     let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
@@ -414,7 +417,7 @@ pub async fn handle_trace_request(
 
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
-
+    log::info!("[{session_id}] write data to wal done, elapsed: {time}");
     // send distinct_values
     if !distinct_values.is_empty() {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
@@ -452,7 +455,7 @@ pub async fn handle_trace_request(
             StreamType::Traces.to_string().as_str(),
         ])
         .inc();
-
+    log::info!("[{session_id}] start metric and data usage");
     // metric + data usage
     report_request_usage_stats(
         req_stats,
@@ -479,7 +482,7 @@ pub async fn handle_trace_request(
     };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
-
+    log::info!("[{session_id}] res.encode done");
     return Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type("application/x-protobuf")

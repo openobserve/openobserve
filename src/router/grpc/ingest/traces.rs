@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::CONFIG;
+use config::{ider, CONFIG};
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_client::TraceServiceClient, trace_service_server::TraceService,
     ExportTraceServiceRequest, ExportTraceServiceResponse,
@@ -33,7 +33,7 @@ impl TraceService for TraceServer {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let (metadata, extensions, message) = request.into_parts();
+        let (mut metadata, extensions, message) = request.into_parts();
 
         // basic validation
         if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
@@ -42,6 +42,8 @@ impl TraceService for TraceServer {
                 &CONFIG.grpc.org_header_key
             )));
         }
+        let session_id = ider::uuid();
+        metadata.insert("session_id", session_id.parse().unwrap());
 
         // call ingester
         let mut request = Request::from_parts(metadata, extensions, message);
@@ -61,7 +63,6 @@ impl TraceService for TraceServer {
             Ok(req)
         });
 
-        let req_size = std::mem::size_of_val(&request);
         let start = std::time::Instant::now();
         match client
             .send_compressed(CompressionEncoding::Gzip)
@@ -79,7 +80,7 @@ impl TraceService for TraceServer {
             }
             Err(e) => {
                 let time = start.elapsed().as_secs_f64();
-                log::error!("export trace size: {req_size}, status: {e}, elapsed: {time}");
+                log::error!("[{session_id}]export trace status: {e}, elapsed: {time}");
                 Err(e)
             }
         }

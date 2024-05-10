@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{ider, CONFIG};
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
@@ -51,12 +51,19 @@ impl TraceService for TraceServer {
             in_stream_name = Some(stream_name.to_str().unwrap());
         };
 
+        let default_session_id = tonic::metadata::MetadataValue::try_from(ider::uuid()).unwrap();
+        let session_id = metadata
+            .get("session_id")
+            .unwrap_or(&default_session_id)
+            .to_str()
+            .unwrap();
         let resp = handle_trace_request(
             org_id.unwrap().to_str().unwrap(),
             0,
             in_req,
             true,
             in_stream_name,
+            session_id,
         )
         .await;
         if resp.is_ok() {

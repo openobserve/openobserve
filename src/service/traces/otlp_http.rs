@@ -64,7 +64,7 @@ pub async fn traces_proto(
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    super::handle_trace_request(org_id, thread_id, request, false, in_stream_name).await
+    super::handle_trace_request(org_id, thread_id, request, false, in_stream_name, "").await
 }
 
 pub async fn traces_json(
