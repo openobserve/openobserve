@@ -262,29 +262,31 @@ pub async fn ingest(
 
             // Start row based transform
             if let Some(transforms) = stream_functions_map.get(&key) {
-                let mut ret_value = value.clone();
-                ret_value = crate::service::ingestion::apply_stream_functions(
-                    transforms,
-                    ret_value,
-                    &stream_vrl_map,
-                    &stream_name,
-                    &mut runtime,
-                )?;
+                if !transforms.is_empty() {
+                    let mut ret_value = value.clone();
+                    ret_value = crate::service::ingestion::apply_stream_functions(
+                        transforms,
+                        ret_value,
+                        &stream_vrl_map,
+                        &stream_name,
+                        &mut runtime,
+                    )?;
 
-                if ret_value.is_null() || !ret_value.is_object() {
-                    bulk_res.errors = true;
-                    add_record_status(
-                        stream_name.clone(),
-                        doc_id.clone(),
-                        action.clone(),
-                        Some(value),
-                        &mut bulk_res,
-                        Some(TRANSFORM_FAILED.to_owned()),
-                        Some(TRANSFORM_FAILED.to_owned()),
-                    );
-                    continue;
-                } else {
-                    value = ret_value;
+                    if ret_value.is_null() || !ret_value.is_object() {
+                        bulk_res.errors = true;
+                        add_record_status(
+                            stream_name.clone(),
+                            doc_id.clone(),
+                            action.clone(),
+                            Some(value),
+                            &mut bulk_res,
+                            Some(TRANSFORM_FAILED.to_owned()),
+                            Some(TRANSFORM_FAILED.to_owned()),
+                        );
+                        continue;
+                    } else {
+                        value = ret_value;
+                    }
                 }
             }
             // End row based transform
