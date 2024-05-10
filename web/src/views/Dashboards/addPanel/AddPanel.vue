@@ -173,7 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="layout-panel-container col"
                       style="height: 100%"
                     >
-                      <DashboardQueryBuilder :dashboardData="currentDashboardData.data"/>
+                      <DashboardQueryBuilder
+                        :dashboardData="currentDashboardData.data"
+                      />
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
@@ -394,7 +396,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
-    
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -486,6 +488,7 @@ export default defineComponent({
       // console.timeEnd("AddPanel:loadDashboard");
 
       // console.time("AddPanel:loadDashboard:after");
+      console.log("data", data);
       currentDashboardData.data = data;
       // if variables data is null, set it to empty list
       if (
@@ -498,6 +501,26 @@ export default defineComponent({
         variablesData.values = [];
       }
       // console.timeEnd("AddPanel:loadDashboard:after");
+      if (data.dateTime) {
+        if (
+          (currentDashboardData.data?.dateTime?.type ?? "relative") ===
+          "relative"
+        ) {
+          dateTimePickerRef.value?.setRelativeDate(
+            currentDashboardData.data?.dateTime?.relativeTimePeriod ?? "15m"
+          );
+        } else {
+          console.log(
+            "currentDashboardData.data?.dateTime?.startTime",
+            currentDashboardData.data?.dateTime?.startTime
+          );
+
+          dateTimePickerRef.value?.setCustomDate("absolute", {
+            start: currentDashboardData.data?.dateTime?.startTime / 1000,
+            end: currentDashboardData.data?.dateTime?.endTime / 1000,
+          });
+        }
+      }
     };
 
     const isInitailDashboardPanelData = () => {
@@ -512,6 +535,7 @@ export default defineComponent({
         dashboardPanelData.data.queries.length == 1
       );
     };
+    console.log("currentDashboardData", currentDashboardData.data);
 
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
