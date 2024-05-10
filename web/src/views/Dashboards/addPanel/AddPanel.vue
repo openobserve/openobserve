@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <DateTimePickerDashboard
+          v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
         />
@@ -326,7 +327,6 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
-import utcToZonedTime from "date-fns-tz/utcToZonedTime";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -379,7 +379,7 @@ export default defineComponent({
       resetAggregationFunction,
     } = useDashboardPanelData();
     const editMode = ref(false);
-    const selectedDate = ref();
+    const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: [],
@@ -489,7 +489,6 @@ export default defineComponent({
       // console.timeEnd("AddPanel:loadDashboard");
 
       // console.time("AddPanel:loadDashboard:after");
-      console.log("data", data);
       currentDashboardData.data = data;
       // if variables data is null, set it to empty list
       if (
@@ -501,32 +500,21 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
-      // console.timeEnd("AddPanel:loadDashboard:after");
-      if (data.dateTime) {
-        if (
-          (currentDashboardData.data?.dateTime?.type ?? "relative") ===
-          "relative"
-        ) {
-          dateTimePickerRef.value?.setRelativeDate(
-            currentDashboardData.data?.dateTime?.relativeTimePeriod ?? "15m"
-          );
-        } else {
-          console.log(
-            "currentDashboardData.data?.dateTime?.startTime",
-            currentDashboardData.data?.dateTime?.startTime
-          );
 
-          dateTimePickerRef.value?.setCustomDate("absolute", {
-            start: utcToZonedTime(
-              currentDashboardData.data?.dateTime?.startTime / 1000,
-              store.state.timezone
-            ),
-            end: utcToZonedTime(
-              currentDashboardData.data?.dateTime?.endTime / 1000,
-              store.state.timezone
-            ),
-          });
-        }
+      // get default time for dashboard
+      // if dashboard has relative time settings
+      if ((data?.dateTime?.type ?? "relative") === "relative") {
+        selectedDate.value = {
+          valueType: "relative",
+          relativeTimePeriod: data?.dateTime?.relativeTimePeriod ?? "15m",
+        };
+      } else {
+        // else, dashboard will have absolute time settings
+        selectedDate.value = {
+          valueType: "absolute",
+          startTime: data?.dateTime?.startTime,
+          endTime: data?.dateTime?.endTime,
+        };
       }
     };
 
@@ -542,7 +530,6 @@ export default defineComponent({
         dashboardPanelData.data.queries.length == 1
       );
     };
-    console.log("currentDashboardData", currentDashboardData.data);
 
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
@@ -628,10 +615,12 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
-      dashboardPanelData.meta.dateTime = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      if (selectedDate.value) {
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        };
+      }
     };
     const goBack = () => {
       return router.push({
