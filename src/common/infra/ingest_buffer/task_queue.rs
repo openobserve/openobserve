@@ -140,9 +140,7 @@ impl TaskQueueManager {
                     // estimate this queue's wait time and compare w/ allowed latency
                     let current_queue_wait_time =
                         (tq.sender.len() * wait_time_estimate_factor) as u64;
-                    if time.elapsed().as_secs() + current_queue_wait_time as u64
-                        > SEARCHABLE_LATENCY
-                    {
+                    if time.elapsed().as_secs() + current_queue_wait_time > SEARCHABLE_LATENCY {
                         None // would've waited too long, try another queue
                     } else {
                         Some(tq)
