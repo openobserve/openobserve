@@ -116,7 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template v-if="indexData.defined_schema_fields.length">
+          <template
+            v-if="
+              indexData.defined_schema_fields.length && isSchemaEvolutionEnabled
+            "
+          >
             <q-separator
               id="schema-add-fields-section"
               class="q-mt-lg q-mb-lg"
@@ -213,9 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       props.row.name !== store.state.zoConfig.timestamp_column
                     "
                     :data-test="`schema-stream-delete-${props.row.name}-field-fts-key-checkbox`"
-                    v-model="props.row.delete"
+                    v-model="selectedFields"
+                    :val="props.row.name"
                     size="sm"
-                    @click="addDeleteField(props.row)"
                   />
                 </q-td>
               </template>
@@ -261,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ><q-td colspan="100%">
                     <div v-if="indexData.schema.length > 0" class="q-mt-sm">
                       <q-btn
-                        v-bind:disable="deleteFieldList.length == 0"
+                        v-bind:disable="!selectedFields.length"
                         data-test="schema-delete-button"
                         class="q-my-sm text-bold btn-delete"
                         color="warning"
@@ -273,9 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
 
                       <q-btn
-                        v-if="
-                          isSchemaEvolutionEnabled && deleteFieldList.length
-                        "
+                        v-if="isSchemaEvolutionEnabled"
                         data-test="schema-add-field-button"
                         class="q-my-sm no-border text-bold q-ml-md"
                         :label="
@@ -286,8 +288,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         padding="sm md"
                         color="secondary"
                         no-caps
-                        v-bind:disable="!deleteFieldList.length"
-                        @click="scrollToAddFields"
+                        v-bind:disable="!selectedFields.length"
+                        @click="updateDefinedSchemaFields"
                       />
 
                       <q-btn
@@ -378,7 +380,6 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
-    const deleteFieldList = ref([]);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
@@ -387,6 +388,8 @@ export default defineComponent({
     const router = useRouter();
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
+
+    const selectedFields = ref([]);
 
     const hasUserDefinedSchema = computed(() => {
       return !!indexData.value.defined_schema_fields?.length;
@@ -425,16 +428,6 @@ export default defineComponent({
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
-    const addDeleteField = (schema: any) => {
-      if (schema.delete) {
-        deleteFieldList.value.push(schema.name);
-      } else {
-        deleteFieldList.value = deleteFieldList.value.filter(
-          (item) => item !== schema.name
-        );
-      }
-    };
-
     const markFormDirty = () => {
       formDirtyFlag.value = true;
     };
@@ -445,7 +438,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
-          deleteFieldList.value
+          selectedFields.value
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -456,7 +449,7 @@ export default defineComponent({
               timeout: 2000,
             });
             confirmQueryModeChangeDialog.value = false;
-            deleteFieldList.value = [];
+            selectedFields.value = [];
             await getStream(
               indexData.value.name,
               indexData.value.stream_type,
@@ -697,10 +690,6 @@ export default defineComponent({
             settings.bloom_filter_fields.push(property.name);
           }
         });
-
-        if (property.delete) {
-          deleteFieldList.value.push(property.name);
-        }
       }
       if (added_part_keys.length > 0) {
         settings.partition_keys =
@@ -798,10 +787,8 @@ export default defineComponent({
     };
 
     const filterFieldFn = (rows: any, terms: any) => {
-      console.log(terms, terms.split("@"));
       let [field, fieldType] = terms.split("@");
 
-      console.log(field, fieldType);
       var filtered = [];
 
       field = field.toLowerCase();
@@ -877,6 +864,28 @@ export default defineComponent({
       activeTab.value = tab;
     };
 
+    const updateDefinedSchemaFields = () => {
+      markFormDirty();
+
+      if (activeTab.value === "schemaFields") {
+        indexData.value.defined_schema_fields =
+          indexData.value.defined_schema_fields.filter(
+            (field) => !selectedFields.value.includes(field)
+          );
+
+        if (!indexData.value.defined_schema_fields.length) {
+          activeTab.value = "allFields";
+        }
+      } else {
+        indexData.value.defined_schema_fields = [
+          ...indexData.value.defined_schema_fields,
+          ...selectedFields.value.map((field) => field),
+        ];
+      }
+
+      selectedFields.value = [];
+    };
+
     return {
       t,
       q,
@@ -893,8 +902,6 @@ export default defineComponent({
       dataRetentionDays,
       showDataRetention,
       formatSizeFromMB,
-      addDeleteField,
-      deleteFieldList,
       confirmQueryModeChangeDialog,
       deleteFields,
       markFormDirty,
@@ -915,6 +922,8 @@ export default defineComponent({
       updateActiveTab,
       hasUserDefinedSchema,
       isSchemaEvolutionEnabled,
+      updateDefinedSchemaFields,
+      selectedFields,
     };
   },
   created() {

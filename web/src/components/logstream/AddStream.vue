@@ -167,6 +167,10 @@ const getDefaultField = () => {
   };
 };
 
+const isSchemaEvolutionEnabled = computed(() => {
+  return store.state.zoConfig.user_defined_schemas_enabled;
+});
+
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
@@ -290,7 +294,9 @@ const getStreamPayload = () => {
         settings.bloom_filter_fields.push(field.name);
       }
     });
-    settings.defined_schema_fields.push(field.name);
+
+    if (isSchemaEvolutionEnabled.value)
+      settings.defined_schema_fields.push(field.name);
   });
 
   return settings;
