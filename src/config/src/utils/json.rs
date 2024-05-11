@@ -21,6 +21,13 @@ pub fn get_float_value(val: &Value) -> f64 {
     match val {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
         Value::Number(v) => v.as_f64().unwrap_or(0.0),
+        Value::Bool(v) => {
+            if *v {
+                1.0
+            } else {
+                0.0
+            }
+        }
         _ => 0.0,
     }
 }
@@ -29,6 +36,13 @@ pub fn get_int_value(val: &Value) -> i64 {
     match val {
         Value::String(v) => v.parse::<i64>().unwrap_or(0),
         Value::Number(v) => v.as_i64().unwrap_or(0),
+        Value::Bool(v) => {
+            if *v {
+                1
+            } else {
+                0
+            }
+        }
         _ => 0,
     }
 }
@@ -37,6 +51,13 @@ pub fn get_uint_value(val: &Value) -> u64 {
     match val {
         Value::String(v) => v.parse::<u64>().unwrap_or(0),
         Value::Number(v) => v.as_u64().unwrap_or(0),
+        Value::Bool(v) => {
+            if *v {
+                1
+            } else {
+                0
+            }
+        }
         _ => 0,
     }
 }
@@ -54,6 +75,15 @@ pub fn get_string_value(value: &Value) -> String {
         value.as_bool().unwrap_or_default().to_string()
     } else {
         value.to_string()
+    }
+}
+
+pub fn pickup_string_value(val: Value) -> String {
+    match val {
+        Value::String(v) => v,
+        Value::Number(v) => v.to_string(),
+        Value::Bool(v) => v.to_string(),
+        _ => val.to_string(),
     }
 }
 

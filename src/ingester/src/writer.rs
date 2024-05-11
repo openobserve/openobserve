@@ -107,6 +107,18 @@ pub async fn read_from_memtable(
     Ok(batches)
 }
 
+pub async fn check_ttl() -> Result<()> {
+    for w in WRITERS.iter() {
+        let w = w.read().await;
+        for r in w.values() {
+            // check writer
+            r.write(Arc::new(Schema::empty()), Entry::default(), true)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
 pub async fn flush_all() -> Result<()> {
     for w in WRITERS.iter() {
         let mut w = w.write().await;
@@ -156,11 +168,21 @@ impl Writer {
         }
     }
 
-    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
-        if entry.data.is_empty() {
+    // check_ttl is used to check if the memtable has expired
+    pub async fn write(
+        &self,
+        schema: Arc<Schema>,
+        mut entry: Entry,
+        check_ttl: bool,
+    ) -> Result<()> {
+        if entry.data.is_empty() && !check_ttl {
             return Ok(());
         }
-        let entry_bytes = entry.into_bytes()?;
+        let entry_bytes = if !check_ttl {
+            entry.into_bytes()?
+        } else {
+            Vec::new()
+        };
         let mut wal = self.wal.lock().await;
         let mut mem = self.memtable.write().await;
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
@@ -211,11 +233,13 @@ impl Writer {
             });
         }
 
-        // write into wal
-        wal.write(&entry_bytes, false).context(WalSnafu)?;
+        if !check_ttl {
+            // write into wal
+            wal.write(&entry_bytes, false).context(WalSnafu)?;
+            // write into memtable
+            mem.write(schema, entry).await?;
+        }
 
-        // write into memtable
-        mem.write(schema, entry).await?;
         Ok(())
     }
 

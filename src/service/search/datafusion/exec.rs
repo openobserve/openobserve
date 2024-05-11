@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
@@ -22,7 +22,10 @@ use config::{
         sql,
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
+    utils::{
+        flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values,
+        schema_ext::SchemaExt,
+    },
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -1148,13 +1151,18 @@ pub async fn merge_parquet_files(
             } else {
                 config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
             };
+            let schema_fields = schema.as_ref().simple_fields();
 
-            // add _timestamp column to columns_to_index
-            if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
-                columns_to_index.push(CONFIG.common.column_timestamp.to_string());
-            }
+            let schema_fields: HashSet<&str> = schema_fields.iter().map(|f| f.0.as_str()).collect();
+
+            columns_to_index.retain(|f| schema_fields.contains(f.as_str()));
 
             if !columns_to_index.is_empty() {
+                // add _timestamp column to columns_to_index
+                if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
+                    columns_to_index.push(CONFIG.common.column_timestamp.to_string());
+                }
+
                 let selected_column_indices: Vec<usize> = columns_to_index
                     .iter()
                     .filter_map(|name| batch.schema().index_of(name).ok())

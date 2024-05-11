@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use chrono::Utc;
 use config::{
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
-    utils::json,
+    utils::{json, schema_ext::SchemaExt},
     RwAHashMap, CONFIG,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -34,7 +36,8 @@ pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, Vec<(i64, bytes::Bytes)>>> =
     Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
+    Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_FIELDS: Lazy<RwAHashMap<String, (i64, Vec<String>)>> =
     Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
@@ -54,11 +57,29 @@ pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Re
 
     let r = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.clone());
+        return Ok(schema.schema.clone());
     }
     drop(r);
     // if not found in cache, get from db
     get_from_db(org_id, stream_name, stream_type).await
+}
+
+pub async fn get_cache(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<SchemaCache> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix("/schema/").unwrap();
+
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    if let Some(schema) = r.get(cache_key) {
+        return Ok(schema.clone());
+    }
+    drop(r);
+    // if not found in cache, get from db
+    let schema = get_from_db(org_id, stream_name, stream_type).await?;
+    Ok(SchemaCache::new(schema))
 }
 
 pub async fn get_from_db(
@@ -614,6 +635,42 @@ pub fn get_merge_schema_changes(
                 .map(|f| f.as_ref().clone())
                 .collect::<Vec<_>>(),
         )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SchemaCache {
+    schema: Schema,
+    fields_map: HashMap<String, usize>,
+    hash_key: String,
+}
+
+impl SchemaCache {
+    pub fn new(schema: Schema) -> Self {
+        let hash_key = schema.hash_key();
+        let fields_map = schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name().to_owned(), i))
+            .collect();
+        Self {
+            schema,
+            fields_map,
+            hash_key,
+        }
+    }
+
+    pub fn hash_key(&self) -> &str {
+        &self.hash_key
+    }
+
+    pub fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    pub fn fields_map(&self) -> &HashMap<String, usize> {
+        &self.fields_map
     }
 }
 
