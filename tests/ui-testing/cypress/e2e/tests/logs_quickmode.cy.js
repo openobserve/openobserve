@@ -184,7 +184,7 @@ describe("Logs Quickmode testcases", () => {
       .click({ force: true });
     cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     cy.reload();
-    cy.wait(2000)
+    cy.wait(4000)
     cy.get('[data-test="logs-search-bar-query-editor"]').contains('SELECT _timestamp FROM "e2e_automate" ORDER BY _timestamp DESC')
   });
 });

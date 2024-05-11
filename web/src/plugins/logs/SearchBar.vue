@@ -250,6 +250,7 @@ color="grey" size="xs" />
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
           :label="t('search.quickModeLabel')"
+          @click="handleQuickMode"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">
@@ -872,7 +873,7 @@ export default defineComponent({
     AutoRefreshInterval,
     ConfirmDialog,
   },
-  emits: ["searchdata", "onChangeInterval", "onChangeTimezone"],
+  emits: ["searchdata", "onChangeInterval", "onChangeTimezone", "handleQuickModeChange"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -1691,6 +1692,8 @@ export default defineComponent({
               delete searchObj.meta.regions;
               if (extractedObj.meta.hasOwnProperty("regions")) {
                 searchObj.meta["regions"] = extractedObj.meta.regions;
+              } else {
+                searchObj.meta["regions"] = [];
               }
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
@@ -1740,6 +1743,13 @@ export default defineComponent({
               resetStreamData();
               searchObj.data.stream.streamType =
                 extractedObj.data.stream.streamType;
+
+              delete searchObj.meta.regions;
+              if (extractedObj.meta.hasOwnProperty("regions")) {
+                searchObj.meta["regions"] = extractedObj.meta.regions;
+              } else {
+                searchObj.meta["regions"] = [];
+              }
               // Here copying selected stream object, as in loadStreamLists() we are setting selected stream object to empty object
               // After loading stream list, we are setting selected stream object to copied object
               const selectedStream = cloneDeep(
@@ -2258,6 +2268,10 @@ export default defineComponent({
       }
     };
 
+    const handleQuickMode = () => {
+      emit("handleQuickModeChange");
+    }
+
     return {
       t,
       store,
@@ -2326,6 +2340,7 @@ export default defineComponent({
       filterSavedViewFn,
       config,
       handleRegionsSelection,
+      handleQuickMode,
     };
   },
   computed: {
