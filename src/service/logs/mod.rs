@@ -293,7 +293,7 @@ async fn add_valid_record(
         .unwrap();
 
     // check schema
-    let (schema_evolution, _) = match check_for_schema(
+    let schema_evolution = match check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
