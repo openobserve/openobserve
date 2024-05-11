@@ -920,7 +920,7 @@ const useLogs = () => {
       let from = 0;
       let lastPage = 0;
       searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
-        (accumulator, currentValue) => accumulator + currentValue,
+        (accumulator: number, currentValue: number) => accumulator + currentValue,
         0
       );
 
