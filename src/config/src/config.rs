@@ -224,8 +224,9 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
                 }
             }
             if should_download {
-                // Download known good chrome version
                 let download_path = &CONFIG.chrome.chrome_download_path;
+
+                // Download known good chrome version
                 log::info!("fetching chrome at: {download_path}");
                 tokio::fs::create_dir_all(download_path).await.unwrap();
                 let fetcher = BrowserFetcher::new(

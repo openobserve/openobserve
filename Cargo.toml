@@ -198,10 +198,10 @@ aws-config = "0.56.1"
 base64 = "0.21"
 bytes = "1.4"
 byteorder = "1.4.3"
-chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
+chromiumoxide = { git = "https://github.com/openobserve/chromiumoxide", features = [
   "tokio-runtime",
   "_fetcher-rusttls-tokio",
-], default-features = false, rev = "348967500868c2b5dfcb3930fe483b2ff17b35ff" }
+], default-features = false, branch = "support-chromium-aarch64"}
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
