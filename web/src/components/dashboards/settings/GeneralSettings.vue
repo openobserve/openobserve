@@ -113,7 +113,6 @@ export default defineComponent({
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
-    console.log("initialTimezone", initialTimezone);
 
     const dashboardData = reactive({
       title: "",
@@ -134,7 +133,6 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-      console.log("getDashboardData", data);
 
       dashboardData.title = data.title;
       dashboardData.description = data.description;
@@ -147,7 +145,6 @@ export default defineComponent({
         relativeTimePeriod: data?.dateTime?.relativeTimePeriod,
         valueType: data?.dateTime?.type,
       };
-      console.log("------------dateTimeValue", dateTimeValue.value);
     };
     onMounted(async () => {
       await getDashboardData();
@@ -178,7 +175,6 @@ export default defineComponent({
         } else {
           data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
         }
-        console.log("---------------", data);
 
         data.dateTime = {
           startTime: dateTimeValue?.value?.startTime,
@@ -186,7 +182,6 @@ export default defineComponent({
           relativeTimePeriod: dateTimeValue?.value?.relativeTimePeriod,
           type: dateTimeValue?.value?.valueType,
         };
-        console.log("saveDashboardApi----------", data);
 
         // now lets save it
         await updateDashboard(
@@ -217,7 +212,6 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
-        console.log("valid", valid);
 
         saveDashboardApi.execute().catch((err: any) => {
           $q.notify({

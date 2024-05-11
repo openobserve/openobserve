@@ -203,14 +203,11 @@ export default defineComponent({
             version: 3,
           };
 
-          console.log(baseObj, "baseObj");
-
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
             baseObj,
             selectedFolder.value.value ?? "default"
           );
-          console.log(callDashboard, "callDashboard");
         }
         try {
           const res = await callDashboard;
