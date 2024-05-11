@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hide-bottom="
           searchObj.data.stream.selectedStreamFields != undefined &&
           (searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
-          searchObj.data.stream.selectedStreamFields.length == 0)
+            searchObj.data.stream.selectedStreamFields.length == 0)
         "
       >
         <template #body-cell-name="props">
@@ -665,7 +665,9 @@ export default defineComponent({
             query_context: query_context,
             query_fn: query_fn,
             type: searchObj.data.stream.streamType,
-            regions: searchObj.meta.regions.join(","),
+            regions: searchObj.meta.hasOwnProperty("regions")
+              ? searchObj.meta.regions.join(",")
+              : "",
           })
           .then((res: any) => {
             if (res.data.hits.length) {

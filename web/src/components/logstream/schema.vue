@@ -116,7 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template v-if="indexData.defined_schema_fields.length">
+          <template
+            v-if="
+              indexData.defined_schema_fields.length && isSchemaEvolutionEnabled
+            "
+          >
             <q-separator
               id="schema-add-fields-section"
               class="q-mt-lg q-mb-lg"
@@ -162,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rows="indexData.schema"
               :columns="columns"
               :row-key="(row) => 'tr_' + row.name"
-              :filter="filterField"
+              :filter="`${filterField}@${activeTab}`"
               :filter-method="filterFieldFn"
               :pagination="{ rowsPerPage }"
               class="q-table"
@@ -172,32 +176,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
             >
               <template #top-right>
-                <q-input
-                  data-test="schema-field-search-input"
-                  v-model="filterField"
-                  data-cy="schema-index-field-search-input"
-                  filled
-                  borderless
-                  dense
-                  clearable
-                  debounce="1"
-                  :placeholder="t('search.searchField')"
-                >
-                  <template #prepend>
-                    <q-icon name="search" />
-                  </template>
-                </q-input>
+                <div class="flex justify-between items-center full-width">
+                  <div>
+                    <app-tabs
+                      v-if="isSchemaEvolutionEnabled"
+                      class="schema-fields-tabs"
+                      style="
+                        border: 1px solid #8a8a8a;
+                        border-radius: 4px;
+                        overflow: hidden;
+                      "
+                      data-test="schema-fields-tabs"
+                      :tabs="tabs"
+                      :active-tab="activeTab"
+                      @update:active-tab="updateActiveTab"
+                    />
+                  </div>
+
+                  <q-input
+                    data-test="schema-field-search-input"
+                    v-model="filterField"
+                    data-cy="schema-index-field-search-input"
+                    filled
+                    borderless
+                    dense
+                    clearable
+                    debounce="1"
+                    :placeholder="t('search.searchField')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" />
+                    </template>
+                  </q-input>
+                </div>
               </template>
               <template v-slot:body-cell-delete="props">
                 <q-td class="text-center">
                   <q-checkbox
                     v-if="
-                      props.row.name !== store.state.zoConfig.timestamp_column
+                      !(
+                        props.row.name ==
+                          store.state.zoConfig.timestamp_column ||
+                        props.row.name == allFieldsName
+                      )
                     "
                     :data-test="`schema-stream-delete-${props.row.name}-field-fts-key-checkbox`"
-                    v-model="props.row.delete"
+                    v-model="selectedFields"
+                    :val="props.row.name"
                     size="sm"
-                    @click="addDeleteField(props.row)"
                   />
                 </q-td>
               </template>
@@ -211,7 +237,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td data-test="schema-stream-index-select"
                   ><q-select
                     v-if="
-                      props.row.name !== store.state.zoConfig.timestamp_column
+                      !(
+                        props.row.name ==
+                          store.state.zoConfig.timestamp_column ||
+                        props.row.name == allFieldsName
+                      )
                     "
                     v-model="props.row.index_type"
                     :options="streamIndexType"
@@ -243,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ><q-td colspan="100%">
                     <div v-if="indexData.schema.length > 0" class="q-mt-sm">
                       <q-btn
-                        v-bind:disable="deleteFieldList.length == 0"
+                        v-bind:disable="!selectedFields.length"
                         data-test="schema-delete-button"
                         class="q-my-sm text-bold btn-delete"
                         color="warning"
@@ -255,14 +285,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
 
                       <q-btn
-                        v-if="indexData.defined_schema_fields.length"
+                        v-if="isSchemaEvolutionEnabled"
                         data-test="schema-add-field-button"
                         class="q-my-sm no-border text-bold q-ml-md"
-                        :label="t('logStream.addField')"
+                        :label="
+                          activeTab === 'schemaFields'
+                            ? t('logStream.removeSchemaField')
+                            : t('logStream.addSchemaField')
+                        "
                         padding="sm md"
                         color="secondary"
                         no-caps
-                        @click="scrollToAddFields"
+                        v-bind:disable="!selectedFields.length"
+                        @click="updateDefinedSchemaFields"
                       />
 
                       <q-btn
@@ -307,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onBeforeMount, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
@@ -319,6 +354,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
 import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 const defaultValue: any = () => {
   return {
@@ -326,6 +362,7 @@ const defaultValue: any = () => {
     schema: [],
     stats: {},
     defaultFts: false,
+    defined_schema_fields: [],
   };
 };
 
@@ -341,6 +378,7 @@ export default defineComponent({
   components: {
     ConfirmDialog,
     StreamFieldsInputs,
+    AppTabs,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -350,7 +388,6 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
-    const deleteFieldList = ref([]);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
@@ -358,6 +395,30 @@ export default defineComponent({
     const filterField = ref("");
     const router = useRouter();
     const newSchemaFields = ref([]);
+    const activeTab = ref("allFields");
+
+    const selectedFields = ref([]);
+
+    const hasUserDefinedSchema = computed(() => {
+      return !!indexData.value.defined_schema_fields?.length;
+    });
+
+    const allFieldsName = computed(() => {
+      return store.state.zoConfig.all_fields_name;
+    });
+
+    const tabs = computed(() => [
+      {
+        value: "allFields",
+        label: "All Fields",
+        disabled: false,
+      },
+      {
+        value: "schemaFields",
+        label: "User Defined Schema",
+        disabled: !hasUserDefinedSchema.value,
+      },
+    ]);
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
@@ -375,15 +436,9 @@ export default defineComponent({
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
     });
 
-    const addDeleteField = (schema: any) => {
-      if (schema.delete) {
-        deleteFieldList.value.push(schema.name);
-      } else {
-        deleteFieldList.value = deleteFieldList.value.filter(
-          (item) => item !== schema.name
-        );
-      }
-    };
+    const isSchemaEvolutionEnabled = computed(() => {
+      return store.state.zoConfig.user_defined_schemas_enabled;
+    });
 
     const markFormDirty = () => {
       formDirtyFlag.value = true;
@@ -395,7 +450,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
-          deleteFieldList.value
+          selectedFields.value
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -406,7 +461,7 @@ export default defineComponent({
               timeout: 2000,
             });
             confirmQueryModeChangeDialog.value = false;
-            deleteFieldList.value = [];
+            selectedFields.value = [];
             await getStream(
               indexData.value.name,
               indexData.value.stream_type,
@@ -647,10 +702,6 @@ export default defineComponent({
             settings.bloom_filter_fields.push(property.name);
           }
         });
-
-        if (property.delete) {
-          deleteFieldList.value.push(property.name);
-        }
       }
       if (added_part_keys.length > 0) {
         settings.partition_keys =
@@ -748,22 +799,36 @@ export default defineComponent({
     };
 
     const filterFieldFn = (rows: any, terms: any) => {
+      let [field, fieldType] = terms.split("@");
+
       var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+
+      field = field.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (fieldType === "schemaFields") {
+          if (indexData.value.defined_schema_fields.includes(rows[i]["name"])) {
+            if (!field) {
+              filtered.push(rows[i]);
+            } else {
+              if (rows[i]["name"].toLowerCase().includes(field)) {
+                filtered.push(rows[i]);
+              }
+            }
+          }
+        } else {
+          if (rows[i]["name"].toLowerCase().includes(field)) {
             filtered.push(rows[i]);
           }
         }
       }
+
       return filtered;
     };
 
     const columns = [
       {
         name: "delete",
-        label: t("logStream.deleteActionLabel"),
+        label: "",
         align: "center",
         sortable: false,
       },
@@ -807,6 +872,32 @@ export default defineComponent({
       }
     };
 
+    const updateActiveTab = (tab) => {
+      activeTab.value = tab;
+    };
+
+    const updateDefinedSchemaFields = () => {
+      markFormDirty();
+
+      if (activeTab.value === "schemaFields") {
+        indexData.value.defined_schema_fields =
+          indexData.value.defined_schema_fields.filter(
+            (field) => !selectedFields.value.includes(field)
+          );
+
+        if (!indexData.value.defined_schema_fields.length) {
+          activeTab.value = "allFields";
+        }
+      } else {
+        indexData.value.defined_schema_fields = [
+          ...indexData.value.defined_schema_fields,
+          ...selectedFields.value.map((field) => field),
+        ];
+      }
+
+      selectedFields.value = [];
+    };
+
     return {
       t,
       q,
@@ -823,8 +914,6 @@ export default defineComponent({
       dataRetentionDays,
       showDataRetention,
       formatSizeFromMB,
-      addDeleteField,
-      deleteFieldList,
       confirmQueryModeChangeDialog,
       deleteFields,
       markFormDirty,
@@ -840,6 +929,14 @@ export default defineComponent({
       removeSchemaField,
       newSchemaFields,
       scrollToAddFields,
+      tabs,
+      activeTab,
+      updateActiveTab,
+      hasUserDefinedSchema,
+      isSchemaEvolutionEnabled,
+      updateDefinedSchemaFields,
+      selectedFields,
+      allFieldsName,
     };
   },
   created() {
@@ -991,6 +1088,29 @@ export default defineComponent({
         text-wrap: nowrap;
         display: inline-block;
       }
+    }
+  }
+}
+// background:
+//             activeTab.value === "allFields" ? "#5960B2 !important" : "",
+// color: activeTab.value === "allFields" ? "#ffffff !important" : "",
+
+.indexDetailsContainer {
+  .q-table__control {
+    width: 100%;
+  }
+}
+
+.schema-fields-tabs {
+  height: fit-content;
+  .rum-tab {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
     }
   }
 }
