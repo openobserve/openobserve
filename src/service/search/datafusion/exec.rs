@@ -1148,13 +1148,11 @@ pub async fn merge_parquet_files(
             } else {
                 config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
             };
-
-            // add _timestamp column to columns_to_index
-            if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
-                columns_to_index.push(CONFIG.common.column_timestamp.to_string());
-            }
-
             if !columns_to_index.is_empty() {
+                // add _timestamp column to columns_to_index
+                if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
+                    columns_to_index.push(CONFIG.common.column_timestamp.to_string());
+                }
                 let selected_column_indices: Vec<usize> = columns_to_index
                     .iter()
                     .filter_map(|name| batch.schema().index_of(name).ok())
