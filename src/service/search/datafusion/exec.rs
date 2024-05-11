@@ -53,6 +53,7 @@ use infra::cache::tmpfs::Directory;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
+use serde_json::{Map, Value};
 
 use super::{storage::file_list, transform_udf::get_all_transform};
 use crate::{
@@ -1068,7 +1069,14 @@ pub async fn merge_parquet_files(
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let result = arrowJson::writer::record_batches_to_json_rows(&batches_ref).unwrap();
+
+    let json_buf = Vec::new();
+    let mut writer = arrowJson::ArrayWriter::new(json_buf);
+    writer.write_batches(&batches_ref).unwrap();
+    writer.finish().unwrap();
+    let json_data = writer.into_inner();
+    let result: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
+
     let record = result.first().unwrap();
     let file_meta = if record.is_empty() {
         FileMeta::default()
@@ -1374,7 +1382,13 @@ fn handle_query_fn(
     org_id: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
-    match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
+    let buf = Vec::new();
+    let mut writer = arrowJson::ArrayWriter::new(buf);
+    writer.write_batches(batches).unwrap();
+    writer.finish().unwrap();
+    let json_data = writer.into_inner();
+
+    match serde_json::from_reader(json_data.as_slice()) {
         Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
         Err(err) => Err(DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
