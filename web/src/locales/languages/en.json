@@ -379,7 +379,9 @@
     "indexing": "Indexing",
     "createStream": "Create Stream",
     "indexType": "Index Type",
-    "addField": "Add Field"
+    "addField": "Add Field",
+    "addSchemaField": "Add to Defined Schema Fields",
+    "removeSchemaField": "Remove Defined Schema Fields"
   },
   "pipeline": {
     "header": "Pipelines",
