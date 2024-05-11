@@ -379,6 +379,7 @@ pub async fn write_file(
                     data: entry.records,
                     data_size: entry.records_size,
                 },
+                false,
             )
             .await
         {
