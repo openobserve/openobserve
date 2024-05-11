@@ -317,11 +317,10 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
-    let meta = unwrap_stream_settings(schema.schema());
-    let defined_schema_fields = match meta {
-        Some(meta) => meta.defined_schema_fields.unwrap_or(vec![]),
-        None => vec![],
-    };
+    let stream_setting = unwrap_stream_settings(schema.schema());
+    let defined_schema_fields = stream_setting
+        .and_then(|s| s.defined_schema_fields)
+        .unwrap_or_default();
 
     for item in inferred_schema.fields.iter() {
         let item_name = item.name();
