@@ -816,7 +816,7 @@ const useLogs = () => {
             paginations: [],
           };
 
-          searchObj.data.queryResults.total = res.data.records;
+          // searchObj.data.queryResults.total = res.data.records;
           const partitions = res.data.partitions;
 
           searchObj.data.queryResults.partitionDetail.partitions = partitions;
@@ -919,6 +919,11 @@ const useLogs = () => {
       let recordSize = 0;
       let from = 0;
       let lastPage = 0;
+      searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
+        (accumulator, currentValue) => accumulator + currentValue,
+        0
+      );
+
       // partitionDetail.partitions.forEach((item: any, index: number) => {
       for (const [index, item] of partitionDetail.partitions.entries()) {
         total = partitionDetail.partitionTotal[index];
@@ -1968,10 +1973,17 @@ const useLogs = () => {
       endCount = searchObj.data.queryResults.hits.length;
       totalCount = searchObj.data.queryResults.hits.length;
     } else {
-      endCount = Math.min(
-        startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-        searchObj.data.queryResults.total
-      );
+      if (
+        currentPage >=
+        searchObj.data.queryResults.partitionDetail.paginations.length - 1
+      ) {
+        endCount = Math.min(
+          startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+          searchObj.data.queryResults.total
+        );
+      } else {
+        endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+      }
     }
     const title =
       "Showing " +
@@ -2059,7 +2071,6 @@ const useLogs = () => {
         //   parsedSQL.columns.push(ts_col);
         // }
         parsedSQL.where = null;
-        console.log(query_context);
         query_context = b64EncodeUnicode(
           parser.sqlify(parsedSQL).replace(/`/g, '"')
         );
