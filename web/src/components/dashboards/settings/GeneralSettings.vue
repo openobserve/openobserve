@@ -48,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons q-mt-sm"
+            class="dashboard-icons q-my-sm"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
-          />{{ dateTimeValue }} initial: {{ initialTimezone }}
+          />
         </div>
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
