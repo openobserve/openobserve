@@ -281,13 +281,25 @@ pub async fn update_user(
                                     let old = old_role.unwrap();
                                     let new = new_role.unwrap();
                                     if !old.eq(&new) {
-                                        update_user_role(
-                                            &old.to_string(),
-                                            &new.to_string(),
-                                            email,
-                                            org_id,
-                                        )
-                                        .await;
+                                        let mut old_str = old.to_string();
+                                        let mut new_str = new.to_string();
+                                        if old.eq(&UserRole::User)
+                                            || old.eq(&UserRole::ServiceAccount)
+                                        {
+                                            old_str = "allowed_user".to_string();
+                                        }
+                                        if new.eq(&UserRole::User)
+                                            || new.eq(&UserRole::ServiceAccount)
+                                        {
+                                            new_str = "allowed_user".to_string();
+                                        }
+                                        if old_str != new_str {
+                                            log::debug!(
+                                                "updating openfga role for {email} from {old_str} to {new_str}"
+                                            );
+                                            update_user_role(&old_str, &new_str, email, org_id)
+                                                .await;
+                                        }
                                     }
                                 }
                             }
@@ -514,13 +526,59 @@ pub async fn remove_user_from_org(
                     let mut orgs = user.clone().organizations;
                     if orgs.len() == 1 {
                         let _ = db::user::delete(email_id).await;
+                        #[cfg(feature = "enterprise")]
+                        {
+                            use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
+                            let user_role = &orgs[0].role;
+                            let user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
+                                || user_role.eq(&UserRole::User)
+                            {
+                                "allowed_user".to_string()
+                            } else {
+                                user_role.to_string()
+                            };
+                            if O2_CONFIG.openfga.enabled {
+                                log::debug!("delete user single org, role: {}", &user_fga_role);
+                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
+                            }
+                        }
                     } else {
+                        let mut _user_fga_role: Option<String> = None;
+                        #[cfg(feature = "enterprise")]
+                        for org in orgs.iter() {
+                            if org.name.eq(&org_id.to_string()) {
+                                let user_role = &org.role;
+                                _user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
+                                    || user_role.eq(&UserRole::User)
+                                {
+                                    Some("allowed_user".to_string())
+                                } else {
+                                    Some(user_role.to_string())
+                                };
+                            }
+                        }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                         user.organizations = orgs;
                         let resp = db::user::set(user).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
                             USERS.remove(&format!("{org_id}/{email_id}"));
+                            #[cfg(feature = "enterprise")]
+                            {
+                                use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
+                                log::debug!(
+                                    "user_fga_role, multi org: {}",
+                                    _user_fga_role.as_ref().unwrap()
+                                );
+                                if O2_CONFIG.openfga.enabled && _user_fga_role.is_some() {
+                                    delete_user_from_org(
+                                        org_id,
+                                        email_id,
+                                        _user_fga_role.unwrap().as_str(),
+                                    )
+                                    .await;
+                                }
+                            }
                         }
                     }
                     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
