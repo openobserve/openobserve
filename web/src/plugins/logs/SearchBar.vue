@@ -250,6 +250,7 @@ color="grey" size="xs" />
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
           :label="t('search.quickModeLabel')"
+          @click="handleQuickMode"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">
@@ -872,7 +873,7 @@ export default defineComponent({
     AutoRefreshInterval,
     ConfirmDialog,
   },
-  emits: ["searchdata", "onChangeInterval", "onChangeTimezone"],
+  emits: ["searchdata", "onChangeInterval", "onChangeTimezone", "handleQuickModeChange"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -2258,6 +2259,10 @@ export default defineComponent({
       }
     };
 
+    const handleQuickMode = () => {
+      emit("handleQuickModeChange");
+    }
+
     return {
       t,
       store,
@@ -2326,6 +2331,7 @@ export default defineComponent({
       filterSavedViewFn,
       config,
       handleRegionsSelection,
+      handleQuickMode,
     };
   },
   computed: {
