@@ -115,7 +115,7 @@ pub async fn list_pipelines(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("logs:{}", org_id))
+                    .contains(&format!("logs:_all_{}", org_id))
             {
                 let fn_list = STREAM_FUNCTIONS
                     .get(&format!(
