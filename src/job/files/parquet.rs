@@ -727,13 +727,13 @@ async fn prepare_index_record_batches_v1(
         let column_name = column.name();
         let split_chars = &CONFIG.common.inverted_index_split_chars;
         let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
-        let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
+        let lower_case_expr = lower(concat(vec![col(column_name), lit("")]));
         let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
         let distinct_terms = array_distinct(split_arr);
 
         let record_batch = index_df
             .with_column("terms", distinct_terms)?
-            .unnest_column("terms")?
+            .unnest_columns(&["terms"])?
             .with_column_renamed("terms", "term")?
             .with_column("term", btrim(vec![col("term"), lit(remove_chars_btrim)]))?
             .with_column("file_name", lit(file_name_without_prefix))?

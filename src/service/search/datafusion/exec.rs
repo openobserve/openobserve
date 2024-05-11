@@ -206,10 +206,9 @@ pub async fn sql(
         };
 
         if !rules.is_empty() {
-            let fields = df.schema().fields();
-            let mut exprs = Vec::with_capacity(fields.len());
-            for field in fields {
-                if let Some(v) = field.qualifier() {
+            let mut exprs = Vec::with_capacity(df.schema().fields().len());
+            for (qualifier, field) in df.schema().iter() {
+                if let Some(v) = qualifier {
                     if v.to_string() != "tbl" {
                         exprs.push(col(field.name()));
                         continue;
@@ -341,10 +340,9 @@ async fn exec_query(
     };
 
     if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if let Some(v) = field.qualifier() {
+        let mut exprs = Vec::with_capacity(df.schema().fields().len());
+        for (qualifier, field) in df.schema().iter() {
+            if let Some(v) = qualifier {
                 if v.to_string() != "tbl" {
                     exprs.push(col(field.name()));
                     continue;
@@ -985,10 +983,9 @@ pub async fn convert_parquet_file(
         }
     };
     if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if let Some(v) = field.qualifier() {
+        let mut exprs = Vec::with_capacity(df.schema().fields().len());
+        for (qualifier, field) in df.schema().iter() {
+            if let Some(v) = qualifier {
                 if v.to_string() != "tbl" {
                     exprs.push(col(field.name()));
                     continue;
