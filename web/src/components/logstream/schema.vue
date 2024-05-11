@@ -214,7 +214,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td class="text-center">
                   <q-checkbox
                     v-if="
-                      props.row.name !== store.state.zoConfig.timestamp_column
+                      !(
+                        props.row.name ==
+                          store.state.zoConfig.timestamp_column ||
+                        props.row.name == allFieldsName
+                      )
                     "
                     :data-test="`schema-stream-delete-${props.row.name}-field-fts-key-checkbox`"
                     v-model="selectedFields"
@@ -233,7 +237,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td data-test="schema-stream-index-select"
                   ><q-select
                     v-if="
-                      props.row.name !== store.state.zoConfig.timestamp_column
+                      !(
+                        props.row.name ==
+                          store.state.zoConfig.timestamp_column ||
+                        props.row.name == allFieldsName
+                      )
                     "
                     v-model="props.row.index_type"
                     :options="streamIndexType"
@@ -393,6 +401,10 @@ export default defineComponent({
 
     const hasUserDefinedSchema = computed(() => {
       return !!indexData.value.defined_schema_fields?.length;
+    });
+
+    const allFieldsName = computed(() => {
+      return store.state.zoConfig.all_fields_name;
     });
 
     const tabs = computed(() => [
@@ -924,6 +936,7 @@ export default defineComponent({
       isSchemaEvolutionEnabled,
       updateDefinedSchemaFields,
       selectedFields,
+      allFieldsName,
     };
   },
   created() {
