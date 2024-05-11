@@ -407,9 +407,10 @@ pub async fn handle_trace_request(
             }
         }
     }
-    log::info!("[{session_id}] write data to wal");
+    log::info!("[{session_id}] get_writer");
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
+    log::info!("[{session_id}] write begin to write_file");
     let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
     log::info!("[{session_id}] write_file begin to sync");
     if let Err(e) = writer.sync().await {
