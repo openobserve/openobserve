@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
+use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -48,7 +49,7 @@ use crate::{
             write_file, TriggerAlertData,
         },
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };

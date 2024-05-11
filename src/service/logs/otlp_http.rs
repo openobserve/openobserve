@@ -25,6 +25,7 @@ use config::{
     utils::{flatten, json},
     CONFIG, DISTINCT_FIELDS,
 };
+use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -44,7 +45,7 @@ use crate::{
         db, get_formatted_stream_name,
         ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };

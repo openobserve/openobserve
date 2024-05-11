@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,6 +28,7 @@ use config::{
     CONFIG, DISTINCT_FIELDS,
 };
 use flate2::read::GzDecoder;
+use infra::schema::SchemaCache;
 use vrl::compiler::runtime::Runtime;
 
 use crate::{
@@ -45,7 +46,7 @@ use crate::{
         ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
         logs::StreamMeta,
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, SchemaCache},
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };

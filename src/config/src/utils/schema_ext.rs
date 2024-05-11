@@ -38,21 +38,19 @@ impl SchemaExt for Schema {
 
     // ensure schema is compatible
     fn cloned_from(&self, schema: &Schema) -> Schema {
-        let mut schema_latest_map = HashMap::with_capacity(schema.fields().len());
-        for field in schema.fields() {
-            schema_latest_map.insert(field.name(), field.clone());
-        }
-        let mut fields = Vec::with_capacity(self.fields().len());
-        for field in self.fields() {
-            match schema_latest_map.get(field.name()) {
-                Some(f) => {
-                    fields.push(f.clone());
-                }
-                None => {
-                    fields.push(field.clone());
-                }
-            }
-        }
+        let schema_latest_map: HashMap<_, _> = schema
+            .fields()
+            .iter()
+            .map(|field| (field.name(), field))
+            .collect();
+        let fields = self
+            .fields()
+            .iter()
+            .map(|f| match schema_latest_map.get(f.name()) {
+                Some(f) => (*f).clone(),
+                None => f.clone(),
+            })
+            .collect::<Vec<_>>();
         Schema::new(fields)
     }
 
