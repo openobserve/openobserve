@@ -10,7 +10,7 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
-    //   await page.getByText('Login as internal user').click();
+      // await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -295,7 +295,7 @@ test.describe("Pipeline testcases", () => {
     // await page.waitForSelector(':text("e2e_automate")')
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
-    await page.waitForTimeout(2000)
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`)
     await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
     await page.waitForTimeout(2000)
 
