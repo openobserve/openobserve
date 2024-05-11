@@ -920,7 +920,8 @@ const useLogs = () => {
       let from = 0;
       let lastPage = 0;
       searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
-        (accumulator: number, currentValue: number) => accumulator + currentValue,
+        (accumulator: number, currentValue: number) =>
+          accumulator + currentValue,
         0
       );
 
@@ -2120,7 +2121,9 @@ const useLogs = () => {
           query_context: query_context,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,
-          regions: searchObj.meta.regions.join(","),
+          regions: searchObj.meta.hasOwnProperty("regions")
+            ? searchObj.meta.regions.join(",")
+            : "",
         })
         .then((res) => {
           searchObj.loading = false;
