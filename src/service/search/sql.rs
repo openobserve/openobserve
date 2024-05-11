@@ -46,7 +46,7 @@ const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
 ];
 
-static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
+pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
@@ -1004,7 +1004,6 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
-            is_partial: false,
         };
 
         let req: config::meta::search::Request = config::meta::search::Request {
@@ -1116,7 +1115,6 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
-                is_partial: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
@@ -1240,7 +1238,6 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
-                is_partial: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),

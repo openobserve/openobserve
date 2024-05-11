@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -379,6 +379,7 @@ pub async fn write_file(
                     data: entry.records,
                     data_size: entry.records_size,
                 },
+                false,
             )
             .await
         {
@@ -515,7 +516,7 @@ pub async fn get_stream_routing(
 
 pub async fn get_user_defined_schema(
     streams: &[StreamParams],
-    user_defined_schema_map: &mut HashMap<String, Vec<String>>,
+    user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
 ) {
     for stream in streams {
         let stream_settings =
@@ -524,7 +525,10 @@ pub async fn get_user_defined_schema(
                 .unwrap_or_default();
         if let Some(fields) = stream_settings.defined_schema_fields {
             if !fields.is_empty() {
-                user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
+                user_defined_schema_map.insert(
+                    stream.stream_name.to_string(),
+                    fields.iter().cloned().collect(),
+                );
             }
         }
     }

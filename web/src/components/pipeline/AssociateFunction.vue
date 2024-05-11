@@ -55,8 +55,10 @@
               style="min-width: 220px"
               v-bind:readonly="isUpdating"
               v-bind:disable="isUpdating"
-              error-message="Function is already associated"
-              :error="!functionExists"
+              :error-message="
+                selectedFunction ? 'Function is already associated' : ''
+              "
+              :error="functionExists"
             />
           </div>
 
@@ -223,7 +225,7 @@ const createNewFunction = ref(false);
 
 const store = useStore();
 
-const functionExists = ref(true);
+const functionExists = ref(false);
 
 const nodeLink = ref({
   from: "",
@@ -282,27 +284,26 @@ const openDeleteDialog = () => {
 };
 
 const saveFunction = () => {
-  console.log("saveFunction");
-  functionExists.value = true;
-
-  if (
-    !isUpdating.value &&
-    props.associatedFunctions.includes(selectedFunction.value)
-  ) {
-    functionExists.value = false;
-    return;
-  }
+  functionExists.value = false;
 
   if (createNewFunction.value) {
     addFunctionRef.value.onSubmit();
-  } else {
-    emit("update:node", {
-      data: { name: selectedFunction.value, order: functionOrder.value },
-      link: nodeLink.value,
-    });
-    emit("cancel:hideform");
+    return;
   }
 
+  if (
+    !isUpdating.value &&
+    selectedFunction.value &&
+    props.associatedFunctions.includes(selectedFunction.value)
+  ) {
+    functionExists.value = true;
+    return;
+  }
+
+  emit("update:node", {
+    data: { name: selectedFunction.value, order: functionOrder.value },
+    link: nodeLink.value,
+  });
   emit("cancel:hideform");
 };
 

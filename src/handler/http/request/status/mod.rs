@@ -87,6 +87,7 @@ struct ConfigResponse<'a> {
     sso_enabled: bool,
     native_login_enabled: bool,
     rbac_enabled: bool,
+    super_cluster_enabled: bool,
     query_on_stream_selection: bool,
     show_stream_stats_doc_num: bool,
     custom_logo_text: String,
@@ -97,6 +98,8 @@ struct ConfigResponse<'a> {
     custom_hide_menus: String,
     meta_org: String,
     quick_mode_enabled: bool,
+    user_defined_schemas_enabled: bool,
+    all_fields_name: String,
 }
 
 #[derive(Serialize)]
@@ -166,10 +169,17 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
+
     #[cfg(feature = "enterprise")]
     let rbac_enabled = O2_CONFIG.openfga.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let super_cluster_enabled = O2_CONFIG.super_cluster.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster_enabled = false;
+
     #[cfg(feature = "enterprise")]
     let custom_logo_text = match get_logo_text().await {
         Some(data) => data,
@@ -217,6 +227,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
+        super_cluster_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
         show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
         custom_logo_text,
@@ -238,6 +249,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         },
         meta_org: CONFIG.common.usage_org.to_string(),
         quick_mode_enabled: CONFIG.limit.quick_mode_enabled,
+        user_defined_schemas_enabled: CONFIG.common.allow_user_defined_schemas,
+        all_fields_name: CONFIG.common.all_fields_name.to_string(),
     }))
 }
 
@@ -318,7 +331,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         stream_num += 1;
         stream_schema_num += 1;
         mem_size += key.len();
-        mem_size += schema.size();
+        mem_size += schema.schema().size();
     }
     drop(r);
     (stream_num, stream_schema_num, mem_size)

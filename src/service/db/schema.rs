@@ -22,8 +22,8 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
     schema::{
-        unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST,
-        STREAM_SETTINGS,
+        unwrap_stream_settings, SchemaCache, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
+        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -141,7 +141,6 @@ pub async fn delete(
     Ok(())
 }
 
-#[tracing::instrument]
 async fn list_stream_schemas(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -171,7 +170,7 @@ async fn list_stream_schemas(
                     stream_name,
                     stream_type,
                     schema: if fetch_schema {
-                        val.clone()
+                        val.schema().clone()
                     } else {
                         Schema::empty()
                     },
@@ -181,7 +180,6 @@ async fn list_stream_schemas(
         .collect()
 }
 
-#[tracing::instrument(name = "db:schema:list")]
 pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
@@ -279,6 +277,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let r = STREAM_SCHEMAS_LATEST.read().await;
                 let prev_schema_start_dt = if let Some(schema) = r.get(&item_key.to_owned()) {
                     schema
+                        .schema()
                         .metadata()
                         .get("start_dt")
                         .unwrap_or(&"0".to_string())
@@ -339,7 +338,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 w.insert(item_key.to_string(), settings);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.insert(item_key.to_string(), latest_schema.clone());
+                w.insert(
+                    item_key.to_string(),
+                    SchemaCache::new(latest_schema.clone()),
+                );
                 drop(w);
                 if CONFIG.common.schema_cache_compress_enabled {
                     let schema_versions = schema_versions
@@ -487,7 +489,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         w.insert(item_key.to_string(), settings);
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(item_key.to_string(), latest_schema.clone());
+        w.insert(
+            item_key.to_string(),
+            SchemaCache::new(latest_schema.clone()),
+        );
         drop(w);
         if CONFIG.common.schema_cache_compress_enabled {
             let schema_versions = schema_versions

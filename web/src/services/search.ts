@@ -36,6 +36,7 @@ const search = {
     query_context,
     query_fn,
     stream_type,
+    regions,
   }: {
     org_identifier: string;
     index: string;
@@ -44,10 +45,15 @@ const search = {
     query_context: any;
     query_fn: any;
     stream_type: string;
+    regions: string;
   }) => {
     let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
+    }
+
+    if (regions.trim()!= "") {
+      url = url + `&regions=${regions}`;
     }
     return http().get(url);
   },
@@ -135,6 +141,10 @@ const search = {
   delete_running_query: (traceID: string) => {
     const url = `/api/query_manager/${traceID}`;
     return http().delete(url);
+  },
+  get_regions: () => {
+    const url = `/api/clusters`;
+    return http().get(url);
   },
 };
 

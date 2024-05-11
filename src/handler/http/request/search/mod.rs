@@ -40,7 +40,10 @@ use crate::{
             http::{get_stream_type_from_request, RequestHeaderExtractor},
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, sql::RE_ONLY_SELECT},
+        usage::report_request_usage_stats,
+    },
 };
 
 pub mod job;
@@ -347,6 +350,7 @@ pub async fn search(
         ("stream_name" = String, Path, description = "stream_name name"),
         ("key" = i64, Query, description = "around key"),
         ("size" = i64, Query, description = "around size"),
+        ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -439,6 +443,12 @@ pub async fn around(
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
 
+    let regions = query.get("regions").map_or("", |v| v.as_str());
+    let regions = regions
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -487,11 +497,10 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions: regions.clone(),
         clusters: vec![],
         timeout,
     };
@@ -567,11 +576,10 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout,
     };
@@ -706,6 +714,7 @@ pub async fn around(
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
+        ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -876,12 +885,12 @@ async fn values_v1(
         None => None,
         Some(v) => match base64::decode_url(v) {
             Err(_) => None,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                Some(v)
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                Some(sql)
             }
         },
     };
@@ -891,6 +900,16 @@ async fn values_v1(
         // We don't need query_context now
         query_context = None;
     }
+
+    // if it is select *, replace to select _timestamp
+    if RE_ONLY_SELECT.is_match(&query_sql) {
+        query_sql = RE_ONLY_SELECT
+            .replace(
+                &query_sql,
+                format!("SELECT {} ", CONFIG.common.column_timestamp).as_str(),
+            )
+            .to_string()
+    };
 
     let size = query
         .get("size")
@@ -907,6 +926,12 @@ async fn values_v1(
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
+
+    let regions = query.get("regions").map_or("", |v| v.as_str());
+    let regions = regions
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
 
     let timeout = query
         .get("timeout")
@@ -944,11 +969,10 @@ async fn values_v1(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout,
     };
@@ -957,7 +981,7 @@ async fn values_v1(
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let schema = if let Some(schema) = r.get(&key) {
-        schema.clone()
+        schema.schema().clone()
     } else {
         arrow_schema::Schema::empty()
     };
@@ -1138,6 +1162,12 @@ async fn values_v2(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
+    let regions = query.get("regions").map_or("", |v| v.as_str());
+    let regions = regions
+        .split(',')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -1174,11 +1204,10 @@ async fn values_v2(
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
-            is_partial: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout,
     };

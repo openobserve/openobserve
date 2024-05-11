@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.showHistogram
         "
       >
-        <h6 class="text-center">
+        <h6 class="text-center" v-if="searchObj.data.histogram.errorCode != 0">
           <q-icon name="warning" color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
           <q-btn
@@ -113,6 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ searchObj.data.histogram.errorMsg }}
             {{ searchObj.data.histogram.errorDetail }}
           </span>
+        </h6>
+        <h6 class="text-center" v-else>
+          {{ searchObj.data.histogram.errorMsg }}
+            {{ searchObj.data.histogram.errorDetail }}
         </h6>
       </div>
       <q-virtual-scroll

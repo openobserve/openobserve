@@ -9,3 +9,7 @@
 node_modules
 cypress/videos
 cypress/screenshots
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
