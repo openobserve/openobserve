@@ -446,6 +446,7 @@ pub async fn around(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
@@ -930,6 +931,7 @@ async fn values_v1(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
@@ -1165,6 +1167,7 @@ async fn values_v2(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
