@@ -60,9 +60,7 @@ pub async fn save_folder(
 
     match db::dashboards::folders::put(org_id, folder).await {
         Ok(folder) => {
-            if folder.folder_id != DEFAULT_FOLDER {
-                set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
-            }
+            set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
             Ok(HttpResponse::Ok().json(folder))
         }
         Err(error) => Ok(
