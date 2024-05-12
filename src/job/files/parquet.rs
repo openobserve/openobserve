@@ -30,14 +30,18 @@ use config::{
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files,
         json,
-        parquet::read_metadata_from_file,
+        parquet::{read_metadata_from_file, read_recordbatch_from_bytes},
         schema_ext::SchemaExt,
     },
     FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
 use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
-use infra::{cache, schema::SchemaCache, storage};
+use infra::{
+    cache::{self, tmpfs},
+    schema::SchemaCache,
+    storage,
+};
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
@@ -66,6 +70,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(CONFIG.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // move files
+    println!(
+        "CONFIG.limit.file_move_thread_num: {}",
+        CONFIG.limit.file_move_thread_num
+    );
     for thread_id in 0..CONFIG.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
@@ -194,6 +202,7 @@ async fn move_files(
     prefix: &str,
     files: Vec<FileKey>,
 ) -> Result<(), anyhow::Error> {
+    println!("move_files using thread_id: {}", thread_id);
     let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
     // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
     // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
@@ -510,19 +519,34 @@ async fn merge_files(
         compressed_size: 0,
     };
 
-    let (mut new_file_meta, _) = match merge_parquet_files(
-        tmp_dir.name(),
-        stream_type,
-        &stream_name,
-        &mut buf,
-        Arc::new(file_schema.unwrap()),
-        &bloom_filter_fields,
-        &full_text_search_fields,
-        &in_file_meta,
-        &mut fts_buf,
-    )
-    .await
-    {
+    let (mut new_file_meta, _) = match if new_file_list.len() == 1 {
+        move_single_file(
+            tmp_dir.name(),
+            file,
+            stream_type,
+            &stream_name,
+            &mut buf,
+            Arc::new(file_schema.unwrap()),
+            &bloom_filter_fields,
+            &full_text_search_fields,
+            &in_file_meta,
+            &mut fts_buf,
+        )
+        .await
+    } else {
+        merge_parquet_files(
+            tmp_dir.name(),
+            stream_type,
+            &stream_name,
+            &mut buf,
+            Arc::new(file_schema.unwrap()),
+            &bloom_filter_fields,
+            &full_text_search_fields,
+            &in_file_meta,
+            &mut fts_buf,
+        )
+        .await
+    } {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -539,6 +563,7 @@ async fn merge_files(
             return Err(e.into());
         }
     };
+
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
@@ -780,4 +805,96 @@ async fn prepare_index_record_batches_v1(
     }
     ctx.deregister_table("_tbl_raw_data")?;
     Ok(indexed_record_batches_to_merge)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn move_single_file(
+    trace_id: &str,
+    file: &FileKey,
+    stream_type: StreamType,
+    stream_name: &str,
+    buf: &mut Vec<u8>,
+    bloom_filter_fields: &[String],
+    full_text_search_fields: &[String],
+    in_file_meta: &FileMeta,
+    fts_buf: &mut Vec<RecordBatch>,
+) -> datafusion::error::Result<(FileMeta, Arc<Schema>)> {
+    let data = match tmpfs::get(&format!("{trace_id}/{}", &file.key)) {
+        Ok(body) => body,
+        Err(err) => {
+            log::error!(
+                "[INGESTER:JOB:] merge small file: {}, err: {}",
+                &file.key,
+                err
+            );
+            return Err(datafusion::error::DataFusionError::Execution(
+                err.to_string(),
+            ));
+        }
+    };
+
+    buf.extend_from_slice(&data);
+
+    let mut new_file_meta = file.meta.clone();
+    new_file_meta.compressed_size = data.len() as i64;
+
+    let (schema, record_batches) = read_recordbatch_from_bytes(&Bytes::from(data))
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[INGESTER:JOB:] read_recordbatch_from_bytes error for stream -> '{}/{}/{}'",
+                trace_id,
+                stream_type,
+                stream_name
+            );
+            log::error!("[INGESTER:JOB:] {} for file {:?}", e, file);
+            datafusion::error::DataFusionError::Execution(e.to_string())
+        })?;
+
+    for batch in record_batches {
+        if stream_type == StreamType::Logs {
+            // for FTS
+            let mut columns_to_index = if !full_text_search_fields.is_empty() {
+                full_text_search_fields.to_vec()
+            } else {
+                config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+            };
+            let schema_fields = schema.as_ref().simple_fields();
+
+            let schema_fields: HashSet<&str> = schema_fields.iter().map(|f| f.0.as_str()).collect();
+
+            columns_to_index.retain(|f| schema_fields.contains(f.as_str()));
+
+            if !columns_to_index.is_empty() {
+                // add _timestamp column to columns_to_index
+                if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
+                    columns_to_index.push(CONFIG.common.column_timestamp.to_string());
+                }
+
+                let selected_column_indices: Vec<usize> = columns_to_index
+                    .iter()
+                    .filter_map(|name| batch.schema().index_of(name).ok())
+                    .collect();
+
+                // Use the found indices to select the columns
+                let selected_columns = selected_column_indices
+                    .iter()
+                    .map(|&i| batch.column(i).clone())
+                    .collect();
+
+                // Create a new schema for the new RecordBatch based on the selected
+                // columns
+                let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
+                    .iter()
+                    .map(|&i| batch.schema().field(i).clone())
+                    .collect();
+                let new_schema = Arc::new(Schema::new(selected_fields));
+
+                // Create a new RecordBatch with the selected columns
+                fts_buf.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
+            }
+        }
+    }
+
+    Ok((new_file_meta.clone(), schema))
 }

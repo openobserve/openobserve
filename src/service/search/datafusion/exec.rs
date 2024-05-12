@@ -1049,7 +1049,7 @@ pub async fn merge_parquet_files(
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     let start = std::time::Instant::now();
-
+    println!("merge_parquet_files start got meta: {:?}", in_file_meta);
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -1135,12 +1135,15 @@ pub async fn merge_parquet_files(
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
     ctx.register_table("tbl", table)?;
-
+    let start1 = std::time::Instant::now();
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-
+    println!(
+        "merge_parquet_files start got batches took: {:?}",
+        start1.elapsed().as_secs_f64()
+    );
     let mut writer = new_parquet_writer(
         buf,
         &schema,
