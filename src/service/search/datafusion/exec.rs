@@ -31,6 +31,7 @@ use config::{
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
+        json as arrowJson,
         record_batch::RecordBatch,
     },
     common::{FileType, GetExt},
@@ -1045,11 +1046,16 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
-    in_file_meta: &FileMeta,
+    original_size: i64,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     let start = std::time::Instant::now();
-    println!("merge_parquet_files start got meta: {:?}", in_file_meta);
+
+    // query data
+    let runtime_env = create_runtime_env(None)?;
+    let session_config = create_session_config(&SearchType::Normal)?;
+    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
+
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -1106,7 +1112,6 @@ pub async fn merge_parquet_files(
         }
     };
 
-
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
         // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
@@ -1134,22 +1139,19 @@ pub async fn merge_parquet_files(
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
-    ctx.register_table("tbl", table)?;
-    let start1 = std::time::Instant::now();
+    ctx.register_table("tbl", table.clone())?;
+
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    println!(
-        "merge_parquet_files start got batches took: {:?}",
-        start1.elapsed().as_secs_f64()
-    );
+
     let mut writer = new_parquet_writer(
         buf,
         &schema,
         bloom_filter_fields,
         full_text_search_fields,
-        in_file_meta,
+        &file_meta,
     );
     for batch in batches {
         if stream_type == StreamType::Logs {
@@ -1204,7 +1206,7 @@ pub async fn merge_parquet_files(
         start.elapsed().as_secs_f64()
     );
 
-    Ok((in_file_meta.clone(), schema))
+    Ok((file_meta, schema))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {

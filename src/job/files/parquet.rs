@@ -536,7 +536,7 @@ async fn merge_files(
             Arc::new(file_schema.unwrap()),
             &bloom_filter_fields,
             &full_text_search_fields,
-            &in_file_meta,
+            new_file_size,
             &mut fts_buf,
         )
         .await
