@@ -436,8 +436,18 @@ async fn merge_files(
     // write parquet files into tmpfs
     let mut file_schema = None;
     let tmp_dir = cache::tmpfs::Directory::default();
+    let mut min_ts = i64::MAX;
+    let mut max_ts = i64::MIN;
+    let mut row_count = 0;
     for file in retain_file_list.iter_mut() {
         log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
+        if &file.meta.min_ts < &min_ts {
+            min_ts = file.meta.min_ts;
+        };
+        if &file.meta.max_ts > &max_ts {
+            max_ts = file.meta.max_ts;
+        };
+        row_count += file.meta.records;
         let data = match get_file_contents(&wal_dir.join(&file.key)).await {
             Ok(body) => body,
             Err(err) => {
@@ -491,6 +501,15 @@ async fn merge_files(
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
     let start = std::time::Instant::now();
+
+    let in_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: row_count,
+        original_size: new_file_size,
+        compressed_size: 0,
+    };
+
     let (mut new_file_meta, _) = match merge_parquet_files(
         tmp_dir.name(),
         stream_type,
@@ -499,7 +518,7 @@ async fn merge_files(
         Arc::new(file_schema.unwrap()),
         &bloom_filter_fields,
         &full_text_search_fields,
-        new_file_size,
+        &in_file_meta,
         &mut fts_buf,
     )
     .await
