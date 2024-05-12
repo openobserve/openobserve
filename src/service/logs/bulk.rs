@@ -171,7 +171,6 @@ pub async fn ingest(
                     });
                 }
             }
-
             // End get stream keys
 
             crate::service::ingestion::get_user_defined_schema(
