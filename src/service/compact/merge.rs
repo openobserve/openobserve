@@ -447,10 +447,10 @@ async fn merge_files(
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
         log::info!("[COMPACT] merge small file: {}", &file.key);
-        if &file.meta.min_ts < &min_ts {
+        if file.meta.min_ts < min_ts {
             min_ts = file.meta.min_ts;
         };
-        if &file.meta.max_ts > &max_ts {
+        if file.meta.max_ts > max_ts {
             max_ts = file.meta.max_ts;
         };
         row_count += file.meta.records;

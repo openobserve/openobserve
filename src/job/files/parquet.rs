@@ -445,10 +445,10 @@ async fn merge_files(
     let mut row_count = 0;
     for file in retain_file_list.iter_mut() {
         log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
-        if &file.meta.min_ts < &min_ts {
+        if file.meta.min_ts < min_ts {
             min_ts = file.meta.min_ts;
         };
-        if &file.meta.max_ts > &max_ts {
+        if file.meta.max_ts > max_ts {
             max_ts = file.meta.max_ts;
         };
         row_count += file.meta.records;
@@ -832,18 +832,16 @@ async fn move_single_file(
     let mut new_file_meta = file.meta.clone();
     new_file_meta.compressed_size = data.len() as i64;
 
-    let (schema, record_batches) = read_recordbatch_from_bytes(&Bytes::from(data))
-        .await
-        .map_err(|e| {
-            log::error!(
-                "[INGESTER:JOB:] read_recordbatch_from_bytes error for stream -> '{}/{}/{}'",
-                trace_id,
-                stream_type,
-                stream_name
-            );
-            log::error!("[INGESTER:JOB:] {} for file {:?}", e, file);
-            datafusion::error::DataFusionError::Execution(e.to_string())
-        })?;
+    let (schema, record_batches) = read_recordbatch_from_bytes(&data).await.map_err(|e| {
+        log::error!(
+            "[INGESTER:JOB:] read_recordbatch_from_bytes error for stream -> '{}/{}/{}'",
+            trace_id,
+            stream_type,
+            stream_name
+        );
+        log::error!("[INGESTER:JOB:] {} for file {:?}", e, file);
+        datafusion::error::DataFusionError::Execution(e.to_string())
+    })?;
 
     for batch in record_batches {
         if stream_type == StreamType::Logs {

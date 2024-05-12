@@ -1149,7 +1149,7 @@ pub async fn merge_parquet_files(
         &schema,
         bloom_filter_fields,
         full_text_search_fields,
-        &in_file_meta,
+        in_file_meta,
     );
     for batch in batches {
         if stream_type == StreamType::Logs {
