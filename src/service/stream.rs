@@ -334,22 +334,6 @@ pub async fn delete_stream(
     )))
 }
 
-pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, anyhow::Error> {
-    match unwrap_stream_settings(schema) {
-        Some(setting) => Ok(setting.full_text_search_keys),
-        None => Ok(vec![]),
-    }
-}
-
-pub fn get_stream_setting_bloom_filter_fields(
-    schema: &Schema,
-) -> Result<Vec<String>, anyhow::Error> {
-    match unwrap_stream_settings(schema) {
-        Some(setting) => Ok(setting.bloom_filter_fields),
-        None => Ok(vec![]),
-    }
-}
-
 fn transform_stats(stats: &mut StreamStats) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
@@ -400,12 +384,5 @@ mod tests {
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
         let res = stream_res("Test", StreamType::Logs, schema, Some(stats));
         assert_eq!(res.stats, stats);
-    }
-
-    #[test]
-    fn test_get_stream_setting_fts_fields() {
-        let sch = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = get_stream_setting_fts_fields(&sch);
-        assert!(res.is_ok());
     }
 }

@@ -28,7 +28,10 @@ use config::{
 };
 use infra::{
     cache, dist_lock, file_list as infra_file_list,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        unwrap_partition_time_level, unwrap_stream_settings,
+    },
     storage,
 };
 use tokio::{sync::Semaphore, task::JoinHandle};
@@ -482,9 +485,8 @@ async fn merge_files(
         infra::schema::get_versions(org_id, stream_name, stream_type, Some((min_ts, max_ts)))
             .await?;
     let schema_latest_id = schema_versions.len() - 1;
-    let bloom_filter_fields =
-        stream::get_stream_setting_bloom_filter_fields(&schema_latest).unwrap();
-    let full_text_search_fields = stream::get_stream_setting_fts_fields(&schema_latest).unwrap();
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_latest).unwrap();
+    let full_text_search_fields = get_stream_setting_fts_fields(&schema_latest).unwrap();
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
