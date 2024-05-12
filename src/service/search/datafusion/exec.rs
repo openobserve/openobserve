@@ -56,6 +56,7 @@ use infra::cache::tmpfs::Directory;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
+use serde_json::{Map, Value};
 
 use super::{storage::file_list, transform_udf::get_all_transform};
 use crate::{
@@ -209,10 +210,9 @@ pub async fn sql(
         };
 
         if !rules.is_empty() {
-            let fields = df.schema().fields();
-            let mut exprs = Vec::with_capacity(fields.len());
-            for field in fields {
-                if let Some(v) = field.qualifier() {
+            let mut exprs = Vec::with_capacity(df.schema().fields().len());
+            for (qualifier, field) in df.schema().iter() {
+                if let Some(v) = qualifier {
                     if v.to_string() != "tbl" {
                         exprs.push(col(field.name()));
                         continue;
@@ -330,6 +330,11 @@ async fn exec_query(
         log::info!("[trace_id {trace_id}] Query sql: {}", query);
     }
 
+    // Hack for limit 0
+    if query.ends_with("LIMIT 0") {
+        return Ok(vec![]);
+    }
+
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
@@ -344,10 +349,9 @@ async fn exec_query(
     };
 
     if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if let Some(v) = field.qualifier() {
+        let mut exprs = Vec::with_capacity(df.schema().fields().len());
+        for (qualifier, field) in df.schema().iter() {
+            if let Some(v) = qualifier {
                 if v.to_string() != "tbl" {
                     exprs.push(col(field.name()));
                     continue;
@@ -988,10 +992,9 @@ pub async fn convert_parquet_file(
         }
     };
     if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if let Some(v) = field.qualifier() {
+        let mut exprs = Vec::with_capacity(df.schema().fields().len());
+        for (qualifier, field) in df.schema().iter() {
+            if let Some(v) = qualifier {
                 if v.to_string() != "tbl" {
                     exprs.push(col(field.name()));
                     continue;
@@ -1074,7 +1077,14 @@ pub async fn merge_parquet_files(
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let result = arrowJson::writer::record_batches_to_json_rows(&batches_ref).unwrap();
+
+    let json_buf = Vec::new();
+    let mut writer = arrowJson::ArrayWriter::new(json_buf);
+    writer.write_batches(&batches_ref).unwrap();
+    writer.finish().unwrap();
+    let json_data = writer.into_inner();
+    let result: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
+
     let record = result.first().unwrap();
     let file_meta = if record.is_empty() {
         FileMeta::default()
@@ -1212,10 +1222,10 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
     if CONFIG.common.bloom_filter_enabled {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
     if CONFIG.common.bloom_filter_disabled_on_search {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", false);
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
     Ok(config)
 }
@@ -1385,7 +1395,13 @@ fn handle_query_fn(
     org_id: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
-    match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
+    let buf = Vec::new();
+    let mut writer = arrowJson::ArrayWriter::new(buf);
+    writer.write_batches(batches).unwrap();
+    writer.finish().unwrap();
+    let json_data = writer.into_inner();
+
+    match serde_json::from_reader(json_data.as_slice()) {
         Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
         Err(err) => Err(DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",

@@ -670,7 +670,11 @@ fn parse_expr_function(
     let field_name = field_name.trim_matches(|c: char| c == '\'' || c == '"');
     if parse_expr_check_field_name(field_name, field) {
         match f.args.get(1).unwrap() {
-            FunctionArg::Named { name: _name, arg } => match arg {
+            FunctionArg::Named {
+                name: _name,
+                arg,
+                operator: _operator,
+            } => match arg {
                 FunctionArgExpr::Expr(expr) => {
                     let val = get_value_from_expr(expr);
                     if val.is_none() {
@@ -718,7 +722,11 @@ fn parse_expr_fun_time_range(
         let mut vals = Vec::new();
         for arg in f.args.iter() {
             let val = match arg {
-                FunctionArg::Named { name: _name, arg } => match arg {
+                FunctionArg::Named {
+                    name: _name,
+                    arg,
+                    operator: _operator,
+                } => match arg {
                     FunctionArgExpr::Expr(expr) => {
                         let val = get_value_from_expr(expr);
                         if val.is_none() {
@@ -797,6 +805,7 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
                     FunctionArg::Named {
                         name: _name,
                         arg: FunctionArgExpr::Expr(expr),
+                        operator: _operator,
                     } => {
                         if let Some(v) = get_field_name_from_expr(expr) {
                             fields.extend(v);

@@ -41,6 +41,7 @@ use infra::{cache, schema::SchemaCache, storage};
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
+use serde_json::{Map, Value};
 use tokio::{
     sync::{Mutex, RwLock},
     time,
@@ -601,7 +602,13 @@ pub(crate) async fn generate_index_on_ingester(
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
 
-    let json_rows = arrow_json::writer::record_batches_to_json_rows(&record_batches)?;
+    let buf = Vec::new();
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    writer.write_batches(&record_batches).unwrap();
+    writer.finish().unwrap();
+    let json_data = writer.into_inner();
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
+
     let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     for record_val in recs {
         let timestamp: i64 = record_val
@@ -726,13 +733,13 @@ async fn prepare_index_record_batches_v1(
         let column_name = column.name();
         let split_chars = &CONFIG.common.inverted_index_split_chars;
         let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
-        let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
+        let lower_case_expr = lower(concat(vec![col(column_name), lit("")]));
         let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
         let distinct_terms = array_distinct(split_arr);
 
         let record_batch = index_df
             .with_column("terms", distinct_terms)?
-            .unnest_column("terms")?
+            .unnest_columns(&["terms"])?
             .with_column_renamed("terms", "term")?
             .with_column("term", btrim(vec![col("term"), lit(remove_chars_btrim)]))?
             .with_column("file_name", lit(file_name_without_prefix))?
