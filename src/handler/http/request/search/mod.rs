@@ -446,7 +446,8 @@ pub async fn around(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
-        .filter_map(|s| (!s.is_empty()).then(|| s.to_string()))
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
     // get a local search queue lock
@@ -930,7 +931,8 @@ async fn values_v1(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
-        .filter_map(|s| (!s.is_empty()).then(|| s.to_string()))
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
     let timeout = query
@@ -1165,7 +1167,8 @@ async fn values_v2(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
-        .filter_map(|s| (!s.is_empty()).then(|| s.to_string()))
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
     let timeout = query
