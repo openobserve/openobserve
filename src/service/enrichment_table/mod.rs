@@ -34,7 +34,10 @@ use config::{
 use futures::{StreamExt, TryStreamExt};
 use infra::{
     cache::stats,
-    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS},
+    schema::{
+        SchemaCache, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST,
+        STREAM_SETTINGS,
+    },
 };
 
 use crate::{
@@ -43,7 +46,7 @@ use crate::{
         compact::retention,
         db, format_stream_name,
         ingestion::write_file,
-        schema::{check_for_schema, stream_schema_exists, SchemaCache},
+        schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
