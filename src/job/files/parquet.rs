@@ -439,6 +439,10 @@ async fn merge_files(
     let mut new_file_size: i64 = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
+    let mut min_ts = i64::MAX;
+    let mut max_ts = i64::MIN;
+    let mut total_records = 0;
+
     for file in files_with_size.iter() {
         if new_file_size > 0
             && ((new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64)
@@ -448,6 +452,7 @@ async fn merge_files(
             break;
         }
         new_file_size += file.meta.original_size;
+
         new_file_list.push(file.clone());
     }
     let mut retain_file_list = new_file_list.clone();
@@ -458,7 +463,12 @@ async fn merge_files(
     for file in retain_file_list.iter_mut() {
         log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
         let data = match get_file_contents(&wal_dir.join(&file.key)).await {
-            Ok(body) => body,
+            Ok(body) => {
+                min_ts = std::cmp::min(min_ts, file.meta.min_ts);
+                max_ts = std::cmp::max(max_ts, file.meta.max_ts);
+                total_records += file.meta.records;
+                body
+            }
             Err(err) => {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] merge small file: {}, err: {}",
@@ -523,6 +533,13 @@ async fn merge_files(
         )
         .await
     } else {
+        let in_file_meta = FileMeta {
+            min_ts,
+            max_ts,
+            records: total_records,
+            original_size: new_file_size,
+            compressed_size: 0,
+        };
         merge_parquet_files(
             tmp_dir.name(),
             stream_type,
@@ -531,7 +548,7 @@ async fn merge_files(
             Arc::new(file_schema.unwrap()),
             &bloom_filter_fields,
             &full_text_search_fields,
-            new_file_size,
+            in_file_meta,
             &mut fts_buf,
         )
         .await

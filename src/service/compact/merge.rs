@@ -421,6 +421,7 @@ async fn merge_files(
     }
 
     let mut new_file_size = 0;
+    let mut total_records = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
@@ -428,6 +429,7 @@ async fn merge_files(
             break;
         }
         new_file_size += file.meta.original_size;
+        total_records += file.meta.records;
         new_file_list.push(file.clone());
         // metrics
         metrics::COMPACT_MERGED_FILES
@@ -563,6 +565,14 @@ async fn merge_files(
         }
     }
 
+    let in_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: total_records,
+        original_size: new_file_size,
+        compressed_size: 0,
+    };
+
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
     let start = std::time::Instant::now();
@@ -574,7 +584,7 @@ async fn merge_files(
         schema.clone(),
         &bloom_filter_fields,
         &full_text_search_fields,
-        new_file_size,
+        in_file_meta,
         &mut fts_buf,
     )
     .await

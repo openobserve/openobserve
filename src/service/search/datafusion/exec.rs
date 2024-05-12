@@ -1044,15 +1044,10 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
-    original_size: i64,
+    in_file_meta: FileMeta,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     let start = std::time::Instant::now();
-
-    // query data
-    let runtime_env = create_runtime_env(None)?;
-    let session_config = create_session_config(&SearchType::Normal)?;
-    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -1065,49 +1060,6 @@ pub async fn merge_parquet_files(
         .with_schema(schema.clone());
 
     let table = Arc::new(ListingTable::try_new(config)?);
-    ctx.register_table("tbl", table.clone())?;
-
-    // get meta data
-    let meta_sql = format!(
-        "SELECT MIN({}) as min_ts, MAX({}) as max_ts, COUNT(1) as num_records FROM tbl",
-        CONFIG.common.column_timestamp, CONFIG.common.column_timestamp
-    );
-    let df = ctx.sql(&meta_sql).await?;
-    let batches = df.collect().await?;
-    let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let result = record_batches_to_json_rows(&batches_ref).map_err(|e| {
-        DataFusionError::Execution(format!(
-            "Error converting record batches to json rows: {}",
-            e
-        ))
-    })?;
-
-    let record = result.first().unwrap();
-    let file_meta = if record.is_empty() {
-        FileMeta::default()
-    } else {
-        match record.get("min_ts") {
-            Some(min_ts) => match min_ts.as_i64() {
-                Some(min_ts) => FileMeta {
-                    min_ts,
-                    max_ts: record["max_ts"].as_i64().unwrap(),
-                    records: record["num_records"].as_i64().unwrap(),
-                    original_size,
-                    compressed_size: 0,
-                },
-                None => {
-                    return Err(DataFusionError::Execution(
-                        "merge_parquet_files: Invalid file meta data".to_string(),
-                    ));
-                }
-            },
-            None => {
-                return Err(DataFusionError::Execution(
-                    "merge_parquet_files: Invalid file meta data".to_string(),
-                ));
-            }
-        }
-    };
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
@@ -1148,7 +1100,7 @@ pub async fn merge_parquet_files(
         &schema,
         bloom_filter_fields,
         full_text_search_fields,
-        &file_meta,
+        &in_file_meta,
     );
     for batch in batches {
         if stream_type == StreamType::Logs {
@@ -1203,7 +1155,7 @@ pub async fn merge_parquet_files(
         start.elapsed().as_secs_f64()
     );
 
-    Ok((file_meta, schema))
+    Ok((in_file_meta, schema))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
