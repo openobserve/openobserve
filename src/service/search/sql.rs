@@ -30,17 +30,14 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::STREAM_SCHEMAS_FIELDS,
+    schema::{get_stream_setting_fts_fields, STREAM_SCHEMAS_FIELDS},
 };
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    common::meta::stream::StreamParams,
-    service::{search::match_source, stream::get_stream_setting_fts_fields},
-};
+use crate::{common::meta::stream::StreamParams, service::search::match_source};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',

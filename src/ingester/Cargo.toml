@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 config.workspace = true
+infra.workspace = true
 wal.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true

@@ -263,6 +263,20 @@ pub fn unwrap_partition_time_level(
     }
 }
 
+pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>> {
+    match unwrap_stream_settings(schema) {
+        Some(setting) => Ok(setting.full_text_search_keys),
+        None => Ok(vec![]),
+    }
+}
+
+pub fn get_stream_setting_bloom_filter_fields(schema: &Schema) -> Result<Vec<String>> {
+    match unwrap_stream_settings(schema) {
+        Some(setting) => Ok(setting.bloom_filter_fields),
+        None => Ok(vec![]),
+    }
+}
+
 pub async fn merge(
     org_id: &str,
     stream_name: &str,
@@ -727,5 +741,12 @@ mod tests {
     #[test]
     fn test_is_widening_conversion() {
         assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
+    }
+
+    #[test]
+    fn test_get_stream_setting_fts_fields() {
+        let sch = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
+        let res = get_stream_setting_fts_fields(&sch);
+        assert!(res.is_ok());
     }
 }

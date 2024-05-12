@@ -23,15 +23,14 @@ use config::{
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{
-        flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values,
-        schema_ext::SchemaExt,
+        arrow::record_batches_to_json_rows, flatten, json, parquet::new_parquet_writer,
+        schema::infer_json_schema_from_values, schema_ext::SchemaExt,
     },
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
-        json as arrowJson,
         record_batch::RecordBatch,
     },
     common::{FileType, GetExt},
@@ -56,7 +55,6 @@ use infra::cache::tmpfs::Directory;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
-use serde_json::{Map, Value};
 
 use super::{storage::file_list, transform_udf::get_all_transform};
 use crate::{
@@ -1046,15 +1044,10 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
-    original_size: i64,
+    in_file_meta: FileMeta,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     let start = std::time::Instant::now();
-
-    // query data
-    let runtime_env = create_runtime_env(None)?;
-    let session_config = create_session_config(&SearchType::Normal)?;
-    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -1067,50 +1060,6 @@ pub async fn merge_parquet_files(
         .with_schema(schema.clone());
 
     let table = Arc::new(ListingTable::try_new(config)?);
-    ctx.register_table("tbl", table.clone())?;
-
-    // get meta data
-    let meta_sql = format!(
-        "SELECT MIN({}) as min_ts, MAX({}) as max_ts, COUNT(1) as num_records FROM tbl",
-        CONFIG.common.column_timestamp, CONFIG.common.column_timestamp
-    );
-    let df = ctx.sql(&meta_sql).await?;
-    let batches = df.collect().await?;
-    let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-
-    let json_buf = Vec::new();
-    let mut writer = arrowJson::ArrayWriter::new(json_buf);
-    writer.write_batches(&batches_ref).unwrap();
-    writer.finish().unwrap();
-    let json_data = writer.into_inner();
-    let result: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
-
-    let record = result.first().unwrap();
-    let file_meta = if record.is_empty() {
-        FileMeta::default()
-    } else {
-        match record.get("min_ts") {
-            Some(min_ts) => match min_ts.as_i64() {
-                Some(min_ts) => FileMeta {
-                    min_ts,
-                    max_ts: record["max_ts"].as_i64().unwrap(),
-                    records: record["num_records"].as_i64().unwrap(),
-                    original_size,
-                    compressed_size: 0,
-                },
-                None => {
-                    return Err(DataFusionError::Execution(
-                        "merge_parquet_files: Invalid file meta data".to_string(),
-                    ));
-                }
-            },
-            None => {
-                return Err(DataFusionError::Execution(
-                    "merge_parquet_files: Invalid file meta data".to_string(),
-                ));
-            }
-        }
-    };
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
@@ -1151,7 +1100,7 @@ pub async fn merge_parquet_files(
         &schema,
         bloom_filter_fields,
         full_text_search_fields,
-        &file_meta,
+        &in_file_meta,
     );
     for batch in batches {
         if stream_type == StreamType::Logs {
@@ -1206,7 +1155,7 @@ pub async fn merge_parquet_files(
         start.elapsed().as_secs_f64()
     );
 
-    Ok((file_meta, schema))
+    Ok((in_file_meta, schema))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
@@ -1395,19 +1344,13 @@ fn handle_query_fn(
     org_id: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
-    let buf = Vec::new();
-    let mut writer = arrowJson::ArrayWriter::new(buf);
-    writer.write_batches(batches).unwrap();
-    writer.finish().unwrap();
-    let json_data = writer.into_inner();
-
-    match serde_json::from_reader(json_data.as_slice()) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
-        Err(err) => Err(DataFusionError::Execution(format!(
+    let json_rows = record_batches_to_json_rows(batches).map_err(|e| {
+        DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
-            err
-        ))),
-    }
+            e
+        ))
+    })?;
+    apply_query_fn(query_fn, json_rows, org_id, stream_type)
 }
 
 fn apply_query_fn(
