@@ -40,7 +40,7 @@ pub struct Dashboard {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_time: Option<DateTimeOptions>,
+    pub default_datetime_duration: Option<DateTimeOptions>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
