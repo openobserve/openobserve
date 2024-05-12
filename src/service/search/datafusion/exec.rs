@@ -330,6 +330,11 @@ async fn exec_query(
         log::info!("[trace_id {trace_id}] Query sql: {}", query);
     }
 
+    // Hack for limit 0
+    if query.ends_with("LIMIT 0") {
+        return Ok(vec![]);
+    }
+
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
