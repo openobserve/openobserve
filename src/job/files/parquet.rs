@@ -70,10 +70,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(CONFIG.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // move files
-    println!(
-        "CONFIG.limit.file_move_thread_num: {}",
-        CONFIG.limit.file_move_thread_num
-    );
     for thread_id in 0..CONFIG.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
@@ -202,7 +198,6 @@ async fn move_files(
     prefix: &str,
     files: Vec<FileKey>,
 ) -> Result<(), anyhow::Error> {
-    println!("move_files using thread_id: {}", thread_id);
     let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
     // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
     // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
