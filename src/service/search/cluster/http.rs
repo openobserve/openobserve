@@ -22,6 +22,7 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
+use serde_json::{Map, Value};
 use vector_enrichment::TableRegistry;
 
 use crate::common::meta::functions::VRLResultResolver;
@@ -66,7 +67,15 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     if !batches_query.is_empty() {
         let schema = batches_query[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches_query_ref) {
+
+        let buf = Vec::new();
+        let mut writer = arrow_json::ArrayWriter::new(buf);
+        writer.write_batches(&batches_query_ref).unwrap();
+        writer.finish().unwrap();
+        let json_data = writer.into_inner();
+
+        let json_rows: Vec<Map<String, Value>> = match serde_json::from_reader(json_data.as_slice())
+        {
             Ok(res) => res,
             Err(err) => {
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -145,7 +154,15 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         }
         let name = name.strip_prefix("agg_").unwrap().to_string();
         let batch_ref: Vec<&RecordBatch> = batch.iter().collect();
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batch_ref) {
+
+        let buf = Vec::new();
+        let mut writer = arrow_json::ArrayWriter::new(buf);
+        writer.write_batches(&batch_ref).unwrap();
+        writer.finish().unwrap();
+        let json_data = writer.into_inner();
+
+        let json_rows: Vec<Map<String, Value>> = match serde_json::from_reader(json_data.as_slice())
+        {
             Ok(res) => res,
             Err(err) => {
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
