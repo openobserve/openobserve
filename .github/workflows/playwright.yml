@@ -21,6 +21,7 @@ env:
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: true
 
 
 jobs:
