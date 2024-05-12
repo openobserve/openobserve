@@ -1209,10 +1209,10 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
     if CONFIG.common.bloom_filter_enabled {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
     if CONFIG.common.bloom_filter_disabled_on_search {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", false);
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
     Ok(config)
 }
