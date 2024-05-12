@@ -21,6 +21,7 @@ env:
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: true
 
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","region.spec.js"]
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","region.spec.js", "schema.spec.js"]
        
     steps:
       - name: Remove unused tools

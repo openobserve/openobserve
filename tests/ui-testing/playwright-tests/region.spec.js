@@ -184,6 +184,7 @@ test.describe("Region testcases", () => {
     await page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":').click();
     await page.waitForTimeout(2000)
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000)
     await page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":').click();
   });
   
