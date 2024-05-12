@@ -109,9 +109,9 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="tab-schemaFields"]').click();
     await page.getByRole('cell', { name: 'kubernetes_annotations_kubectl_kubernetes_io_default_container' }).click();
     await page.getByRole('cell', { name: 'kubernetes_annotations_kubernetes_io_psp' }).click();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await ingestion(page);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(5000);
     await page.locator('button').filter({ hasText: 'close' }).click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.locator('[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
@@ -126,8 +126,9 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
     await page.locator('button').filter({ hasText: 'close' }).click();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await ingestion(page);
+    await page.waitForTimeout(5000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.locator('[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.getByText('{ arrow_drop_down_timestamp:').click();
