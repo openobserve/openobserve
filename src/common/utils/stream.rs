@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,15 +21,14 @@ use std::{
 use actix_web::HttpResponse;
 use config::{
     meta::stream::{FileMeta, StreamType},
-    utils::json,
+    utils::{arrow::record_batches_to_json_rows, json},
     CONFIG, FILE_EXT_JSON,
 };
 use datafusion::{
-    arrow::{datatypes::Schema, json as arrow_json, record_batch::RecordBatch},
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
     datasource::MemTable,
     prelude::SessionContext,
 };
-use serde_json::{Map, Value};
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
@@ -90,14 +89,7 @@ pub async fn populate_file_meta(
     let df = ctx.sql(sql.as_str()).await?;
     let batches = df.collect().await?;
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-
-    let buf = Vec::new();
-    let mut writer = arrow_json::ArrayWriter::new(buf);
-    writer.write_batches(&batches_ref).unwrap();
-    writer.finish().unwrap();
-    let json_data = writer.into_inner();
-    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
-
+    let json_rows = record_batches_to_json_rows(&batches_ref)?;
     let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     if result.is_empty() {
         return Ok(());

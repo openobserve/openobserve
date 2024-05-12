@@ -27,6 +27,7 @@ use config::{
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     metrics,
     utils::{
+        arrow::record_batches_to_json_rows,
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files,
         json,
@@ -35,7 +36,7 @@ use config::{
     },
     FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
-use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
+use datafusion::{datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
 use infra::{
     cache::{self, tmpfs},
@@ -45,7 +46,6 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
-use serde_json::{Map, Value};
 use tokio::{
     sync::{Mutex, RwLock},
     time,
@@ -636,13 +636,7 @@ pub(crate) async fn generate_index_on_ingester(
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
 
-    let buf = Vec::new();
-    let mut writer = arrow_json::ArrayWriter::new(buf);
-    writer.write_batches(&record_batches).unwrap();
-    writer.finish().unwrap();
-    let json_data = writer.into_inner();
-    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
-
+    let json_rows = record_batches_to_json_rows(&record_batches)?;
     let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     for record_val in recs {
         let timestamp: i64 = record_val

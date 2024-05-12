@@ -23,15 +23,14 @@ use config::{
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{
-        flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values,
-        schema_ext::SchemaExt,
+        arrow::record_batches_to_json_rows, flatten, json, parquet::new_parquet_writer,
+        schema::infer_json_schema_from_values, schema_ext::SchemaExt,
     },
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
-        json as arrowJson,
         record_batch::RecordBatch,
     },
     common::{FileType, GetExt},
@@ -56,7 +55,6 @@ use infra::cache::tmpfs::Directory;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
-use serde_json::{Map, Value};
 
 use super::{storage::file_list, transform_udf::get_all_transform};
 use crate::{
@@ -1077,13 +1075,12 @@ pub async fn merge_parquet_files(
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-
-    let json_buf = Vec::new();
-    let mut writer = arrowJson::ArrayWriter::new(json_buf);
-    writer.write_batches(&batches_ref).unwrap();
-    writer.finish().unwrap();
-    let json_data = writer.into_inner();
-    let result: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
+    let result = record_batches_to_json_rows(&batches_ref).map_err(|e| {
+        DataFusionError::Execution(format!(
+            "Error converting record batches to json rows: {}",
+            e
+        ))
+    })?;
 
     let record = result.first().unwrap();
     let file_meta = if record.is_empty() {
@@ -1395,19 +1392,13 @@ fn handle_query_fn(
     org_id: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
-    let buf = Vec::new();
-    let mut writer = arrowJson::ArrayWriter::new(buf);
-    writer.write_batches(batches).unwrap();
-    writer.finish().unwrap();
-    let json_data = writer.into_inner();
-
-    match serde_json::from_reader(json_data.as_slice()) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
-        Err(err) => Err(DataFusionError::Execution(format!(
+    let json_rows = record_batches_to_json_rows(batches).map_err(|e| {
+        DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
-            err
-        ))),
-    }
+            e
+        ))
+    })?;
+    apply_query_fn(query_fn, json_rows, org_id, stream_type)
 }
 
 fn apply_query_fn(
