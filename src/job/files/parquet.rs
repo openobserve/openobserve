@@ -526,7 +526,6 @@ async fn merge_files(
             stream_type,
             &stream_name,
             &mut buf,
-            Arc::new(file_schema.unwrap()),
             &bloom_filter_fields,
             &full_text_search_fields,
             &in_file_meta,
@@ -814,9 +813,9 @@ async fn move_single_file(
     stream_type: StreamType,
     stream_name: &str,
     buf: &mut Vec<u8>,
-    bloom_filter_fields: &[String],
+    _bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
-    in_file_meta: &FileMeta,
+    _in_file_meta: &FileMeta,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> datafusion::error::Result<(FileMeta, Arc<Schema>)> {
     let data = match tmpfs::get(&format!("{trace_id}/{}", &file.key)) {
