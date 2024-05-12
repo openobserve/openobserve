@@ -29,6 +29,7 @@ use datafusion::{
     datasource::MemTable,
     prelude::SessionContext,
 };
+use serde_json::{Map, Value};
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
@@ -89,7 +90,14 @@ pub async fn populate_file_meta(
     let df = ctx.sql(sql.as_str()).await?;
     let batches = df.collect().await?;
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches_ref)?;
+
+    let buf = Vec::new();
+    let mut writer = arrow_json::ArrayWriter::new(buf);
+    writer.write_batches(&batches_ref).unwrap();
+    writer.finish().unwrap();
+    let json_data = writer.into_inner();
+    let json_rows: Vec<Map<String, Value>> = serde_json::from_reader(json_data.as_slice()).unwrap();
+
     let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     if result.is_empty() {
         return Ok(());
