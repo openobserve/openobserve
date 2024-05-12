@@ -118,7 +118,7 @@ export default defineComponent({
       title: "",
       description: "",
       showDynamicFilters: true,
-      dateTime: {
+      defaultDatetimeDuration: {
         startTime: null,
         endTime: null,
         relativeTimePeriod: "15m",
@@ -140,10 +140,10 @@ export default defineComponent({
         data.variables?.showDynamicFilters ?? false;
 
       dateTimeValue.value = {
-        startTime: data?.dateTime?.startTime,
-        endTime: data?.dateTime?.endTime,
-        relativeTimePeriod: data?.dateTime?.relativeTimePeriod,
-        valueType: data?.dateTime?.type,
+        startTime: data?.defaultDatetimeDuration?.startTime,
+        endTime: data?.defaultDatetimeDuration?.endTime,
+        relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod,
+        valueType: data?.defaultDatetimeDuration?.type,
       };
     };
     onMounted(async () => {
@@ -176,7 +176,7 @@ export default defineComponent({
           data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
         }
 
-        data.dateTime = {
+        data.defaultDatetimeDuration = {
           startTime: dateTimeValue?.value?.startTime,
           endTime: dateTimeValue?.value?.endTime,
           relativeTimePeriod: dateTimeValue?.value?.relativeTimePeriod,

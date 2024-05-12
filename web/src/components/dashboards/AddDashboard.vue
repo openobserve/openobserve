@@ -184,7 +184,7 @@ export default defineComponent({
               list: [],
               showDynamicFilters: true,
             },
-            dateTime: {
+            defaultDatetimeDuration: {
               startTime: null,
               endTime: null,
               relativeTimePeriod: "15m",

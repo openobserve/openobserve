@@ -503,17 +503,17 @@ export default defineComponent({
 
       // get default time for dashboard
       // if dashboard has relative time settings
-      if ((data?.dateTime?.type ?? "relative") === "relative") {
+      if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
         selectedDate.value = {
           valueType: "relative",
-          relativeTimePeriod: data?.dateTime?.relativeTimePeriod ?? "15m",
+          relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
         };
       } else {
         // else, dashboard will have absolute time settings
         selectedDate.value = {
           valueType: "absolute",
-          startTime: data?.dateTime?.startTime,
-          endTime: data?.dateTime?.endTime,
+          startTime: data?.defaultDatetimeDuration?.startTime,
+          endTime: data?.defaultDatetimeDuration?.endTime,
         };
       }
     };
