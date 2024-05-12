@@ -61,8 +61,6 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     // check stream
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
     check_ingestion_allowed(org_id, Some(stream_name))?;
@@ -101,6 +99,7 @@ pub async fn ingest(
     // End get stream alerts
 
     // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
         &[stream_param],
         &mut user_defined_schema_map,
