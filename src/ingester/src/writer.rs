@@ -178,13 +178,18 @@ impl Writer {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
         }
+        let session_id = entry.session_id.to_string();
+        log::info!("[{session_id}] entry.into_bytes start");
         let entry_bytes = if !check_ttl {
             entry.into_bytes()?
         } else {
             Vec::new()
         };
+        log::info!("[{session_id}] entry.into_bytes done");
         let mut wal = self.wal.lock().await;
+        log::info!("[{session_id}] self.wal.lock done");
         let mut mem = self.memtable.write().await;
+        log::info!("[{session_id}] self.memtable.write done");
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(mem.size(), entry.data_size)
         {
@@ -223,21 +228,31 @@ impl Writer {
             let key = self.key.clone();
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
+            let sid = session_id.clone();
             tokio::task::spawn(async move {
-                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
+                log::info!(
+                    "[INGESTER:WAL] [{sid}] start add to IMMUTABLES, file: {}",
+                    path_str,
+                );
                 IMMUTABLES.write().await.insert(
                     path,
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
-                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
+                log::info!(
+                    "[INGESTER:WAL] [{sid}] dones add to IMMUTABLES, file: {}",
+                    path_str
+                );
             });
         }
 
         if !check_ttl {
             // write into wal
+            log::info!("[{session_id}]wal.write start");
             wal.write(&entry_bytes, false).context(WalSnafu)?;
+            log::info!("[{session_id}]wal.write done");
             // write into memtable
             mem.write(schema, entry).await?;
+            log::info!("[{session_id}]mem.write done");
         }
 
         Ok(())

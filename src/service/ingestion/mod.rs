@@ -364,11 +364,19 @@ pub async fn write_file(
     buf: HashMap<String, SchemaRecords>,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
+    let (stream_name, seesion_id) =
+        if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
+            (*stream_name, *seesion_id)
+        } else {
+            (stream_name, "")
+        };
+
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
         }
         let entry_records = entry.records.len();
+        log::info!("write_file inside : {seesion_id}");
         if let Err(e) = writer
             .write(
                 entry.schema,
@@ -378,6 +386,7 @@ pub async fn write_file(
                     partition_key: Arc::from(hour_key.as_str()),
                     data: entry.records,
                     data_size: entry.records_size,
+                    session_id: Arc::from(seesion_id),
                 },
                 false,
             )
@@ -624,5 +633,28 @@ mod tests {
             "default",
         );
         assert!(result.is_err())
+    }
+
+    #[tokio::test]
+    async fn test_stream_name_with_sid() {
+        let stream_name = "default^123456";
+        let (stream_name, seesion_id) =
+            if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
+                (*stream_name, *seesion_id)
+            } else {
+                (stream_name, "")
+            };
+        assert_eq!(stream_name, "default");
+        assert_eq!(seesion_id, "123456");
+
+        let stream_name = "default";
+        let (stream_name, seesion_id) =
+            if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
+                (*stream_name, *seesion_id)
+            } else {
+                (stream_name, "")
+            };
+        assert_eq!(stream_name, "default");
+        assert_eq!(seesion_id, "");
     }
 }

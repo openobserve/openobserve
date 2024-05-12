@@ -35,6 +35,7 @@ pub struct Entry {
     pub partition_key: Arc<str>, // 2023/12/18/00/country=US/state=CA
     pub data: Vec<Arc<serde_json::Value>>,
     pub data_size: usize,
+    pub session_id: Arc<str>,
 }
 
 impl Entry {
@@ -45,6 +46,7 @@ impl Entry {
             partition_key: "".into(),
             data: Vec::new(),
             data_size: 0,
+            session_id: "".into(),
         }
     }
     pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
@@ -96,6 +98,7 @@ impl Entry {
             partition_key: partition_key.into(),
             data,
             data_size: data_len as usize,
+            session_id: "".into(),
         })
     }
 

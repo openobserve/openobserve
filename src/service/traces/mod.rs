@@ -411,7 +411,8 @@ pub async fn handle_trace_request(
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
     log::info!("[{session_id}] write begin to write_file");
-    let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
+    let traces_stream_name_with_sid = format!("{traces_stream_name}^{session_id}");
+    let mut req_stats = write_file(&writer, &traces_stream_name_with_sid, data_buf).await;
     log::info!("[{session_id}] write_file begin to sync");
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
