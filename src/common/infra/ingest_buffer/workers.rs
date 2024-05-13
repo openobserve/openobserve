@@ -24,6 +24,7 @@ use tokio::{sync::RwLock, task::JoinHandle};
 use super::{
     entry::IngestEntry,
     queue_store::{build_file_path, persist_job, persist_job_inner},
+    task_queue::update_size,
 };
 
 type RwVec<T> = RwLock<Vec<T>>;
@@ -62,14 +63,12 @@ impl Workers {
     }
 
     /// Initializes additional {count} number of workers.
-    pub async fn add_workers_by(&self, count: usize, max_worker_count: usize) -> usize {
+    pub async fn add_workers_by(&self, count: usize) {
         let mut rw = self.handles.write().await;
-        let add_count = count.min(max_worker_count - rw.len());
-        for _ in 0..add_count {
+        for _ in 0..count {
             let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
             rw.push(handle);
         }
-        add_count
     }
 
     /// Removes finished workers and returns remaining active worker count.
@@ -213,6 +212,7 @@ pub(super) async fn process_tasks_with_retries(
     retry_count: i32,
 ) {
     let mut succeed = 0;
+    let mut tq_size_update = 0;
     for task in tasks {
         match task.ingest().await {
             Ok(mut retry) => {
@@ -235,6 +235,7 @@ pub(super) async fn process_tasks_with_retries(
                     }
                 }
                 succeed += 1;
+                tq_size_update += task.content_length;
             }
             Err(e) => {
                 log::error!(
@@ -250,4 +251,5 @@ pub(super) async fn process_tasks_with_retries(
         succeed,
         tasks.len()
     );
+    update_size(tq_size_update, false).await;
 }

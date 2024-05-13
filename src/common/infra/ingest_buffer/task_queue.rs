@@ -35,8 +35,7 @@ static SEARCHABLE_LATENCY: u64 = 60;
 static TASK_QUEUE: Lazy<RwLock<TaskQueue>> = Lazy::new(RwLock::default);
 
 pub(super) async fn init() -> Result<()> {
-    // _ = TQ_MANAGER.read().await.task_queues.len();
-    _ = TASK_QUEUE.read().await.channel_is_full();
+    _ = TASK_QUEUE.read().await.sender.len();
     Ok(())
 }
 
@@ -46,11 +45,21 @@ pub async fn send_task(task: IngestEntry) -> HttpResponse {
     if let Err(e) = ingester::check_memtable_size() {
         return HttpResponse::ServiceUnavailable().json(e.to_string());
     }
-    let tq = TASK_QUEUE.read().await;
-    match tq.send_task(task).await {
-        Ok(_) => HttpResponse::Ok().json("Request buffered. Waiting to be processed"),
+    let content_length = task.content_length;
+    let tq_r = TASK_QUEUE.read().await;
+    match tq_r.send_task(task).await {
+        Ok(_) => {
+            drop(tq_r);
+            update_size(content_length, true).await;
+            HttpResponse::Ok().json("Request buffered. Waiting to be processed")
+        }
         Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
+}
+
+pub async fn update_size(delta: usize, incr: bool) {
+    let mut tq_w = TASK_QUEUE.write().await;
+    tq_w.update_size(delta, incr);
 }
 
 /// Gracefully terminates all running TaskQueues
@@ -68,7 +77,7 @@ pub async fn shut_down() {
 struct TaskQueue {
     sender: Arc<Sender<IngestEntry>>,
     workers: Arc<Workers>,
-    max_workers_cnt: usize,
+    size: usize,
 }
 
 impl Default for TaskQueue {
@@ -79,20 +88,20 @@ impl Default for TaskQueue {
 
 impl TaskQueue {
     pub fn new(tq_index: usize) -> Self {
-        let estimated_ingest_entry_size = if CONFIG.limit.ingest_buffer_threshold != 0 {
-            CONFIG.limit.ingest_buffer_threshold
-        } else {
-            5 * 1024 * 1024 // 5mb
-        };
-        let max_workers_cnt = (CONFIG.limit.ingest_buffer_size
-            / (DEFAULT_CHANNEL_CAP * estimated_ingest_entry_size))
-            - 1; // channel takes 1, the rest is workers
         let (sender, receiver) = bounded::<IngestEntry>(DEFAULT_CHANNEL_CAP);
         let workers = Arc::new(Workers::new(MIN_WORKER_CNT, tq_index, Arc::new(receiver)));
         Self {
             sender: Arc::new(sender),
             workers,
-            max_workers_cnt,
+            size: 0,
+        }
+    }
+
+    fn update_size(&mut self, delta: usize, incr: bool) {
+        if incr {
+            self.size += delta
+        } else {
+            self.size -= delta
         }
     }
 
@@ -106,20 +115,8 @@ impl TaskQueue {
                 self.workers.tq_index
             ));
         }
-        if self.channel_is_full() || self.workers.running_worker_count().await == 0 {
-            let added_worker_count = self
-                .workers
-                .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
-                .await;
-            if added_worker_count > 0 {
-                log::info!(
-                    "IngestBuffer channel currently full. Added {added_worker_count} workers"
-                );
-            } else {
-                log::info!(
-                    "IngestBuffer channel currently full and reached max workers count. Wait"
-                );
-            }
+        if self.should_add_more_workers().await {
+            self.workers.add_workers_by(MIN_WORKER_CNT).await;
         }
         tokio::select! {
             _ = self.sender.send(task) => Ok(()),
@@ -133,8 +130,18 @@ impl TaskQueue {
         }
     }
 
-    fn channel_is_full(&self) -> bool {
-        self.sender.capacity().unwrap() - self.sender.len() == 0
+    async fn should_add_more_workers(&self) -> bool {
+        if self.size >= CONFIG.limit.ingest_buffer_size {
+            log::info!("IngestBuffer channel currently full and reached max workers count. Wait");
+            false
+        } else if self.sender.capacity().unwrap() - self.sender.len() == 0
+            || self.workers.running_worker_count().await == 0
+        {
+            log::info!("IngestBuffer channel currently full. Added more workers");
+            true
+        } else {
+            false
+        }
     }
 
     async fn shut_down(&self) {
