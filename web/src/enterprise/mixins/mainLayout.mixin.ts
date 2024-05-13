@@ -7,7 +7,6 @@ import { getUserInfo, getImageURL } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
-import PipelineIcon from "@/components/icons/PipelineIcon.vue";
 
 const MainLayoutCloudMixin = {
   setup() {

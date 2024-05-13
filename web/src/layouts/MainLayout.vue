@@ -181,8 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated
-no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md" color="grey" text-color="white">
@@ -361,6 +360,7 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import FunctionIcon from "@/components/icons/FunctionIcon.vue";
+import PipelineIcon from "@/components/icons/PipelineIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -506,10 +506,10 @@ export default defineComponent({
         name: "rum",
       },
       {
-        title: t("menu.function"),
-        iconComponent: markRaw(FunctionIcon),
-        link: "/functions",
-        name: 'functions',
+        title: t("menu.pipeline"),
+        iconComponent: markRaw(PipelineIcon),
+        link: "/pipeline",
+        name: "pipeline",
       },
       {
         title: t("menu.dashboard"),
