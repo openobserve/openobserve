@@ -228,13 +228,15 @@ pub async fn search_multi(
         #[cfg(not(feature = "enterprise"))]
         let locker = locker.lock().await;
         #[cfg(not(feature = "enterprise"))]
-        if !config::CONFIG.common.feature_query_queue_enabled {
+        if !CONFIG.common.feature_query_queue_enabled {
             drop(locker);
         }
         #[cfg(not(feature = "enterprise"))]
         let took_wait = start.elapsed().as_millis() as usize;
         #[cfg(feature = "enterprise")]
         let took_wait = 0;
+        log::info!("http search multi API wait in queue took: {}", took_wait);
+
         let trace_id = trace_id.clone();
         // do search
         let search_fut = SearchService::search(
@@ -627,8 +629,22 @@ pub async fn around_multi(
 
     for around_sql in around_sqls.iter() {
         // get a local search queue lock
+        #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
-        let _locker = locker.lock().await;
+        #[cfg(not(feature = "enterprise"))]
+        let locker = locker.lock().await;
+        #[cfg(not(feature = "enterprise"))]
+        if !CONFIG.common.feature_query_queue_enabled {
+            drop(locker);
+        }
+        #[cfg(not(feature = "enterprise"))]
+        let took_wait = start.elapsed().as_millis() as usize;
+        #[cfg(feature = "enterprise")]
+        let took_wait = 0;
+        log::info!(
+            "http search around multi API wait in queue took: {}",
+            took_wait
+        );
 
         // search forward
         let req = config::meta::search::Request {
