@@ -207,17 +207,16 @@ impl TaskQueue {
                 self.workers.tq_index
             ));
         }
-        let mut exponential_delay = tokio::time::Duration::from_millis(500);
-        while self.sender.try_send(task.clone()).is_err() {
-            log::info!(
-                "TaskQueue({}) waits {}/s",
-                self.workers.tq_index,
-                exponential_delay.as_secs()
-            );
-            tokio::time::sleep(exponential_delay).await;
-            exponential_delay *= 2; // Exponential backoff
+        tokio::select! {
+            _ = self.sender.send(task) => Ok(()),
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(SEARCHABLE_LATENCY)) => {
+                log::warn!(
+                    "TaskQueue({}) fully loaded & max latency reached. Request rejected.",
+                    self.workers.tq_index,
+                );
+                Err(anyhow::anyhow!("Max latency reached. Ingest request rejected."))
+            }
         }
-        Ok(())
     }
 
     fn channel_is_full(&self) -> bool {
