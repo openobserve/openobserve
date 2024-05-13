@@ -254,13 +254,13 @@ impl Writer {
             log::info!("[{session_id}]wal.write done");
             metrics::INGEST_WAL_LOCK_TIME
                 .with_label_values(&[&self.key.org_id])
-                .observe(start.elapsed().as_micros() as f64);
+                .observe(start.elapsed().as_millis() as f64);
             // write into memtable
             let start = std::time::Instant::now();
             mem.write(schema, entry).await?;
             metrics::INGEST_MEMTABLE_LOCK_TIME
                 .with_label_values(&[&self.key.org_id])
-                .observe(start.elapsed().as_micros() as f64);
+                .observe(start.elapsed().as_millis() as f64);
             log::info!("[{session_id}]mem.write done");
         }
 
