@@ -2262,7 +2262,6 @@ dependencies = [
  "getrandom",
  "gxhash",
  "hashbrown 0.14.5",
- "hashlink",
  "hex",
  "indexmap 2.1.0",
  "itertools 0.12.1",
@@ -3822,6 +3821,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashlink"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
+dependencies = [
+ "hashbrown 0.14.5",
+]
+
+[[package]]
 name = "hdrhistogram"
 version = "7.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4208,7 +4216,7 @@ dependencies = [
  "etcd-client",
  "futures",
  "hashbrown 0.14.5",
- "hashlink",
+ "hashlink 0.9.1",
  "log",
  "object_store",
  "once_cell",
@@ -4236,6 +4244,7 @@ dependencies = [
  "futures",
  "hashbrown 0.14.5",
  "indexmap 2.1.0",
+ "infra",
  "itertools 0.12.1",
  "log",
  "once_cell",
@@ -7272,7 +7281,7 @@ dependencies = [
  "futures-intrusive",
  "futures-io",
  "futures-util",
- "hashlink",
+ "hashlink 0.8.4",
  "hex",
  "indexmap 2.1.0",
  "log",

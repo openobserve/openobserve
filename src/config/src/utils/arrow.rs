@@ -13,18 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod arrow;
-pub mod asynchronism;
-pub mod base64;
-pub mod cgroup;
-pub mod file;
-pub mod flatten;
-pub mod hash;
-pub mod json;
-pub mod parquet;
-pub mod rand;
-pub mod record_batch_ext;
-pub mod schema;
-pub mod schema_ext;
-pub mod str;
-pub mod time;
+use arrow::array::RecordBatch;
+
+use super::json::{Map as JsonMap, Value};
+
+/// Converts an arrow [`RecordBatch`] into a `Vec` of Serde JSON
+/// [`JsonMap`]s (objects)
+pub fn record_batches_to_json_rows(
+    batches: &[&RecordBatch],
+) -> Result<Vec<JsonMap<String, Value>>, anyhow::Error> {
+    let json_buf = Vec::with_capacity(
+        batches
+            .iter()
+            .map(|b| b.get_array_memory_size())
+            .sum::<usize>(),
+    );
+    let mut writer = arrow_json::ArrayWriter::new(json_buf);
+    writer.write_batches(batches)?;
+    writer.finish()?;
+    let json_data = writer.into_inner();
+    let ret = serde_json::from_reader(json_data.as_slice())?;
+    Ok(ret)
+}

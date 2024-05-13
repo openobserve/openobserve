@@ -467,6 +467,7 @@ pub struct Common {
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
+    pub instance_name_short: String,
     #[env_config(name = "ZO_WEB_URL", default = "")] // http://localhost:5080
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
@@ -1113,6 +1114,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
     }
+    cfg.common.instance_name_short = cfg
+        .common
+        .instance_name
+        .split('.')
+        .next()
+        .unwrap()
+        .to_string();
 
     // HACK for tracing, always disable tracing except ingester and querier
     let local_node_role: Vec<cluster::Role> = cfg
