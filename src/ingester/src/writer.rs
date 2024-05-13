@@ -249,14 +249,14 @@ impl Writer {
         if !check_ttl {
             // write into wal
             log::info!("[{session_id}]wal.write start");
-            // let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             log::info!("[{session_id}]wal.write done");
-            // metrics::INGEST_WAL_LOCK_TIME
-            //     .with_label_values(&[
-            //         &self.key.org_id,
-            //     ])
-            //     .observe(start.elapsed().as_micros() as f64);
+            metrics::INGEST_WAL_LOCK_TIME
+                .with_label_values(&[
+                    &self.key.org_id,
+                ])
+                .observe(start.elapsed().as_micros() as f64);
             // write into memtable
             let start = std::time::Instant::now();
             mem.write(schema, entry).await?;
