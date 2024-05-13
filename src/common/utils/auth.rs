@@ -66,6 +66,7 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
     if O2_CONFIG.openfga.enabled {
         use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
@@ -77,6 +78,23 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
         };
 
+        // Default folder is already created in case of new org, this handles the case for old org
+        if obj_type.eq("folders")
+            && authorizer::authz::check_folder_exists(org_id, &obj.obj_id).await
+        {
+            // If the folder tuples are missing, it automatically creates them
+            // So we can return here
+            log::debug!(
+                "folder tuples already exists for org: {org_id}; folder: {}",
+                &obj.obj_id
+            );
+            return;
+        } else if obj.parent_type.eq("folders") {
+            log::debug!("checking parent folder tuples for folder: {}", &obj.parent);
+            // In case of dashboard, we need to check if the tuples for its folder exist
+            // If not, the below function creates the proper tuples for the folder
+            authorizer::authz::check_folder_exists(org_id, &obj.parent).await;
+        }
         authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
     }
 }
