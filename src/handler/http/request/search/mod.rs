@@ -205,7 +205,6 @@ pub async fn search(
     }
 
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
-
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
             query_fn = Some(format!("{} \n .", vrl_function));
@@ -420,9 +419,14 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
     };
-    let query_fn = query
+    let mut query_fn = query
         .get("query_fn")
         .and_then(|v| base64::decode_url(v).ok());
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
 
     let default_sql = format!("SELECT * FROM \"{}\" ", stream_name);
     let around_sql = match query.get("sql") {
