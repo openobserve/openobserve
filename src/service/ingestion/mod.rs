@@ -638,22 +638,24 @@ mod tests {
     #[tokio::test]
     async fn test_stream_name_with_sid() {
         let stream_name = "default^123456";
-        let (stream_name, seesion_id) =
-            if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
-                (*stream_name, *seesion_id)
-            } else {
-                (stream_name, "")
-            };
+        let (stream_name, seesion_id) = if let [stream_name, seesion_id] =
+            stream_name.split('^').collect::<Vec<_>>().as_slice()
+        {
+            (*stream_name, *seesion_id)
+        } else {
+            (stream_name, "")
+        };
         assert_eq!(stream_name, "default");
         assert_eq!(seesion_id, "123456");
 
         let stream_name = "default";
-        let (stream_name, seesion_id) =
-            if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
-                (*stream_name, *seesion_id)
-            } else {
-                (stream_name, "")
-            };
+        let (stream_name, seesion_id) = if let [stream_name, seesion_id] =
+            stream_name.split('^').collect::<Vec<_>>().as_slice()
+        {
+            (*stream_name, *seesion_id)
+        } else {
+            (stream_name, "")
+        };
         assert_eq!(stream_name, "default");
         assert_eq!(seesion_id, "");
     }

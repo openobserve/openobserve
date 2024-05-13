@@ -260,9 +260,7 @@ impl Writer {
             let start = std::time::Instant::now();
             mem.write(schema, entry).await?;
             metrics::INGEST_MEMTABLE_LOCK_TIME
-                .with_label_values(&[
-                    &self.key.org_id,
-                ])
+                .with_label_values(&[&self.key.org_id])
                 .observe(start.elapsed().as_micros() as f64);
             log::info!("[{session_id}]mem.write done");
         }
@@ -293,8 +291,9 @@ impl Writer {
     }
 
     pub async fn sync(&self) -> Result<()> {
-        let wal = self.wal.lock().await;
-        wal.sync().context(WalSnafu)
+        // let wal = self.wal.lock().await;
+        // wal.sync().context(WalSnafu)
+        Ok(())
     }
 
     pub async fn read(
