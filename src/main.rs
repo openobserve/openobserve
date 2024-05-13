@@ -168,6 +168,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Some(setup_logs())
     };
 
+    log::info!("Well this is just a test");
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
