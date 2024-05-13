@@ -253,9 +253,7 @@ impl Writer {
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             log::info!("[{session_id}]wal.write done");
             metrics::INGEST_WAL_LOCK_TIME
-                .with_label_values(&[
-                    &self.key.org_id,
-                ])
+                .with_label_values(&[&self.key.org_id])
                 .observe(start.elapsed().as_micros() as f64);
             // write into memtable
             let start = std::time::Instant::now();

@@ -202,6 +202,9 @@ pub static INGEST_MEMTABLE_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new("ingest_memtable_lock_time", "ingest memtable lock time")
             .namespace(NAMESPACE)
+            .buckets(vec![
+                0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0,
+            ])
             .const_labels(create_const_labels()),
         &["organization"],
     )
@@ -212,6 +215,9 @@ pub static INGEST_WAL_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new("ingest_wal_lock_time", "ingest wal lock time")
             .namespace(NAMESPACE)
+            .buckets(vec![
+                0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0,
+            ])
             .const_labels(create_const_labels()),
         &["organization"],
     )
@@ -581,6 +587,10 @@ pub static SPAN_DURATION_MILLISECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new("span_duration_milliseconds", "span duration milliseconds")
             .namespace(NAMESPACE)
+            .buckets(vec![
+                0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0,
+                10000.0, 60000.0,
+            ])
             .const_labels(create_const_labels()),
         &[
             "organization",
