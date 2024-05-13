@@ -108,13 +108,7 @@ pub fn new_parquet_writer<'a>(
         }
     }
     let writer_props = writer_props.build();
-    AsyncArrowWriter::try_new(
-        buf,
-        schema.clone(),
-        PARQUET_WRITE_BUFFER_SIZE,
-        Some(writer_props),
-    )
-    .unwrap()
+    AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
 
 // parse file key to get stream_key, date_key, file_name
@@ -143,6 +137,12 @@ pub async fn read_recordbatch_from_bytes(
     let record_reader = arrow_reader.build()?;
     let batches = record_reader.try_collect().await?;
     Ok((schema, batches))
+}
+
+pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow::Error> {
+    let mut file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+    Ok(arrow_reader.schema().clone())
 }
 
 pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {

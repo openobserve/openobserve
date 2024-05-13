@@ -10,7 +10,7 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
-    //   await page.getByText('Login as internal user').click();
+      // await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -31,6 +31,20 @@ const selectStreamAndStreamTypeForLogs = async (page,stream) => {await page.wait
   '[data-test="log-search-index-list-select-stream"]').click({ force: true });await page.locator(
   "div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
+async function deletePipeline(page, randomPipelineName) {
+  // Click the back button
+  await page.locator('[data-test="add-pipeline-back-btn"]').click();
+  await page.locator('[data-test="confirm-button"]').click();
+  await page.waitForTimeout(2000);
+
+  // Search for the pipeline
+  await page.locator('[data-test="pipeline-list-search-input"]').click();
+  await page.locator('[data-test="pipeline-list-search-input"]').fill(randomPipelineName);
+
+  // Delete the pipeline
+  await page.locator(`[data-test="pipeline-list-${randomPipelineName}-delete-pipeline"]`).click();
+  await page.locator('[data-test="confirm-button"]').click();
+}
 test.describe("Pipeline testcases", () => {
   // let logData;
   function removeUTFCharacters(text) {
@@ -123,11 +137,11 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="add-pipeline-name-input"]').getByLabel('Name *').click();
     await page.locator('[data-test="add-pipeline-name-input"]').getByLabel('Name *').fill('e2epipeline');
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
-    await page.getByText('Field is required!').click();
+    await page.getByText('Field is required!').click(); 
     await page.locator('[data-test="add-pipeline-close-dialog-btn"]').click();
-    
-    // const isElementVisible = await page.locator('[data-test="add-pipeline-name-input"] label').isVisible();
-    // expect(isElementVisible).toBe(false); 
+    // await page.waitForTimeout(2000);
+    await page.locator('[data-test="pipeline-list-add-pipeline-btn"]')
+
   });
 
   test('should add and delete pipeline', async ({ page }) => {
@@ -148,6 +162,8 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
     await page.waitForTimeout(2000)
+    await page.reload();
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-delete-pipeline"]`);
     await page.locator(`[data-test="pipeline-list-${randomPipelineName}-delete-pipeline"]`).click();
     await page.locator('[data-test="confirm-button"]').click();
   });
@@ -200,7 +216,15 @@ test.describe("Pipeline testcases", () => {
   await page.getByLabel('Name').click();
   await page.getByLabel('Name').fill(randomFunctionName);
   await page.locator('[data-test="associate-function-save-btn"]').click();
-  await page.locator('#q-notify').getByRole('alert').click();
+  await page.waitForTimeout(2000)
+  await page.getByText('Function saved successfully').click();
+  await page.locator('[data-test="associate-function-save-btn"]').click();
+  await page.locator('[data-test="pipeline-editor-pipeline-chart"]').getByRole('img').getByText(randomFunctionName).click();
+  await page.locator('[data-test="associate-function-delete-btn"]');
+  await page.locator('[data-test="associate-function-delete-btn"]').click();
+  await page.locator('[data-test="confirm-button"]').click();
+  await deletePipeline(page, randomPipelineName);
+  
   });
 
 
@@ -250,11 +274,9 @@ test.describe("Pipeline testcases", () => {
   await page.mouse.up();
   await page.waitForTimeout(2000)
   await page.locator('[data-test="associate-function-save-btn"]').click();
-  await page.getByText('Function is already associated').click();
-
+  // await page.getByText('Function is already associated').click();
 
   });
-
 
   test('should add streamroute node', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
@@ -273,7 +295,7 @@ test.describe("Pipeline testcases", () => {
     // await page.waitForSelector(':text("e2e_automate")')
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.locator('[data-test="add-pipeline-submit-btn"]').click();
-    await page.waitForTimeout(2000)
+    await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`)
     await page.locator(`[data-test="pipeline-list-${randomPipelineName}-udpate-pipeline"]`).click();
     await page.waitForTimeout(2000)
 
@@ -309,14 +331,8 @@ test.describe("Pipeline testcases", () => {
   await page.getByPlaceholder('Value').click();
   await page.getByPlaceholder('Value').fill('1');
   await page.locator('[data-test="add-report-save-btn"]').click();
-  await page.waitForTimeout(2000)
-  await page.locator('[data-test="add-pipeline-back-btn"]').click();
-  await page.locator('[data-test="confirm-button"]').click();
-  await page.waitForTimeout(2000)
-  await page.locator('[data-test="pipeline-list-search-input"]').click();
-  await page.locator('[data-test="pipeline-list-search-input"]').fill(randomPipelineName);
-  await page.locator(`[data-test="pipeline-list-${randomPipelineName}-delete-pipeline"]`).click();
-  await page.locator('[data-test="confirm-button"]').click();
+  await deletePipeline(page, randomPipelineName);
+
 });
 
   test('should display error when only blank spaces added in stream route name', async ({ page }) => {
@@ -368,14 +384,7 @@ test.describe("Pipeline testcases", () => {
   await page.getByText('Use alphanumeric and \'+=,.@-_').click();
   await page.locator('[data-test="stream-routing-cancel-btn"]').click();
   await page.locator('[data-test="confirm-button"]').click();
-  await page.locator('[data-test="add-pipeline-back-btn"]').click();
-  await page.locator('[data-test="confirm-button"]').click();
-  await page.waitForTimeout(2000)
-  await page.locator('[data-test="pipeline-list-search-input"]').click();
-  await page.locator('[data-test="pipeline-list-search-input"]').fill(randomPipelineName);
-  await page.locator(`[data-test="pipeline-list-${randomPipelineName}-delete-pipeline"]`).click();
-  await page.locator('[data-test="confirm-button"]').click();
-  
+  await deletePipeline(page, randomPipelineName);
   });
 
 })

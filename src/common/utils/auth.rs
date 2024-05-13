@@ -207,6 +207,14 @@ impl FromRequest for AuthExtractor {
                     .map_or(path_columns[1], |model| model.key),
                 path_columns[0]
             )
+        } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+            format!(
+                "{}:{org_id}/{}",
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
+                path_columns[2]
+            )
         } else if url_len == 3 {
             if path_columns[2].starts_with("alerts")
                 || path_columns[2].starts_with("templates")
@@ -272,6 +280,9 @@ impl FromRequest for AuthExtractor {
                     path_columns[3]
                 )
             } else {
+                if method.eq("POST") && path_columns[3].eq("pipelines") {
+                    method = "PUT".to_string();
+                }
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -322,7 +333,7 @@ impl FromRequest for AuthExtractor {
                     Some(token) => {
                         format!("Bearer {}", *token)
                     }
-                    None => format!("session {}", access_token),
+                    None => access_token,
                 }
             } else {
                 format!("Bearer {}", access_token)
@@ -345,6 +356,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/format_query")
                 || path.contains("/prometheus/api/v1/series")
                 || path.contains("/traces/latest")
+                || (method.eq("LIST") && path.contains("pipelines"))
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

@@ -58,7 +58,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
-pub const PARQUET_WRITE_BUFFER_SIZE: usize = 4096;
 
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
@@ -468,6 +467,7 @@ pub struct Common {
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
+    pub instance_name_short: String,
     #[env_config(name = "ZO_WEB_URL", default = "")] // http://localhost:5080
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
@@ -651,6 +651,8 @@ pub struct Common {
     pub skip_formatting_bulk_stream_name: bool,
     #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
     pub bulk_api_response_errors_only: bool,
+    #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
+    pub allow_user_defined_schemas: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1120,6 +1122,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
     }
+    cfg.common.instance_name_short = cfg
+        .common
+        .instance_name
+        .split('.')
+        .next()
+        .unwrap()
+        .to_string();
 
     // HACK for tracing, always disable tracing except ingester and querier
     let local_node_role: Vec<cluster::Role> = cfg

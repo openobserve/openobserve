@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
+            @handleQuickModeChange="handleQuickModeChange"
           />
         </template>
         <template v-slot:after>
@@ -138,7 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -157,7 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -174,7 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -367,6 +371,7 @@ export default defineComponent({
       getHistogramQueryData,
       fnParsedSQL,
       addOrderByToQuery,
+      getRegionInfo,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -439,9 +444,16 @@ export default defineComponent({
       refreshHistogramChart();
     });
 
-    onBeforeMount(() => {
+    onBeforeMount(async () => {
       searchObj.loading = true;
       searchObj.meta.pageType = "logs";
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled
+      ) {
+        await getRegionInfo();
+      }
+
       resetSearchObj();
       resetStreamData();
       searchObj.organizationIdetifier =
@@ -451,6 +463,7 @@ export default defineComponent({
       if (config.isCloud == "true") {
         MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
       }
+      searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
     });
 
     /**
@@ -705,6 +718,25 @@ export default defineComponent({
       }
     };
 
+    const handleQuickModeChange = () => {
+      if (searchObj.meta.quickMode == true) {
+        let field_list: string = "*";
+        if (searchObj.data.stream.interestingFieldList.length > 0) {
+          field_list = searchObj.data.stream.interestingFieldList.join(",");
+        }
+        if (searchObj.meta.sqlMode == true) {
+          searchObj.data.query = searchObj.data.query.replace(
+            /SELECT\s+(.*?)\s+FROM/i,
+            (match, fields) => {
+              return `SELECT ${field_list} FROM`;
+            }
+          );
+          setQuery(searchObj.meta.quickMode);
+          updateUrlQueryParams();
+        }
+      }
+    };
+
     return {
       t,
       store,
@@ -736,6 +768,7 @@ export default defineComponent({
       resetStreamData,
       getHistogramQueryData,
       setInterestingFieldInSQLQuery,
+      handleQuickModeChange,
     };
   },
   computed: {
@@ -771,9 +804,6 @@ export default defineComponent({
     },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
-    },
-    quickMode() {
-      return this.searchObj.meta.quickMode;
     },
     refreshHistogram() {
       return this.searchObj.meta.histogramDirtyFlag;
@@ -880,25 +910,6 @@ export default defineComponent({
         }
       }
       // this.searchResultRef.reDrawChart();
-    },
-    quickMode(newVal) {
-      if (newVal == true) {
-        let field_list: string = "*";
-        if (this.searchObj.data.stream.interestingFieldList.length > 0) {
-          field_list =
-            this.searchObj.data.stream.interestingFieldList.join(",");
-        }
-        if (this.searchObj.meta.sqlMode == true) {
-          this.searchObj.data.query = this.searchObj.data.query.replace(
-            /SELECT\s+(.*?)\s+FROM/i,
-            (match, fields) => {
-              return `SELECT ${field_list} FROM`;
-            }
-          );
-          this.setQuery(newVal);
-          this.updateUrlQueryParams();
-        }
-      }
     },
     refreshHistogram() {
       if (

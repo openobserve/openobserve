@@ -20,7 +20,7 @@ use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
     http::header,
-    web, HttpRequest, HttpResponse,
+    middleware, web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::{from_fn, Next};
@@ -294,6 +294,18 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
 
+    // set server header
+    #[cfg(feature = "enterprise")]
+    let server = format!(
+        "{}-{}",
+        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+            .super_cluster
+            .region,
+        CONFIG.common.instance_name_short
+    );
+    #[cfg(not(feature = "enterprise"))]
+    let server = CONFIG.common.instance_name_short.to_string();
+
     cfg.service(
         web::scope("/api")
             .wrap(from_fn(audit_middleware))
@@ -301,6 +313,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
+            .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
             .service(users::list)
             .service(users::save)
             .service(users::delete)

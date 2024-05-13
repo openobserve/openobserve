@@ -16,13 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="show" class="flex items-center rum-tabs">
-    <div v-for="tab in (tabs as Tab[])" :key="tab.value" class="cursor-pointer">
+    <div
+      v-for="tab in (tabs as Tab[])"
+      :key="tab.value + tab.disabled"
+      class="cursor-pointer"
+    >
       <div
         :data-test="`tab-${tab.value}`"
         class="q-px-lg q-py-sm rum-tab text-center"
         :style="tab.style"
-        :class="activeTab === tab.value ? 'active text-primary' : ''"
-        @click="changeTab(tab.value)"
+        :title="tab.title || tab.label"
+        :class="[
+          activeTab === tab.value ? 'active text-primary' : '',
+          tab.disabled && 'disabled',
+        ]"
+        @click="changeTab(tab)"
       >
         {{ tab.label }}
       </div>
@@ -31,16 +39,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { defineProps } from "vue";
+import { computed, defineProps } from "vue";
 
 interface Tab {
   label: string;
   value: string;
   style?: Record<string, string>;
+  disabled?: boolean;
+  title?: string;
 }
 
 const emit = defineEmits(["update:activeTab"]);
-defineProps({
+const props = defineProps({
   show: {
     type: Boolean,
     default: true,
@@ -55,8 +65,9 @@ defineProps({
   },
 });
 
-const changeTab = (tab: string) => {
-  emit("update:activeTab", tab);
+const changeTab = (tab: Tab) => {
+  if (tab.disabled) return;
+  emit("update:activeTab", tab.value);
 };
 </script>
 

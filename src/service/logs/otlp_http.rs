@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
@@ -25,6 +25,7 @@ use config::{
     utils::{flatten, json},
     CONFIG, DISTINCT_FIELDS,
 };
+use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -44,7 +45,7 @@ use crate::{
         db, get_formatted_stream_name,
         ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -139,7 +140,6 @@ pub async fn logs_json_handler(
     let stream_name = &stream_name;
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<TriggerAlertData> = None;
@@ -156,17 +156,26 @@ pub async fn logs_json_handler(
     let partition_keys = partition_det.partition_keys;
     let partition_time_level = partition_det.partition_time_level;
 
+    let stream_param = StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_name: stream_name.to_owned().into(),
+        stream_type: StreamType::Logs,
+    };
+
     // Start get stream alerts
-    crate::service::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    crate::service::ingestion::get_stream_alerts(&[stream_param.clone()], &mut stream_alerts_map)
+        .await;
+    // End get stream alert
+
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
+    crate::service::ingestion::get_user_defined_schema(
+        &[stream_param],
+        &mut user_defined_schema_map,
     )
     .await;
-    // End get stream alert
+    // End get user defined schema
 
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
@@ -367,10 +376,14 @@ pub async fn logs_json_handler(
                 }
 
                 // get json object
-                let local_val = match value.take() {
+                let mut local_val = match value.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
                 };
+
+                if let Some(fields) = user_defined_schema_map.get(stream_name) {
+                    local_val = crate::service::logs::refactor_map(local_val, fields);
+                }
 
                 let mut to_add_distinct_values = vec![];
                 // get distinct_value item

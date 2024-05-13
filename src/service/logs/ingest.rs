@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{BufRead, Read},
 };
 
@@ -28,6 +28,7 @@ use config::{
     CONFIG, DISTINCT_FIELDS,
 };
 use flate2::read::GzDecoder;
+use infra::schema::SchemaCache;
 use vrl::compiler::runtime::Runtime;
 
 use crate::{
@@ -45,7 +46,7 @@ use crate::{
         ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
         logs::StreamMeta,
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, SchemaCache},
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };
@@ -89,18 +90,26 @@ pub async fn ingest(
     );
     // End Register Transforms for stream
 
+    let stream_param = StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_name: stream_name.to_owned().into(),
+        stream_type: StreamType::Logs,
+    };
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
+    crate::service::ingestion::get_stream_alerts(&[stream_param.clone()], &mut stream_alerts_map)
+        .await;
+    // End get stream alerts
+
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
+    crate::service::ingestion::get_user_defined_schema(
+        &[stream_param],
+        &mut user_defined_schema_map,
     )
     .await;
-    // End get stream alerts
+    // End get user defined schema
 
     let mut stream_status = StreamStatus::new(stream_name);
     let mut distinct_values = Vec::with_capacity(16);
@@ -162,6 +171,11 @@ pub async fn ingest(
             json::Value::Object(val) => val,
             _ => unreachable!(),
         };
+
+        if let Some(fields) = user_defined_schema_map.get(stream_name) {
+            local_val = crate::service::logs::refactor_map(local_val, fields);
+        }
+
         if let Err(e) = handle_timestamp(&mut local_val, min_ts, timestamp) {
             stream_status.status.failed += 1;
             stream_status.status.error = e.to_string();

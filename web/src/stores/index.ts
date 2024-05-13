@@ -70,6 +70,7 @@ export default createStore({
     refreshIntervalID: 0,
     savedViewFlag: false,
     savedFunctionDialog: false,
+    regionInfo: [],
   },
   mutations: {
     login(state, payload) {
@@ -175,6 +176,9 @@ export default createStore({
     setIsDataIngested(state, payload) {
       state.organizationData.isDataIngested = payload;
     },
+    setRegionInfo(state, payload) {
+      state.regionInfo = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -272,6 +276,9 @@ export default createStore({
     },
     setIsDataIngested(context, payload) {
       context.commit("setIsDataIngested", payload);
+    },
+    setRegionInfo(context, payload) {
+      context.commit("setRegionInfo", payload);
     },
   },
   modules: {},

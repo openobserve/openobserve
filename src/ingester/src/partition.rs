@@ -108,9 +108,25 @@ impl Partition {
                 batch_num: data.data.len(),
             };
             // write into parquet buf
+            let (bloom_filter_fields, full_text_search_fields) =
+                if self.schema.fields().len() > CONFIG.limit.file_move_fields_limit {
+                    let bloom_filter_fields =
+                        infra::schema::get_stream_setting_bloom_filter_fields(self.schema.as_ref())
+                            .unwrap();
+                    let full_text_search_fields =
+                        infra::schema::get_stream_setting_fts_fields(self.schema.as_ref()).unwrap();
+                    (bloom_filter_fields, full_text_search_fields)
+                } else {
+                    (vec![], vec![])
+                };
             let mut buf_parquet = Vec::new();
-            let mut writer =
-                new_parquet_writer(&mut buf_parquet, &self.schema, &[], &[], &file_meta);
+            let mut writer = new_parquet_writer(
+                &mut buf_parquet,
+                &self.schema,
+                &bloom_filter_fields,
+                &full_text_search_fields,
+                &file_meta,
+            );
             for batch in data.data.iter() {
                 persist_stat.arrow_size += batch.data_arrow_size;
                 writer

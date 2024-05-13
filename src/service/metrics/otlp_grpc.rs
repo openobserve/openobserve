@@ -29,7 +29,7 @@ use config::{
     CONFIG,
 };
 use hashbrown::HashSet;
-use infra::schema::{unwrap_partition_time_level, update_setting};
+use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
@@ -52,7 +52,7 @@ use crate::{
             write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels},
-        schema::{check_for_schema, stream_schema_exists, SchemaCache},
+        schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };

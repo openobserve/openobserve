@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
@@ -22,13 +22,15 @@ use config::{
         sql,
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
+    utils::{
+        arrow::record_batches_to_json_rows, flatten, json, parquet::new_parquet_writer,
+        schema::infer_json_schema_from_values, schema_ext::SchemaExt,
+    },
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
-        json as arrowJson,
         record_batch::RecordBatch,
     },
     common::{FileType, GetExt},
@@ -206,10 +208,9 @@ pub async fn sql(
         };
 
         if !rules.is_empty() {
-            let fields = df.schema().fields();
-            let mut exprs = Vec::with_capacity(fields.len());
-            for field in fields {
-                if let Some(v) = field.qualifier() {
+            let mut exprs = Vec::with_capacity(df.schema().fields().len());
+            for (qualifier, field) in df.schema().iter() {
+                if let Some(v) = qualifier {
                     if v.to_string() != "tbl" {
                         exprs.push(col(field.name()));
                         continue;
@@ -327,6 +328,11 @@ async fn exec_query(
         log::info!("[trace_id {trace_id}] Query sql: {}", query);
     }
 
+    // Hack for limit 0
+    if query.ends_with("LIMIT 0") {
+        return Ok(vec![]);
+    }
+
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
@@ -341,10 +347,9 @@ async fn exec_query(
     };
 
     if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if let Some(v) = field.qualifier() {
+        let mut exprs = Vec::with_capacity(df.schema().fields().len());
+        for (qualifier, field) in df.schema().iter() {
+            if let Some(v) = qualifier {
                 if v.to_string() != "tbl" {
                     exprs.push(col(field.name()));
                     continue;
@@ -985,10 +990,9 @@ pub async fn convert_parquet_file(
         }
     };
     if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if let Some(v) = field.qualifier() {
+        let mut exprs = Vec::with_capacity(df.schema().fields().len());
+        for (qualifier, field) in df.schema().iter() {
+            if let Some(v) = qualifier {
                 if v.to_string() != "tbl" {
                     exprs.push(col(field.name()));
                     continue;
@@ -1040,15 +1044,10 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
-    original_size: i64,
+    in_file_meta: FileMeta,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     let start = std::time::Instant::now();
-
-    // query data
-    let runtime_env = create_runtime_env(None)?;
-    let session_config = create_session_config(&SearchType::Normal)?;
-    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -1061,43 +1060,6 @@ pub async fn merge_parquet_files(
         .with_schema(schema.clone());
 
     let table = Arc::new(ListingTable::try_new(config)?);
-    ctx.register_table("tbl", table.clone())?;
-
-    // get meta data
-    let meta_sql = format!(
-        "SELECT MIN({}) as min_ts, MAX({}) as max_ts, COUNT(1) as num_records FROM tbl",
-        CONFIG.common.column_timestamp, CONFIG.common.column_timestamp
-    );
-    let df = ctx.sql(&meta_sql).await?;
-    let batches = df.collect().await?;
-    let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let result = arrowJson::writer::record_batches_to_json_rows(&batches_ref).unwrap();
-    let record = result.first().unwrap();
-    let file_meta = if record.is_empty() {
-        FileMeta::default()
-    } else {
-        match record.get("min_ts") {
-            Some(min_ts) => match min_ts.as_i64() {
-                Some(min_ts) => FileMeta {
-                    min_ts,
-                    max_ts: record["max_ts"].as_i64().unwrap(),
-                    records: record["num_records"].as_i64().unwrap(),
-                    original_size,
-                    compressed_size: 0,
-                },
-                None => {
-                    return Err(DataFusionError::Execution(
-                        "merge_parquet_files: Invalid file meta data".to_string(),
-                    ));
-                }
-            },
-            None => {
-                return Err(DataFusionError::Execution(
-                    "merge_parquet_files: Invalid file meta data".to_string(),
-                ));
-            }
-        }
-    };
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
@@ -1138,7 +1100,7 @@ pub async fn merge_parquet_files(
         &schema,
         bloom_filter_fields,
         full_text_search_fields,
-        &file_meta,
+        &in_file_meta,
     );
     for batch in batches {
         if stream_type == StreamType::Logs {
@@ -1148,13 +1110,18 @@ pub async fn merge_parquet_files(
             } else {
                 config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
             };
+            let schema_fields = schema.as_ref().simple_fields();
 
-            // add _timestamp column to columns_to_index
-            if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
-                columns_to_index.push(CONFIG.common.column_timestamp.to_string());
-            }
+            let schema_fields: HashSet<&str> = schema_fields.iter().map(|f| f.0.as_str()).collect();
+
+            columns_to_index.retain(|f| schema_fields.contains(f.as_str()));
 
             if !columns_to_index.is_empty() {
+                // add _timestamp column to columns_to_index
+                if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
+                    columns_to_index.push(CONFIG.common.column_timestamp.to_string());
+                }
+
                 let selected_column_indices: Vec<usize> = columns_to_index
                     .iter()
                     .filter_map(|name| batch.schema().index_of(name).ok())
@@ -1188,7 +1155,7 @@ pub async fn merge_parquet_files(
         start.elapsed().as_secs_f64()
     );
 
-    Ok((file_meta, schema))
+    Ok((in_file_meta, schema))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
@@ -1204,10 +1171,10 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
     if CONFIG.common.bloom_filter_enabled {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
     if CONFIG.common.bloom_filter_disabled_on_search {
-        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", false);
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
     Ok(config)
 }
@@ -1377,13 +1344,13 @@ fn handle_query_fn(
     org_id: &str,
     stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
-    match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
-        Err(err) => Err(DataFusionError::Execution(format!(
+    let json_rows = record_batches_to_json_rows(batches).map_err(|e| {
+        DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
-            err
-        ))),
-    }
+            e
+        ))
+    })?;
+    apply_query_fn(query_fn, json_rows, org_id, stream_type)
 }
 
 fn apply_query_fn(

@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - "*"
+env:
+  GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
   initiate_enterprise_build:
@@ -20,6 +22,15 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           # Set the owner, so the token can be used in all repositories
           owner: ${{ github.repository_owner }}
+    - name: Set build short sha
+      shell: bash
+      run: |
+          unset SHORT_COMMIT_ID
+          echo "SHORT_COMMIT_ID=${GITHUB_HEAD_SHA:0:7}" >> $GITHUB_ENV
+
+    - name: Confirm git commit SHA output
+      run: echo ${{ env.SHORT_COMMIT_ID }}
+      
     - name: Repository Dispatch
       uses: peter-evans/repository-dispatch@v3
       env:
@@ -29,4 +40,4 @@ jobs:
           token: ${{ env.TOKEN }} # GitHub App installation access token
           repository: openobserve/o2-enterprise
           event-type: initiate-enterprise-build
-          client-payload: '{"o2_enterprise_repo": "main", "o2_opensource_repo": "${{ env.BRANCH_NAME }}"}'
+          client-payload: '{"o2_enterprise_repo": "main", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}"}' 

@@ -50,10 +50,25 @@ pub async fn init() -> errors::Result<()> {
         loop {
             // persist immutable data to disk
             if let Err(e) = immutable::persist().await {
-                log::error!("persist error: {}", e);
+                log::error!("immutable persist error: {}", e);
             }
             // shrink metadata cache
             WAL_PARQUET_METADATA.write().await.shrink_to_fit();
+            interval.tick().await;
+        }
+    });
+
+    // start a job to flush memtable to immutable
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            config::CONFIG.limit.max_file_retention_time,
+        ));
+        interval.tick().await; // the first tick is immediate
+        loop {
+            // check memtable ttl
+            if let Err(e) = writer::check_ttl().await {
+                log::error!("memtable check ttl error: {}", e);
+            }
             interval.tick().await;
         }
     });

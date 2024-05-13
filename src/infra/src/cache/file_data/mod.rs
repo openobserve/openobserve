@@ -18,8 +18,8 @@ pub mod memory;
 
 use std::collections::VecDeque;
 
-use config::utils::lru_cache::LruCache;
 use hashbrown::HashSet;
+use hashlink::lru_cache::LruCache;
 
 const INITIAL_CACHE_SIZE: usize = 128;
 

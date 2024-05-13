@@ -26,7 +26,6 @@ get_if_addrs.workspace = true
 getrandom.workspace = true
 gxhash.workspace = true
 hashbrown.workspace = true
-hashlink.workspace = true
 hex.workspace = true
 indexmap.workspace = true
 itertools.workspace = true
