@@ -18,7 +18,7 @@ use std::sync::Arc;
 use actix_web::HttpResponse;
 use anyhow::Result;
 use async_channel::{bounded, Sender};
-use config::CONFIG;
+use config::{cluster, CONFIG};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
@@ -28,7 +28,7 @@ use super::{entry::IngestEntry, workers::Workers};
 /// initial # of workers
 static MIN_WORKER_CNT: usize = 3;
 /// max # of requests could be held in channel.
-static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more workers
+static DEFAULT_CHANNEL_CAP: usize = 5; // if channel if full -> init more workers
 /// Max acceptable latency between a request is accepted and searchable
 static SEARCHABLE_LATENCY: u64 = 60;
 /// Estimated time in seconds it takes to ingest a 5mb request in seconds
@@ -54,9 +54,14 @@ pub async fn send_task(task: IngestEntry) -> HttpResponse {
 
 /// Gracefully terminates all running TaskQueues
 pub async fn shut_down() {
-    log::info!("Shutting down TaskQueueManager");
-    let mut w = TQ_MANAGER.write().await;
-    w.terminal_all().await;
+    if CONFIG.common.feature_ingest_buffer_enabled
+        && (cluster::is_router(&cluster::LOCAL_NODE_ROLE)
+            || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE))
+    {
+        log::info!("Shutting down TaskQueueManager");
+        let mut w = TQ_MANAGER.write().await;
+        w.terminal_all().await;
+    }
 }
 
 struct TaskQueueManager {
@@ -158,8 +163,8 @@ impl TaskQueueManager {
                     if added_worker_count > 0 {
                         log::info!(
                             "All TaskQueue is full. Added {} new workers to TaskQueue({})",
-                            self.round_robin_idx,
-                            added_worker_count
+                            added_worker_count,
+                            self.round_robin_idx
                         );
                         Some(tq)
                     } else {

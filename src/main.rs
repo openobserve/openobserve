@@ -260,10 +260,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
-    // terminate ingest buffer
-    if CONFIG.common.feature_ingest_buffer_enabled {
-        common_infra::ingest_buffer::shut_down().await;
-    }
+    // terminate ingest buffer if active
+    common_infra::ingest_buffer::shut_down().await;
     // flush distinct values
     _ = metadata::close().await;
     // flush compact offset cache to disk disk

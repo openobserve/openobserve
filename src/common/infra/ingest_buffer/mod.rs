@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{cluster, CONFIG};
 
 mod entry;
 mod queue_store;
@@ -24,13 +24,19 @@ pub use entry::{IngestEntry, IngestSource};
 pub use task_queue::{send_task, shut_down};
 
 pub(super) async fn init() -> anyhow::Result<()> {
-    // replay wal files to create ingestion tasks
-    queue_store::replay_persisted_tasks().await?;
+    if cluster::is_router(&cluster::LOCAL_NODE_ROLE)
+        || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE)
+    {
+        tokio::spawn(async move {
+            // replay wal files to create ingestion tasks
+            queue_store::replay_persisted_tasks().await.unwrap(); // replay in case feature was previously enabled
+        });
 
-    if CONFIG.common.feature_ingest_buffer_enabled {
-        // init task queue
-        log::info!("Start TaskQueueManager as ingest buffer");
-        task_queue::init().await?;
+        if CONFIG.common.feature_ingest_buffer_enabled {
+            // init task queue
+            log::info!("Start TaskQueueManager as ingest buffer");
+            task_queue::init().await?;
+        }
     }
 
     Ok(())
