@@ -24,9 +24,10 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{metrics, CONFIG};
+use futures::lock::Mutex;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use wal::Writer as WalWriter;
 
 use crate::{
