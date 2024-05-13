@@ -25,7 +25,7 @@ use byteorder::WriteBytesExt;
 use config::CONFIG;
 use ingester::scan_files;
 
-use super::{entry::IngestEntry, workers::process_tasks_with_retries};
+use super::{entry::IngestEntry, workers::process_tasks};
 
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";
@@ -33,24 +33,19 @@ const FILE_EXTENSION: &str = "wal";
 const DELIMITER: u8 = b'|';
 
 /// Writes the given array of IngestEntries to disk at directory formatted by
-/// pattern {data_wal_dir}/ingest_buffer/{stream_name}/{worker_id}.wal.
+/// pattern {data_wal_dir}/ingest_buffer/{worker_id}.wal.
 ///
 /// Overwrites if previously persisted.
-///
-/// Bytes of IngestEntries are written to wal file one by one separated by delimiter (|)
-///
-/// `entry|entry|entry|...`
 pub(super) async fn persist_job(
-    tq_index: usize,
     worker_id: String,
     store_sig_r: Receiver<Option<Vec<IngestEntry>>>,
 ) -> Result<()> {
-    let path = build_file_path(tq_index, &worker_id);
+    let path = build_file_path(&worker_id);
 
     while let Ok(tasks) = store_sig_r.recv().await {
         if let Err(e) = persist_job_inner(&path, tasks) {
             log::error!(
-                "TaskQueue({tq_index})-worker({worker_id}) failed to persist tasks: {:?} ",
+                "IngestBuffer-worker({worker_id}) failed to persist tasks: {:?} ",
                 e
             );
         }
@@ -58,6 +53,11 @@ pub(super) async fn persist_job(
     Ok(())
 }
 
+/// Bytes of IngestEntries are serialized to bytes and written to wal file one by one separated by
+/// delimiter (|) e.g. `entry|entry|entry|...`
+/// Serialized bytes are also compressed with zstd before written to wal.
+///
+/// Receiving empty array indicates to remove the wal file.
 pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>) -> Result<()> {
     create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
     if let Some(tasks) = tasks {
@@ -105,7 +105,7 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
                     wal_file
                 );
                 // Hack temp tq_index & worker_id and max 1 retry
-                process_tasks_with_retries(0, "0", &entries, 1).await;
+                process_tasks("replay_worker", &entries).await;
             }
             _ => {
                 log::error!("Failed to decode from wal file. Skip");
@@ -117,16 +117,16 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
 }
 
 /// Builds file path for TaskQueue workers to persist their pending tasks to disk.
-pub(super) fn build_file_path(tq_index: usize, worker_id: &str) -> PathBuf {
-    let tq_folder = format!("task_queue_{tq_index}");
+pub(super) fn build_file_path(worker_id: &str) -> PathBuf {
     let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
     path.push("ingest_buffer");
-    path.push(tq_folder);
+    path.push("task_queue");
     path.push(worker_id);
     path.set_extension(FILE_EXTENSION);
     path
 }
 
+/// Deserializes compressed bytes read from 'wal' file back to an array of IngestEntries
 fn decode_from_wal_file(wal_file: &PathBuf) -> Result<Option<Vec<IngestEntry>>> {
     let f = File::open(wal_file)?;
     let mut f = zstd::Decoder::new(f)?;

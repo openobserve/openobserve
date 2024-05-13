@@ -28,12 +28,11 @@ pub(super) async fn init() -> anyhow::Result<()> {
         || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE)
     {
         tokio::spawn(async move {
-            // replay wal files to create ingestion tasks
+            // replay previously received yet processed tasks persisted on disk
             queue_store::replay_persisted_tasks().await.unwrap(); // replay in case feature was previously enabled
         });
 
         if CONFIG.common.feature_ingest_buffer_enabled {
-            // init task queue
             log::info!("Start TaskQueueManager as ingest buffer");
             task_queue::init().await?;
         }

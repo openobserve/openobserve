@@ -23,9 +23,6 @@ use chrono::Utc;
 
 use crate::{common::meta::ingestion::IngestionRequest, service::logs};
 
-// TODO: support other two endpoints
-// KinesisFH,
-// GCP,
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IngestSource {
     Bulk,
@@ -72,6 +69,7 @@ impl IngestEntry {
         Ok(entry)
     }
 
+    /// validates self by checking the size
     pub fn validate(&self) -> Result<()> {
         if self.content_length != self.body.len() {
             return Err(anyhow!("Invalid request. Inconsistent body content length"));
@@ -79,9 +77,8 @@ impl IngestEntry {
         Ok(())
     }
 
-    /// Calls Ingester to ingest data stored in self based on sources.
-    /// Error returned by Ingester will be passed along. If Ingester returns
-    /// SERVICE_UNAVAILABLE (code = 503), this function will return true to indicate retry.
+    /// Calls OpenObserve service to ingest data stored in self based on sources.
+    /// Error returned by Ingester will be passed along.
     pub async fn ingest(&self) -> Result<bool> {
         let in_req = match self.source {
             IngestSource::Bulk => {
@@ -92,7 +89,7 @@ impl IngestEntry {
                     &self.user_email,
                 )
                 .await
-                .map(|_| false);
+                .map(|bk_resp| !bk_resp.errors);
             }
             IngestSource::Multi => IngestionRequest::Multi(&self.body),
             IngestSource::JSON => IngestionRequest::JSON(&self.body),
@@ -110,11 +107,10 @@ impl IngestEntry {
             in_req,
             self.thread_id,
             &self.user_email,
-            Some(self.timestamp)
+            Some(self.timestamp),
         )
         .await
-        // Mark 503 as retries
-        .map(|resp| resp.code == 503)
+        .map(|resp| resp.error.is_none())
     }
 
     pub fn into_bytes(&self) -> Result<Vec<u8>> {

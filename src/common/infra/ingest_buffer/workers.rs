@@ -24,54 +24,51 @@ use tokio::{sync::RwLock, task::JoinHandle};
 use super::{
     entry::IngestEntry,
     queue_store::{build_file_path, persist_job, persist_job_inner},
-    task_queue::update_size,
+    task_queue::update_buffer_size,
 };
 
 type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<Result<()>>;
 
-// REVIEW: static ok or env variables?
-/// seconds between each pull for a worker
+/// for batch processing: worker's default wait time between each pull from channel
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
-/// max idle time in seconds before shut down
+/// for batch processing: max number of requests a worker should process in one batch
+static WORKER_BATCH_PROCESSING_SIZE: usize = 5; // 
+/// max idle time in seconds before a worker shuts itself down
 static WORKER_MAX_IDLE_TIME: f64 = 60.0;
-/// max number of requests a worker should process in one batch
-static WORKER_BATCH_PROCESSING_SIZE: usize = 5;
 
-/// Multi-consumer side of the TaskQueue. Created and manged by TaskQueue associated with a stream.
-/// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold
-/// the receiver. Each initialized worker has two tasks to perform. Worker will shut down
-/// when corresponding producer closes their channel.
+/// Consumer side of the IngestBuffer. The number of workers is dynamically increased
+/// or decreased based on the load the IngestBuffer is receiving. All active workers
+/// receives the fair chance of being picked to receive buffered requests thanks to
+/// async-channel crate.
 pub(super) struct Workers {
-    pub tq_index: usize,
     pub receiver: Arc<Receiver<IngestEntry>>,
     pub handles: RwVec<Worker>,
 }
 
 impl Workers {
-    pub fn new(count: usize, tq_index: usize, receiver: Arc<Receiver<IngestEntry>>) -> Self {
+    pub fn new(count: usize, receiver: Arc<Receiver<IngestEntry>>) -> Self {
         let mut handles = Vec::with_capacity(count);
         for _ in 0..count {
-            let worker = init_worker(tq_index, Arc::clone(&receiver));
+            let worker = init_worker(Arc::clone(&receiver));
             handles.push(worker);
         }
         Self {
-            tq_index,
             receiver,
             handles: RwVec::from(handles),
         }
     }
 
-    /// Initializes additional {count} number of workers.
+    /// Initializes additional workers.
     pub async fn add_workers_by(&self, count: usize) {
         let mut rw = self.handles.write().await;
         for _ in 0..count {
-            let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
+            let handle = init_worker(Arc::clone(&self.receiver));
             rw.push(handle);
         }
     }
 
-    /// Removes finished workers and returns remaining active worker count.
+    /// Removes stopped workers and returns remaining active worker count.
     pub async fn running_worker_count(&self) -> usize {
         let mut rw = self.handles.write().await;
         rw.retain(|handle| !handle.is_finished());
@@ -86,74 +83,70 @@ impl Workers {
         for res in join_res {
             if let Err(e) = res {
                 if !e.is_cancelled() {
-                    log::error!(
-                        "TaskQueue({})-Worker error when closing: {:?}",
-                        self.tq_index,
-                        e
-                    )
+                    log::error!("IngestBuffer error when closing: {:?}", e)
                 }
             }
         }
     }
 }
 
-/// Initializes a background worker (TaskQueue consumer) with two tasks.
-/// The main task is receiving and processing IngestEntry sent by TaskQueue producers.
-/// The side task is persisting pending tasks to disk.
-/// The worker is associated with a stream by stream_name.
-fn init_worker(tq_index: usize, receiver: Arc<Receiver<IngestEntry>>) -> Worker {
+/// Initializes a background worker (TaskQueue consumer) to perform two async jobs as below:
+/// [process_job]                                 | [persist_job]
+/// 1. receives {tasks} buffered in TaskQueue     | channel by producers                       |
+/// 2. sends all received {tasks} to      --------> persists received {tasks} to disk in '.wal'
+/// 3. processes all received {tasks}             |
+/// 4. informs to remove 'wa              --------> removes the 'wal'
+fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
     tokio::spawn(async move {
         let worker_id = ider::generate();
-        log::info!("TaskQueue({tq_index})-Worker({worker_id}) starting");
+        log::info!("IngestBuffer-Worker({worker_id}) starting");
 
         // Used to communicated between the worker's two tasks
         let (store_sig_s, store_sig_r) = bounded::<Option<Vec<IngestEntry>>>(1);
 
         // side job - persisting
-        let persist_job_handle =
-            tokio::spawn(persist_job(tq_index, worker_id.clone(), store_sig_r));
+        let persist_job_handle = tokio::spawn(persist_job(worker_id.clone(), store_sig_r));
 
         // main task - receiving/processing IngestEntries (awaited)
-        process_job(tq_index, worker_id, receiver, store_sig_s).await?;
+        process_job(worker_id, receiver, store_sig_s).await?;
         // Join the side task
         _ = persist_job_handle.await?;
         Ok(())
     })
 }
 
-/// TaskQueue worker's main task.
-/// Worker pulls all available IngestEntries in the channel periodically (defined by
-/// worker_wait_time).
+/// TaskQueue worker's main job.
+/// Worker pulls available {tasks} buffered in the channel periodically (defined by
+/// [WORKER_DEFAULT_WAIT_TIME]). At most, a worker pulls [WORKER_BATCH_PROCESSING_SIZE]
+/// tasks out of channel each time.
 ///
-/// If there is any IngestEntries to be processed:
-///     1. Sends received IngestEntries to persist job to store in disk
+/// If there is any tasks to be processed:
+///     1. Sends received IngestEntries to persist job to store in disk in 'wal'
 ///     2. Process all received IngestEntries
-///     3. Signal persist job to remove successfully processed IngestEntries
+///     3. Signals persist job to remove corresponding 'wal' file
 ///
 /// Otherwise:
-///     Records elapsed time, which if exceeds WORKER_MAX_IDLE_TIME time, exists this task.
+///     Records elapsed time, which if exceeds [WORKER_MAX_IDLE_TIME] time, exists this task.
 async fn process_job(
-    tq_index: usize,
     worker_id: String,
     receiver: Arc<Receiver<IngestEntry>>,
     store_sig_s: Sender<Option<Vec<IngestEntry>>>,
 ) -> Result<()> {
     let mut wait_interval =
         tokio::time::interval(tokio::time::Duration::from_secs(WORKER_DEFAULT_WAIT_TIME));
-    let mut time = std::time::Instant::now();
+    let mut idle_time = std::time::Instant::now();
 
     let mut pending_tasks = vec![];
 
-    while time.elapsed().as_secs_f64() <= WORKER_MAX_IDLE_TIME {
+    while idle_time.elapsed().as_secs_f64() <= WORKER_MAX_IDLE_TIME {
         if receiver.is_closed() {
-            // closed by TaskQueue::shut_down()
-            break;
+            break; // closed by TaskQueue::shut_down()
         }
 
         while let Ok(req) = receiver.try_recv() {
             if let Err(e) = req.validate() {
                 log::warn!(
-                    "TaskQueue({tq_index})-Worker({worker_id}) received an invalid request {:?}. Skip.",
+                    "IngestBuffer-Worker({worker_id}) received an invalid request {:?}. Skip.",
                     e
                 );
                 continue;
@@ -165,33 +158,34 @@ async fn process_job(
         }
 
         if !pending_tasks.is_empty() {
-            // Send to background to persist
+            // received some tasks -> Send to background to persist
             if let Err(e) = store_sig_s.send(Some(pending_tasks.clone())).await {
                 log::error!(
-                    "TaskQueue({tq_index})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
+                    "IngestBuffer-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
                     e
                 );
             }
             log::info!(
-                "TaskQueue({tq_index})-Worker({worker_id}) received and processing {} requests",
+                "IngestBuffer-Worker({worker_id}) received and processing {} requests",
                 pending_tasks.len()
             );
-            process_tasks_with_retries(tq_index, &worker_id, &pending_tasks, 0).await;
+            process_tasks(&worker_id, &pending_tasks).await;
             pending_tasks.clear();
             if let Err(e) = store_sig_s.send(None).await {
                 log::error!(
-                    "TaskQueue({tq_index})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
+                    "IngestBuffer-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
                     e
                 );
             }
-            time = std::time::Instant::now();
+            idle_time = std::time::Instant::now(); // refresh idle time
         }
         wait_interval.tick().await;
     }
-    log::info!("TaskQueue({tq_index})-Worker({worker_id}) shutting down.");
+    log::info!("IngestBuffer-Worker({worker_id}) shutting down.");
     store_sig_s.close(); // signal persist job to close
-    // Flush to disk or remove saved file
-    let path = build_file_path(tq_index, &worker_id);
+    // In case worker was terminated by TaskQueue with unfinished tasks
+    // -> flush to disk or remove saved file
+    let path = build_file_path(&worker_id);
     let to_persist = if pending_tasks.is_empty() {
         None
     } else {
@@ -202,54 +196,32 @@ async fn process_job(
     Ok(())
 }
 
-/// Batch ingests IngestEntries with maximum 3 retries.
-/// Retry only applies to IngestEntries that failed due to ServiceUnavailable (503)
-/// from Ingester
-pub(super) async fn process_tasks_with_retries(
-    tq_index: usize,
-    worker_id: &str,
-    tasks: &Vec<IngestEntry>,
-    retry_count: i32,
-) {
+/// processes received tasks and update IngestBuffer total size after done.
+pub(super) async fn process_tasks(worker_id: &str, tasks: &Vec<IngestEntry>) {
     let mut succeed = 0;
     let mut tq_size_update = 0;
     for task in tasks {
+        tq_size_update += task.content_length;
         match task.ingest().await {
-            Ok(mut retry) => {
-                if retry {
-                    log::error!("Ingester not available. Trying again",);
-                    let mut retires = 0;
-                    while retires < retry_count && retry {
-                        if let Ok(r) = task.ingest().await {
-                            retires += 1;
-                            retry = r;
-                        } else {
-                            break;
-                        }
-                    }
-                    if retry {
-                        log::warn!(
-                            "TaskQueue({tq_index})-Worker({worker_id}): max retries reached. Skip request",
-                        );
-                        continue;
-                    }
+            Ok(success) => {
+                if success {
+                    succeed += 1;
+                } else {
+                    log::warn!("")
                 }
-                succeed += 1;
-                tq_size_update += task.content_length;
             }
             Err(e) => {
                 log::error!(
-                    "TaskQueue({tq_index})-Worker({worker_id}) failed to ingest {:?}. Error: {:?}. Request dropped",
-                    task,
+                    "IngestBuffer-Worker({worker_id}) failed to ingest. Error: {:?}. Request dropped",
                     e,
                 );
             }
         }
     }
     log::info!(
-        "TaskQueue({tq_index})-Worker({worker_id}) successfully ingested {}/{} request(s).",
+        "IngestBuffer-Worker({worker_id}) successfully ingested {}/{} request(s).",
         succeed,
         tasks.len()
     );
-    update_size(tq_size_update, false).await;
+    update_buffer_size(tq_size_update, false).await;
 }

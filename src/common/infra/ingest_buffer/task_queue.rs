@@ -24,13 +24,12 @@ use tokio::sync::RwLock;
 
 use super::{entry::IngestEntry, workers::Workers};
 
-// REVIEW: static ok or env variables?
 /// initial # of workers
-static MIN_WORKER_CNT: usize = 3;
+static DEFAULT_WORKER_CNT: usize = 3;
 /// max # of requests could be held in channel.
 static DEFAULT_CHANNEL_CAP: usize = 5; // if channel if full -> init more workers
 /// Max acceptable latency between a request is accepted and searchable
-static SEARCHABLE_LATENCY: u64 = 60;
+static SEARCHABLE_LATENCY: u64 = 60; // request dropped if exceeding this latency
 /// A global hash map that maps stream of a TaskQueue instance.
 static TASK_QUEUE: Lazy<RwLock<TaskQueue>> = Lazy::new(RwLock::default);
 
@@ -39,7 +38,12 @@ pub(super) async fn init() -> Result<()> {
     Ok(())
 }
 
-/// Sends a task to a TaskQueue based on stream name. To be called by server api endpoitns.
+/// External-facing function to be called by endpoint handlers to send a task
+/// into the buffer. Returns `HttpResponse` directly to client.
+///
+/// 2 scenarios function fails to send a task
+/// 1. server memtable overflow -> ServiceUnavailable
+/// 2. ingest buffer errors: a. channel closed, or, b. fully loaded and max latency exceeded
 pub async fn send_task(task: IngestEntry) -> HttpResponse {
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
@@ -50,14 +54,17 @@ pub async fn send_task(task: IngestEntry) -> HttpResponse {
     match tq_r.send_task(task).await {
         Ok(_) => {
             drop(tq_r);
-            update_size(content_length, true).await;
+            update_buffer_size(content_length, true).await;
             HttpResponse::Ok().json("Request buffered. Waiting to be processed")
         }
         Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
 }
 
-pub async fn update_size(delta: usize, incr: bool) {
+/// Keeps track of the total ingest buffer size to limit the memory usage.
+/// Shared among producer and all consumers, which is managed by a RwLock.
+/// Producer increases the buffer size whereas consumers decrease buffer size.
+pub async fn update_buffer_size(delta: usize, incr: bool) {
     let mut tq_w = TASK_QUEUE.write().await;
     tq_w.update_size(delta, incr);
 }
@@ -68,76 +75,94 @@ pub async fn shut_down() {
         && (cluster::is_router(&cluster::LOCAL_NODE_ROLE)
             || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE))
     {
-        log::info!("Shutting down TaskQueueManager");
+        log::info!("Shutting down IngestBuffer");
         let tq = TASK_QUEUE.read().await;
         tq.shut_down().await;
     }
 }
 
+/// A multi-producer multi-consumer task queue implemented with
+/// async-channel crate to function as IngestBuffer to buffer
+/// IngestEntry requests.
+///
+/// While all accepted tasks are processed in memory, all TaskQueue's
+/// workers do persist the tasks they received to disk before processing
+/// to avoid data loss if application crashes.
 struct TaskQueue {
     sender: Arc<Sender<IngestEntry>>,
     workers: Arc<Workers>,
-    size: usize,
+    current_size: usize,
 }
 
 impl Default for TaskQueue {
     fn default() -> Self {
-        Self::new(0)
+        Self::new()
     }
 }
 
 impl TaskQueue {
-    pub fn new(tq_index: usize) -> Self {
+    pub fn new() -> Self {
+        // underlying channel is bounded for reasons
+        //  a. avoid unbounded memory usage;
+        //  b. ensure tasks are picked up by workers as only then do received tasks get persisted to
+        //     disk
         let (sender, receiver) = bounded::<IngestEntry>(DEFAULT_CHANNEL_CAP);
-        let workers = Arc::new(Workers::new(MIN_WORKER_CNT, tq_index, Arc::new(receiver)));
+        let workers = Arc::new(Workers::new(DEFAULT_WORKER_CNT, Arc::new(receiver)));
         Self {
             sender: Arc::new(sender),
             workers,
-            size: 0,
+            current_size: 0,
         }
     }
 
+    /// Updates the total size of ingest buffer.
+    /// Increased when requests accepted by the buffer and decreased when requests
+    /// successfully processed by buffer's worker.
     fn update_size(&mut self, delta: usize, incr: bool) {
         if incr {
-            self.size += delta
+            self.current_size += delta
         } else {
-            self.size -= delta
+            self.current_size -= delta
         }
     }
 
-    /// Sends an IngestEntry into the TaskQueue.
-    /// Error if the channel was wrongly closed.
-    /// Increase the worker count if channel is full.
+    /// Sends a task (IngestEntry) into the TaskQueue.
+    /// Error if the channel was wrongly closed or max latency exceeded.
+    /// Elastically increases the number of consumers (workers) when:
+    ///     - no active running workers (workers self shut down when ideal too long)
+    ///     - channel is full and all workers are processing.
     async fn send_task(&self, task: IngestEntry) -> Result<()> {
         if self.sender.is_closed() {
-            return Err(anyhow::anyhow!(
-                "TaskQueue({}) channel is closed. BUG",
-                self.workers.tq_index
-            ));
+            return Err(anyhow::anyhow!("IngestBuffer channel is closed. BUG",));
         }
         if self.should_add_more_workers().await {
-            self.workers.add_workers_by(MIN_WORKER_CNT).await;
+            self.workers.add_workers_by(DEFAULT_WORKER_CNT).await;
         }
+        // tries to enqueue the task into the channel with `SEARCHABLE_LATENCY` as timeout
         tokio::select! {
             _ = self.sender.send(task) => Ok(()),
             _ = tokio::time::sleep(tokio::time::Duration::from_secs(SEARCHABLE_LATENCY)) => {
+                // timed out because channel is full and no additional workers
+                // were invoked due to memory constraint
                 log::warn!(
-                    "TaskQueue({}) fully loaded & max latency reached. Request rejected.",
-                    self.workers.tq_index,
+                    "IngestBuffer fully loaded & max latency reached. Request rejected.",
                 );
-                Err(anyhow::anyhow!("Max latency reached. Ingest request rejected."))
+                Err(anyhow::anyhow!("Max latency reached. Ingestion request rejected."))
             }
         }
     }
 
+    /// Determines whether the TaskQueue should init more producers (workers).
+    /// No if total buffered size already surpasses allowed memory usage.
+    /// Otherwise, yes if either channel is currently full or no workers actively running
     async fn should_add_more_workers(&self) -> bool {
-        if self.size >= CONFIG.limit.ingest_buffer_size {
+        if self.current_size >= CONFIG.limit.ingest_buffer_size {
             log::info!("IngestBuffer channel currently full and reached max workers count. Wait");
             false
         } else if self.sender.capacity().unwrap() - self.sender.len() == 0
             || self.workers.running_worker_count().await == 0
         {
-            log::info!("IngestBuffer channel currently full. Added more workers");
+            log::info!("IngestBuffer adding more workers");
             true
         } else {
             false
