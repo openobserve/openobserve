@@ -198,6 +198,26 @@ pub static INGEST_MEMTABLE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static INGEST_MEMTABLE_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("ingest_memtable_lock_time", "ingest memtable lock time")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static INGEST_WAL_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("ingest_wal_lock_time", "ingest wal lock time")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 // querier memory cache stats
 pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -616,7 +636,12 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(INGEST_MEMTABLE_FILES.clone()))
         .expect("Metric registered");
-
+    registry
+        .register(Box::new(INGEST_MEMTABLE_LOCK_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_WAL_LOCK_TIME.clone()))
+        .expect("Metric registered");
     // querier stats
     registry
         .register(Box::new(QUERY_MEMORY_CACHE_LIMIT_BYTES.clone()))
@@ -712,6 +737,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+
+    // span metrics
+    registry
+        .register(Box::new(SPAN_CALLS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SPAN_DURATION_MILLISECONDS.clone()))
         .expect("Metric registered");
 }
 

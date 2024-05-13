@@ -194,7 +194,7 @@ impl Writer {
             || self.check_mem_threshold(mem.size(), entry.data_size)
         {
             // sync wal before rotation
-            wal.sync().context(WalSnafu)?;
+            // wal.sync().context(WalSnafu)?;
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
@@ -248,10 +248,22 @@ impl Writer {
         if !check_ttl {
             // write into wal
             log::info!("[{session_id}]wal.write start");
+            // let start = std::time::Instant::now();
             // wal.write(&entry_bytes, false).context(WalSnafu)?;
             // log::info!("[{session_id}]wal.write done");
+            // metrics::INGEST_WAL_LOCK_TIME
+            //     .with_label_values(&[
+            //         &self.key.org_id,
+            //     ])
+            //     .observe(start.elapsed().as_micros() as f64);
             // write into memtable
+            let start = std::time::Instant::now();
             mem.write(schema, entry).await?;
+            metrics::INGEST_MEMTABLE_LOCK_TIME
+                .with_label_values(&[
+                    &self.key.org_id,
+                ])
+                .observe(start.elapsed().as_micros() as f64);
             log::info!("[{session_id}]mem.write done");
         }
 
