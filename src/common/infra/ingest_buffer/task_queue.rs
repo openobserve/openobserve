@@ -31,14 +31,12 @@ static MIN_WORKER_CNT: usize = 3;
 static DEFAULT_CHANNEL_CAP: usize = 5; // if channel if full -> init more workers
 /// Max acceptable latency between a request is accepted and searchable
 static SEARCHABLE_LATENCY: u64 = 60;
-/// Estimated time in seconds it takes to ingest a 5mb request in seconds
-static ESTIMATED_INGEST_PROCESS_TIME: usize = 2; // TODO(taiming): run test to get better ingest latency based on size
-
 /// A global hash map that maps stream of a TaskQueue instance.
-static TQ_MANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
+static TASK_QUEUE: Lazy<RwLock<TaskQueue>> = Lazy::new(RwLock::default);
 
 pub(super) async fn init() -> Result<()> {
-    _ = TQ_MANAGER.read().await.task_queues.len();
+    // _ = TQ_MANAGER.read().await.task_queues.len();
+    _ = TASK_QUEUE.read().await.channel_is_full();
     Ok(())
 }
 
@@ -48,8 +46,11 @@ pub async fn send_task(task: IngestEntry) -> HttpResponse {
     if let Err(e) = ingester::check_memtable_size() {
         return HttpResponse::ServiceUnavailable().json(e.to_string());
     }
-    let mut w = TQ_MANAGER.write().await;
-    w.send_task(task).await
+    let tq = TASK_QUEUE.read().await;
+    match tq.send_task(task).await {
+        Ok(_) => HttpResponse::Ok().json("Request buffered. Waiting to be processed"),
+        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+    }
 }
 
 /// Gracefully terminates all running TaskQueues
@@ -59,146 +60,39 @@ pub async fn shut_down() {
             || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE))
     {
         log::info!("Shutting down TaskQueueManager");
-        let mut w = TQ_MANAGER.write().await;
-        w.terminal_all().await;
-    }
-}
-
-struct TaskQueueManager {
-    round_robin_idx: usize,
-    task_queues: Vec<TaskQueue>,
-    max_workers_cnt: usize,
-    estimated_ingest_entry_size: usize,
-}
-
-impl Default for TaskQueueManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TaskQueueManager {
-    /// Constructs and configures TaskQueues as Ingest Buffer based on CONFIG
-    /// ingest_buffer_size = (size of channel + size of workers) * num_of_queues
-    /// size of channel = channel_cap * estimated ingest entry size
-    fn new() -> Self {
-        // TODO(taiming): Fine tune estimation calculation
-        let estimated_ingest_entry_size = if CONFIG.limit.ingest_buffer_threshold != 0 {
-            CONFIG.limit.ingest_buffer_threshold
-        } else {
-            5 * 1024 * 1024 // 5mb
-        };
-        let max_workers_cnt = (CONFIG.limit.ingest_buffer_size
-            / CONFIG.limit.ingest_buffer_queue_cnt
-            / (DEFAULT_CHANNEL_CAP * estimated_ingest_entry_size))
-            - 1; // channel takes 1, the rest is workers
-        let mut task_queues = Vec::with_capacity(CONFIG.limit.ingest_buffer_queue_cnt);
-        for idx in 0..CONFIG.limit.ingest_buffer_queue_cnt {
-            task_queues.push(TaskQueue::new(idx));
-        }
-        Self {
-            round_robin_idx: 0,
-            task_queues,
-            max_workers_cnt,
-            estimated_ingest_entry_size,
-        }
-    }
-
-    async fn send_task(&mut self, task: IngestEntry) -> HttpResponse {
-        // Update estimated_ingest_entry_size ("online" average)
-        self.estimated_ingest_entry_size =
-            (self.estimated_ingest_entry_size * (DEFAULT_CHANNEL_CAP - 1) / DEFAULT_CHANNEL_CAP)
-                + (task.content_length / DEFAULT_CHANNEL_CAP);
-        let Some(tq) = self.find_tq_or_add_workers().await else {
-            log::warn!("Buffer fully loaded & max ingestion latency reached");
-            return HttpResponse::InternalServerError()
-                .json("IngestBuffer currently full and maximum buffered ingestion latency reached. Please try again later");
-        };
-        match tq.send_task(task).await {
-            Ok(_) => HttpResponse::Ok().json("Request buffered. Waiting to be processed"),
-            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
-        }
-    }
-
-    /// Finds the first TaskQueue whose channel is not currently full.
-    /// If all TaskQueues are busy, add more workers to a TaskQueue.
-    /// If all TaskQueues have reached max number of workers allowed, try again.
-    async fn find_tq_or_add_workers(&mut self) -> Option<&TaskQueue> {
-        // estimates the wait time for a particular queue based on # of tasks in that queue
-        let wait_time_estimate_factor =
-            (self.estimated_ingest_entry_size / (5 * 1024 * 1024)) * ESTIMATED_INGEST_PROCESS_TIME;
-
-        let time = std::time::Instant::now();
-        let mut tq = None;
-        while tq.is_none() && time.elapsed().as_secs() <= SEARCHABLE_LATENCY {
-            tq = match self.task_queues[self.round_robin_idx..]
-                .iter()
-                .chain(self.task_queues[..self.round_robin_idx].iter())
-                .find(|tq| !tq.channel_is_full())
-            {
-                Some(tq) => {
-                    if tq.workers.running_worker_count().await == 0 {
-                        tq.workers
-                            .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
-                            .await;
-                    }
-                    // estimate this queue's wait time and compare w/ allowed latency
-                    let current_queue_wait_time =
-                        (tq.sender.len() * wait_time_estimate_factor) as u64;
-                    if time.elapsed().as_secs() + current_queue_wait_time > SEARCHABLE_LATENCY {
-                        None // would've waited too long, try another queue
-                    } else {
-                        Some(tq)
-                    }
-                }
-                None => {
-                    let tq = self.task_queues.get(self.round_robin_idx).unwrap();
-                    // Try add more workers
-                    let added_worker_count = tq
-                        .workers
-                        .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
-                        .await;
-                    // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                    if added_worker_count > 0 {
-                        log::info!(
-                            "All TaskQueue is full. Added {} new workers to TaskQueue({})",
-                            added_worker_count,
-                            self.round_robin_idx
-                        );
-                        Some(tq)
-                    } else {
-                        log::info!(
-                            "All TaskQueue busy with max number of workers allowed. Try finding again.",
-                        );
-                        None
-                    }
-                }
-            };
-            self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
-        }
-        tq
-    }
-
-    async fn terminal_all(&mut self) {
-        for tq in self.task_queues.drain(..) {
-            tq.shut_down().await;
-        }
+        let tq = TASK_QUEUE.read().await;
+        tq.shut_down().await;
     }
 }
 
 struct TaskQueue {
     sender: Arc<Sender<IngestEntry>>,
     workers: Arc<Workers>,
+    max_workers_cnt: usize,
+}
+
+impl Default for TaskQueue {
+    fn default() -> Self {
+        Self::new(0)
+    }
 }
 
 impl TaskQueue {
     pub fn new(tq_index: usize) -> Self {
+        let estimated_ingest_entry_size = if CONFIG.limit.ingest_buffer_threshold != 0 {
+            CONFIG.limit.ingest_buffer_threshold
+        } else {
+            5 * 1024 * 1024 // 5mb
+        };
+        let max_workers_cnt = (CONFIG.limit.ingest_buffer_size
+            / (DEFAULT_CHANNEL_CAP * estimated_ingest_entry_size))
+            - 1; // channel takes 1, the rest is workers
         let (sender, receiver) = bounded::<IngestEntry>(DEFAULT_CHANNEL_CAP);
         let workers = Arc::new(Workers::new(MIN_WORKER_CNT, tq_index, Arc::new(receiver)));
         Self {
             sender: Arc::new(sender),
             workers,
+            max_workers_cnt,
         }
     }
 
@@ -211,6 +105,21 @@ impl TaskQueue {
                 "TaskQueue({}) channel is closed. BUG",
                 self.workers.tq_index
             ));
+        }
+        if self.channel_is_full() || self.workers.running_worker_count().await == 0 {
+            let added_worker_count = self
+                .workers
+                .add_workers_by(MIN_WORKER_CNT, self.max_workers_cnt)
+                .await;
+            if added_worker_count > 0 {
+                log::info!(
+                    "IngestBuffer channel currently full. Added {added_worker_count} workers"
+                );
+            } else {
+                log::info!(
+                    "IngestBuffer channel currently full and reached max workers count. Wait"
+                );
+            }
         }
         tokio::select! {
             _ = self.sender.send(task) => Ok(()),

@@ -33,7 +33,9 @@ type Worker = JoinHandle<Result<()>>;
 /// seconds between each pull for a worker
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
 /// max idle time in seconds before shut down
-static WORKER_MAX_IDLE: f64 = 60.0;
+static WORKER_MAX_IDLE_TIME: f64 = 60.0;
+/// max number of requests a worker should process in one batch
+static WORKER_BATCH_PROCESSING_SIZE: usize = 5;
 
 /// Multi-consumer side of the TaskQueue. Created and manged by TaskQueue associated with a stream.
 /// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold
@@ -130,7 +132,7 @@ fn init_worker(tq_index: usize, receiver: Arc<Receiver<IngestEntry>>) -> Worker 
 ///     3. Signal persist job to remove successfully processed IngestEntries
 ///
 /// Otherwise:
-///     Records elapsed time, which if exceeds WORKER_MAX_IDLE time, exists this task.
+///     Records elapsed time, which if exceeds WORKER_MAX_IDLE_TIME time, exists this task.
 async fn process_job(
     tq_index: usize,
     worker_id: String,
@@ -143,7 +145,7 @@ async fn process_job(
 
     let mut pending_tasks = vec![];
 
-    while time.elapsed().as_secs_f64() <= WORKER_MAX_IDLE {
+    while time.elapsed().as_secs_f64() <= WORKER_MAX_IDLE_TIME {
         if receiver.is_closed() {
             // closed by TaskQueue::shut_down()
             break;
@@ -158,6 +160,9 @@ async fn process_job(
                 continue;
             }
             pending_tasks.push(req);
+            if pending_tasks.len() == WORKER_BATCH_PROCESSING_SIZE {
+                break;
+            }
         }
 
         if !pending_tasks.is_empty() {
