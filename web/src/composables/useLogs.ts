@@ -1880,7 +1880,7 @@ const useLogs = () => {
       searchObj.data.stream.interestingFieldList = [];
       // searchObj.data.stream.expandGroupRows = [];
 
-      let localInterestingFields: any = useLocalInterestingFields();
+      const localInterestingFields: any = useLocalInterestingFields();
       const schemaInterestingFields: any = {};
       const multiStreamObj: any = [];
 
@@ -2257,7 +2257,7 @@ const useLogs = () => {
             if (index > -1) {
               if (ftsKeys.length) {
                 searchObj.data.stream.selectedStreamFields[index].ftsKey =
-                  ftsKeys.has(row.name);
+                  ftsKeys.includes(row.name);
               }
 
               searchObj.data.stream.selectedStreamFields[index].isSchemaField =
@@ -2477,8 +2477,8 @@ const useLogs = () => {
         //   parsedSQL.columns.push(ts_col);
         // }
         parsedSQL.where = null;
-        query_context = b64EncodeUnicode(
-          parser.sqlify(parsedSQL).replace(/`/g, '"')
+        sqlContext.push(
+          b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"'))
         );
       } else {
         const parseQuery = query.split("|");
