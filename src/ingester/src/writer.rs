@@ -248,8 +248,8 @@ impl Writer {
         if !check_ttl {
             // write into wal
             log::info!("[{session_id}]wal.write start");
-            wal.write(&entry_bytes, false).context(WalSnafu)?;
-            log::info!("[{session_id}]wal.write done");
+            // wal.write(&entry_bytes, false).context(WalSnafu)?;
+            // log::info!("[{session_id}]wal.write done");
             // write into memtable
             mem.write(schema, entry).await?;
             log::info!("[{session_id}]mem.write done");
