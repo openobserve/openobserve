@@ -350,16 +350,8 @@ pub async fn search_multi(
     }
 
     multi_res.hits.sort_by(|a, b| {
-        let a_ts = a
-            .get("_timestamp")
-            .unwrap()
-            .as_i64()
-            .unwrap();
-        let b_ts = b
-            .get("_timestamp")
-            .unwrap()
-            .as_i64()
-            .unwrap();
+        let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
+        let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_res))
@@ -658,6 +650,7 @@ pub async fn around_multi(
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout,
         };
@@ -733,6 +726,7 @@ pub async fn around_multi(
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout,
         };
@@ -851,16 +845,8 @@ pub async fn around_multi(
     }
 
     multi_resp.hits.sort_by(|a, b| {
-        let a_ts = a
-            .get("_timestamp")
-            .unwrap()
-            .as_i64()
-            .unwrap();
-        let b_ts = b
-            .get("_timestamp")
-            .unwrap()
-            .as_i64()
-            .unwrap();
+        let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
+        let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_resp))

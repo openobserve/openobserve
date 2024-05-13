@@ -613,6 +613,8 @@ pub async fn search_partition_multi(
                 end_time: req.end_time,
                 sql: query.to_string(),
                 sql_mode: "".to_string(),
+                regions: vec![],
+                clusters: vec![],
             },
         )
         .await

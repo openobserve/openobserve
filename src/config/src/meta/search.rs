@@ -401,6 +401,7 @@ impl MultiStreamRequest {
                     skip_wal: self.skip_wal,
                 },
                 aggs: self.aggs.clone(),
+                regions: vec![],
                 clusters: vec![],
                 encoding: self.encoding,
                 timeout: self.timeout,
