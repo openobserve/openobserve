@@ -13,17 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use config::CONFIG;
 
 use crate::service::db;
 
-static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
+static LOCAL_OFFSET: AtomicI64 = AtomicI64::new(0);
 
 pub async fn get_offset() -> (i64, String) {
     if !CONFIG.common.meta_store_external {
-        let offset = LOCAL_OFFSET.load(atomic::Ordering::Relaxed);
+        let offset = LOCAL_OFFSET.load(Ordering::Relaxed);
         return (offset, String::from(""));
     }
 
@@ -44,7 +44,7 @@ pub async fn get_offset() -> (i64, String) {
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
     if !CONFIG.common.meta_store_external {
-        LOCAL_OFFSET.store(offset, atomic::Ordering::Release);
+        LOCAL_OFFSET.store(offset, Ordering::Release);
         return Ok(());
     }
 

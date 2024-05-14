@@ -26,7 +26,7 @@ use crate::{
 };
 
 pub(crate) struct Stream {
-    partitions: RwMap<Arc<str>, Partition>, // key: schema hash, val: partitions
+    partitions: RwMap<Arc<str>, Arc<Partition>>, // key: schema hash, val: partitions
 }
 
 impl Stream {
@@ -36,13 +36,19 @@ impl Stream {
         }
     }
 
-    pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
+    pub(crate) async fn write(&self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
         let mut arrow_size = 0;
-        let mut rw = self.partitions.write().await;
-        let partition = rw.entry(entry.schema_key.clone()).or_insert_with(|| {
-            arrow_size += schema.size();
-            Partition::new(schema)
-        });
+        let partition = self.partitions.read().await.get(&entry.stream).cloned();
+        let partition = match partition {
+            Some(v) => v,
+            None => {
+                arrow_size += schema.size();
+                let mut w = self.partitions.write().await;
+                w.entry(entry.schema_key.clone())
+                    .or_insert_with(|| Arc::new(Partition::new(schema)))
+                    .clone()
+            }
+        };
         arrow_size += partition.write(entry).await?;
         Ok(arrow_size)
     }
@@ -56,6 +62,7 @@ impl Stream {
         for partition in r.values() {
             batches.push(partition.read(time_range).await?);
         }
+        drop(r);
         Ok(batches)
     }
 

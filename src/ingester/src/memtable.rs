@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 use arrow_schema::Schema;
 use config::metrics;
@@ -26,9 +32,9 @@ use crate::{
 };
 
 pub(crate) struct MemTable {
-    streams: RwMap<Arc<str>, Stream>, // key: schema name, val: stream
-    json_bytes_written: usize,
-    arrow_bytes_written: usize,
+    streams: RwMap<Arc<str>, Arc<Stream>>, // key: schema name, val: stream
+    json_bytes_written: AtomicU64,
+    arrow_bytes_written: AtomicU64,
 }
 
 impl MemTable {
@@ -36,18 +42,28 @@ impl MemTable {
         metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).inc();
         Self {
             streams: RwMap::default(),
-            json_bytes_written: 0,
-            arrow_bytes_written: 0,
+            json_bytes_written: AtomicU64::new(0),
+            arrow_bytes_written: AtomicU64::new(0),
         }
     }
 
-    pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let mut rw = self.streams.write().await;
-        let partition = rw.entry(entry.stream.clone()).or_insert_with(Stream::new);
+    pub(crate) async fn write(&self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
+        let partitions = self.streams.read().await.get(&entry.stream).cloned();
+        let partitions = match partitions {
+            Some(v) => v,
+            None => {
+                let mut w = self.streams.write().await;
+                w.entry(entry.stream.clone())
+                    .or_insert_with(|| Arc::new(Stream::new()))
+                    .clone()
+            }
+        };
         let json_size = entry.data_size;
-        let arrow_size = partition.write(schema, entry).await?;
-        self.arrow_bytes_written += arrow_size;
-        self.json_bytes_written += json_size;
+        let arrow_size = partitions.write(schema, entry).await?;
+        self.json_bytes_written
+            .fetch_add(json_size as u64, Ordering::SeqCst);
+        self.arrow_bytes_written
+            .fetch_add(arrow_size as u64, Ordering::SeqCst);
         Ok(())
     }
 
@@ -84,6 +100,9 @@ impl MemTable {
 
     // Return the number of bytes written (json format size, arrow format size)
     pub(crate) fn size(&self) -> (usize, usize) {
-        (self.json_bytes_written, self.arrow_bytes_written)
+        (
+            self.json_bytes_written.load(Ordering::SeqCst) as usize,
+            self.arrow_bytes_written.load(Ordering::SeqCst) as usize,
+        )
     }
 }
