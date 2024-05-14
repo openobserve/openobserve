@@ -50,7 +50,7 @@ impl Partition {
         }
     }
 
-    pub(crate) async fn write(&mut self, entry: Entry) -> Result<usize> {
+    pub(crate) async fn write(&self, entry: Entry) -> Result<usize> {
         let mut rw = self.files.write().await;
         let partition = rw
             .entry(entry.partition_key.clone())
@@ -67,6 +67,7 @@ impl Partition {
         for file in r.values() {
             batches.extend(file.read(time_range)?);
         }
+        drop(r);
         Ok((self.schema.clone(), batches))
     }
 
