@@ -8,7 +8,7 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText('Login as internal user').click();
+// await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -539,9 +539,10 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-    // const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
-    // const isVisible = await element.isVisible();
-    // expect(isVisible).toBeTruthy();
+    await page.waitForTimeout(1000);
+    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
     
   });
   
