@@ -139,6 +139,17 @@ pub async fn read_recordbatch_from_bytes(
     Ok((schema, batches))
 }
 
+pub async fn read_recordbatch_from_file(
+    path: &PathBuf,
+) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+    let file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
+    let schema = arrow_reader.schema().clone();
+    let record_reader = arrow_reader.build()?;
+    let batches = record_reader.try_collect().await?;
+    Ok((schema, batches))
+}
+
 pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow::Error> {
     let mut file = tokio::fs::File::open(path).await?;
     let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
