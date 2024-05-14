@@ -357,8 +357,8 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/prometheus/api/v1/series")
                 || path.contains("/traces/latest")
                 || (method.eq("LIST") && path.contains("pipelines"))
-                || path.contains("/clusters")
-                || path.contains("/query_manager")
+                || path.contains("clusters")
+                || path.contains("query_manager")
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
