@@ -194,3 +194,18 @@ impl Default for Report {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReportEmailDetails {
+    pub recepients: Vec<String>,
+    pub title: String,
+    pub name: String,
+    pub message: String,
+    pub dashb_url: String,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone)]
+pub struct HttpReportPayload {
+    pub dashboards: Vec<ReportDashboard>,
+    pub email_details: ReportEmailDetails,
+}

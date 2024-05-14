@@ -31,8 +31,8 @@ use crate::{
         meta::{
             authz::Authz,
             dashboards::reports::{
-                Report, ReportDashboard, ReportDestination, ReportFrequencyType,
-                ReportTimerangeType,
+                HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
+                ReportFrequencyType, ReportTimerangeType,
             },
         },
         utils::auth::{remove_ownership, set_ownership},
@@ -47,14 +47,14 @@ pub async fn save(
     create: bool,
 ) -> Result<(), anyhow::Error> {
     // Check if SMTP is enabled, otherwise don't save the report
-    if !CONFIG.smtp.smtp_enabled {
-        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
-    }
+    // if !CONFIG.smtp.smtp_enabled {
+    //     return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+    // }
 
-    // Check if Chrome is enabled, otherwise don't save the report
-    if !CONFIG.chrome.chrome_enabled {
-        return Err(anyhow::anyhow!("Chrome not enabled"));
-    }
+    // // Check if Chrome is enabled, otherwise don't save the report
+    // if !CONFIG.chrome.chrome_enabled {
+    //     return Err(anyhow::anyhow!("Chrome not enabled"));
+    // }
 
     if CONFIG.common.report_user_name.is_empty() || CONFIG.common.report_user_password.is_empty() {
         return Err(anyhow::anyhow!("Report username and password ENVs not set"));
@@ -236,20 +236,43 @@ impl Report {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
 
-        if !CONFIG.common.local_mode {
+        // if !CONFIG.common.local_mode {
+        if true {
             if CONFIG.common.report_server_url.is_empty() {
                 return Err(anyhow::anyhow!("Report server url not specified"));
             }
 
-            let url = url::Url::parse(&CONFIG.common.report_server_url).unwrap();
+            let mut recepients = vec![];
+            for recepient in &self.destinations {
+                match recepient {
+                    ReportDestination::Email(email) => recepients.push(email.clone()),
+                }
+            }
+
+            let report_data = HttpReportPayload {
+                dashboards: self.dashboards.clone(),
+                email_details: ReportEmailDetails {
+                    title: self.title.clone(),
+                    recepients,
+                    name: self.name.clone(),
+                    message: self.message.clone(),
+                    dashb_url: format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri),
+                },
+            };
+
+            let url = url::Url::parse(&format!(
+                "{}/{}/reports/{}/send",
+                &CONFIG.common.report_server_url, &self.org_id, &self.name
+            ))
+            .unwrap();
             match Client::builder()
                 .build()
                 .unwrap()
-                .post(url)
+                .put(url)
                 .query(&[("timezone", &self.timezone)])
                 .header("Content-Type", "application/json")
                 // .header(reqwest::header::AUTHORIZATION, creds)
-                // .json(&report_data)
+                .json(&report_data)
                 .send()
                 .await
             {
