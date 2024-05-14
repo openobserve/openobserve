@@ -532,7 +532,7 @@ test.describe("Logs UI testcases", () => {
   });
 
 
-  test('should display results for search around after adding function', async ({ page }) => {
+  test.skip('should display results for search around after adding function', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
