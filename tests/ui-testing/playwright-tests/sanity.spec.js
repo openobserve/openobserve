@@ -266,6 +266,7 @@ test('should create and delete dashboard', async ({ page }) => {
   await page.locator('[data-test="dashboard-panel-save"]').click();
   await page.locator('[data-test="dashboard-panel-name"]').click();
   await page.locator('[data-test="dashboard-panel-name"]').fill('sanitydash');
+  await page.waitForTimeout(2000)
   await page.locator('[data-test="dashboard-panel-save"]').click();
   await page.waitForTimeout(2000)
   await page.locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]').click();
