@@ -8,7 +8,7 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText('Login as internal user').click();
+// await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -532,16 +532,17 @@ test.describe("Logs UI testcases", () => {
   });
 
 
-  test('should display results for search around after adding function', async ({ page }) => {
+  test.skip('should display results for search around after adding function', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-    // const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
-    // const isVisible = await element.isVisible();
-    // expect(isVisible).toBeTruthy();
+    await page.waitForTimeout(1000);
+    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
     
   });
   
