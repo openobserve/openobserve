@@ -1,13 +1,7 @@
 <template>
   <div class="running-queries-page" v-if="isMetaOrg">
-    <q-table
-      data-test="running-queries-table"
-      ref="qTable"
-      :rows="rowsQuery"
-      :columns="columns"
-      row-key="trace_id"
-      style="width: 100%"
-    >
+    <q-table data-test="running-queries-table" ref="qTable" :rows="rowsQuery" :columns="columns" row-key="trace_id"
+      style="width: 100%">
       <template #no-data>
         <div v-if="!loadingState" class="text-center full-width full-height">
           <NoData />
@@ -24,31 +18,10 @@
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
-            icon="list_alt"
-            :title="t('queries.queryList')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="listSchema(props)"
-            data-test="queryList-btn"
-          />
-          <q-btn
-            :icon="outlinedCancel"
-            :title="t('queries.cancelQuery')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            style="color: red"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-            data-test="cancelQuery-btn"
-          />
+          <q-btn icon="list_alt" :title="t('queries.queryList')" class="q-ml-xs" padding="sm" unelevated size="sm" round
+            flat @click="listSchema(props)" data-test="queryList-btn" />
+          <q-btn :icon="outlinedCancel" :title="t('queries.cancelQuery')" class="q-ml-xs" padding="sm" unelevated
+            size="sm" style="color: red" round flat @click="confirmDeleteAction(props)" data-test="cancelQuery-btn" />
         </q-td>
       </template>
 
@@ -58,69 +31,32 @@
             {{ t("queries.runningQueries") }}
           </div>
           <div class="flex items-start">
-            <div
-              data-test="streams-search-stream-input"
-              class="flex items-center"
-            >
-              <q-input
-                v-model="filterQuery"
-                borderless
-                filled
-                dense
-                class="q-ml-auto q-mb-xs no-border search-input"
-                :placeholder="t('queries.search')"
-                data-test="running-queries-search-input"
-              >
+            <div data-test="streams-search-stream-input" class="flex items-center">
+              <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border search-input"
+                :placeholder="t('queries.search')" data-test="running-queries-search-input">
                 <template #prepend>
                   <q-icon name="search" />
                 </template>
               </q-input>
-              <q-btn
-                data-test="running-queries-refresh-btn"
-                class="q-ml-md q-mb-xs text-bold no-border"
-                padding="sm lg"
-                color="secondary"
-                no-caps
-                icon="refresh"
-                :label="t(`queries.refreshQuery`)"
-                @click="refreshData"
-              />
+              <q-btn data-test="running-queries-refresh-btn" class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg"
+                color="secondary" no-caps icon="refresh" :label="t(`queries.refreshQuery`)" @click="refreshData" />
             </div>
           </div>
         </div>
         <div class="label-container">
-          <label class="q-my-sm text-bold"
-            >Last Data Refresh Time: {{ lastRefreshed }}</label
-          >
+          <label class="q-my-sm text-bold">Last Data Refresh Time: {{ lastRefreshed }}</label>
         </div>
       </template>
 
       <template #bottom="scope">
-        <q-table-pagination
-          data-test="query-stream-table-pagination"
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-          v-model="filterQuery"
-        />
+        <q-table-pagination data-test="query-stream-table-pagination" :scope="scope" :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions" position="bottom" @update:changeRecordPerPage="changePagination"
+          v-model="filterQuery" />
       </template>
     </q-table>
-    <confirm-dialog
-      v-model="deleteDialog.show"
-      :title="deleteDialog.title"
-      :message="deleteDialog.message"
-      @update:ok="deleteQuery"
-      @update:cancel="deleteDialog.show = false"
-    />
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
-      data-test="list-schema-dialog"
-    >
+    <confirm-dialog v-model="deleteDialog.show" :title="deleteDialog.title" :message="deleteDialog.message"
+      @update:ok="deleteQuery" @update:cancel="deleteDialog.show = false" />
+    <q-dialog v-model="showListSchemaDialog" position="right" full-height maximized data-test="list-schema-dialog">
       <QueryList :schemaData="schemaData" />
     </q-dialog>
   </div>
@@ -185,7 +121,7 @@ export default defineComponent({
       message: "Are you sure you want to delete this running query?",
       data: null as any,
     });
-    
+
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
@@ -358,7 +294,7 @@ export default defineComponent({
         position: "bottom",
         spinner: true,
       });
-      SearchService.get_running_queries()
+      SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
           // resultTotal.value = response?.data?.status?.length;
           queries.value = response?.data?.status;
@@ -380,7 +316,7 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_query(deleteDialog.value.data)
+      SearchService.delete_running_query(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
           getRunningQueries();
           deleteDialog.value.show = false;
