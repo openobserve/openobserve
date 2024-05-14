@@ -1,0 +1,374 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!-- eslint-disable vue/no-unused-components -->
+<template>
+  <div>
+    <q-separator></q-separator>
+    <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
+      <div
+        class="col scroll"
+        style="
+          overflow-y: auto;
+          height: 100%;
+          min-width: 100px;
+          max-width: 100px;
+        "
+      >
+        <ChartSelection
+          v-model:selectedChartType="dashboardPanelData.data.type"
+          @update:selected-chart-type="resetAggregationFunction"
+        />
+      </div>
+      <q-separator vertical />
+      <!-- for query related chart only -->
+      <div
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        class="col"
+        style="width: 100%; height: 100%"
+      >
+        <q-splitter
+          v-model="dashboardPanelData.layout.splitter"
+          @update:model-value="layoutSplitterUpdated"
+          style="width: 100%; height: 100%"
+        >
+          <template #before>
+            <div
+              class="col scroll"
+              style="height: calc(100vh - 115px); overflow-y: auto"
+            >
+              <div class="column" style="height: 100%">
+                <div class="col-auto q-pa-sm">
+                  <span class="text-weight-bold">{{ t("panel.fields") }}</span>
+                </div>
+                <div class="col" style="width: 100%">
+                  <FieldList :editMode="false" />
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #separator>
+            <div class="splitter-vertical splitter-enabled"></div>
+            <q-avatar
+              color="primary"
+              text-color="white"
+              size="20px"
+              icon="drag_indicator"
+              style="top: 10px; left: 3.5px"
+            />
+          </template>
+          <template #after>
+            <div
+              class="row"
+              style="height: calc(100vh - 115px); overflow-y: auto"
+            >
+              <div class="col" style="height: 100%">
+                <q-splitter
+                  class="query-editor-splitter"
+                  v-model="dashboardPanelData.layout.querySplitter"
+                  horizontal
+                  @update:model-value="querySplitterUpdated"
+                  reverse
+                  unit="px"
+                  :limits="
+                    !dashboardPanelData.layout.showQueryBar
+                      ? [43, 400]
+                      : [140, 400]
+                  "
+                  :disable="!dashboardPanelData.layout.showQueryBar"
+                  style="height: 100%"
+                >
+                  <template #before>
+                    <div
+                      class="layout-panel-container col"
+                      style="height: 100%"
+                    >
+                      <DashboardQueryBuilder :dashboardData="{}" />
+                      <q-separator />
+
+                      <div style="flex: 1">
+                        <PanelSchemaRenderer
+                          @metadata-update="metaDataValue"
+                          :key="dashboardPanelData.data.type"
+                          :panelSchema="chartData"
+                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                          :variablesData="{}"
+                          :width="6"
+                          @error="handleChartApiError"
+                        />
+                      </div>
+                      <DashboardErrorsComponent :errors="errorData" />
+                    </div>
+                  </template>
+                  <template #separator>
+                    <div
+                      class="splitter"
+                      :class="
+                        dashboardPanelData.layout.showQueryBar
+                          ? 'splitter-enabled'
+                          : ''
+                      "
+                    ></div>
+                  </template>
+                </q-splitter>
+              </div>
+              <q-separator vertical />
+              <div class="col-auto">
+                <PanelSidebar
+                  :title="t('dashboard.configLabel')"
+                  v-model="dashboardPanelData.layout.isConfigPanelOpen"
+                >
+                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
+                </PanelSidebar>
+              </div>
+            </div>
+          </template>
+        </q-splitter>
+      </div>
+      <div
+        v-if="dashboardPanelData.data.type == 'html'"
+        class="col column"
+        style="width: 100%; height: 100%; flex: 1"
+      >
+        <CustomHTMLEditor
+          v-model="dashboardPanelData.data.htmlContent"
+          style="width: 100%; height: 100%"
+          class="col"
+        />
+        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+      </div>
+      <div
+        v-if="dashboardPanelData.data.type == 'markdown'"
+        class="col column"
+        style="width: 100%; height: 100%; flex: 1"
+      >
+        <CustomMarkdownEditor
+          v-model="dashboardPanelData.data.markdownContent"
+          style="width: 100%; height: 100%"
+          class="col"
+        />
+        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import {
+  defineComponent,
+  ref,
+  computed,
+  nextTick,
+  watch,
+  reactive,
+  onMounted,
+  defineAsyncComponent,
+} from "vue";
+import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
+import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
+import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
+
+import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
+import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQueryEditor.vue";
+import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import { provide } from "vue";
+
+const ConfigPanel = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ConfigPanel.vue");
+});
+
+const QueryInspector = defineAsyncComponent(() => {
+  return import("@/components/dashboards/QueryInspector.vue");
+});
+
+const CustomHTMLEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomHTMLEditor.vue");
+});
+
+const CustomMarkdownEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
+});
+
+export default defineComponent({
+  name: "VisualizeLogsQuery",
+  props: {
+    chartData: {
+      type: Object,
+      required: true,
+    },
+    errorData: {
+      type: Object,
+      required: true,
+    },
+  },
+  components: {
+    ChartSelection,
+    FieldList,
+    DashboardQueryBuilder,
+    DateTimePickerDashboard,
+    DashboardErrorsComponent,
+    PanelSidebar,
+    ConfigPanel,
+    VariablesValueSelector,
+    PanelSchemaRenderer,
+    DashboardQueryEditor,
+    QueryInspector,
+    CustomHTMLEditor,
+    CustomMarkdownEditor,
+  },
+  emits: ["handleChartApiError"],
+  setup(props, { emit }) {
+    const { t } = useI18n();
+    const store = useStore();
+    const { dashboardPanelData, resetAggregationFunction, validatePanel } =
+      useDashboardPanelData("dashboard");
+    const metaData = ref(null);
+    const metaDataValue = (metadata: any) => {
+      metaData.value = metadata;
+    };
+
+    watch(
+      () => dashboardPanelData.data.type,
+      async () => {
+        // console.time("watch:dashboardPanelData.data.type");
+        await nextTick();
+        props.chartData.value = JSON.parse(
+          JSON.stringify(dashboardPanelData.data)
+        );
+        // console.timeEnd("watch:dashboardPanelData.data.type");
+      }
+    );
+
+    // resize the chart when config panel is opened and closed
+    watch(
+      () => dashboardPanelData.layout.isConfigPanelOpen,
+      () => {
+        // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
+        window.dispatchEvent(new Event("resize"));
+        // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
+      }
+    );
+
+    // resize the chart when query editor is opened and closed
+    watch(
+      () => dashboardPanelData.layout.showQueryBar,
+      (newValue) => {
+        // console.time("watch:dashboardPanelData.layout.showQueryBar");
+        if (!newValue) {
+          dashboardPanelData.layout.querySplitter = 41;
+        } else {
+          if (expandedSplitterHeight.value !== null) {
+            dashboardPanelData.layout.querySplitter =
+              expandedSplitterHeight.value;
+          }
+        }
+        // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
+      }
+    );
+
+    const layoutSplitterUpdated = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    const expandedSplitterHeight = ref(null);
+
+    const querySplitterUpdated = (newHeight: any) => {
+      window.dispatchEvent(new Event("resize"));
+      if (dashboardPanelData.layout.showQueryBar) {
+        expandedSplitterHeight.value = newHeight;
+      }
+    };
+
+    const handleChartApiError = (errorMessage: any) => {
+      emit("handleChartApiError", errorMessage);
+    };
+
+    const hoveredSeriesState = ref({
+      hoveredSeriesName: "",
+      panelId: -1,
+      dataIndex: -1,
+      seriesIndex: -1,
+      hoveredTime: null,
+      setHoveredSeriesName: function (name: string) {
+        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
+      },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    // used provide and inject to share data between components
+    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
+    provide("hoveredSeriesState", hoveredSeriesState);
+
+    return {
+      t,
+      layoutSplitterUpdated,
+      expandedSplitterHeight,
+      querySplitterUpdated,
+      dashboardPanelData,
+      handleChartApiError,
+      resetAggregationFunction,
+      store,
+      metaDataValue,
+      metaData,
+    };
+  },
+});
+</script>
+
+<style lang="scss" scoped>
+.layout-panel-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.splitter {
+  height: 4px;
+  width: 100%;
+}
+.splitter-vertical {
+  width: 4px;
+  height: 100%;
+}
+.splitter-enabled {
+  background-color: #ffffff00;
+  transition: 0.3s;
+  transition-delay: 0.2s;
+}
+
+.splitter-enabled:hover {
+  background-color: orange;
+}
+
+:deep(.query-editor-splitter .q-splitter__separator) {
+  background-color: transparent !important;
+}
+</style>

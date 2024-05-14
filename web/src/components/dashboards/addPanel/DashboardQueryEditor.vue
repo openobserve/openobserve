@@ -159,7 +159,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -190,7 +189,6 @@ export default defineComponent({
     const {
       dashboardPanelData,
       promqlMode,
-      updateXYFieldsOnCustomQueryChange,
       addQuery,
       removeQuery,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
@@ -1010,7 +1008,6 @@ export default defineComponent({
     return {
       t,
       router,
-      updateQueryValue,
       updatePromQLQuery,
       onDropDownClick,
       promqlMode,

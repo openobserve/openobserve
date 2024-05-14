@@ -94,6 +94,7 @@ const defaultObject = {
     ],
   },
   meta: {
+    logsVisualizeToggle: "logs",
     refreshInterval: <number>0,
     refreshIntervalLabel: "Off",
     showFields: true,

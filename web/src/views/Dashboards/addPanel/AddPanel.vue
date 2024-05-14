@@ -381,9 +381,9 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const {
       dashboardPanelData,
-      promqlMode,
       resetDashboardPanelData,
       resetAggregationFunction,
+      validatePanel,
     } = useDashboardPanelData("dashboard");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
@@ -548,22 +548,6 @@ export default defineComponent({
 
     watch(isOutDated, () => {
       window.dispatchEvent(new Event("resize"));
-    });
-
-    const currentXLabel = computed(() => {
-      return dashboardPanelData.data.type == "table"
-        ? "First Column"
-        : dashboardPanelData.data.type == "h-bar"
-        ? "Y-Axis"
-        : "X-Axis";
-    });
-
-    const currentYLabel = computed(() => {
-      return dashboardPanelData.data.type == "table"
-        ? "Other Columns"
-        : dashboardPanelData.data.type == "h-bar"
-        ? "X-Axis"
-        : "Y-Axis";
     });
 
     watch(
