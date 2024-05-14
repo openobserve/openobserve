@@ -26,7 +26,7 @@ use crate::{
 };
 
 pub(crate) struct MemTable {
-    streams: RwMap<Arc<str>, Stream>, // key: schema name, val: stream
+    streams: RwMap<Arc<str>, Arc<Stream>>, // key: schema name, val: stream
     json_bytes_written: usize,
     arrow_bytes_written: usize,
 }
@@ -42,10 +42,18 @@ impl MemTable {
     }
 
     pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let mut rw = self.streams.write().await;
-        let partition = rw.entry(entry.stream.clone()).or_insert_with(Stream::new);
+        let partitions = self.streams.read().await.get(&entry.stream).cloned();
+        let partitions = match partitions {
+            Some(v) => v,
+            None => {
+                let mut w = self.streams.write().await;
+                w.entry(entry.stream.clone())
+                    .or_insert_with(|| Arc::new(Stream::new()))
+                    .clone()
+            }
+        };
         let json_size = entry.data_size;
-        let arrow_size = partition.write(schema, entry).await?;
+        let arrow_size = partitions.write(schema, entry).await?;
         self.arrow_bytes_written += arrow_size;
         self.json_bytes_written += json_size;
         Ok(())
