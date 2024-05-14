@@ -62,7 +62,8 @@ pub async fn token_validator(
         Ok(res) => {
             let user_id = &res.0.user_email;
             if res.0.is_valid {
-                if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+                let path_suffix = path_columns.last().unwrap_or(&"");
+                if path_suffix.eq(&"organizations") || path_suffix.eq(&"clusters") {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {
                         Ok(user) => {
@@ -106,10 +107,10 @@ pub async fn token_validator(
                         Err((ErrorForbidden("Unauthorized Access"), req))
                     }
                 } else {
-                    Err((ErrorUnauthorized("Unauthorized Access"), req))
+                    Err((ErrorForbidden("Unauthorized Access"), req))
                 }
             } else {
-                Err((ErrorUnauthorized("Unauthorized Access"), req))
+                Err((ErrorForbidden("Unauthorized Access"), req))
             }
         }
         Err(err) => Err((ErrorUnauthorized(err), req)),

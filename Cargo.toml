@@ -249,7 +249,7 @@ rayon = "1.7.0"
 regex = "1.7"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+  "rustls-tls-native-roots",
   "stream",
 ] }
 segment = "0.2"
