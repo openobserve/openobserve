@@ -134,12 +134,12 @@ const search = {
     const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
     return http().post(url, query);
   },
-  get_running_queries: () => {
-    const url = `/api/query_manager/status`;
+  get_running_queries: (org_identifier:string) => {
+    const url = `/api/${org_identifier}/query_manager/status`;
     return http().get(url);
   },
-  delete_running_query: (traceID: string) => {
-    const url = `/api/query_manager/${traceID}`;
+  delete_running_query: (org_identifier:string,traceID: string) => {
+    const url = `/api/${org_identifier}/query_manager/${traceID}`;
     return http().delete(url);
   },
   get_regions: () => {

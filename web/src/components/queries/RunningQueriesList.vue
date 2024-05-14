@@ -358,7 +358,7 @@ export default defineComponent({
         position: "bottom",
         spinner: true,
       });
-      SearchService.get_running_queries()
+      SearchService.get_running_queries(store.state.zoConfig.meta_org,)
         .then((response: any) => {
           // resultTotal.value = response?.data?.status?.length;
           queries.value = response?.data?.status;
@@ -380,7 +380,7 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_query(deleteDialog.value.data)
+      SearchService.delete_running_query(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
           getRunningQueries();
           deleteDialog.value.show = false;
