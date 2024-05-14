@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
             @handleQuickModeChange="handleQuickModeChange"
+            @handleRunQueryFn="handleRunQueryFn"
           />
         </template>
         <template v-slot:after>
@@ -41,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden"
             style="width: 100%"
+            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -211,6 +213,12 @@ size="10rem" /><br />
               </template>
             </q-splitter>
           </div>
+          <div else>
+            <VisualizeLogsQuery
+              :chartData="visualizeChartData"
+              :errorData="visualizeErrorData"
+            ></VisualizeLogsQuery>
+          </div>
         </template>
       </q-splitter>
     </div>
@@ -228,6 +236,7 @@ import {
   onBeforeMount,
   watch,
   defineAsyncComponent,
+  provide,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -240,6 +249,9 @@ import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { reactive } from "vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -254,6 +266,7 @@ export default defineComponent({
       () => import("@/plugins/logs/SearchResult.vue")
     ),
     SanitizedHtmlRenderer,
+    VisualizeLogsQuery,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -391,6 +404,13 @@ export default defineComponent({
     const searchBarRef = ref(null);
     let parser: any;
     const expandedLogs = ref({});
+
+    provide("dashboardPanelDataPageKey", "logs");
+    const visualizeChartData = ref({});
+    const { dashboardPanelData, validatePanel } = useDashboardPanelData("logs");
+    const visualizeErrorData: any = reactive({
+      errors: [],
+    });
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -770,6 +790,65 @@ export default defineComponent({
       }
     };
 
+    //validate the data
+    const isValid = (onlyChart = false) => {
+      const errors = visualizeErrorData.errors;
+      errors.splice(0);
+      const dashboardData = dashboardPanelData;
+
+      // check if name of panel is there
+      if (!onlyChart) {
+        if (
+          dashboardData.data.title == null ||
+          dashboardData.data.title.trim() == ""
+        ) {
+          errors.push("Name of Panel is required");
+        }
+      }
+
+      validatePanel(
+        dashboardData,
+        errors,
+      );
+
+      if (errors.length) {
+        $q.notify({
+          type: "negative",
+          message: "There are some errors, please fix them and try again",
+          timeout: 5000,
+        });
+      }
+
+      if (errors.length) {
+        return false;
+      } else {
+        return true;
+      }
+    };
+
+    const handleRunQueryFn = () => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        dashboardPanelData.data.queries[0].customQuery = true;
+        dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+        dashboardPanelData.data.queries[0].fields.stream =
+          searchObj.data.stream.selectedStream.value ?? "default";
+        console.log("handleRunQueryFn", dashboardPanelData.data);
+        if (!isValid(true)) {
+          return;
+        }
+
+        visualizeChartData.value = JSON.parse(
+          JSON.stringify(dashboardPanelData.data)
+        );
+      }
+    };
+
+    const handleChartApiError = (errorMessage: any) => {
+      const errorList = visualizeErrorData.errors;
+      errorList.splice(0);
+      errorList.push(errorMessage);
+    };
+
     return {
       t,
       store,
@@ -802,6 +881,10 @@ export default defineComponent({
       getHistogramQueryData,
       setInterestingFieldInSQLQuery,
       handleQuickModeChange,
+      handleRunQueryFn,
+      visualizeChartData,
+      handleChartApiError,
+      visualizeErrorData,
     };
   },
   computed: {
@@ -961,7 +1044,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 $navbarHeight: 64px;
 
 .logPage {
