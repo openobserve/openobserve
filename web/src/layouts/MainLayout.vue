@@ -359,6 +359,8 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
+import FunctionIcon from "@/components/icons/FunctionIcon.vue";
+import PipelineIcon from "@/components/icons/PipelineIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -502,6 +504,12 @@ export default defineComponent({
         icon: "devices",
         link: "/rum/performance/overview",
         name: "rum",
+      },
+      {
+        title: t("menu.pipeline"),
+        iconComponent: markRaw(PipelineIcon),
+        link: "/pipeline",
+        name: "pipeline",
       },
       {
         title: t("menu.dashboard"),
@@ -918,6 +926,13 @@ export default defineComponent({
         })
         .catch((error) => console.log(error));
     };
+
+    if (
+      !store.state.zoConfig.hasOwnProperty("version") ||
+      store.state.zoConfig.version == ""
+    ) {
+      getConfig();
+    }
 
     if (config.isCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);

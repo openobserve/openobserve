@@ -120,7 +120,7 @@ describe("Logs testcases", () => {
     applyQueryButton()
     cy.wait(2000);
     cy.get('[data-cy="index-field-search-input"]').type("code");
-
+    cy.wait(2000);
     cy.get('[data-test="log-search-expand-code-field-btn"]').click();
     cy.wait(2000);
     cy.get('[data-test="logs-search-subfield-add-code-200"]').click({
@@ -143,7 +143,7 @@ describe("Logs testcases", () => {
     ).click({ force: true });
     cy.wait(2000);
     cy.contains("streamlogsnavigate").click();
-    cy.wait(200);
+    cy.wait(2000);
     cy.get('[data-test="logs-search-bar-query-editor"]').then((editor) => {
       let text = editor.text();
       text = removeUTFCharacters(text);
@@ -547,7 +547,9 @@ describe("Logs testcases", () => {
     cy.get('[data-test="saved-view-dialog-save-btn"] > .q-btn__content').click()
     
     cy.get('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon').click()
+    cy.wait(2000)
     cy.get('.q-item__label').contains('timestamp').click();
+    cy.wait(2000)
     cy.get(".q-notification__message").should(
       "contain",
       "e2etimestamp view applied successfully"

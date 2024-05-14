@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('search.showHistogramLabel')"
         />
         <q-toggle
+          :disable="searchObj.data.stream.selectedStream.length > 1"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
           :label="t('search.sqlModeLabel')"
@@ -987,6 +988,8 @@ export default defineComponent({
       fnParsedSQL,
       onStreamChange,
       moveItemsToTop,
+      validateFilterForMultiStream,
+      extractFields,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -1096,13 +1099,9 @@ export default defineComponent({
           parsedSQL != undefined &&
           parsedSQL.hasOwnProperty("from") &&
           parsedSQL?.from.length > 0 &&
-          parsedSQL?.from[0].table !==
-            searchObj.data.stream.selectedStream.value
+          parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
         ) {
-          searchObj.data.stream.selectedStream = {
-            label: parsedSQL.from[0].table,
-            value: parsedSQL.from[0].table,
-          };
+          searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
           searchObj.data.stream.selectedStreamFields = [];
           onStreamChange(value);
         }
@@ -1134,23 +1133,25 @@ export default defineComponent({
               col != "*"
             ) {
               // searchObj.data.stream.interestingFieldList.push(col);
+              const localInterestingFields: any = useLocalInterestingFields();
+              let localFields: any = {};
+              if (localInterestingFields.value != null) {
+                localFields = localInterestingFields.value;
+              }
               for (const stream of searchObj.data.stream.selectedStreamFields) {
-                if (stream.name == col) {
+                if (
+                  stream.name == col &&
+                  !searchObj.data.stream.interestingFieldList.includes(col)
+                ) {
                   searchObj.data.stream.interestingFieldList.push(col);
-                  const localInterestingFields: any =
-                    useLocalInterestingFields();
-                  let localFields: any = {};
-                  if (localInterestingFields.value != null) {
-                    localFields = localInterestingFields.value;
-                  }
                   localFields[
                     searchObj.organizationIdetifier +
                       "_" +
-                      searchObj.data.stream.selectedStream.value
+                      searchObj.data.stream.selectedStream[0]
                   ] = searchObj.data.stream.interestingFieldList;
-                  useLocalInterestingFields(localFields);
                 }
               }
+              useLocalInterestingFields(localFields);
             }
           }
 
@@ -1174,8 +1175,9 @@ export default defineComponent({
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
-              searchObj.data.parsedQuery.from[0].table !==
-                searchObj.data.stream.selectedStream.value &&
+              !searchObj.data.stream.selectedStream.includes(
+                searchObj.data.parsedQuery.from[0].table
+              ) &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
               let streamFound = false;
@@ -1187,7 +1189,8 @@ export default defineComponent({
                     label: stream.name,
                     value: stream.name,
                   };
-                  searchObj.data.stream.selectedStream = itemObj;
+                  // searchObj.data.stream.selectedStream = itemObj;
+                  searchObj.data.stream.selectedStream.push(itemObj.value);
                   stream.schema.forEach((field) => {
                     searchObj.data.stream.selectedStreamFields.push({
                       name: field.name,
@@ -1196,7 +1199,8 @@ export default defineComponent({
                 }
               });
               if (streamFound == false) {
-                searchObj.data.stream.selectedStream = { label: "", value: "" };
+                // searchObj.data.stream.selectedStream = { label: "", value: "" };
+                searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
                 $q.notify({
                   message: "Stream not found",
@@ -1245,7 +1249,7 @@ export default defineComponent({
           value: value,
           //user_org: this.store.state.selectedOrganization.identifier,
           //user_id: this.store.state.userInfo.email,
-          stream_name: searchObj.data.stream.selectedStream.value,
+          stream_name: searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });
       }
@@ -1641,7 +1645,7 @@ export default defineComponent({
     };
 
     const fnSavedView = () => {
-      if (!searchObj.data.stream.selectedStream.value) {
+      if (searchObj.data.stream.selectedStream.length == 0) {
         $q.notify({
           type: "negative",
           message: "No stream available to save view.",
@@ -1687,7 +1691,45 @@ export default defineComponent({
               //   extractedObj.data.stream.streamLists =
               //     searchObj.data.stream.streamLists;
               // }
+              // ----- Here we are explicitly handling stream change for multistream -----
+              let selectedStreams = [];
+              const streamValues = searchObj.data.stream.streamLists.map(
+                (item) => item.value
+              );
+              if (typeof extractedObj.data.stream.selectedStream == "object") {
+                if (
+                  extractedObj.data.stream.selectedStream.hasOwnProperty(
+                    "value"
+                  )
+                ) {
+                  selectedStreams.push(
+                    extractedObj.data.stream.selectedStream.value
+                  );
+                } else {
+                  selectedStreams.push(
+                    ...extractedObj.data.stream.selectedStream
+                  );
+                }
+              } else {
+                selectedStreams.push(extractedObj.data.stream.selectedStream);
+              }
+
+              const streamNotExist = selectedStreams.filter(
+                (stream_str) => !streamValues.includes(stream_str)
+              );
+
+              if (streamNotExist.length > 0) {
+                let errMsg = t("search.streamNotExist").replace(
+                  "[STREAM_NAME]",
+                  streamNotExist
+                );
+                throw new Error(errMsg);
+                return;
+              }
+              // extractedObj.data.stream.selectedStream = [];
+              // extractedObj.data.stream.selectedStream = selectedStreams;
               delete extractedObj.data.stream.streamLists;
+              delete extractedObj.data.stream.selectedStream;
               delete searchObj.data.stream.selectedStream;
               delete searchObj.meta.regions;
               if (extractedObj.meta.hasOwnProperty("regions")) {
@@ -1695,6 +1737,9 @@ export default defineComponent({
               } else {
                 searchObj.meta["regions"] = [];
               }
+              delete searchObj.data.queryResults.aggs;
+              delete searchObj.data.stream.interestingFieldList;
+              searchObj.data.stream.selectedStream = [];
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
                 searchObj.data.stream.functions;
@@ -1707,7 +1752,7 @@ export default defineComponent({
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
               searchObj.value = mergeDeep(searchObj, extractedObj);
-              await nextTick();
+              // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
                   {
@@ -1736,6 +1781,7 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
+              searchObj.data.stream.selectedStream.push(...selectedStreams);
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
@@ -1752,9 +1798,28 @@ export default defineComponent({
               }
               // Here copying selected stream object, as in loadStreamLists() we are setting selected stream object to empty object
               // After loading stream list, we are setting selected stream object to copied object
-              const selectedStream = cloneDeep(
-                extractedObj.data.stream.selectedStream
-              );
+              // const selectedStream = cloneDeep(
+              //   extractedObj.data.stream.selectedStream
+              // );
+
+              let selectedStreams = [];
+              if (typeof extractedObj.data.stream.selectedStream == "object") {
+                if (
+                  extractedObj.data.stream.selectedStream.hasOwnProperty(
+                    "value"
+                  )
+                ) {
+                  selectedStreams.push(
+                    extractedObj.data.stream.selectedStream.value
+                  );
+                } else {
+                  selectedStreams.push(
+                    ...extractedObj.data.stream.selectedStream
+                  );
+                }
+              } else {
+                selectedStreams.push(extractedObj.data.stream.selectedStream);
+              }
 
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.histogram = {
@@ -1765,6 +1830,7 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
+              delete searchObj.data.queryResults.aggs;
 
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
@@ -1775,10 +1841,26 @@ export default defineComponent({
               );
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
-              searchObj.data.stream.selectedStream = selectedStream;
+              searchObj.data.stream.selectedStream = [selectedStreams];
               // searchObj.value = mergeDeep(searchObj, extractedObj);
 
-              await nextTick();
+              const streamValues = searchObj.data.stream.streamLists.map(
+                (item) => item.value
+              );
+              const streamNotExist = selectedStreams.filter(
+                (stream_str) => !streamValues.includes(stream_str)
+              );
+
+              if (streamNotExist.length > 0) {
+                let errMsg = t("search.streamNotExist").replace(
+                  "[STREAM_NAME]",
+                  streamNotExist
+                );
+                throw new Error(errMsg);
+                return;
+              }
+
+              // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
                   {
@@ -1818,6 +1900,7 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loading = true;
+                await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
                 updateUrlQueryParams();
@@ -1845,10 +1928,10 @@ export default defineComponent({
         .catch((err) => {
           store.dispatch("setSavedViewFlag", false);
           $q.notify({
-            message: `Error while applying saved view.`,
+            message: err.message || `Error while applying saved view.`,
             color: "negative",
             position: "bottom",
-            timeout: 1000,
+            timeout: 3000,
           });
           console.log(err);
         });
@@ -2137,7 +2220,9 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
+          ","
+        )}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
         if (
           searchObj.data.stream.interestingFieldList.length > 0 &&
           searchObj.meta.quickMode
@@ -2341,6 +2426,7 @@ export default defineComponent({
       config,
       handleRegionsSelection,
       handleQuickMode,
+      validateFilterForMultiStream,
     };
   },
   computed: {

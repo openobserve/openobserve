@@ -404,6 +404,7 @@ const useStreams = () => {
   };
 
   return {
+    streams,
     getStreams,
     getStream,
     setStreams,

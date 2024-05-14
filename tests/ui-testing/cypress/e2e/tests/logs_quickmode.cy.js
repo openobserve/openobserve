@@ -98,8 +98,11 @@ describe("Logs Quickmode testcases", () => {
         '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
       )
       .click({ force: true });
+    cy.wait(2000);
     cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    cy.wait(2000);
     cy.get('[data-test="logs-search-bar-query-editor"]').contains("_timestamp");
+    cy.wait(2000);
   });
   it("should display quick mode toggle button", () => {
     cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').should(
@@ -162,7 +165,6 @@ describe("Logs Quickmode testcases", () => {
     cy.get(
       '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]:last'
     ).click({ force: true });
-    cy.wait(2000);
     cy.get('[data-test="logs-search-bar-query-editor"]').should(
       "not.contain",
       "kubernetes_pod_id"
