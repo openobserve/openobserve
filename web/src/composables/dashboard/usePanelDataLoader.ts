@@ -445,6 +445,9 @@ export const usePanelDataLoader = (
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
+          const value = variable.value
+            .map((value: any) => `'${value}'`)
+            .join(",");
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
@@ -460,15 +463,15 @@ export const usePanelDataLoader = (
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,
-              value: variable.value.map((value: any) => `'${value}'`).join(","),
+              value: value,
             },
             {
               placeHolder: `\${${variable.name}}`,
-              value: variable.value.join(","),
+              value: queryType === "sql" ? value : variable.value.join("|"),
             },
             {
               placeHolder: `\$${variable.name}`,
-              value: variable.value.join(","),
+              value: queryType === "sql" ? value : variable.value.join("|"),
             },
           ];
 
