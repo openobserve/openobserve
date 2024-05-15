@@ -1790,7 +1790,7 @@ const useLogs = () => {
               searchObj.data.queryResults.hasOwnProperty("hits") &&
               searchObj.data.queryResults?.hits.length > 0 &&
               !store.state.zoConfig.user_defined_schemas_enabled &&
-              !searchObj.meta.useUserDefinedSchemas == "user_defined_schema"
+              searchObj.meta.useUserDefinedSchemas == "user_defined_schema"
             ) {
               // Find the index of the record with max attributes
               const maxAttributesIndex =
