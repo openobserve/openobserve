@@ -1657,6 +1657,7 @@ export default defineComponent({
     };
 
     const applySavedView = (item) => {
+      searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       savedviewsService
         .getViewDetail(
@@ -1707,6 +1708,7 @@ export default defineComponent({
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
               searchObj.value = mergeDeep(searchObj, extractedObj);
+              searchObj.shouldIgnoreWatcher = true;
               await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -1821,7 +1823,9 @@ export default defineComponent({
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
                 updateUrlQueryParams();
+                searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
+                searchObj.shouldIgnoreWatcher = false;
                 console.log(e);
               }
             }, 1000);
@@ -1833,6 +1837,7 @@ export default defineComponent({
             //   handleRunQuery();
             // }
           } else {
+            searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             $q.notify({
               message: `Error while applying saved view. ${res.data.error_detail}`,
@@ -1843,6 +1848,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           $q.notify({
             message: `Error while applying saved view.`,
