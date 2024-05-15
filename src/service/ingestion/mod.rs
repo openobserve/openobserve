@@ -376,7 +376,6 @@ pub async fn write_file(
             continue;
         }
         let entry_records = entry.records.len();
-        log::info!("write_file inside : {seesion_id}");
         if let Err(e) = writer
             .write(
                 entry.schema,

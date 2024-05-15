@@ -180,17 +180,13 @@ impl Writer {
             return Ok(());
         }
         let session_id = entry.session_id.to_string();
-        log::info!("[{session_id}] entry.into_bytes start");
         let entry_bytes = if !check_ttl {
             entry.into_bytes()?
         } else {
             Vec::new()
         };
-        log::info!("[{session_id}] entry.into_bytes done");
         let mut wal = self.wal.lock().await;
-        log::info!("[{session_id}] self.wal.lock done");
         let mut mem = self.memtable.write().await;
-        log::info!("[{session_id}] self.memtable.write done");
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(mem.size(), entry.data_size)
         {
@@ -248,10 +244,8 @@ impl Writer {
 
         if !check_ttl {
             // write into wal
-            log::info!("[{session_id}]wal.write start");
             let start = std::time::Instant::now();
             wal.write(&entry_bytes, false).context(WalSnafu)?;
-            log::info!("[{session_id}]wal.write done");
             metrics::INGEST_WAL_LOCK_TIME
                 .with_label_values(&[&self.key.org_id])
                 .observe(start.elapsed().as_millis() as f64);
@@ -261,7 +255,6 @@ impl Writer {
             metrics::INGEST_MEMTABLE_LOCK_TIME
                 .with_label_values(&[&self.key.org_id])
                 .observe(start.elapsed().as_millis() as f64);
-            log::info!("[{session_id}]mem.write done");
         }
 
         Ok(())
@@ -290,9 +283,8 @@ impl Writer {
     }
 
     pub async fn sync(&self) -> Result<()> {
-        // let wal = self.wal.lock().await;
-        // wal.sync().context(WalSnafu)
-        Ok(())
+        let wal = self.wal.lock().await;
+        wal.sync().context(WalSnafu)
     }
 
     pub async fn read(

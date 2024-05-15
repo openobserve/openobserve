@@ -64,7 +64,6 @@ impl TraceService for TraceServer {
         });
 
         let start = std::time::Instant::now();
-        log::info!("[{session_id}] router begin to export");
         match client
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
