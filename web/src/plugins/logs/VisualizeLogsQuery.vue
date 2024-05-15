@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
+                          :panelSchema="visualizeChartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="{}"
                           :width="6"
@@ -191,6 +191,7 @@ import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQuer
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { provide } from "vue";
+import { toRefs } from "vue";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -211,7 +212,7 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
 export default defineComponent({
   name: "VisualizeLogsQuery",
   props: {
-    chartData: {
+    visualizeChartData: {
       type: Object,
       required: true,
     },
@@ -246,15 +247,18 @@ export default defineComponent({
       metaData.value = metadata;
     };
 
+    const { visualizeChartData }: any = toRefs(props);
+
+    console.log(JSON.parse(JSON.stringify(visualizeChartData.value)));
+
     watch(
       () => dashboardPanelData.data.type,
       async () => {
         // console.time("watch:dashboardPanelData.data.type");
         await nextTick();
-        props.chartData.value = JSON.parse(
+        visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data)
         );
-        // console.timeEnd("watch:dashboardPanelData.data.type");
       }
     );
 
@@ -339,6 +343,7 @@ export default defineComponent({
       store,
       metaDataValue,
       metaData,
+      visualizeChartData,
     };
   },
 });

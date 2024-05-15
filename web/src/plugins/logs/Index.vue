@@ -215,7 +215,7 @@ size="10rem" /><br />
           </div>
           <div else>
             <VisualizeLogsQuery
-              :chartData="visualizeChartData"
+              :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
             ></VisualizeLogsQuery>
           </div>
@@ -806,10 +806,7 @@ export default defineComponent({
         }
       }
 
-      validatePanel(
-        dashboardData,
-        errors,
-      );
+      validatePanel(dashboardData, errors);
 
       if (errors.length) {
         $q.notify({
@@ -832,7 +829,6 @@ export default defineComponent({
         dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
         dashboardPanelData.data.queries[0].fields.stream =
           searchObj.data.stream.selectedStream.value ?? "default";
-        console.log("handleRunQueryFn", dashboardPanelData.data);
         if (!isValid(true)) {
           return;
         }
@@ -1044,7 +1040,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 $navbarHeight: 64px;
 
 .logPage {
