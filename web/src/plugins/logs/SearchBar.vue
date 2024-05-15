@@ -255,9 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn-toggle
           class="q-ml-xs no-outline q-pa-none no-border"
           v-model="searchObj.meta.logsVisualizeToggle"
-          style="margin-left: 5px"
+          style="margin-left: 5px; border-radius: 4px;"
           no-caps
-          padding="3px"
+          padding="5px"
+          size="sm"
           toggle-color="primary"
           :options="[
             { label: 'Logs', value: 'logs' },
@@ -2581,7 +2582,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 #logsQueryEditor,
 #fnEditor {
   height: 100% !important;
