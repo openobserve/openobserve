@@ -1502,12 +1502,12 @@ export const convertSQLData = async (
     if (isYAxisExistInOrderBy) {
       // Calculate the total for each series and combine it with the corresponding x-axis label
       let totals = new Map();
-      for (let i = 0; i < xAxisObj[0].data.length; i++) {
-        let total = options.series.reduce(
-          (sum: number, currentSeries: any) => sum + currentSeries.data[i],
+      for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
+        let total = options?.series?.reduce(
+          (sum: number, currentSeries: any) => sum + currentSeries?.data[i] ?? 0,
           0
         );
-        totals.set(i, { label: xAxisObj[0].data[i], total });
+        totals.set(i, { label: xAxisObj[0]?.data[i], total });
       }
 
       // Sort the indices by total in the specified order
@@ -1519,8 +1519,8 @@ export const convertSQLData = async (
 
       // Create new sorted arrays for the x-axis labels and series
       xAxisObj[0].data = sortedIndices.map((i) => totals.get(i).label);
-      options.series = options.series.map((currentSeries: any) => {
-        currentSeries.data = sortedIndices.map((i) => currentSeries.data[i]);
+      options.series = options?.series?.map((currentSeries: any) => {
+        currentSeries.data = sortedIndices?.map((i) => currentSeries?.data[i]);
         return currentSeries;
       });
     }
