@@ -44,6 +44,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         )
         .await?;
     }
+    log::info!("Spawned alert manager");
 
     tokio::task::spawn(async move { run_schedule_jobs().await });
     tokio::task::spawn(async move { clean_complete_jobs().await });
