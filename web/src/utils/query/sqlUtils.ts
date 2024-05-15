@@ -144,3 +144,20 @@ export const getStreamFromQuery = async (query: any) => {
     return "";
   }
 };
+
+// returns 'ASC' or 'DESC' if exist
+// return null if not exist
+export const isGivenFieldInOrderBy = async (sqlQuery: string, fieldAlias: string) => {
+  await importSqlParser();
+  const ast: any = parser.astify(sqlQuery);
+
+  if (ast && ast.orderby) {
+    for (let item of ast.orderby) {
+      if (item.expr.column === fieldAlias) {
+        return item.type; // 'ASC' or 'DESC'
+      }
+    }
+  }
+
+  return null;
+};
