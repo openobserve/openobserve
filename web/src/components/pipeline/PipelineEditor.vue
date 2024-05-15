@@ -325,7 +325,10 @@ const getPipeline = () => {
       await getFunctions();
 
       const _pipeline = response.data.list.find(
-        (pipeline: Pipeline) => pipeline.name === route.query.name
+        (pipeline: Pipeline) =>
+          pipeline.name === route.query.name &&
+          pipeline.stream_name === route.query.stream &&
+          pipeline.stream_type === route.query.stream_type
       );
 
       if (!_pipeline) {
