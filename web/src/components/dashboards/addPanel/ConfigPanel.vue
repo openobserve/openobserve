@@ -929,9 +929,17 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.promql_legend;
 
+      // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
-      const newValue =
-        inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+
+      let newValue;
+      if (openingBraceIndex !== -1) {
+        // If there is an opening brace, replace the content inside it
+        newValue = inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+      } else {
+        // If no opening brace, simply append the option inside new braces
+        newValue = `${inputValue} {${option}}`;
+      }
       return newValue;
     };
 
