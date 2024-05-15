@@ -345,8 +345,8 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
 // generate parquet file search schema
 fn generate_search_schema(
     sql: &Arc<Sql>,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
     schema: &Schema,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
     // cacluate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
@@ -393,14 +393,18 @@ fn generate_search_schema(
 // generate parquet file search schema
 fn generate_select_start_search_schema(
     sql: &Arc<Sql>,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
     schema: &Schema,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    defined_schema_fields: &[String],
 ) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    let mut schema = schema.clone();
+    let schema_fields_map = schema
+        .fields()
+        .iter()
+        .map(|f| (f.name(), f))
+        .collect::<HashMap<_, _>>();
     // cacluate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
-    let group_fields = schema.fields();
-    for field in group_fields {
+    for field in schema.fields().iter() {
         if let Some(f) = schema_latest_map.get(field.name()) {
             if f.data_type() != field.data_type() {
                 diff_fields.insert(field.name().clone(), f.data_type().clone());
@@ -415,18 +419,35 @@ fn generate_select_start_search_schema(
     // add not exists field in group schema but used in sql
     let mut new_fields = Vec::new();
     for field in generate_used_fields_in_query(sql).iter() {
-        if schema.field_with_name(field).is_err() {
+        if schema_fields_map.get(field).is_none() {
             if let Some(field) = schema_latest_map.get(field) {
                 new_fields.push(Arc::new(field.as_ref().clone()));
             }
         }
     }
-    if !new_fields.is_empty() {
+    let schema = if !defined_schema_fields.is_empty() {
+        let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
+        if !fields.contains(&CONFIG.common.column_timestamp) {
+            fields.insert(CONFIG.common.column_timestamp.to_string());
+        }
+        if !fields.contains(&CONFIG.common.all_fields_name) {
+            fields.insert(CONFIG.common.all_fields_name.to_string());
+        }
+        let new_fields = fields
+            .iter()
+            .filter_map(|f| match schema_fields_map.get(f) {
+                Some(f) => Some((*f).clone()),
+                None => schema_latest_map.get(f).map(|f| (*f).clone()),
+            })
+            .collect::<Vec<_>>();
+        Schema::new(new_fields)
+    } else if !new_fields.is_empty() {
         let new_schema = Schema::new(new_fields);
-        schema = Schema::try_merge(vec![schema, new_schema])?;
-    }
-
-    Ok((Arc::new(schema.clone()), diff_fields))
+        Schema::try_merge(vec![schema.to_owned(), new_schema])?
+    } else {
+        schema.clone()
+    };
+    Ok((Arc::new(schema), diff_fields))
 }
 
 fn generate_used_fields_in_query(sql: &Arc<Sql>) -> Vec<String> {

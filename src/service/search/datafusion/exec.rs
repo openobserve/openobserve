@@ -588,7 +588,8 @@ pub async fn merge(
     // rewrite sql
     let mut query_sql = match merge_rewrite_sql(sql, schema, is_final_phase) {
         Ok(sql) => {
-            if offset > 0
+            if is_final_phase
+                && offset > 0
                 && sql.to_uppercase().contains(" LIMIT ")
                 && !sql.to_uppercase().contains(" OFFSET ")
             {
