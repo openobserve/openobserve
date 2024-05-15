@@ -51,7 +51,9 @@ use {
             infra::config::O2_CONFIG,
             settings::{get_logo, get_logo_text},
         },
-        dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
+        dex::service::auth::{
+            exchange_code, get_dex_auth_proxy, get_dex_login, get_jwks, refresh_token,
+        },
     },
     std::io::ErrorKind,
 };
@@ -439,6 +441,18 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
     use o2_enterprise::enterprise::dex::meta::auth::PreLoginData;
 
     let login_data: PreLoginData = get_dex_login();
+    let state = login_data.state;
+    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
+
+    Ok(HttpResponse::Ok().json(login_data.url))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/dex_auth_proxy")]
+pub async fn dex_auth_proxy() -> Result<HttpResponse, Error> {
+    use o2_enterprise::enterprise::dex::meta::auth::PreLoginData;
+
+    let login_data: PreLoginData = get_dex_auth_proxy();
     let state = login_data.state;
     let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
 

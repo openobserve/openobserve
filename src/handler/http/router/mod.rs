@@ -287,7 +287,8 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
             .service(status::redirect)
             .service(status::dex_login)
             .service(status::refresh_token_with_dex)
-            .service(status::logout),
+            .service(status::logout)
+            .service(status::dex_auth_proxy),
     );
 }
 
