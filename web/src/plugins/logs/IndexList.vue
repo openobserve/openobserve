@@ -411,6 +411,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
+          <q-tr
+            v-if="
+              store.state.zoConfig.user_defined_schemas_enabled &&
+              searchObj.meta.hasUserDefinedSchemas
+            "
+          >
+            <q-td colspan="100%" class="text-bold q-pa-none">
+              <q-btn-toggle
+                no-caps
+                v-model="searchObj.meta.useUserDefinedSchemas"
+                data-test="logs-page-field-list-user-defined-schema-toggle"
+                class="schema-field-toggle"
+                toggle-color="primary"
+                size="13px"
+                color="white"
+                text-color="primary"
+                @update:model-value="extractFields"
+                :options="userDefinedSchemaBtnGroupOption"
+              >
+                <template v-slot:all_fields_warning>
+                  <q-tooltip
+                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                    >{{ t("search.allFieldsWarningMsg") }}</q-tooltip
+                  >
+                </template>
+              </q-btn-toggle>
+              <q-separator class="q-mb-xs" />
+            </q-td>
+          </q-tr>
           <q-tr v-if="searchObj.loadingStream == true">
             <q-td colspan="100%" class="text-bold"
 style="opacity: 0.7">
@@ -472,7 +505,19 @@ export default defineComponent({
       handleQueryData,
       onStreamChange,
       filterHitsColumns,
+      extractFields,
     } = useLogs();
+    const userDefinedSchemaBtnGroupOption = [
+      {
+        label: t("search.userDefinedSchemaLabel"),
+        value: "user_defined_schema",
+      },
+      {
+        label: t("search.allFieldsLabel"),
+        value: "all_fields",
+        slot: "all_fields_warning",
+      },
+    ];
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -776,6 +821,8 @@ export default defineComponent({
       onStreamChange,
       addToInterestingFieldList,
       rowsPerPage,
+      extractFields,
+      userDefinedSchemaBtnGroupOption,
     };
   },
 });
@@ -1058,6 +1105,12 @@ $streamSelectorHeight: 44px;
         }
       }
     }
+  }
+
+  .schema-field-toggle {
+    border: 1px;
+    border-radius: 5px;
+    line-height: 10px;
   }
 }
 </style>

@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import { useStore } from "vuex";
 
 const defaultKeywords = [
@@ -215,18 +215,22 @@ const useSqlSuggestions = () => {
   const updateFieldKeywords = (fields: any[]) => {
     autoCompleteKeywords.value = [];
     fieldKeywords.value = [];
-    fields.forEach((field: any) => {
-      if (field.name == store.state.zoConfig.timestamp_column) {
-        return;
-      }
-      const itemObj = {
-        label: field.name,
-        kind: "Field",
-        insertText: field.name,
-        insertTextRules: "InsertAsSnippet",
-      };
-      fieldKeywords.value.push(itemObj);
+    let itemObj: any = {};
+    nextTick(() => {
+      fields.forEach((field: any) => {
+        if (field.name == store.state.zoConfig.timestamp_column) {
+          return;
+        }
+        itemObj = {
+          label: field.name,
+          kind: "Field",
+          insertText: field.name,
+          insertTextRules: "InsertAsSnippet",
+        };
+        fieldKeywords.value.push(itemObj);
+      });  
     });
+    
     updateAutoComplete();
   };
 
