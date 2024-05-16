@@ -2357,6 +2357,23 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
+    const handleRunQueryFn = () => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        emit("handleRunQueryFn");
+      } else {
+        handleRunQuery();
+      }
+    };
+
+    watch(
+      () => searchObj?.meta?.logsVisualizeToggle,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          emit("handleRunQueryFn");
+        }
+      }
+    );
+
     return {
       t,
       store,
