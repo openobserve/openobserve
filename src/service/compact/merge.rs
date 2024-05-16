@@ -34,13 +34,34 @@ use infra::{
     },
     storage,
 };
-use tokio::{sync::Semaphore, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, Semaphore},
+    task::JoinHandle,
+};
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::generate_index_on_compactor,
     service::{db, file_list, search::datafusion, stream},
 };
+
+#[derive(Clone)]
+pub struct MergeBatch {
+    pub batch_id: usize,
+    pub org_id: String,
+    pub stream_type: StreamType,
+    pub stream_name: String,
+    pub schema: Arc<Schema>,
+    pub prefix: String,
+    pub files: Vec<FileKey>,
+}
+
+pub struct MergeResult {
+    pub batch_id: usize,
+    pub new_file: FileKey,
+}
+
+pub type MergeSender = mpsc::Sender<Result<(usize, FileKey), anyhow::Error>>;
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -53,18 +74,12 @@ use crate::{
 /// 10. update last compacted offset
 /// 11. release cluster lock
 pub async fn merge_by_stream(
+    worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
-
-    // log::debug!(
-    //     "[COMPACTOR] merge_by_stream [{}/{}/{}] start",
-    //     org_id,
-    //     stream_type,
-    //     stream_name,
-    // );
 
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -171,7 +186,7 @@ pub async fn merge_by_stream(
                 .unwrap())
         || (CONFIG.compact.step_secs >= 3600
             && (offset >= time_now_hour
-                || time_now.timestamp_micros() - time_now_hour
+                || time_now.timestamp_micros() - offset
                     <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
                         .unwrap()
                         .num_microseconds()
@@ -284,33 +299,94 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let schema = schema.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let worker_tx = worker_tx.clone();
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
             // sort by file size
             let mut files_with_size = files_with_size.to_owned();
             files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
             // delete duplicated files
             files_with_size.dedup_by(|a, b| a.key == b.key);
-            loop {
-                // yield to other tasks
-                tokio::task::yield_now().await;
-                // merge file and get the big file key
-                let (new_file_name, new_file_meta, new_file_list) = match merge_files(
-                    &org_id,
+            // partition files by size
+            if files_with_size.len() <= 1 {
+                return Ok(());
+            }
+
+            // group files need to merge
+            let mut batch_groups = Vec::new();
+            let mut new_file_list = Vec::new();
+            let mut new_file_size = 0;
+            for file in files_with_size.iter() {
+                if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
+                    if new_file_list.len() <= 1 {
+                        break; // no files need to merge
+                    }
+                    batch_groups.push(MergeBatch {
+                        batch_id: batch_groups.len(),
+                        org_id: org_id.clone(),
+                        stream_type,
+                        stream_name: stream_name.clone(),
+                        schema: schema.clone(),
+                        prefix: prefix.clone(),
+                        files: new_file_list.clone(),
+                    });
+                    new_file_size = 0;
+                    new_file_list.clear();
+                }
+                new_file_size += file.meta.original_size;
+                new_file_list.push(file.clone());
+                // metrics
+                metrics::COMPACT_MERGED_FILES
+                    .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                    .inc();
+                metrics::COMPACT_MERGED_BYTES
+                    .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                    .inc_by(file.meta.original_size as u64);
+            }
+            if new_file_list.len() > 1 {
+                batch_groups.push(MergeBatch {
+                    batch_id: batch_groups.len(),
+                    org_id: org_id.clone(),
                     stream_type,
-                    &stream_name,
-                    schema.clone(),
-                    &prefix,
-                    &files_with_size,
-                )
-                .await
-                {
+                    stream_name: stream_name.clone(),
+                    schema: schema.clone(),
+                    prefix: prefix.clone(),
+                    files: new_file_list.clone(),
+                });
+            }
+
+            if batch_groups.is_empty() {
+                return Ok(()); // no files need to merge
+            }
+
+            // send to worker
+            let batch_group_len = batch_groups.len();
+            let (inner_tx, mut inner_rx) = mpsc::channel(batch_group_len);
+            for batch in batch_groups.iter() {
+                if let Err(e) = worker_tx.send((inner_tx.clone(), batch.clone())).await {
+                    log::error!("[COMPACT] send batch to worker failed: {}", e);
+                    return Err(anyhow::Error::msg("send batch to worker failed"));
+                }
+            }
+            let mut worker_results = Vec::with_capacity(batch_group_len);
+            for _ in 0..batch_group_len {
+                let result = inner_rx.recv().await.unwrap();
+                worker_results.push(result);
+            }
+
+            let mut last_error = None;
+            for ret in worker_results {
+                let (batch_id, mut new_file) = match ret {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[COMPACT] merge files failed: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        last_error = Some(e);
                         continue;
                     }
                 };
+                let new_file_name = std::mem::take(&mut new_file.key);
+                let new_file_meta = std::mem::take(&mut new_file.meta);
+                let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
+
                 if new_file_name.is_empty() {
                     if new_file_list.is_empty() {
                         // no file need to merge
@@ -348,13 +424,11 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 }
-
-                // No need delete file here, will use another task to delete files
-
-                // delete files from file list
-                files_with_size.retain(|f| !&new_file_list.contains(f));
             }
             drop(permit);
+            if let Some(e) = last_error {
+                return Err(e);
+            }
             Ok(())
         });
         tasks.push(task);
@@ -408,7 +482,8 @@ pub async fn merge_by_stream(
 
 /// merge some small files into one big file, upload to storage, returns the big
 /// file key and merged files
-async fn merge_files(
+pub async fn merge_files(
+    thread_id: usize,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -449,16 +524,20 @@ async fn merge_files(
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
-        log::info!("[COMPACT] merge small file: {}", &file.key);
+        log::info!("[COMPACT:{thread_id}] merge small file: {}", &file.key);
         let data = match storage::get(&file.key).await {
             Ok(body) => body,
             Err(err) => {
-                log::error!("[COMPACT] merge small file: {}, err: {}", &file.key, err);
+                log::error!(
+                    "[COMPACT:{thread_id}] merge small file: {}, err: {}",
+                    &file.key,
+                    err
+                );
                 if err.to_string().to_lowercase().contains("not found") {
                     // delete file from file list
                     if let Err(err) = file_list::delete_parquet_file(&file.key, true).await {
                         log::error!(
-                            "[COMPACT] delete file: {}, from file_list err: {}",
+                            "[COMPACT:{thread_id}] delete file: {}, from file_list err: {}",
                             &file.key,
                             err
                         );
@@ -500,7 +579,7 @@ async fn merge_files(
                 Some(id) => id,
                 None => {
                     log::error!(
-                        "[COMPACT] merge small file: {}, schema version not found, min_ts: {}, max_ts: {}",
+                        "[COMPACT:{thread_id}] merge small file: {}, schema version not found, min_ts: {}, max_ts: {}",
                         &file.key,
                         file.meta.min_ts,
                         file.meta.max_ts
@@ -538,7 +617,7 @@ async fn merge_files(
                 log::warn!("found invalid file: {}", file.key);
                 if let Err(err) = file_list::delete_parquet_file(&file.key, true).await {
                     log::error!(
-                        "[COMPACT] delete file: {}, from file_list err: {}",
+                        "[COMPACT:{thread_id}] delete file: {}, from file_list err: {}",
                         &file.key,
                         err
                     );
@@ -613,7 +692,7 @@ async fn merge_files(
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
     log::info!(
-        "[COMPACT] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {:?}",
+        "[COMPACT:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {:?}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -807,28 +886,4 @@ async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyh
         break;
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use infra::db as infra_db;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn test_compact() {
-        infra_db::create_table().await.unwrap();
-        infra_file_list::create_table().await.unwrap();
-        let offset = Duration::try_hours(2).unwrap().num_microseconds().unwrap();
-        let _ = db::compact::files::set_offset(
-            "default",
-            "logs".into(),
-            "default",
-            offset,
-            Some(&LOCAL_NODE_UUID.clone()),
-        )
-        .await;
-        let resp = merge_by_stream("default", "logs".into(), "default").await;
-        assert!(resp.is_ok());
-    }
 }
