@@ -347,6 +347,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
 
         match schema.fields_map().get(item_name) {
             None => {
+                log::info!("get_schema_changes: new field: {}", item_name);
                 is_schema_changed = true;
             }
             Some(idx) => {
