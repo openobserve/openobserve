@@ -166,8 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete"
-color="grey" size="xs" />
+                            <q-icon name="delete" color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -348,8 +347,7 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -403,7 +401,7 @@ clickable v-close-popup>
                 class="region-dropdown-btn q-px-xs"
                 :title="t('search.regionTitle')"
                 label="Region"
-                >
+              >
                 <q-input
                   ref="reginFilterRef"
                   filled
@@ -819,6 +817,7 @@ import {
   onActivated,
   onUnmounted,
   onDeactivated,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -827,7 +826,6 @@ import { useQuasar, copyToClipboard } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
-import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
@@ -836,7 +834,6 @@ import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import {
@@ -863,7 +860,9 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue")
+    ),
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
@@ -1302,83 +1301,7 @@ export default defineComponent({
       URL.revokeObjectURL(url);
     };
 
-    const initFunctionEditor = () => {
-      monaco.editor.defineTheme("myFnCustomTheme", {
-        base: "vs", // can also be vs-dark or hc-black
-        inherit: true, // can also be false to completely replace the builtin rules
-        rules: [
-          {
-            token: "comment",
-            foreground: "ffa500",
-            fontStyle: "italic underline",
-          },
-          { token: "comment.js", foreground: "008800", fontStyle: "bold" },
-          { token: "comment.css", foreground: "0000ff" }, // will inherit fontStyle from `comment` above
-        ],
-        colors: {
-          "editor.foreground": "#000000",
-          "editor.background": "#fafafa",
-          "editorCursor.foreground": "#000000",
-          "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#000000",
-        },
-      });
-      fnEditorobj = monaco.editor.create(fnEditorRef.value, {
-        value: ``,
-        language: "ruby",
-        minimap: {
-          enabled: false,
-        },
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-        showFoldingControls: "never",
-        wordWrap: "on",
-        lineNumbers: "on",
-        lineNumbersMinChars: 0,
-        overviewRulerLanes: 0,
-        fixedOverflowWidgets: false,
-        overviewRulerBorder: false,
-        lineDecorationsWidth: 3,
-        hideCursorInOverviewRuler: true,
-        renderLineHighlight: "none",
-        glyphMargin: false,
-        folding: false,
-        scrollBeyondLastColumn: 0,
-        scrollBeyondLastLine: false,
-        smoothScrolling: true,
-        mouseWheelScrollSensitivity: 0,
-        fastScrollSensitivity: 0,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
-        find: {
-          addExtraSpaceOnTop: false,
-          autoFindInSelection: "never",
-          seedSearchStringFromSelection: "never",
-        },
-      });
-
-      fnEditorobj.onDidChangeModelContent((e: any) => {
-        searchObj.data.tempFunctionContent = fnEditorobj.getValue();
-      });
-
-      fnEditorobj.onDidBlurEditorText((e: any) => {
-        searchObj.data.tempFunctionContent = fnEditorobj.getValue();
-        // saveFunction(fnEditorobj.getValue());
-      });
-
-      fnEditorobj.onDidFocusEditorWidget(() => {
-        searchObj.meta.functionEditorPlaceholderFlag = false;
-      });
-
-      fnEditorobj.onDidBlurEditorWidget(() => {
-        searchObj.meta.functionEditorPlaceholderFlag = true;
-      });
-
-      fnEditorobj.layout();
-    };
-
     onMounted(async () => {
-      initFunctionEditor();
-
       if (
         router.currentRoute.value.query.functionContent ||
         searchObj.data.tempFunctionContent
@@ -2316,7 +2239,6 @@ export default defineComponent({
       udpateQuery,
       downloadLogs,
       saveFunction,
-      initFunctionEditor,
       resetFunctionContent,
       resetEditorLayout,
       populateFunctionImplementation,

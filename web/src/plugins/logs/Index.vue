@@ -139,8 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info"
-color="primary" size="md" /> Select a
+                    <q-icon name="info" color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -159,8 +158,7 @@ color="primary" size="md" /> Select a
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -177,8 +175,7 @@ color="primary" size="md" />
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -215,16 +212,13 @@ import {
   nextTick,
   onBeforeMount,
   watch,
+  defineAsyncComponent,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import SearchBar from "./SearchBar.vue";
-import IndexList from "./IndexList.vue";
-import SearchResult from "./SearchResult.vue";
-import useLogs from "@/composables/useLogs";
 import { Parser } from "node-sql-parser/build/mysql";
 
 import segment from "@/services/segment_analytics";
@@ -236,9 +230,15 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 export default defineComponent({
   name: "PageSearch",
   components: {
-    SearchBar,
-    IndexList,
-    SearchResult,
+    SearchBar: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchBar.vue")
+    ),
+    IndexList: defineAsyncComponent(
+      () => import("@/plugins/logs/IndexList.vue")
+    ),
+    SearchResult: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchResult.vue")
+    ),
     SanitizedHtmlRenderer,
   },
   mixins: [MainLayoutCloudMixin],
@@ -372,7 +372,7 @@ export default defineComponent({
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
-    } = useLogs();
+    } = defineAsyncComponent(() => import("@/composables/useLogs")());
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
