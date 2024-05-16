@@ -372,6 +372,17 @@ pub async fn add_user_to_org(
                     role: role.clone(),
                 }]
             } else {
+                if db_user.is_external {
+                    for org in orgs.iter() {
+                        if org.name.eq(org_id) {
+                            // External user is already part of this org
+                            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                                http::StatusCode::FORBIDDEN.into(),
+                                "Not Allowed".to_string(),
+                            )));
+                        }
+                    }
+                }
                 orgs.retain(|org| !org.name.eq(&local_org));
                 orgs.push(UserOrg {
                     name: local_org.to_string(),
