@@ -825,6 +825,24 @@ export default defineComponent({
       }
     };
 
+    // watch for changes in the visualize toggle
+    // if it is in visualize mode, then set the query and stream name in the dashboard panel
+    watch(
+      () => [
+        searchObj.meta.logsVisualizeToggle,
+        searchObj.data.query,
+        searchObj.data.stream.selectedStream.value,
+      ],
+      () => {
+        if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          dashboardPanelData.data.queries[0].customQuery = true;
+          dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+          dashboardPanelData.data.queries[0].fields.stream =
+            searchObj.data.stream.selectedStream.value ?? "default";
+        }
+      }
+    );
+
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         dashboardPanelData.data.queries[0].customQuery = true;

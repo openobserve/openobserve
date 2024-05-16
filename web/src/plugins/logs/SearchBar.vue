@@ -2364,15 +2364,6 @@ export default defineComponent({
       }
     };
 
-    watch(
-      () => searchObj?.meta?.logsVisualizeToggle,
-      () => {
-        if (searchObj.meta.logsVisualizeToggle == "visualize") {
-          emit("handleRunQueryFn");
-        }
-      }
-    );
-
     return {
       t,
       store,
