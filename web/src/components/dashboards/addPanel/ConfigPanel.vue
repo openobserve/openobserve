@@ -932,15 +932,16 @@ export default defineComponent({
       // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
 
-      let newValue;
-      if (openingBraceIndex !== -1) {
-        // If there is an opening brace, replace the content inside it
-        newValue = inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+      //if { is not present add it at the start and than return
+      if (openingBraceIndex === -1) {
+        const newValue =
+          "{ " + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+        return newValue;
       } else {
-        // If no opening brace, simply append the option inside new braces
-        newValue = `${inputValue} {${option}}`;
+        const newValue =
+          inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+        return newValue;
       }
-      return newValue;
     };
 
     const dashboardSelectfieldPromQlList = computed(() =>
