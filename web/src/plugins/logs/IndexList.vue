@@ -414,39 +414,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
-          <q-tr
-            v-if="
-              store.state.zoConfig.user_defined_schemas_enabled &&
-              searchObj.meta.hasUserDefinedSchemas
-            "
-          >
-            <q-td colspan="100%" class="text-bold q-pa-none">
-              <q-btn-toggle
-                no-caps
-                v-model="searchObj.meta.useUserDefinedSchemas"
-                data-test="logs-page-field-list-user-defined-schema-toggle"
-                class="schema-field-toggle"
-                toggle-color="primary"
-                size="13px"
-                color="white"
-                text-color="primary"
-                @update:model-value="extractFields"
-                :options="userDefinedSchemaBtnGroupOption"
-              >
-                <template v-slot:all_fields_warning>
-                  <q-tooltip
-                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    class="text-body2"
-                    >{{ t("search.allFieldsWarningMsg") }}</q-tooltip
-                  >
-                </template>
-              </q-btn-toggle>
-              <q-separator class="q-mb-xs" />
-            </q-td>
-          </q-tr>
           <q-tr v-if="searchObj.loadingStream == true">
             <q-td colspan="100%" class="text-bold"
 style="opacity: 0.7">
@@ -583,7 +550,7 @@ style="opacity: 0.7">
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch, computed, nextTick } from "vue";
+import { defineComponent, ref, type Ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
