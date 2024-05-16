@@ -373,7 +373,13 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
             }
         }
     }
-
+    if is_schema_changed && CONFIG.log.enable_schema_change_log {
+        log::info!(
+            "get_schema_changes: is_schema_changed: {}, field_datatype_delta: {:?}",
+            is_schema_changed,
+            field_datatype_delta
+        );
+    }
     (is_schema_changed, field_datatype_delta)
 }
 

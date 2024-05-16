@@ -294,6 +294,7 @@ pub async fn merge(
     let inferred_schema = schema.clone();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let db = infra_db::get_db().await;
+    log::info!("[infra::schema::mod::merge]: Called get_for_update for {key}");
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
@@ -407,6 +408,7 @@ pub async fn update_setting(
     #[cfg(feature = "enterprise")]
     let metadata_for_update = metadata.clone();
     let db = infra_db::get_db().await;
+    log::info!("[infra::schema::mod::update_setting]: Called get_for_update for {key}");
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
@@ -484,6 +486,7 @@ pub async fn delete_fields(
     #[cfg(feature = "enterprise")]
     let deleted_fields_for_update = deleted_fields.clone();
     let db = infra_db::get_db().await;
+    log::info!("[infra::schema::mod::delete_fields]: Called get_for_update for {key}");
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
