@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </h6>
         <h6 class="text-center" v-else>
           {{ searchObj.data.histogram.errorMsg }}
-            {{ searchObj.data.histogram.errorDetail }}
+          {{ searchObj.data.histogram.errorDetail }}
         </h6>
       </div>
       <q-virtual-scroll
@@ -439,6 +439,7 @@ import {
   onMounted,
   onUpdated,
   onRenderTracked,
+  defineAsyncComponent,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -452,7 +453,6 @@ import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
 import JsonPreview from "./JsonPreview.vue";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { convertLogData } from "@/utils/logs/convertLogData";
 
 export default defineComponent({
@@ -463,7 +463,9 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     JsonPreview,
-    ChartRenderer,
+    ChartRenderer: defineAsyncComponent(
+      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+    ),
   },
   emits: [
     "update:scroll",

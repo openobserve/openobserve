@@ -48,12 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import { useI18n } from "vue-i18n";
 import BillingService from "@/services/billings";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { convertBillingData } from "@/utils/billing/convertBillingData";
 
 let currentDate = new Date(); // Get the current date and time
@@ -64,7 +63,9 @@ let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 export default defineComponent({
   name: "Usage",
   components: {
-    ChartRenderer,
+    ChartRenderer: defineAsyncComponent(
+      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+    ),
   },
   setup() {
     const { t } = useI18n();
