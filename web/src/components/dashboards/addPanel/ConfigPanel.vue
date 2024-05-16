@@ -935,7 +935,7 @@ export default defineComponent({
       //if { is not present add it at the start and than return
       if (openingBraceIndex === -1) {
         const newValue =
-          "{ " + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+          "{" + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
         return newValue;
       } else {
         const newValue =
