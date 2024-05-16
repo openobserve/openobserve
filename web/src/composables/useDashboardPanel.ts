@@ -2398,7 +2398,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.meta.stream.customQueryFields = [];
         dashboardPanelData.meta.parsedQuery.columns.forEach(
           (item: any, index: any) => {
-            let val;
+            let val: any;
             // if there is a lable, use that, else leave it
             if (item["as"] === undefined || item["as"] === null) {
               val = item["expr"]["column"];
