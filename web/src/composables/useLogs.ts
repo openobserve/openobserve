@@ -143,6 +143,7 @@ const defaultObject = {
       functions: <any>[],
       streamType: "logs",
       interestingFieldList: <string[]>[],
+      userDefinedSchema: <any>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -1856,6 +1857,7 @@ const useLogs = () => {
                 searchObj.data.stream.selectedStream.value
             ] = searchObj.data.stream.interestingFieldList;
             useLocalInterestingFields(localFields);
+            searchObj.data.stream.userDefinedSchema = stream.settings.defined_schema_fields || [];
           }
         }
 
