@@ -373,7 +373,7 @@ export default defineComponent({
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
-    } = useLogs();
+    } = defineAsyncComponent(() => import("@/composables/useLogs")());
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
