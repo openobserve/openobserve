@@ -226,6 +226,7 @@ import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   name: "PageSearch",
@@ -372,7 +373,7 @@ export default defineComponent({
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
-    } = defineAsyncComponent(() => import("@/composables/useLogs")());
+    } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();

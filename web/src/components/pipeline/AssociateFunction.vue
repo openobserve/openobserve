@@ -147,10 +147,10 @@ import {
   onBeforeMount,
   watch,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import AddFunction from "../functions/AddFunction.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 
 interface RouteCondition {
@@ -167,6 +167,10 @@ interface StreamRoute {
   destinationStreamType: string;
   conditions: RouteCondition[];
 }
+
+const AddFunction = defineAsyncComponent(
+  () => import("../functions/AddFunction.vue")
+);
 
 const props = defineProps({
   defaultOrder: {

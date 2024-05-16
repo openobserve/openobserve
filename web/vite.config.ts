@@ -143,8 +143,6 @@ export default defineConfig({
       ],
       manualChunks: {
         "o2cs-analytics": ["rudder-sdk-js"],
-        "o2cs-monaco-editor": ["monaco-editor"],
-        "o2cs-echarts": ["echarts"],
         lodash: ["lodash-es", "lodash/lodash.js"],
         "o2cs-moment": ["moment", "moment-timezone"],
         "o2cs-oo-rum": [
@@ -152,7 +150,7 @@ export default defineConfig({
           "@openobserve/browser-rum",
           "@openobserve/rrweb-player",
         ],
-        "vgl": ["vue3-grid-layout"],
+        vgl: ["vue3-grid-layout"],
         "o2cs-nsp": ["node-sql-parser/build/mysql"],
         "o2cs-date-fns": ["date-fns", "date-fns-tz"],
         "o2cs-map": ["@joakimono/echarts-extension-leaflet"],

@@ -89,7 +89,6 @@ import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
-import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 
 import { Parser } from "node-sql-parser/build/mysql";
@@ -101,7 +100,9 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue")
+    ),
     SyntaxGuide,
   },
   emits: ["searchdata", "date-change"],

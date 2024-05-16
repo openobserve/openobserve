@@ -251,6 +251,7 @@ import {
   onBeforeMount,
   watch,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
@@ -268,7 +269,6 @@ import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
-import QueryEditor from "@/components/QueryEditor.vue";
 import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
@@ -287,7 +287,9 @@ export default defineComponent({
     MetricList,
     DateTime,
     AutoRefreshInterval,
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue")
+    ),
     AddToDashboard,
     SyntaxGuideMetrics,
     PanelSchemaRenderer,

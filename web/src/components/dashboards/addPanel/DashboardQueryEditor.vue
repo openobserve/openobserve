@@ -153,13 +153,13 @@ import {
   onActivated,
   computed,
   onMounted,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { Parser } from "node-sql-parser/build/mysql";
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
-import QueryEditor from "../QueryEditor.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
@@ -167,7 +167,7 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(() => import("../QueryEditor.vue")),
     ConfirmDialog,
     QueryTypeSelector,
   },
@@ -408,7 +408,7 @@ export default defineComponent({
       }
 
       // Group By clause
-        if (latitude || longitude) {
+      if (latitude || longitude) {
         const aliases = [latitude?.alias, longitude?.alias]
           .filter(Boolean)
           .join(", ");
