@@ -252,6 +252,8 @@ import useLogs from "@/composables/useLogs";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "PageSearch",
@@ -829,6 +831,19 @@ export default defineComponent({
         dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
         dashboardPanelData.data.queries[0].fields.stream =
           searchObj.data.stream.selectedStream.value ?? "default";
+
+        const dateTime =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(dateTime.startTime),
+          end_time: new Date(dateTime.endTime),
+        };
+
         if (!isValid(true)) {
           return;
         }
