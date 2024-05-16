@@ -119,7 +119,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
-const { AddTemplate } = defineAsyncComponent(() => import("./index"));
+const AddTemplate = defineAsyncComponent(
+  () => import("@/components/alerts/AddTemplate.vue")
+);
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
