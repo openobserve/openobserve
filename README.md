@@ -114,6 +114,7 @@ OpenObserve is available in three different editions:
 | Role Based Access Control (RBAC) | ❌ | ✅ | ✅ |
 | Federated search / Super cluster | ❌ | ✅ | ❌ |
 | Query management | ❌ | ✅ | ❌ |
+| Workload management (QoS) | ❌ | ✅ | ❌ |
 | License | AGPL | Enterprise | Cloud |
 | Support | Community | Enterprise | Cloud |
 | Cost | Free | Paid | Paid |
