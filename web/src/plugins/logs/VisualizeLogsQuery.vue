@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
-                          :panelSchema="visualizeChartData"
+                          :panelSchema="chartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="{}"
                           :width="6"
@@ -170,11 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  computed,
   nextTick,
   watch,
-  reactive,
-  onMounted,
   defineAsyncComponent,
 } from "vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
@@ -185,20 +182,14 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
-import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQueryEditor.vue";
-import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { provide } from "vue";
 import { toRefs } from "vue";
+import { inject } from "vue";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
-});
-
-const QueryInspector = defineAsyncComponent(() => {
-  return import("@/components/dashboards/QueryInspector.vue");
 });
 
 const CustomHTMLEditor = defineAsyncComponent(() => {
@@ -225,40 +216,44 @@ export default defineComponent({
     ChartSelection,
     FieldList,
     DashboardQueryBuilder,
-    DateTimePickerDashboard,
     DashboardErrorsComponent,
     PanelSidebar,
     ConfigPanel,
-    VariablesValueSelector,
     PanelSchemaRenderer,
-    DashboardQueryEditor,
-    QueryInspector,
     CustomHTMLEditor,
     CustomMarkdownEditor,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "logs"
+    );
     const { t } = useI18n();
     const store = useStore();
-    const { dashboardPanelData, resetAggregationFunction, validatePanel } =
-      useDashboardPanelData("dashboard");
+    const { dashboardPanelData, resetAggregationFunction } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
 
     const { visualizeChartData }: any = toRefs(props);
+    const chartData = ref(visualizeChartData.value);
 
-    console.log(JSON.parse(JSON.stringify(visualizeChartData.value)));
+    watch(
+      () => visualizeChartData.value,
+      async () => {
+        await nextTick();
+        chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
+      }
+    );
 
     watch(
       () => dashboardPanelData.data.type,
       async () => {
-        // console.time("watch:dashboardPanelData.data.type");
         await nextTick();
-        visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data)
-        );
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       }
     );
 
@@ -343,7 +338,7 @@ export default defineComponent({
       store,
       metaDataValue,
       metaData,
-      visualizeChartData,
+      chartData,
     };
   },
 });
