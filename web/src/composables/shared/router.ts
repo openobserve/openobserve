@@ -15,56 +15,54 @@
 
 import { routeGuard } from "@/utils/zincutils";
 import Home from "@/views/HomeView.vue";
+import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
+import Tickets from "@/views/TicketsView.vue";
+import About from "@/views/About.vue";
+import MemberSubscription from "@/views/MemberSubscription.vue";
+import Error404 from "@/views/Error404.vue";
+
 const Search = () => import("@/views/Search.vue");
 const AppMetrics = () => import("@/views/AppMetrics.vue");
 const AppTraces = () => import("@/views/AppTraces.vue");
 
-import Tickets from "@/views/TicketsView.vue";
-import About from "@/views/About.vue";
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
-import MemberSubscription from "@/views/MemberSubscription.vue";
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Alerts = () => import("@/views/AppAlerts.vue");
-import Error404 from "@/views/Error404.vue";
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const DestinationList = () => import("@/components/alerts/DestinationList.vue");
 const Settings = () => import("@/components/settings/index.vue");
 
-// import Tickets from "@/views/TicketsView.vue";
-// import About from "@/views/About.vue";
-// const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
-// const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
-// import MemberSubscription from "@/views/MemberSubscription.vue";
-// const StreamExplorer = () => import("@/views/StreamExplorer.vue");
-// const LogStream = () => import("@/views/LogStream.vue");
-// const Alerts = () => import("@/views/AppAlerts.vue");
-// import Error404 from "@/views/Error404.vue";
-// const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
-// const AlertList = () => import("@/components/alerts/AlertList.vue");
-// const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-// const DestinationList = () => import("@/components/alerts/DestinationList.vue");
-// const Settings = () => import("@/components/settings/index.vue");
+const Functions = () => import("@/views/Functions.vue");
+const FunctionList = () => import("@/components/functions/FunctionList.vue");
+const AssociatedStreamFunction = () =>
+  import("@/components/functions/AssociatedStreamFunction.vue");
+const EnrichmentTableList = () =>
+  import("@/components/functions/EnrichmentTableList.vue");
+const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
+const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
+const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
+const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
+const AppErrors = () => import("@/views/RUM/AppErrors.vue");
+const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 
-// import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-// const Functions = () => import("@/views/Functions.vue");
-// const FunctionList = () => import("@/components/functions/FunctionList.vue");
-// const AssociatedStreamFunction = () =>
-//   import("@/components/functions/AssociatedStreamFunction.vue");
-// const EnrichmentTableList = () =>
-//   import("@/components/functions/EnrichmentTableList.vue");
-// const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
-// const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
-// const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
-// const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
-// const AppErrors = () => import("@/views/RUM/AppErrors.vue");
-// const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const ReportList = () => import("@/components/reports/ReportList.vue");
+const CreateReport = () => import("@/components/reports/CreateReport.vue");
 
-// const ReportList = () => import("@/components/reports/ReportList.vue");
-// const CreateReport = () => import("@/components/reports/CreateReport.vue");
+const PerformanceSummary = () =>
+  import("@/components/rum/performance/PerformanceSummary.vue");
+const WebVitalsDashboard = () =>
+  import("@/components/rum/performance/WebVitalsDashboard.vue");
+const ErrorsDashboard = () =>
+  import("@/components/rum/performance/ErrorsDashboard.vue");
+const ApiDashboard = () =>
+  import("@/components/rum/performance/ApiDashboard.vue");
+const StreamRouting = () => import("@/components/functions/StreamRouting.vue");
+const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
+const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
@@ -410,30 +408,30 @@ const useRoutes = () => {
     },
   ];
 
-  // if (config.isCloud === "false") {
-  //   homeChildRoutes.splice(
-  //     13,
-  //     0,
-  //     {
-  //       path: "/reports",
-  //       name: "reports",
-  //       component: ReportList,
-  //       props: true,
-  //       beforeEnter(to: any, from: any, next: any) {
-  //         routeGuard(to, from, next);
-  //       },
-  //     },
-  //     {
-  //       path: "/reports/create",
-  //       name: "createReport",
-  //       component: CreateReport,
-  //       props: true,
-  //       beforeEnter(to: any, from: any, next: any) {
-  //         routeGuard(to, from, next);
-  //       },
-  //     }
-  //   );
-  // }
+  if (config.isCloud === "false") {
+    homeChildRoutes.splice(
+      13,
+      0,
+      {
+        path: "/reports",
+        name: "reports",
+        component: ReportList,
+        props: true,
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "/reports/create",
+        name: "createReport",
+        component: CreateReport,
+        props: true,
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      }
+    );
+  }
 
   return { parentRoutes, homeChildRoutes };
 };
