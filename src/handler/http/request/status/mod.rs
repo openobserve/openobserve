@@ -449,14 +449,23 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 
 #[cfg(feature = "enterprise")]
 #[get("/dex_auth_proxy")]
-pub async fn dex_auth_proxy() -> Result<HttpResponse, Error> {
+pub async fn dex_auth_proxy(req: HttpRequest) -> Result<HttpResponse, Error> {
     use o2_enterprise::enterprise::dex::meta::auth::PreLoginData;
+    // Extract the X-Remote-User header from the request
+    let remote_user = match req.headers().get("X-Remote-User") {
+        Some(header_value) => header_value.to_str().unwrap_or_default(),
+        None => "",
+    };
 
     let login_data: PreLoginData = get_dex_auth_proxy();
     let state = login_data.state;
     let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
-
-    Ok(HttpResponse::Ok().json(login_data.url))
+    let redirect_url = format!("{}?X-Remote-User={}", login_data.url, remote_user);
+    // Redirect to login_data.url with the X-Remote-User header
+    Ok(HttpResponse::Found()
+        .insert_header(("X-Remote-User", remote_user))
+        .append_header((header::LOCATION, redirect_url))
+        .finish())
 }
 
 #[cfg(feature = "enterprise")]
