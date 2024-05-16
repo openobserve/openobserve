@@ -410,7 +410,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     // delete only one version
                     continue;
                 }
-                log::info!("Watching schema: Delete stream schema {}", item_key);
+                log::info!("Watching schema: deleted stream schema {}", item_key);
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
                 drop(w);
