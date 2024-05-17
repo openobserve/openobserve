@@ -4,6 +4,8 @@ on:
     paths:
       - "**/package-lock.json"
       - "**/package.json"
+    paths-ignore:
+      - "**.md"
 
 jobs:
   js-license-check:

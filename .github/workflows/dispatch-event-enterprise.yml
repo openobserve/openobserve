@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - "*"
+    paths-ignore:
+      - "**.md"
 env:
   GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 

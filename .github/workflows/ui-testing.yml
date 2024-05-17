@@ -9,8 +9,8 @@ on:
   pull_request:
     branches:
       - "*"
-    # paths:
-    #   - "web/**"
+    paths-ignore:
+      - "**.md"
 
 env:
   COLUMNS: 150

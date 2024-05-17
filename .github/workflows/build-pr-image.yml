@@ -5,7 +5,8 @@ on:
   pull_request:
     branches:
       - "*"
-
+    paths-ignore:
+      - "**.md"
 env:
     AWS_REGION: us-east-1
 

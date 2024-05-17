@@ -4,6 +4,9 @@ on:
     paths: 
       - '**/Cargo.toml'
       - '**/Cargo.lock'
+    paths-ignore:
+      - "**.md"
+
 jobs:
   security_audit:
     runs-on: ubuntu-latest

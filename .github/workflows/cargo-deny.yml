@@ -4,7 +4,8 @@ on:
     paths:
       - "**/Cargo.lock"
       - "**/Cargo.toml"
-
+    paths-ignore:
+      - "**.md"
 jobs:
   check:
     runs-on: ubuntu-latest
