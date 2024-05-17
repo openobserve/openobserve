@@ -221,19 +221,17 @@ const useSqlSuggestions = () => {
     autoCompleteKeywords.value = [];
     fieldKeywords = [];
     let itemObj: any = {};
-    nextTick(() => {
-      fields.forEach((field: any) => {
-        if (field.name == store.state.zoConfig.timestamp_column) {
-          return;
-        }
-        itemObj = {
-          label: field.name,
-          kind: "Field",
-          insertText: field.name,
-          insertTextRules: "InsertAsSnippet",
-        };
-        fieldKeywords.push(itemObj);
-      });
+    fields.forEach((field: any) => {
+      if (field.name == store.state.zoConfig.timestamp_column) {
+        return;
+      }
+      itemObj = {
+        label: field.name,
+        kind: "Field",
+        insertText: field.name,
+        insertTextRules: "InsertAsSnippet",
+      };
+      fieldKeywords.push(itemObj);
     });
     updateAutoComplete();
   };
