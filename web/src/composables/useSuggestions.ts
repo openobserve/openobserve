@@ -113,7 +113,8 @@ const defaultSuggestions = [
   {
     label: (_keyword: string) => `match_all_indexed_ignore_case('${_keyword}')`,
     kind: "Text",
-    insertText: (_keyword: string) => `match_all_indexed_ignore_case('${_keyword}')`,
+    insertText: (_keyword: string) =>
+      `match_all_indexed_ignore_case('${_keyword}')`,
   },
   {
     label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
@@ -121,9 +122,11 @@ const defaultSuggestions = [
     insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
   },
   {
-    label: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
+    label: (_keyword: string) =>
+      `str_match_ignore_case(fieldname, '${_keyword}')`,
     kind: "Text",
-    insertText: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
+    insertText: (_keyword: string) =>
+      `str_match_ignore_case(fieldname, '${_keyword}')`,
   },
 ];
 
@@ -135,8 +138,8 @@ const useSqlSuggestions = () => {
       cursorIndex: 0,
     },
     popup: {
-      open: (val: string) => { },
-      close: (val: string) => { },
+      open: (val: string) => {},
+      close: (val: string) => {},
     },
   });
   const autoCompleteSuggestions: any = ref([]);
@@ -144,7 +147,7 @@ const useSqlSuggestions = () => {
   const autoCompleteKeywords: any = ref([]);
   const store = useStore();
   const functionKeywords: any = ref([]);
-  const fieldKeywords: any = ref([]);
+  let fieldKeywords: any = [];
 
   function analyzeSqlWhereClause(whereClause: string, cursorIndex: number) {
     const labelMeta = {
@@ -188,7 +191,7 @@ const useSqlSuggestions = () => {
     ) {
       const values = Array.from(
         autoCompleteData.value.fieldValues[sqlWhereClause.meta.label] ||
-        new Set()
+          new Set()
       ).map((item) => {
         return {
           label: item,
@@ -207,14 +210,16 @@ const useSqlSuggestions = () => {
 
   const updateAutoComplete = () => {
     autoCompleteKeywords.value.push(...functionKeywords.value);
-    autoCompleteKeywords.value.push(...fieldKeywords.value);
+    for (const item of fieldKeywords) {
+      autoCompleteKeywords.value.push(item);
+    }
     autoCompleteKeywords.value.push(...defaultKeywords);
     autoCompleteSuggestions.value = [...defaultSuggestions];
   };
 
   const updateFieldKeywords = (fields: any[]) => {
     autoCompleteKeywords.value = [];
-    fieldKeywords.value = [];
+    fieldKeywords = [];
     let itemObj: any = {};
     nextTick(() => {
       fields.forEach((field: any) => {
@@ -227,10 +232,9 @@ const useSqlSuggestions = () => {
           insertText: field.name,
           insertTextRules: "InsertAsSnippet",
         };
-        fieldKeywords.value.push(itemObj);
-      });  
+        fieldKeywords.push(itemObj);
+      });
     });
-    
     updateAutoComplete();
   };
 

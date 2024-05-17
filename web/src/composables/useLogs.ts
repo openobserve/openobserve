@@ -2453,6 +2453,7 @@ const useLogs = () => {
   };
 
   const onStreamChange = async (queryStr: string) => {
+    searchObj.loadingStream = true;
     searchObj.data.queryResults = {
       hits: [],
     };
@@ -2533,6 +2534,7 @@ const useLogs = () => {
         errorDetail: "",
       };
       extractFields();
+      searchObj.loadingStream = false;
     }
   };
 
