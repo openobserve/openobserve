@@ -329,6 +329,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 w.insert(item_key.to_string(), settings);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                log::warn!(
+                    "Caching schema: updated stream schema {}, fieds num: {}, start_dt: {:?}",
+                    item_key,
+                    latest_schema.fields().len(),
+                    ts_range
+                );
                 w.insert(
                     item_key.to_string(),
                     SchemaCache::new(latest_schema.clone()),
@@ -410,7 +416,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     // delete only one version
                     continue;
                 }
-                log::info!("Watching schema: deleted stream schema {}", item_key);
+                log::warn!("Caching schema: deleted stream schema {}", item_key);
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
                 drop(w);
@@ -484,6 +490,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         w.insert(item_key.to_string(), settings);
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
+        log::warn!(
+            "Caching schema: cache stream schema {}, fieds num: {}",
+            item_key,
+            latest_schema.fields().len(),
+        );
         w.insert(
             item_key.to_string(),
             SchemaCache::new(latest_schema.clone()),

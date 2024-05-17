@@ -300,6 +300,7 @@ pub async fn delete_stream(
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    log::warn!("removing stream schema cache: {key}");
     w.remove(&key);
     drop(w);
 

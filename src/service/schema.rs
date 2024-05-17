@@ -335,6 +335,10 @@ pub fn generate_schema_for_defined_schema_fields(
 fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
+    log::info!(
+        "get_schema_changes: schema fields {}",
+        schema.fields_map().len()
+    );
 
     let stream_setting = unwrap_stream_settings(schema.schema());
     let defined_schema_fields = stream_setting
