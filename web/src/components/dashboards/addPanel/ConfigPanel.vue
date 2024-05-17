@@ -731,6 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type
           )
         "
+        :variablesData="variablesData"
       />
     </div>
   </div>
@@ -745,10 +746,11 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 
 export default defineComponent({
   components: { Drilldown, CommonAutoComplete },
-  props: ["dashboardPanelData"],
+  props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
+    console.log("variablesData", props.variablesData);
 
     const basemapTypeOptions = [
       {

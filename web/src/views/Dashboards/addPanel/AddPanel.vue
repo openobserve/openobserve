@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
+                  <ConfigPanel :dashboardPanelData="dashboardPanelData" :variablesData="variablesData" />
                 </PanelSidebar>
               </div>
             </div>
@@ -401,6 +401,8 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
+      console.log(variablesData, "variablesData");
+      
     };
     const currentDashboardData: any = reactive({
       data: {},
