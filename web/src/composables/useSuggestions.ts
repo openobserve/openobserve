@@ -233,7 +233,6 @@ const useSqlSuggestions = () => {
       };
       fieldKeywords.push(itemObj);
     });
-    
     updateAutoComplete();
   };
 
