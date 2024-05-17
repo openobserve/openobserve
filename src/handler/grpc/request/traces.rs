@@ -13,16 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{ider, CONFIG};
+use config::CONFIG;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
 use tonic::{codegen::*, Response, Status};
 
-use crate::service::traces::handle_trace_request;
+use crate::service::traces::{
+    flusher,
+    flusher::{ExportRequest, WriteBufferFlusher},
+};
 
-#[derive(Default)]
-pub struct TraceServer {}
+pub struct TraceServer {
+    pub flusher: Arc<WriteBufferFlusher>,
+}
 
 #[async_trait]
 impl TraceService for TraceServer {
@@ -39,39 +43,29 @@ impl TraceService for TraceServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let in_req = request.into_inner();
+        // let in_req = request.into_inner();
         let org_id = metadata.get(&CONFIG.grpc.org_header_key);
         if org_id.is_none() {
+            println!("{:?}", org_id);
             return Err(Status::invalid_argument(msg));
         }
 
-        let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
-
-        let default_session_id = tonic::metadata::MetadataValue::try_from(ider::uuid()).unwrap();
-        let session_id = metadata
-            .get("session_id")
-            .unwrap_or(&default_session_id)
-            .to_str()
-            .unwrap();
-        let resp = handle_trace_request(
-            org_id.unwrap().to_str().unwrap(),
-            0,
-            in_req,
-            true,
-            in_stream_name,
-            session_id,
-        )
-        .await;
-        if resp.is_ok() {
-            return Ok(Response::new(ExportTraceServiceResponse {
-                partial_success: None,
-            }));
-        } else {
-            Err(Status::internal(resp.err().unwrap().to_string()))
+        let request = tonic::Request::new(ExportRequest::ExportTraceServiceRequest(
+            request.into_inner(),
+        ));
+        match self.flusher.write(request).await {
+            Ok(resp) => match resp {
+                flusher::BufferedWriteResult::Success(_) => {
+                    Ok(Response::new(ExportTraceServiceResponse {
+                        partial_success: None,
+                    }))
+                }
+                flusher::BufferedWriteResult::Error(e) => Err(Status::internal(e)),
+            },
+            Err(e) => {
+                println!("{}", e);
+                Err(Status::internal(e.to_string()))
+            }
         }
     }
 }

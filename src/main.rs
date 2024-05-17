@@ -85,6 +85,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use openobserve::service::traces::flusher::WriteBufferFlusher;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -208,12 +209,13 @@ async fn main() -> Result<(), anyhow::Error> {
     job::init().await.expect("job init failed");
 
     // gRPC server
+    let tracer_flusher = Arc::new(WriteBufferFlusher::new());
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     if is_router(&LOCAL_NODE_ROLE) {
         init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     } else {
-        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
+        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx, tracer_flusher.clone())?;
     }
 
     // let node online
@@ -238,10 +240,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // init http server
     if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-        if let Err(e) = init_http_server_without_tracing().await {
+        if let Err(e) = init_http_server_without_tracing(tracer_flusher.clone()).await {
             log::error!("HTTP server runs failed: {}", e);
         }
-    } else if let Err(e) = init_http_server().await {
+    } else if let Err(e) = init_http_server(tracer_flusher.clone()).await {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
@@ -289,6 +291,7 @@ async fn main() -> Result<(), anyhow::Error> {
 fn init_common_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
+    tracer_flusher: Arc<WriteBufferFlusher>,
 ) -> Result<(), anyhow::Error> {
     let ip = if !CONFIG.grpc.addr.is_empty() {
         CONFIG.grpc.addr.clone()
@@ -317,7 +320,11 @@ fn init_common_grpc_server(
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let tracer = TraceServer::default();
+
+    let flush_shutdown_tx = tracer_flusher.get_shutdown_tx().unwrap();
+    let tracer = TraceServer {
+        flusher: tracer_flusher,
+    };
     let trace_svc = TraceServiceServer::new(tracer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -336,6 +343,7 @@ fn init_common_grpc_server(
             .add_service(logs_svc)
             .serve_with_shutdown(gaddr, async {
                 shutdown_rx.await.ok();
+                let _ = flush_shutdown_tx.send(());
                 log::info!("gRPC server starts shutting down");
             })
             .await
@@ -384,7 +392,7 @@ fn init_router_grpc_server(
     Ok(())
 }
 
-async fn init_http_server() -> Result<(), anyhow::Error> {
+async fn init_http_server(_tracer_flusher: Arc<WriteBufferFlusher>) -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
@@ -399,6 +407,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         };
         format!("{}:{}", ip, CONFIG.http.port).parse()?
     };
+
+    let tracer_flusher = WriteBufferFlusher::new();
+    let flush_shutdown_tx = tracer_flusher.get_shutdown_tx().unwrap();
+    let tracer_flusher = web::Data::new(tracer_flusher);
 
     let server = HttpServer::new(move || {
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
@@ -441,9 +453,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes),
             )
         }
+
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id%10))
+            .app_data(tracer_flusher.clone())
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
@@ -468,12 +482,15 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let handle = server.handle();
     tokio::task::spawn(async move {
         graceful_shutdown(handle).await;
+        let _ = flush_shutdown_tx.send(());
     });
     server.await?;
     Ok(())
 }
 
-async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
+async fn init_http_server_without_tracing(
+    _tracer_flusher: Arc<WriteBufferFlusher>,
+) -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 

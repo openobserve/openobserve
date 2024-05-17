@@ -29,7 +29,10 @@ use crate::{
         utils::http::RequestHeaderExtractor,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::{search as SearchService, traces::otlp_http},
+    service::{
+        search as SearchService,
+        traces::{flusher::WriteBufferFlusher, otlp_http},
+    },
 };
 
 /// TracesIngest
@@ -52,8 +55,9 @@ pub async fn traces_write(
     thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
+    flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
-    handle_req(org_id, thread_id, req, body).await
+    handle_req(org_id, thread_id, req, body, flusher).await
 }
 
 #[post("/{org_id}/v1/traces")]
@@ -62,8 +66,9 @@ pub async fn otlp_traces_write(
     thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
+    flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
-    handle_req(org_id, thread_id, req, body).await
+    handle_req(org_id, thread_id, req, body, flusher).await
 }
 
 async fn handle_req(
@@ -71,6 +76,7 @@ async fn handle_req(
     thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
+    flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
@@ -79,9 +85,9 @@ async fn handle_req(
         .get(&CONFIG.grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        otlp_http::traces_proto(&org_id, **thread_id, body, in_stream_name).await
+        otlp_http::traces_proto(&org_id, **thread_id, body, in_stream_name, flusher).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        otlp_http::traces_json(&org_id, **thread_id, body, in_stream_name).await
+        otlp_http::traces_json(&org_id, **thread_id, body, in_stream_name, flusher).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(

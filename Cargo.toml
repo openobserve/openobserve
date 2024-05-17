@@ -106,13 +106,7 @@ opentelemetry-otlp = { version = "0.15", features = [
   "serde",
   "reqwest-client",
 ] }
-opentelemetry-proto = { version = "0.5", features = [
-  "gen-tonic",
-  "serde",
-  "logs",
-  "metrics",
-  "trace",
-] }
+opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.3"
@@ -161,6 +155,7 @@ infra.workspace = true
 ingester.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
+crossbeam-channel.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -186,6 +181,7 @@ infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
+openobserve = { path = "" }
 
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.5"
@@ -284,3 +280,12 @@ utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 async-walkdir = "1.0.0"
 zstd = "0.13"
+opentelemetry-proto = { version = "0.5", features = [
+  "gen-tonic",
+  "serde",
+  "logs",
+  "metrics",
+  "trace",
+] }
+crossbeam-channel = "0.5.11"
+futures-locks = "0.7.1"

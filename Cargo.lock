@@ -4260,11 +4260,13 @@ dependencies = [
  "itertools 0.12.1",
  "log",
  "once_cell",
+ "opentelemetry-proto",
  "parquet",
  "serde",
  "serde_json",
  "snafu 0.7.5",
  "tokio",
+ "tonic 0.11.0",
  "wal",
 ]
 
@@ -5275,6 +5277,7 @@ dependencies = [
  "config",
  "console-subscriber",
  "cron",
+ "crossbeam-channel",
  "csv",
  "dashmap",
  "datafusion",
