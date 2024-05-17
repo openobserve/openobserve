@@ -455,6 +455,7 @@ const useLogs = () => {
       query["type"] = searchObj.meta.pageType;
     }
 
+    query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
@@ -2306,6 +2307,13 @@ const useLogs = () => {
       searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       searchObj.data.query = b64DecodeUnicode(queryParams.query);
     }
+
+    if (
+      queryParams.hasOwnProperty("defined_schemas") &&
+      queryParams.defined_schemas != ""
+    ) {
+      searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
+    }
     if (queryParams.refresh) {
       searchObj.meta.refreshInterval = queryParams.refresh;
     }
@@ -2354,6 +2362,7 @@ const useLogs = () => {
         to: date.endTime,
         period: date.relativeTimePeriod,
         sql_mode: searchObj.meta.sqlMode,
+        defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
   };
