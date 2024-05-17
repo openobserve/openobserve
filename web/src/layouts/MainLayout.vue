@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <img
             class="appLogo"
-            loading="eager"
+            loading="lazy"
             :src="
               store?.state?.theme == 'dark'
                 ? getImageURL('images/common/open_observe_logo_2.svg')
@@ -70,12 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
-            loading="eager"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/open_observe_logo_2.svg')
-                : getImageURL('images/common/open_observe_logo.svg')
-            "
+            loading="lazy"
+            :src="getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
@@ -110,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Upgrade to PRO Plan</q-btn
           >
         </div>
-        <!-- <ThemeSwitcher></ThemeSwitcher> -->
+        <ThemeSwitcher></ThemeSwitcher>
         <template v-if="config.isCloud !== 'true'">
           <q-btn
             class="q-ml-xs no-border"
@@ -338,7 +334,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
-// import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import {
   outlinedHome,
   outlinedSearch,
@@ -392,6 +388,7 @@ export default defineComponent({
     "q-select": QSelect,
     SlackIcon,
     ManagementIcon,
+    ThemeSwitcher,
   },
   methods: {
     navigateToDocs() {

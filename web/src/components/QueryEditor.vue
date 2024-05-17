@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-query-editor"
     ref="editorRef"
     :id="editorId"
-  ></div>
+  />
 </template>
 
 <script lang="ts">
@@ -74,6 +74,10 @@ export default defineComponent({
     readOnly: {
       type: Boolean,
       default: false,
+    },
+    language: {
+      type: String,
+      default: "sql",
     },
   },
   emits: ["update-query", "run-query", "update:query"],
@@ -148,7 +152,7 @@ export default defineComponent({
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query,
-        language: "sql",
+        language: props.language,
         theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         showFoldingControls: "never",
         wordWrap: "on",
@@ -249,49 +253,51 @@ export default defineComponent({
 
     const registerAutoCompleteProvider = () => {
       if (!props.showAutoComplete) return;
-      provider.value = monaco.languages.registerCompletionItemProvider("sql", {
-        provideCompletionItems: function (model, position) {
-          // find out if we are completing a property in the 'dependencies' object.
-          var textUntilPosition = model.getValueInRange({
-            startLineNumber: 1,
-            startColumn: 1,
-            endLineNumber: position.lineNumber,
-            endColumn: position.column,
-          });
-
-          var word = model.getWordUntilPosition(position);
-          var range = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: word.startColumn,
-            endColumn: word.endColumn,
-          };
-
-          let arr = textUntilPosition.trim().split(" ");
-          let filteredSuggestions = [];
-          filteredSuggestions = createDependencyProposals(range);
-          filteredSuggestions = filteredSuggestions.filter((item) => {
-            return item.label.toLowerCase().includes(word.word.toLowerCase());
-          });
-
-          // if (filteredSuggestions.length == 0) {
-          const lastElement = arr.pop();
-          props.suggestions.forEach((suggestion: any) => {
-            filteredSuggestions.push({
-              label: suggestion.label(lastElement),
-              kind: monaco.languages.CompletionItemKind[
-                suggestion.kind || "Text"
-              ],
-              insertText: suggestion.insertText(lastElement),
-              range: range,
+      provider.value = monaco.languages.registerCompletionItemProvider(
+        props.language,
+        {
+          provideCompletionItems: function (model, position) {
+            // find out if we are completing a property in the 'dependencies' object.
+            var textUntilPosition = model.getValueInRange({
+              startLineNumber: 1,
+              startColumn: 1,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
             });
-          });
 
-          return {
-            suggestions: filteredSuggestions,
-          };
-        },
-      });
+            var word = model.getWordUntilPosition(position);
+            var range = {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: word.startColumn,
+              endColumn: word.endColumn,
+            };
+
+            let arr = textUntilPosition.trim().split(" ");
+            let filteredSuggestions = [];
+            filteredSuggestions = createDependencyProposals(range);
+            filteredSuggestions = filteredSuggestions.filter((item) => {
+              return item.label.toLowerCase().includes(word.word.toLowerCase());
+            });
+
+            const lastElement = arr.pop();
+            props.suggestions.forEach((suggestion: any) => {
+              filteredSuggestions.push({
+                label: suggestion.label(lastElement),
+                kind: monaco.languages.CompletionItemKind[
+                  suggestion.kind || "Text"
+                ],
+                insertText: suggestion.insertText(lastElement),
+                range: range,
+              });
+            });
+
+            return {
+              suggestions: filteredSuggestions,
+            };
+          },
+        }
+      );
     };
 
     const resetEditorLayout = () => {

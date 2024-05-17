@@ -415,8 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%" class="text-bold"
-style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
@@ -941,20 +940,21 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 $streamSelectorHeight: 44px;
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-  }
-}
 
 .index-menu {
   width: 100%;
+
+  .q-menu {
+    box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(0.5rem);
+    border-radius: 0px;
+
+    .q-virtual-scroll__content {
+      padding: 0.5rem;
+    }
+  }
 
   .q-field {
     &__control {
@@ -1032,6 +1032,7 @@ $streamSelectorHeight: 44px;
       display: inline;
       z-index: 2;
       left: 0;
+      height: 20px;
       // text-transform: capitalize;
     }
 
@@ -1073,82 +1074,71 @@ $streamSelectorHeight: 44px;
       }
     }
   }
-}
 
-.theme-dark {
-  .field_list {
-    &:hover {
-      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
+  &.theme-dark {
+    .field_list {
+      &:hover {
+        box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
 
-      .field_overlay {
-        background-color: #3f4143;
-        opacity: 1;
+        .field_overlay {
+          background-color: #3f4143;
+          opacity: 1;
+        }
       }
     }
   }
-}
 
-.theme-light {
-  .field_list {
-    &:hover {
-      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+  &.theme-light {
+    .field_list {
+      &:hover {
+        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
 
-      .field_overlay {
-        background-color: #e8e8e8;
-        opacity: 1;
+        .field_overlay {
+          background-color: #e8e8e8;
+          opacity: 1;
+        }
       }
     }
   }
-}
 
-.q-item {
-  min-height: 1.3rem;
-  padding: 5px 10px;
+  .q-item {
+    min-height: 1.3rem;
+    padding: 5px 10px;
 
-  &__label {
-    font-size: 0.75rem;
+    &__label {
+      font-size: 0.75rem;
+    }
+
+    &.q-manual-focusable--focused > .q-focus-helper {
+      background: currentColor !important;
+      opacity: 0.3 !important;
+    }
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
+  .q-field--dense .q-field__before,
+  .q-field--dense .q-field__prepend {
+    padding: 0px 0px 0px 0px;
+    height: auto;
+    line-height: auto;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    // background-color: $selected-list-bg !important;
+  .q-field__native,
+  .q-field__input {
+    padding: 0px 0px 0px 0px;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
+  .q-field--dense .q-field__label {
+    top: 5px;
   }
-}
 
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
-  height: auto;
-  line-height: auto;
-}
-
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
+  .q-field--dense .q-field__control,
+  .q-field--dense .q-field__marginal {
+    height: 34px;
+  }
 }
 </style>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .index-table {
   .q-table {
     width: 100%;
@@ -1195,6 +1185,11 @@ $streamSelectorHeight: 44px;
         img {
           width: 12px;
           height: 12px;
+        }
+
+        .q-icon {
+          font-size: 18px;
+          color: #808080;
         }
       }
     }

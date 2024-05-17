@@ -476,26 +476,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'empty-query'
                   : ''
               "
-            ></query-editor>
+            />
           </template>
           <template #after>
             <div
               data-test="logs-vrl-function-editor"
               v-show="searchObj.meta.toggleFunction"
-              style="height: 100%"
+              style="width: 100%; height: 100%"
             >
-              <div
+              <query-editor
                 data-test="logs-vrl-function-editor"
                 ref="fnEditorRef"
-                id="fnEditor"
-                style="height: 100%"
+                editor-id="fnEditor"
+                class="monaco-editor"
+                v-model:query="searchObj.data.tempFunctionContent"
                 :class="
                   searchObj.data.tempFunctionContent == '' &&
                   searchObj.meta.functionEditorPlaceholderFlag
                     ? 'empty-function'
                     : ''
                 "
-              ></div>
+                language="ruby"
+              />
             </div>
           </template>
         </q-splitter>
@@ -1005,7 +1007,6 @@ export default defineComponent({
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
     let confirmCallback;
-    let fnEditorobj: any = null;
     let streamName = "";
 
     const parser = new Parser();
@@ -1310,19 +1311,19 @@ export default defineComponent({
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
-        fnEditorobj.setValue(fnContent);
-        fnEditorobj.layout();
+        fnEditorRef.value.setValue(fnContent);
+        fnEditorRef.value.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
       }
 
       window.addEventListener("click", () => {
-        fnEditorobj.layout();
+        fnEditorRef.value.resetEditorLayout();
       });
     });
 
     onUnmounted(() => {
       window.removeEventListener("click", () => {
-        fnEditorobj.layout();
+        fnEditorRef.value.resetEditorLayout();
       });
     });
 
@@ -1337,26 +1338,26 @@ export default defineComponent({
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
-        fnEditorobj.setValue(fnContent);
-        fnEditorobj.layout();
+        fnEditorRef.value.setValue(fnContent);
+        fnEditorRef.value.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
         window.removeEventListener("click", () => {
-          fnEditorobj.layout();
+          fnEditorRef.value.resetEditorLayout();
         });
       }
-      fnEditorobj.layout();
+      fnEditorRef.value.resetEditorLayout();
     });
 
     onDeactivated(() => {
       window.removeEventListener("click", () => {
-        fnEditorobj.layout();
+        fnEditorRef.value.resetEditorLayout();
       });
     });
 
     const saveFunction = () => {
       saveFunctionLoader.value = true;
       let callTransform: Promise<{ data: any }>;
-      const content = fnEditorobj.getValue();
+      const content = searchObj.data.tempFunctionContent;
       let fnName = "";
       if (isSavedFunctionAction.value == "create") {
         fnName = savedFunctionName.value;
@@ -1478,7 +1479,7 @@ export default defineComponent({
     };
 
     const resetFunctionContent = () => {
-      fnEditorobj.setValue("");
+      fnEditorRef.value.setValue("");
       store.dispatch("setSavedFunctionDialog", false);
       isSavedFunctionAction.value = "create";
       savedFunctionName.value = "";
@@ -1489,7 +1490,8 @@ export default defineComponent({
     const resetEditorLayout = () => {
       setTimeout(() => {
         queryEditorRef.value.resetEditorLayout();
-        fnEditorobj.layout();
+        console.log("resetEditorLayout", fnEditorRef.value);
+        fnEditorRef.value.resetEditorLayout();
       }, 100);
     };
 
@@ -1503,13 +1505,13 @@ export default defineComponent({
       }
       searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
-      fnEditorobj.setValue(fnValue.function);
+      fnEditorRef.value.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
     };
 
     const fnSavedFunctionDialog = () => {
-      const content = fnEditorobj.getValue();
+      const content = searchObj.data.tempFunctionContent;
       if (content == "") {
         $q.notify({
           type: "negative",
@@ -2223,7 +2225,6 @@ export default defineComponent({
       store,
       router,
       fnEditorRef,
-      fnEditorobj,
       searchObj,
       queryEditorRef,
       confirmDialogVisible,
