@@ -330,7 +330,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 log::warn!(
-                    "Caching schema: updated stream schema {}, fieds num: {}, start_dt: {:?}",
+                    "Caching schema: updated stream schema {}, fields num: {}, start_dt: {:?}",
                     item_key,
                     latest_schema.fields().len(),
                     ts_range
@@ -491,7 +491,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         log::warn!(
-            "Caching schema: cache stream schema {}, fieds num: {}",
+            "Caching schema: cache stream schema {}, fields num: {}",
             item_key,
             latest_schema.fields().len(),
         );

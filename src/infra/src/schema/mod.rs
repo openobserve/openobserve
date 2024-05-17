@@ -111,9 +111,11 @@ pub async fn get_from_db(
             }
         }
     };
-    if ret.fields().is_empty() {
-        log::error!("Schema is empty from db for {key}");
-    }
+    log::warn!(
+        "Schema cache is not exist, get from db for stream {}, fields num: {}",
+        key,
+        ret.fields().len()
+    );
     Ok(ret)
 }
 
