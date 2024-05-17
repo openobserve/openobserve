@@ -198,7 +198,7 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="add-alert-name-input"]').type("e2e@@@@@");
     await page.waitForTimeout(2000);
     await page
-      .locator(".q-card__actions > .bg-primary > .q-btn__content")
+      .locator('[data-test="saved-view-dialog-save-btn"]')
       .click({
         force: true,
       });
@@ -472,7 +472,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding only blank spaces under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textarea').fill('.a=2');
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill(' ');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
@@ -482,7 +482,7 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding invalid characters under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.locator('#fnEditor').getByRole('textarea').fill('.a=2');
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill('e2e@@@');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
