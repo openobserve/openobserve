@@ -8,7 +8,7 @@ const folderName = `Folder ${Date.now()}`
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
-      // await page.getByText('Login as internal user').click();
+    await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -390,5 +390,32 @@ test('create stream and delete it', async ({ page }) => {
   await page.getByRole('button', { name: 'Delete' }).click();
   await page.getByRole('button', { name: 'Ok' }).click();
 });
+
+test('should display pagination even after clicking result summary', async ({ page }) => {
+  await page.waitForTimeout(2000)
+  await page.locator('[data-test="log-table-column-0-\\@timestamp"]').click();
+  await page.locator('[data-test="close-dialog"]').click();
+  await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
+})
+
+test('should change settings successfully', async ({ page }) => {
+  await page.waitForTimeout(2000)
+  await page.locator('[data-test="menu-link-\\/settings\\/-item"]').click();
+  await page.waitForTimeout(2000)
+  await page.getByText('General SettingsScrape').click();
+  await page.getByRole('tab', { name: 'Settings' }).click();
+  await page.getByLabel('Scrape Interval (In Seconds) *').fill('16');
+  await page.locator('[data-test="dashboard-add-submit"]').click();
+  await page.getByText('Organization settings updated').click();
+})
+
+test('should display results on click refresh stats', async ({ page }) => {
+  await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+  await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
+  page.reload();
+  await page.getByRole('cell', { name: '01', exact: true }).click();
+  
+})
+
 
 })
