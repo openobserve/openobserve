@@ -550,7 +550,7 @@ style="opacity: 0.7">
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch, computed } from "vue";
+import { defineComponent, ref, type Ref, watch, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
