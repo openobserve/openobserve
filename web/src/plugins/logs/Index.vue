@@ -406,6 +406,16 @@ export default defineComponent({
     const searchBarRef = ref(null);
     let parser: any;
     const expandedLogs = ref({});
+    const splitterModel = ref(10);
+
+    watch(
+      () => splitterModel.value,
+      (val) => {
+        console.log("splitterModel", val);
+        
+        window.dispatchEvent(new Event("resize"));
+      }
+    );
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -885,7 +895,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
-      splitterModel: ref(10),
+      splitterModel,
       // loadPageData,
       getQueryData,
       searchResultRef,

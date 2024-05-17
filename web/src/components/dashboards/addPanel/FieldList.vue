@@ -298,6 +298,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+Z</div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery == false
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-data"
@@ -358,6 +363,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+W</div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery == false
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-geomap-data"
@@ -418,6 +428,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+V</div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery == false
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-sankey-data"
@@ -714,12 +729,23 @@ export default defineComponent({
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
+      let filtered = [...dashboardPanelData.meta.stream.customQueryFields];
+
       if (terms != "") {
         terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
+        for (
+          let i = 0;
+          i < dashboardPanelData.meta.stream.selectedStreamFields.length;
+          i++
+        ) {
+          if (
+            dashboardPanelData.meta.stream.selectedStreamFields[i]["name"]
+              .toLowerCase()
+              .includes(terms)
+          ) {
+            filtered.push(
+              dashboardPanelData.meta.stream.selectedStreamFields[i]
+            );
           }
         }
       }
