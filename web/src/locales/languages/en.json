@@ -114,7 +114,7 @@
     "regionTitle": "Select Region",
     "userDefinedSchemaLabel": "User Defined Schema",
     "allFieldsLabel": "All Fields",
-    "allFieldsWarningMsg": "When dealing with a significant number of schema fields, expect some delay in processing. This may lead to a decline in UI performance."
+    "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately."
   },
   "menu": {
     "home": "Home",
