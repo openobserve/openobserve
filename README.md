@@ -115,6 +115,7 @@ OpenObserve is available in three different editions:
 | Federated search / Super cluster | ❌ | ✅ | ❌ |
 | Query management | ❌ | ✅ | ❌ |
 | Workload management (QoS) | ❌ | ✅ | ❌ |
+| Audit trail | ❌ | ✅ | ❌ |
 | License | AGPL | Enterprise | Cloud |
 | Support | Community | Enterprise | Cloud |
 | Cost | Free | Paid | Paid |
