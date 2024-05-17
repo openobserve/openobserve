@@ -293,7 +293,7 @@ export default defineComponent({
           }
         }
         settingsService
-          .createLogo(orgIdentifier, formData)
+          .createLogo(store.state.selectedOrganization?.identifier || orgIdentifier, formData)
           .then(async (res) => {
             if (res.status == 200) {
               q.notify({
@@ -343,7 +343,7 @@ export default defineComponent({
         }
       }
       settingsService
-        .deleteLogo(orgIdentifier)
+        .deleteLogo(store.state.selectedOrganization?.identifier || orgIdentifier)
         .then(async (res: any) => {
           if (res.status == 200) {
             q.notify({
@@ -385,7 +385,7 @@ export default defineComponent({
       }
 
       settingsService
-        .updateCustomText(orgIdentifier, "custom_logo_text", customText.value)
+        .updateCustomText(store.state.selectedOrganization?.identifier || orgIdentifier, "custom_logo_text", customText.value)
         .then(async (res: any) => {
           if (res.status == 200) {
             q.notify({
