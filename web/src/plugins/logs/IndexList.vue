@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column index-menu full-height"
+    class="column logs-index-menu full-height"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div>
@@ -943,7 +943,7 @@ export default defineComponent({
 <style lang="scss">
 $streamSelectorHeight: 44px;
 
-.index-menu {
+.logs-index-menu {
   width: 100%;
 
   .q-menu {

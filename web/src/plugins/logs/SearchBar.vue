@@ -1315,10 +1315,6 @@ export default defineComponent({
         fnEditorRef.value.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
       }
-
-      window.addEventListener("click", () => {
-        fnEditorRef.value.resetEditorLayout();
-      });
     });
 
     onUnmounted(() => {
