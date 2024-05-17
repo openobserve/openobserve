@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Upgrade to PRO Plan</q-btn
           >
         </div>
-        <!-- <ThemeSwitcher></ThemeSwitcher> -->
+        <ThemeSwitcher></ThemeSwitcher>
         <template v-if="config.isCloud !== 'true'">
           <q-btn
             class="q-ml-xs no-border"
@@ -334,7 +334,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
-// import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import {
   outlinedHome,
   outlinedSearch,

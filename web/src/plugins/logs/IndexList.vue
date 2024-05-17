@@ -902,7 +902,7 @@ export default defineComponent({
         await extractFields();
         searchObj.loadingStream = false;
       }, 0);
-    }
+    };
 
     return {
       t,
