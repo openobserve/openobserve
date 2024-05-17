@@ -441,7 +441,7 @@ style="opacity: 0.7">
               size="8px"
               color="white"
               text-color="primary"
-              @update:model-value="extractFields"
+              @update:model-value="toggleSchema"
               :options="userDefinedSchemaBtnGroupOption"
             >
               <template v-slot:user_defined_slot>
@@ -550,7 +550,7 @@ style="opacity: 0.7">
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch, computed } from "vue";
+import { defineComponent, ref, type Ref, watch, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -894,6 +894,14 @@ export default defineComponent({
       rowsPerPage: 25,
     });
 
+    const toggleSchema = async () => {
+      searchObj.loadingStream = true;
+      setTimeout(async () => {
+        await extractFields();
+        searchObj.loadingStream = false;
+      }, 0);
+    }
+
     return {
       t,
       store,
@@ -918,6 +926,7 @@ export default defineComponent({
       extractFields,
       userDefinedSchemaBtnGroupOption,
       pagination,
+      toggleSchema,
       pagesNumber: computed(() => {
         return Math.ceil(
           searchObj.data.stream.selectedStreamFields.length /
