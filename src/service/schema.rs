@@ -304,7 +304,7 @@ async fn handle_diff_schema(
 
 // if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
 // then we will use defined_schema_fields
-pub fn generate_schema_for_defined_schema_fields(
+fn generate_schema_for_defined_schema_fields(
     schema: &SchemaCache,
     fields: &[String],
 ) -> SchemaCache {
