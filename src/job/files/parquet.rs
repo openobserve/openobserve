@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
+use anyhow::Context;
 use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
@@ -622,8 +623,19 @@ pub(crate) async fn generate_index_on_ingester(
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
+    let debug_schem = buf[0].schema().clone();
+
     let index_record_batches =
-        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await.map_err(|e| {
+            anyhow::anyhow!(
+                "prepare_index_record_batches_v1 error, record_batch schema {}, org/stream {}/{}. new_file_key, {}. Error {}",
+                debug_schem,
+                org_id,
+                stream_name,
+                new_file_key,
+                e
+            )
+        })?;
     let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
     if record_batches.is_empty() {
         return Ok(());
@@ -653,7 +665,17 @@ pub(crate) async fn generate_index_on_ingester(
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
 
-    let json_rows = record_batches_to_json_rows(&record_batches)?;
+    let debug_schema = record_batches[0].schema().clone();
+    let json_rows = record_batches_to_json_rows(&record_batches).map_err(|e|
+        anyhow::anyhow!(
+            "record_batches_to_json_rows error, index_record_batch schema {}, org/stream {}/{}. new_file_key, {}. Error {}",
+            debug_schema,
+            org_id,
+            stream_name,
+            new_file_key,
+            e
+        )
+    )?;
     let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     for record_val in recs {
         let timestamp: i64 = record_val
