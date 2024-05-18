@@ -15,7 +15,6 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use anyhow::Context;
 use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
