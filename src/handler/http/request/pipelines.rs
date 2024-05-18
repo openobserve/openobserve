@@ -113,7 +113,7 @@ async fn list_pipelines(
             &org_id,
             user_id.to_str().unwrap(),
             "GET",
-            "pipeline",
+            "logs",
         )
         .await
         {

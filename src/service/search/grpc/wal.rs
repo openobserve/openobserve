@@ -76,6 +76,7 @@ pub async fn search_parquet(
     let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let files = get_file_list(
@@ -261,9 +262,14 @@ pub async fn search_parquet(
 
         // cacluate the diff between latest schema and group schema
         let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_select_start_search_schema(
+                &sql,
+                &schema,
+                &schema_latest_map,
+                &defined_schema_fields,
+            )?
         } else {
-            generate_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_search_schema(&sql, &schema, &schema_latest_map)?
         };
 
         let datafusion_span = info_span!(
@@ -384,10 +390,8 @@ pub async fn search_memtable(
     let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    // let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
-    // let partition_time_level =
-    // unwrap_partition_time_level(schema_settings.partition_time_level,
-    // stream_type);
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     let mut scan_stats = ScanStats::new();
 
@@ -465,9 +469,14 @@ pub async fn search_memtable(
 
         // cacluate the diff between latest schema and group schema
         let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_select_start_search_schema(
+                &sql,
+                &schema,
+                &schema_latest_map,
+                &defined_schema_fields,
+            )?
         } else {
-            generate_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_search_schema(&sql, &schema, &schema_latest_map)?
         };
 
         for batch in record_batches.iter_mut() {

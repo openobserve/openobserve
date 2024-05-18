@@ -205,7 +205,6 @@ pub async fn search(
     }
 
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
-
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
             query_fn = Some(format!("{} \n .", vrl_function));
@@ -420,9 +419,14 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
     };
-    let query_fn = query
+    let mut query_fn = query
         .get("query_fn")
         .and_then(|v| base64::decode_url(v).ok());
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
 
     let default_sql = format!("SELECT * FROM \"{}\" ", stream_name);
     let around_sql = match query.get("sql") {
@@ -446,6 +450,7 @@ pub async fn around(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
@@ -930,6 +935,7 @@ async fn values_v1(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
@@ -981,7 +987,7 @@ async fn values_v1(
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let schema = if let Some(schema) = r.get(&key) {
-        schema.clone()
+        schema.schema().clone()
     } else {
         arrow_schema::Schema::empty()
     };
@@ -1165,6 +1171,7 @@ async fn values_v2(
     let regions = query.get("regions").map_or("", |v| v.as_str());
     let regions = regions
         .split(',')
+        .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 

@@ -18,13 +18,15 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::infra::cluster;
 
-const QUERIER_ROUTES: [&str; 16] = [
+const QUERIER_ROUTES: [&str; 18] = [
     "/config",
     "/summary",
     "/organizations",
     "/settings",
     "/schema",
     "/streams",
+    "/clusters",
+    "/query_manager",
     "/_search",
     "/_around",
     "/_values",

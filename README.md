@@ -90,6 +90,38 @@ For other ways to quickly install OpenObserve or use OpenObserve cloud, check [q
 
 For installing OpenObserve in HA mode, check [HA deployment documentation](https://openobserve.ai/docs/ha_deployment/).
 
+## Enterprise Vs Open source Vs Cloud edition
+
+OpenObserve is available in three different editions:
+
+
+| Feature | Open Source (Self hosted) | Enterprise (Self hosted) | Cloud |
+| --- | --- | --- | --- | 
+| Logs | ✅ | ✅ | ✅ |
+| Metrics | ✅ | ✅ | ✅ |
+| Traces | ✅ | ✅ | ✅ |
+| RUM | ✅ | ✅ | ✅ |
+| Alerts | ✅ | ✅ | ✅ |
+| Dashboards | ✅ | ✅ | ✅ |
+| Reports | ✅ | ✅ | ✅ |
+| VRL functions | ✅ | ✅ | ✅ |
+| Pipelines | ✅ | ✅ | ✅ |
+| High Availability | ✅ | ✅ | ✅ |
+| Multitenancy (Organizations) | ✅ | ✅ | ✅ |
+| Dynamic schema and schema evolution | ✅ | ✅ | ✅ |
+| Advanced multilingual GUI | ✅ | ✅ | ✅ |
+| Single Sign On | ❌ | ✅ | ✅ |
+| Role Based Access Control (RBAC) | ❌ | ✅ | ✅ |
+| Federated search / Super cluster | ❌ | ✅ | ❌ |
+| Query management | ❌ | ✅ | ❌ |
+| Workload management (QoS) | ❌ | ✅ | ❌ |
+| Audit trail | ❌ | ✅ | ❌ |
+| License | AGPL | Enterprise | Cloud |
+| Support | Community | Enterprise | Cloud |
+| Cost | Free | Paid | Paid |
+
+
+
 ## 📷 Screenshots
 
 ### Home

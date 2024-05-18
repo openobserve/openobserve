@@ -129,7 +129,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             .parse()
             .unwrap_or_default();
         let key = WriterKey::new(org_id, stream_type);
-        let mut memtable = memtable::MemTable::new();
+        let memtable = memtable::MemTable::new();
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,
             Err(e) => {

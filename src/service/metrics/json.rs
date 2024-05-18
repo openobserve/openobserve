@@ -28,7 +28,7 @@ use config::{
     CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use vrl::compiler::runtime::Runtime;
 
 use super::get_exclude_labels;
@@ -42,7 +42,7 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
-        schema::{check_for_schema, SchemaCache},
+        schema::check_for_schema,
         usage::report_request_usage_stats,
     },
 };
@@ -123,13 +123,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     )
                     .await?;
                 }
-                let fields_map = schema
-                    .fields()
-                    .iter()
-                    .enumerate()
-                    .map(|(i, f)| (f.name().to_owned(), i))
-                    .collect();
-                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema, fields_map));
+                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
             }
             continue;
         }
@@ -223,13 +217,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 )
                 .await;
             }
-            let fields_map = schema
-                .fields()
-                .iter()
-                .enumerate()
-                .map(|(i, f)| (f.name().to_owned(), i))
-                .collect();
-            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema, fields_map));
+            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
         }
 
         // check for schema evolution

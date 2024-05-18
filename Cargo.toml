@@ -205,13 +205,13 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "36"
-datafusion-expr = "36"
-arrow = { version = "50.0.0", features = ["ipc_compression"] }
-arrow-json = "50.0.0"
-arrow-schema = { version = "50.0.0", features = ["serde"] }
-parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.9", features = ["aws", "azure", "gcp"] }
+datafusion = "38"
+datafusion-expr = "38"
+arrow = { version = "51.0.0", features = ["ipc_compression"] }
+arrow-json = "51.0.0"
+arrow-schema = { version = "51.0.0", features = ["serde"] }
+parquet = { version = "51.0.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.9.1", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -222,7 +222,7 @@ futures = "0.3"
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
 gxhash = "~3.0.0"
-hashlink = "0.8.4"
+hashlink = "0.9.1"
 hashbrown = { version = "0.14", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
@@ -249,7 +249,7 @@ rayon = "1.7.0"
 regex = "1.7"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+  "rustls-tls-native-roots",
   "stream",
 ] }
 segment = "0.2"
@@ -265,7 +265,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.43", features = ["serde", "visitor"] }
+sqlparser = { version = "0.45", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"

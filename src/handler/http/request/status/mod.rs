@@ -98,6 +98,8 @@ struct ConfigResponse<'a> {
     custom_hide_menus: String,
     meta_org: String,
     quick_mode_enabled: bool,
+    user_defined_schemas_enabled: bool,
+    all_fields_name: String,
 }
 
 #[derive(Serialize)]
@@ -247,6 +249,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         },
         meta_org: CONFIG.common.usage_org.to_string(),
         quick_mode_enabled: CONFIG.limit.quick_mode_enabled,
+        user_defined_schemas_enabled: CONFIG.common.allow_user_defined_schemas,
+        all_fields_name: CONFIG.common.all_fields_name.to_string(),
     }))
 }
 
@@ -327,7 +331,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         stream_num += 1;
         stream_schema_num += 1;
         mem_size += key.len();
-        mem_size += schema.size();
+        mem_size += schema.schema().size();
     }
     drop(r);
     (stream_num, stream_schema_num, mem_size)

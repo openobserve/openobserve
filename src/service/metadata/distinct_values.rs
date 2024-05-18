@@ -135,7 +135,7 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
                 if let Err(e) = INSTANCE.flush().await {
                     log::error!("[DISTINCT_VALUES] flush error: {}", e);
                 }
-                INSTANCE.shutdown.store(true, Ordering::SeqCst);
+                INSTANCE.shutdown.store(true, Ordering::Release);
                 break;
             }
             let mut mem_table = INSTANCE.mem_table.write().await;
@@ -261,7 +261,7 @@ impl Metadata for DistinctValues {
             .map_err(|e| Error::Message(e.to_string()))?;
         let mut i = 0;
         while i < 10 {
-            if self.shutdown.load(Ordering::SeqCst) {
+            if self.shutdown.load(Ordering::Relaxed) {
                 break;
             }
             time::sleep(time::Duration::from_secs(1)).await;

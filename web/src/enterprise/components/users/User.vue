@@ -312,7 +312,7 @@ export default defineComponent({
         .split(";")
         .flatMap((email: any) => email.split(","))
         .filter((email: any) => email.trim().length > 0)
-        .map((email: any) => email.trim());
+        .map((email: any) => email.trim().toLowerCase());
       const validationArray = emailArray.map((email: any) =>
         validateEmail(email)
       );

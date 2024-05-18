@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-md"
+          class="q-pr-sm q-pl-xs reset-filters q-ml-xs"
           @click="resetFilters"
         />
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         ></syntax-guide>
-        <q-btn-group class="q-ml-sm no-outline q-pa-none no-border">
+        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
@@ -250,6 +250,7 @@ color="grey" size="xs" />
           data-test="logs-search-bar-quick-mode-toggle-btn"
           v-model="searchObj.meta.quickMode"
           :label="t('search.quickModeLabel')"
+          @click="handleQuickMode"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">
@@ -271,7 +272,7 @@ color="grey" size="xs" />
           size="32px"
         />
         <q-btn-group
-          class="q-ml-sm no-outline q-pa-none no-border float-left q-mr-sm"
+          class="no-outline q-pa-none no-border float-left q-mr-xs"
           :disable="!searchObj.meta.toggleFunction"
         >
           <q-btn-dropdown
@@ -320,10 +321,10 @@ color="grey" size="xs" />
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
+        <q-btn-group class="no-outline q-pa-none no-border">
           <q-btn-dropdown
             data-test="logs-search-bar-reset-function-btn"
-            class="q-mr-sm download-logs-btn q-px-xs"
+            class="q-mr-xs download-logs-btn q-px-xs"
             size="sm"
             icon="download"
             :title="t('search.exportLogs')"
@@ -361,7 +362,7 @@ clickable v-close-popup>
         </q-btn-group>
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-sm download-logs-btn q-px-sm"
+          class="q-mr-xs download-logs-btn q-px-sm"
           size="sm"
           icon="share"
           :title="t('search.shareLink')"
@@ -382,13 +383,60 @@ clickable v-close-popup>
             @on:timezone-change="updateTimezone"
           />
         </div>
-        <div class="search-time float-left q-mr-sm">
+        <div class="search-time float-left q-mr-xs">
           <div class="flex">
             <auto-refresh-interval
-              class="q-mr-sm q-px-none logs-auto-refresh-interval"
+              class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
               @update:model-value="onRefreshIntervalUpdate"
             />
+            <q-btn-group
+              class="no-outline q-pa-none no-border"
+              v-if="
+                config.isEnterprise == 'true' &&
+                Object.keys(store.state.regionInfo).length > 0 &&
+                store.state.zoConfig.super_cluster_enabled
+              "
+            >
+              <q-btn-dropdown
+                data-test="logs-search-bar-region-btn"
+                class="q-mr-xs region-dropdown-btn q-px-xs"
+                :title="t('search.regionTitle')"
+                label="Region"
+              >
+                <q-list class="region-dropdown-list">
+                  <q-item
+                    class="q-pa-sm"
+                    clickable
+                    v-close-popup
+                    v-for="item in Object.keys(store.state.regionInfo)"
+                    :key="'region-key-' + item"
+                  >
+                    <q-item-section
+                      class="full-width"
+                      @click.stop="
+                        handleRegionsSelection(
+                          item,
+                          searchObj.meta.regions.includes(item)
+                        )
+                      "
+                    >
+                      <q-icon
+                        size="xs"
+                        :name="
+                          searchObj.meta.regions.includes(item)
+                            ? 'check_circle'
+                            : 'radio_button_unchecked'
+                        "
+                        class="float-left"
+                      ></q-icon>
+                      <q-item-label>{{ item }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-btn-dropdown>
+            </q-btn-group>
+
             <!-- <q-separator vertical inset /> -->
             <q-btn
               data-test="logs-search-bar-refresh-btn"
@@ -825,7 +873,7 @@ export default defineComponent({
     AutoRefreshInterval,
     ConfirmDialog,
   },
-  emits: ["searchdata", "onChangeInterval", "onChangeTimezone"],
+  emits: ["searchdata", "onChangeInterval", "onChangeTimezone", "handleQuickModeChange"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -1609,6 +1657,7 @@ export default defineComponent({
     };
 
     const applySavedView = (item) => {
+      searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       savedviewsService
         .getViewDetail(
@@ -1641,6 +1690,12 @@ export default defineComponent({
               // }
               delete extractedObj.data.stream.streamLists;
               delete searchObj.data.stream.selectedStream;
+              delete searchObj.meta.regions;
+              if (extractedObj.meta.hasOwnProperty("regions")) {
+                searchObj.meta["regions"] = extractedObj.meta.regions;
+              } else {
+                searchObj.meta["regions"] = [];
+              }
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
                 searchObj.data.stream.functions;
@@ -1653,6 +1708,7 @@ export default defineComponent({
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
               searchObj.value = mergeDeep(searchObj, extractedObj);
+              searchObj.shouldIgnoreWatcher = true;
               await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -1689,6 +1745,13 @@ export default defineComponent({
               resetStreamData();
               searchObj.data.stream.streamType =
                 extractedObj.data.stream.streamType;
+
+              delete searchObj.meta.regions;
+              if (extractedObj.meta.hasOwnProperty("regions")) {
+                searchObj.meta["regions"] = extractedObj.meta.regions;
+              } else {
+                searchObj.meta["regions"] = [];
+              }
               // Here copying selected stream object, as in loadStreamLists() we are setting selected stream object to empty object
               // After loading stream list, we are setting selected stream object to copied object
               const selectedStream = cloneDeep(
@@ -1760,7 +1823,9 @@ export default defineComponent({
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
                 updateUrlQueryParams();
+                searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
+                searchObj.shouldIgnoreWatcher = false;
                 console.log(e);
               }
             }, 1000);
@@ -1772,6 +1837,7 @@ export default defineComponent({
             //   handleRunQuery();
             // }
           } else {
+            searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             $q.notify({
               message: `Error while applying saved view. ${res.data.error_detail}`,
@@ -1782,6 +1848,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           $q.notify({
             message: `Error while applying saved view.`,
@@ -2196,6 +2263,21 @@ export default defineComponent({
       return filtered;
     };
 
+    const handleRegionsSelection = (item, isSelected) => {
+      if (isSelected) {
+        const index = searchObj.meta.regions.indexOf(item);
+        if (index > -1) {
+          searchObj.meta.regions.splice(index, 1);
+        }
+      } else {
+        searchObj.meta.regions.push(item);
+      }
+    };
+
+    const handleQuickMode = () => {
+      emit("handleQuickModeChange");
+    }
+
     return {
       t,
       store,
@@ -2262,6 +2344,9 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       filterSavedViewFn,
+      config,
+      handleRegionsSelection,
+      handleQuickMode,
     };
   },
   computed: {
@@ -2570,7 +2655,7 @@ export default defineComponent({
   }
 
   .search-button {
-    min-width: 96px;
+    min-width: 70px;
     line-height: 29px;
     font-weight: bold;
     text-transform: initial;
@@ -2713,5 +2798,38 @@ export default defineComponent({
 .favorite-label {
   line-height: 24px !important;
   font-weight: bold !important;
+}
+
+.region-dropdown-btn {
+  text-transform: capitalize;
+  font-weight: 600;
+  font-size: 12px;
+  padding-left: 8px;
+  height: 30px;
+  padding-top: 3px;
+
+  .q-btn-dropdown__arrow {
+    margin-left: 0px !important;
+  }
+}
+
+.download-logs-btn {
+  .q-btn-dropdown__arrow {
+    margin-left: 0px !important;
+  }
+}
+
+.region-dropdown-list {
+  min-width: 150px;
+
+  .q-item__section {
+    display: inline-block;
+  }
+
+  .q-item__label {
+    margin-left: 20px;
+    text-transform: capitalize;
+    margin-top: 2px;
+  }
 }
 </style>

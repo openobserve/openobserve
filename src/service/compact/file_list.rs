@@ -57,7 +57,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         offset = time_now.timestamp_micros();
         let r = STREAM_SCHEMAS_LATEST.read().await;
         for (key, val) in r.iter() {
-            if let Some(val) = val.metadata.get("created_at") {
+            if let Some(val) = val.schema().metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
                 if time_min == 0 {
                     log::info!(

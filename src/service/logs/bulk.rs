@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{BufRead, BufReader},
     sync::Arc,
 };
@@ -32,7 +32,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
     BLOCKED_STREAMS, CONFIG, DISTINCT_FIELDS,
 };
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{add_record, cast_to_schema_v1, StreamMeta};
 use crate::{
@@ -49,9 +49,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{
-            get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists, SchemaCache,
-        },
+        schema::{get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -112,7 +110,7 @@ pub async fn ingest(
 
     let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
 
-    let mut user_defined_schema_map: HashMap<String, Vec<String>> = HashMap::new();
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -173,7 +171,6 @@ pub async fn ingest(
                     });
                 }
             }
-
             // End get stream keys
 
             crate::service::ingestion::get_user_defined_schema(
@@ -262,30 +259,32 @@ pub async fn ingest(
 
             // Start row based transform
             if let Some(transforms) = stream_functions_map.get(&key) {
-                let mut ret_value = value.clone();
-                ret_value = crate::service::ingestion::apply_stream_functions(
-                    transforms,
-                    ret_value,
-                    &stream_vrl_map,
-                    org_id,
+                if !transforms.is_empty() {
+                    let mut ret_value = value.clone();
+                    ret_value = crate::service::ingestion::apply_stream_functions(
+                        transforms,
+                        ret_value,
+                        &stream_vrl_map,
+                        org_id,
                     &stream_name,
-                    &mut runtime,
-                )?;
+                        &mut runtime,
+                    )?;
 
-                if ret_value.is_null() || !ret_value.is_object() {
-                    bulk_res.errors = true;
-                    add_record_status(
-                        stream_name.clone(),
-                        doc_id.clone(),
-                        action.clone(),
-                        Some(value),
-                        &mut bulk_res,
-                        Some(TRANSFORM_FAILED.to_owned()),
-                        Some(TRANSFORM_FAILED.to_owned()),
-                    );
-                    continue;
-                } else {
-                    value = ret_value;
+                    if ret_value.is_null() || !ret_value.is_object() {
+                        bulk_res.errors = true;
+                        add_record_status(
+                            stream_name.clone(),
+                            doc_id.clone(),
+                            action.clone(),
+                            Some(value),
+                            &mut bulk_res,
+                            Some(TRANSFORM_FAILED.to_owned()),
+                            Some(TRANSFORM_FAILED.to_owned()),
+                        );
+                        continue;
+                    } else {
+                        value = ret_value;
+                    }
                 }
             }
             // End row based transform
@@ -297,7 +296,7 @@ pub async fn ingest(
             };
 
             if let Some(fields) = user_defined_schema_map.get(&stream_name) {
-                crate::service::logs::refactor_map(&mut local_val, fields);
+                local_val = crate::service::logs::refactor_map(local_val, fields);
             }
 
             // set _id

@@ -16,7 +16,7 @@
 use std::{
     collections::HashSet,
     io::{BufRead, BufReader},
-    sync::atomic,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use bytes::Buf;
@@ -31,7 +31,7 @@ use crate::service::db;
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
-pub static LOADED_ALL_FILES: atomic::AtomicBool = atomic::AtomicBool::new(false);
+pub static LOADED_ALL_FILES: AtomicBool = AtomicBool::new(false);
 
 pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     let prefix = format!("file_list/{prefix}");
@@ -231,7 +231,7 @@ pub async fn cache_day(day: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_all() -> Result<(), anyhow::Error> {
-    if LOADED_ALL_FILES.load(atomic::Ordering::Relaxed) {
+    if LOADED_ALL_FILES.load(Ordering::Relaxed) {
         return Ok(());
     }
     let prefix = "file_list/".to_string();
@@ -249,7 +249,7 @@ pub async fn cache_all() -> Result<(), anyhow::Error> {
     for prefix in prefixes {
         cache(&prefix, false).await?;
     }
-    LOADED_ALL_FILES.store(true, atomic::Ordering::Release);
+    LOADED_ALL_FILES.store(true, Ordering::Release);
     Ok(())
 }
 

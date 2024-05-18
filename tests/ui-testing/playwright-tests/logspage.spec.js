@@ -8,7 +8,7 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText('Login as internal user').click();
+// await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -502,7 +502,7 @@ test.describe("Logs UI testcases", () => {
    
   });
 
-  test('test', async ({ page }) => {
+  test('should display bar chart when histogram toggle is on', async ({ page }) => {
     await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
     await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('code');
     await page.waitForTimeout(4000);
@@ -519,5 +519,42 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
     });
     await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+  });
+
+  test('should display search around in histogram mode', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+    
+  });
+
+
+  test.skip('should display results for search around after adding function', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(1000);
+    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+    
+  });
+  
+  test('should display search around in SQL mode', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const isVisible = await element.isVisible();
+    expect(isVisible).toBeTruthy();
+   
+    
   });
 });
