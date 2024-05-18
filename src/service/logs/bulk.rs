@@ -266,7 +266,7 @@ pub async fn ingest(
                         ret_value,
                         &stream_vrl_map,
                         org_id,
-                    &stream_name,
+                        &stream_name,
                         &mut runtime,
                     )?;
 

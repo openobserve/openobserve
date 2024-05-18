@@ -1353,7 +1353,7 @@ fn handle_query_fn(
             e
         ))
     })?;
-    apply_query_fn(query_fn, json_rows, org_id, stream_type)
+    apply_query_fn(query_fn, json_rows, org_id, stream_name, stream_type)
 }
 
 fn apply_query_fn(
