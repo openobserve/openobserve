@@ -624,8 +624,8 @@ pub(crate) async fn generate_index_on_ingester(
 
     let index_record_batches =
         prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
-    let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
-    if record_batches.is_empty() {
+    let record_batches: Vec<RecordBatch> = index_record_batches.into_iter().flatten().collect();
+    if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(());
     }
     let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
@@ -653,7 +653,10 @@ pub(crate) async fn generate_index_on_ingester(
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
 
-    let json_rows = record_batches_to_json_rows(&record_batches)?;
+    let json_rows = record_batches_to_json_rows(&record_batches.iter().collect::<Vec<_>>())?;
+    if json_rows.is_empty() {
+        return Ok(());
+    }
     let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     for record_val in recs {
         let timestamp: i64 = record_val
@@ -698,13 +701,13 @@ pub(crate) async fn generate_index_on_compactor(
     org_id: &str,
     stream_name: &str,
 ) -> Result<(String, FileMeta), anyhow::Error> {
-    let mut index_record_batches =
+    let index_record_batches =
         prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
-    let schema = if let Some(first_batch) = index_record_batches.first() {
-        first_batch[0].schema()
-    } else {
+    let mut record_batches: Vec<RecordBatch> = index_record_batches.into_iter().flatten().collect();
+    if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok((String::new(), FileMeta::default()));
-    };
+    }
+    let schema = record_batches.first().unwrap().schema();
 
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
@@ -731,13 +734,11 @@ pub(crate) async fn generate_index_on_compactor(
     let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
     let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
     let batch = RecordBatch::try_new(schema, columns).unwrap();
-    index_record_batches.push(vec![batch]);
-
-    let record_batches_flattened = index_record_batches.into_iter().flatten().collect();
+    record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
     let (filename, filemeta, _stream_type) = write_to_disk(
-        record_batches_flattened,
+        record_batches,
         original_file_size,
         org_id,
         stream_name,
@@ -760,14 +761,33 @@ async fn prepare_index_record_batches_v1(
     if batches.is_empty() {
         return Ok(vec![]);
     }
-    let local = batches.first().unwrap().schema();
+
+    // filter null columns
+    let schema = batches.first().unwrap().schema();
+    let batches = batches.iter().collect::<Vec<_>>();
+    let mut new_batch = arrow::compute::concat_batches(&schema, batches)?;
+    let mut null_columns = 0;
+    for i in 0..new_batch.num_columns() {
+        let ni = i - null_columns;
+        if new_batch.column(ni).null_count() == new_batch.num_rows() {
+            new_batch.remove_column(ni);
+            null_columns += 1;
+        }
+    }
+    let schema = new_batch.schema();
+    if schema.fields().is_empty()
+        || (schema.fields().len() == 1 && schema.field(0).name() == &CONFIG.common.column_timestamp)
+    {
+        return Ok(vec![]);
+    }
+
     let ctx = SessionContext::new();
-    let provider = MemTable::try_new(local.clone(), vec![batches])?;
+    let provider = MemTable::try_new(schema.clone(), vec![vec![new_batch]])?;
     ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
-    for column in local.fields().iter() {
+    for column in schema.fields().iter() {
         if column.data_type() != &DataType::Utf8 {
             continue;
         }

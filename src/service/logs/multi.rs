@@ -139,7 +139,7 @@ async fn ingest_inner(
                 &local_trans,
                 value,
                 &stream_vrl_map,
-                org_id, 
+                org_id,
                 stream_name,
                 &mut runtime,
             )?;

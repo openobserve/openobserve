@@ -100,19 +100,12 @@ pub async fn check_for_schema(
         let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
-            // generate new schema
-            let inferred_schema = if field_datatype_delta.is_empty() {
-                inferred_schema
-            } else {
-                inferred_schema.cloned_from(schema.schema())
-            };
             // check defined_schema_fields
             let stream_setting = get_settings(org_id, stream_name, stream_type).await;
             let defined_schema_fields = stream_setting
                 .and_then(|s| s.defined_schema_fields)
                 .unwrap_or_default();
             if !defined_schema_fields.is_empty() {
-                let schema = SchemaCache::new(inferred_schema);
                 let schema =
                     generate_schema_for_defined_schema_fields(schema, &defined_schema_fields);
                 stream_schema_map.insert(stream_name.to_string(), schema);
@@ -272,7 +265,7 @@ async fn handle_diff_schema(
         .unwrap_or_default();
     let final_schema = SchemaCache::new(final_schema);
     let final_schema =
-        generate_schema_for_defined_schema_fields(final_schema, &defined_schema_fields);
+        generate_schema_for_defined_schema_fields(&final_schema, &defined_schema_fields);
 
     // update thread cache
     stream_schema_map.insert(stream_name.to_string(), final_schema);
@@ -287,11 +280,11 @@ async fn handle_diff_schema(
 // if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
 // then we will use defined_schema_fields
 fn generate_schema_for_defined_schema_fields(
-    schema: SchemaCache,
+    schema: &SchemaCache,
     fields: &[String],
 ) -> SchemaCache {
     if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
-        return schema;
+        return schema.clone();
     }
 
     let mut fields: HashSet<_> = fields.iter().collect();
