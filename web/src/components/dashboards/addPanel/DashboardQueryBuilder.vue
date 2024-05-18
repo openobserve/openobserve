@@ -957,6 +957,22 @@ export default defineComponent({
       { label: t("dashboard.avg"), value: "avg" },
       { label: t("dashboard.min"), value: "min" },
       { label: t("dashboard.max"), value: "max" },
+      {
+        label: t("dashboard.p50"),
+        value: "p50",
+      },
+      {
+        label: t("dashboard.p90"),
+        value: "p90",
+      },
+      {
+        label: t("dashboard.p95"),
+        value: "p95",
+      },
+      {
+        label: t("dashboard.p99"),
+        value: "p99",
+      },
     ];
     const triggerOperatorsWithHistogram: any = [
       { label: t("dashboard.histogram"), value: "histogram" },
@@ -972,13 +988,19 @@ export default defineComponent({
             value: null,
           },
         ];
+        console.log("field if", field?.args[0]?.value);
+
         return { value: null, label: "Auto" };
       } else if (field?.args?.length === 0) {
         field?.args?.push({
           value: null,
         });
+        console.log("field else if", field?.args[0]?.value);
+
         return { value: null, label: "Auto" };
       }
+      console.log("field else", field?.args[0]?.value);
+
       return { value: field?.args[0]?.value, label: field?.args[0]?.value };
     };
 

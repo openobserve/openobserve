@@ -735,6 +735,22 @@ export default defineComponent({
       { label: t("dashboard.avg"), value: "avg" },
       { label: t("dashboard.min"), value: "min" },
       { label: t("dashboard.max"), value: "max" },
+      {
+        label: t("dashboard.p50"),
+        value: "p50",
+      },
+      {
+        label: t("dashboard.p90"),
+        value: "p90",
+      },
+      {
+        label: t("dashboard.p95"),
+        value: "p95",
+      },
+      {
+        label: t("dashboard.p99"),
+        value: "p99",
+      },
     ];
 
     watch(

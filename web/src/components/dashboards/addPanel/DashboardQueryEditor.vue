@@ -352,12 +352,28 @@ export default defineComponent({
 
       if (query) {
         if (weight) {
-          const weightField = weight.aggregationFunction
-            ? weight.aggregationFunction == "count-distinct"
-              ? `count(distinct(${weight.column}))`
-              : `${weight.aggregationFunction}(${weight.column})`
-            : `${weight.column}`;
-          query += `, ${weightField} as ${weight.alias}`;
+          switch (weight.aggregationFunction) {
+            case "p50":
+              query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
+              break;
+            case "p90":
+              query += `, approx_percentile_cont(${weight.column}, 0.9) as ${weight.alias}`;
+              break;
+            case "p95":
+              query += `, approx_percentile_cont(${weight.column}, 0.95) as ${weight.alias}`;
+              break;
+            case "p99":
+              query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
+              break;
+            default:
+              const weightField = weight.aggregationFunction
+                ? weight.aggregationFunction == "count-distinct"
+                  ? `count(distinct(${weight.column}))`
+                  : `${weight.aggregationFunction}(${weight.column})`
+                : `${weight.column}`;
+              query += `, ${weightField} as ${weight.alias}`;
+              break;
+          }
         }
         query += ` FROM "${
           dashboardPanelData.data.queries[
@@ -479,9 +495,33 @@ export default defineComponent({
       }
 
       if (value) {
-        selectFields.push(
-          `${value.aggregationFunction}(${value.column}) as ${value.alias}`
-        );
+        switch (value?.aggregationFunction) {
+          case "p50":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`
+            );
+            break;
+          case "p90":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`
+            );
+            break;
+          case "p95":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`
+            );
+            break;
+          case "p99":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`
+            );
+            break;
+          default:
+            selectFields.push(
+              `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+            );
+            break;
+        }
       }
 
       // Adding the selected fields to the query
@@ -610,6 +650,18 @@ export default defineComponent({
           switch (field?.aggregationFunction) {
             case "count-distinct":
               selector += `count(distinct(${field?.column}))`;
+              break;
+            case "p50":
+              selector += `approx_percentile_cont(${field?.column}, 0.5)`;
+              break;
+            case "p90":
+              selector += `approx_percentile_cont(${field?.column}, 0.9)`;
+              break;
+            case "p95":
+              selector += `approx_percentile_cont(${field?.column}, 0.95)`;
+              break;
+            case "p99":
+              selector += `approx_percentile_cont(${field?.column}, 0.99)`;
               break;
             case "histogram": {
               // if inteval is not null, then use it
