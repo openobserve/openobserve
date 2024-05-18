@@ -432,6 +432,7 @@ pub async fn handle_grpc_request(
                         &local_trans,
                         rec,
                         &stream_vrl_map,
+                        org_id,
                         stream_name,
                         &mut runtime,
                     )?;
