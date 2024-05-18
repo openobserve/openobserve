@@ -749,15 +749,19 @@ fn add_record_status(
                     stream_name,
                 ),
             );
+
+            bulk_res.items.push(item);
         }
         None => {
             item.insert(
                 action,
                 BulkResponseItem::new(stream_name.clone(), doc_id, value, stream_name),
             );
+            if !CONFIG.common.bulk_api_response_errors_only {
+                bulk_res.items.push(item);
+            }
         }
     }
-    bulk_res.items.push(item);
 }
 
 #[cfg(test)]
