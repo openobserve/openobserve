@@ -152,6 +152,7 @@ pub async fn ingest(
             item,
             &local_trans,
             &stream_vrl_map,
+            org_id,
             stream_name,
             &mut runtime,
         ) {
@@ -294,6 +295,7 @@ pub fn apply_functions<'a>(
     item: json::Value,
     local_trans: &[StreamTransform],
     stream_vrl_map: &'a HashMap<String, VRLResultResolver>,
+    org_id: &'a str,
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value> {
@@ -304,6 +306,7 @@ pub fn apply_functions<'a>(
             local_trans,
             value,
             stream_vrl_map,
+            org_id,
             stream_name,
             runtime,
         )?;
