@@ -389,20 +389,6 @@ pub async fn merge(
         }),
     )
     .await?;
-
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::schema_merge(
-            &key_for_update,
-            json::to_vec(&schema).unwrap().into(),
-            infra::db::NEED_WATCH,
-            start_dt,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
-
     rx.await.map_err(|e| Error::Message(e.to_string()))
 }
 
