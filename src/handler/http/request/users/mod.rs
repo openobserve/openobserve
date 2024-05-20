@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{cookie, delete, get, http, post, put, web, HttpResponse};
+use actix_web::{cookie, delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use config::{
     utils::{base64, json},
     CONFIG,
@@ -213,7 +213,10 @@ pub async fn delete(
     )
 )]
 #[post("/login")]
-pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
+pub async fn authentication(
+    auth: Option<web::Json<SignInUser>>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
     #[cfg(feature = "enterprise")]
@@ -226,6 +229,47 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
     }
 
     let mut resp = SignInResponse::default();
+    let auth = match auth {
+        Some(auth) => auth.into_inner(),
+        None => {
+            // get Authorization header
+            #[cfg(feature = "enterprise")]
+            {
+                let auth_header = _req.headers().get("Authorization");
+                if auth_header.is_some() {
+                    let auth_header = auth_header.unwrap().to_str().unwrap();
+                    let auth_header = auth_header.split_whitespace().collect::<Vec<&str>>();
+                    if auth_header.len() == 2 {
+                        let auth_header = auth_header[1];
+                        let auth_header = match base64::decode(auth_header) {
+                            Ok(v) => v,
+                            Err(_) => return unauthorized_error(resp),
+                        };
+                        let auth_header = auth_header.split(":").collect::<Vec<&str>>();
+                        if auth_header.len() == 2 {
+                            let name = auth_header[0];
+                            let password = auth_header[1];
+                            SignInUser {
+                                name: name.to_string(),
+                                password: password.to_string(),
+                            }
+                        } else {
+                            return unauthorized_error(resp);
+                        }
+                    } else {
+                        return unauthorized_error(resp);
+                    }
+                } else {
+                    return unauthorized_error(resp);
+                }
+            }
+            #[cfg(not(feature = "enterprise"))]
+            {
+                return unauthorized_error(resp);
+            }
+        }
+    };
+
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
@@ -300,4 +344,10 @@ pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
         .collect::<Vec<RolesResponse>>();
 
     Ok(HttpResponse::Ok().json(roles))
+}
+
+fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
+    resp.status = false;
+    resp.message = "Invalid credentials".to_string();
+    Ok(HttpResponse::Unauthorized().json(resp))
 }
