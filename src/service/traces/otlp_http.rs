@@ -89,7 +89,7 @@ async fn hanlde_resp(
                 Ok(HttpResponse::Ok().json(ExportTraceServiceResponse::default()))
             }
             flusher::BufferedWriteResult::Error(e) => {
-                log::info!("flusher::BufferedWriteResult::Success");
+                log::info!("flusher::BufferedWriteResult::Error e: {}", e);
                 Ok(
                     HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                         http::StatusCode::SERVICE_UNAVAILABLE.into(),

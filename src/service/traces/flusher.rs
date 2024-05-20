@@ -207,7 +207,7 @@ pub fn run_trace_io_flush(
                 }
             };
 
-            info!("[{session_id}]run_trace_io_flush match resp");
+            info!("[{session_id}]run_trace_io_flush match resp: {:?}, buffer_notify len: {}", resp, buffer_notify.len());
             match resp {
                 Ok(_) => {
                     buffer_notify.send(Ok(())).expect("buffer flusher is dead");
@@ -221,6 +221,7 @@ pub fn run_trace_io_flush(
             }
         }
 
+        info!("[{session_id}]run_trace_io_flush for request done, buffer_notify len: {} ", buffer_notify.len());
         buffer_notify.send(Ok(())).expect("buffer flusher is dead");
     }
 }
@@ -279,12 +280,13 @@ pub async fn run_trace_op_buffer(
                     },
                     Err(e) => BufferedWriteResult::Error(e.to_string()),
                 };
-                info!("io_flush_tx get buffer write result done, notifies len : {}", notifies.len());
+                info!("io_flush_tx get buffer write result done, notifies len : {}, res: {:?}", notifies.len(), res);
                 // notify the watchers of the write response
                 for response_tx in notifies {
+                    info!("io_flush_tx response_tx len : {}, res: {:?}", response_tx.len(), res);
                     let _ = response_tx.send(res.clone());
                 }
-
+                info!("io_flush_tx response_tx send done");
                 // reset the buffers
                 ops = RequestOps::new();
                 notifies = Vec::new();
