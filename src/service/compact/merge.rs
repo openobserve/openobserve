@@ -16,6 +16,7 @@
 use std::{collections::HashMap, io::Write, sync::Arc};
 
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
+use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
@@ -23,9 +24,13 @@ use config::{
     ider,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
-    utils::{json, parquet::parse_file_key_columns},
+    utils::{
+        json,
+        parquet::{parse_file_key_columns, write_recordbatch_to_parquet},
+    },
     CONFIG, FILE_EXT_PARQUET,
 };
+use hashbrown::HashSet;
 use infra::{
     cache, dist_lock, file_list as infra_file_list,
     schema::{
@@ -644,27 +649,23 @@ pub async fn merge_files(
         }
     }
 
-    let in_file_meta = FileMeta {
+    let mut new_file_meta = FileMeta {
         min_ts,
         max_ts,
         records: total_records,
         original_size: new_file_size,
         compressed_size: 0,
     };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
 
-    let mut buf = Vec::new();
-    let mut fts_buf = Vec::new();
     let start = std::time::Instant::now();
-    let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
+    let (new_schema, new_batches) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         stream_type,
         stream_name,
-        &mut buf,
         schema.clone(),
-        &bloom_filter_fields,
-        &full_text_search_fields,
-        in_file_meta,
-        &mut fts_buf,
     )
     .await
     .map_err(|e| {
@@ -676,18 +677,32 @@ pub async fn merge_files(
             files,
             schema
         );
+
         DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
     })?;
-    new_file_meta.original_size = new_file_size;
+
+    let buf = write_recordbatch_to_parquet(
+        new_schema.clone(),
+        &new_batches,
+        &bloom_filter_fields,
+        &full_text_search_fields,
+        &new_file_meta,
+    )
+    .await?;
     new_file_meta.compressed_size = buf.len() as i64;
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
-    }
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
+
+    // generate inverted index RecordBatch
+    let inverted_idx_batches = generate_inverted_idx_recordbatch(
+        schema.clone(),
+        &new_batches,
+        stream_type,
+        &full_text_search_fields,
+    );
 
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
@@ -707,7 +722,7 @@ pub async fn merge_files(
             if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
-                    fts_buf,
+                    inverted_idx_batches,
                     new_file_key.clone(),
                     org_id,
                     stream_name,
@@ -886,4 +901,64 @@ async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyh
         break;
     }
     Ok(())
+}
+
+pub fn generate_inverted_idx_recordbatch(
+    schema: Arc<Schema>,
+    batches: &[RecordBatch],
+    stream_type: StreamType,
+    full_text_search_fields: &[String],
+) -> Vec<RecordBatch> {
+    if !CONFIG.common.inverted_index_enabled
+        || batches.is_empty()
+        || stream_type != StreamType::Logs
+    {
+        return Vec::new();
+    }
+
+    let mut inverted_idx_columns = if !full_text_search_fields.is_empty() {
+        full_text_search_fields.to_vec()
+    } else {
+        config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+    };
+
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    inverted_idx_columns.retain(|f| schema_fields.contains(f));
+    if inverted_idx_columns.is_empty() {
+        return Vec::new();
+    }
+    // add _timestamp column to columns_to_index
+    if !inverted_idx_columns.contains(&CONFIG.common.column_timestamp) {
+        inverted_idx_columns.push(CONFIG.common.column_timestamp.to_string());
+    }
+
+    let mut inverted_idx_batches = Vec::with_capacity(batches.len());
+    for batch in batches {
+        let selected_column_indices: Vec<usize> = inverted_idx_columns
+            .iter()
+            .filter_map(|name| batch.schema().index_of(name).ok())
+            .collect();
+
+        // Use the found indices to select the columns
+        let selected_columns = selected_column_indices
+            .iter()
+            .map(|&i| batch.column(i).clone())
+            .collect();
+
+        // Create a new schema for the new RecordBatch based on the selected columns
+        let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
+            .iter()
+            .map(|&i| batch.schema().field(i).clone())
+            .collect();
+        let new_schema = Arc::new(Schema::new(selected_fields));
+
+        // Create a new RecordBatch with the selected columns
+        inverted_idx_batches.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
+    }
+
+    inverted_idx_batches
 }
