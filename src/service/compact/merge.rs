@@ -655,19 +655,34 @@ pub async fn merge_files(
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
     let start = std::time::Instant::now();
-    let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
-        tmp_dir.name(),
-        stream_type,
-        stream_name,
-        &mut buf,
-        schema.clone(),
-        &bloom_filter_fields,
-        &full_text_search_fields,
-        in_file_meta,
-        &mut fts_buf,
-    )
-    .await
-    .map_err(|e| {
+    let merge_result = if stream_type == StreamType::Logs {
+        crate::job::files::parquet::merge_parquet_files(
+            thread_id,
+            tmp_dir.name(),
+            stream_type,
+            &mut buf,
+            schema.clone(),
+            &bloom_filter_fields,
+            &full_text_search_fields,
+            in_file_meta,
+            &mut fts_buf,
+        )
+        .await
+    } else {
+        datafusion::exec::merge_parquet_files(
+            tmp_dir.name(),
+            stream_type,
+            stream_name,
+            &mut buf,
+            schema.clone(),
+            &bloom_filter_fields,
+            &full_text_search_fields,
+            in_file_meta,
+            &mut fts_buf,
+        )
+        .await
+    };
+    let (mut new_file_meta, _) = merge_result.map_err(|e| {
         let files = tmp_dir.list("all").unwrap();
         let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
         log::error!(
