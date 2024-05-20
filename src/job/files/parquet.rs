@@ -58,10 +58,11 @@ use crate::{
     common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
-        compact::merge::generate_inverted_idx_recordbatch,
+        compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
         search::datafusion::{
-            exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
+            exec::merge_parquet_files as merge_parquet_files_by_datafusion,
+            string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
         },
     },
 };
@@ -550,8 +551,10 @@ async fn merge_files(
             &mut buf,
         )
         .await
+    } else if stream_type == StreamType::Logs {
+        merge_parquet_files(thread_id, tmp_dir.name(), Arc::new(file_schema.unwrap())).await
     } else {
-        merge_parquet_files(
+        merge_parquet_files_by_datafusion(
             tmp_dir.name(),
             stream_type,
             &stream_name,

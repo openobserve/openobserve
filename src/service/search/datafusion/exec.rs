@@ -1037,7 +1037,6 @@ pub async fn convert_parquet_file(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub async fn merge_parquet_files(
     trace_id: &str,
     stream_type: StreamType,
