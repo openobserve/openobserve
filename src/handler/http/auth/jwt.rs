@@ -70,6 +70,7 @@ pub async fn process_token(
             }
         }
     };
+    log::debug!("Here is the groups array: {:#?}", groups);
 
     let user_email = res.0.user_email.to_owned();
 
@@ -90,7 +91,10 @@ pub async fn process_token(
         for group in groups {
             let role_org = parse_dn(group.as_str().unwrap()).unwrap();
             if O2_CONFIG.openfga.map_group_to_role {
-                custom_roles.push(format_role_name(role_org.custom_role.unwrap()));
+                custom_roles.push(format_role_name(
+                    &role_org.org,
+                    role_org.custom_role.unwrap(),
+                ));
             } else {
                 source_orgs.push(UserOrg {
                     role: role_org.role,
@@ -318,6 +322,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let mut org = "";
     let mut role = "";
     let mut custom_role = None;
+    log::debug!("parse_dn dn is: {dn}");
 
     if O2_CONFIG.openfga.map_group_to_role {
         custom_role = Some(dn.to_owned());
@@ -355,6 +360,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
 async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Vec<String>) {
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
+    log::debug!("map_group_to_custom_role custom roles: {:#?}", custom_roles);
 
     if db_user.is_none() {
         let mut tuples = vec![];
@@ -436,17 +442,13 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         let mut remove_tuples = vec![];
         // user exists in the db with default org hence skip org creation tuples
         let existing_roles = get_roles_for_user(user_email).await;
+        log::debug!("user exists existing roles: {:#?}", existing_roles);
 
         // Find roles to delete: present in existing_role but not in custom_role
         for existing_role in &existing_roles {
             if !custom_roles.contains(existing_role) {
                 // delete role
-                get_user_crole_removal_tuples(
-                    &O2_CONFIG.dex.default_org,
-                    user_email,
-                    existing_role,
-                    &mut remove_tuples,
-                );
+                get_user_crole_removal_tuples(user_email, existing_role, &mut remove_tuples);
             }
         }
 
@@ -456,6 +458,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             .filter(|&role| !existing_roles.contains(role))
             .cloned()
             .collect();
+        log::debug!("new roles: {:#?}", new_roles);
 
         check_and_get_crole_tuple_for_new_user(
             user_email,
@@ -464,6 +467,11 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             &mut add_tuples,
         )
         .await;
+        log::debug!(
+            "add_tuples: {:#?}\nremove_tuples: {:#?}",
+            add_tuples,
+            remove_tuples
+        );
 
         if O2_CONFIG.openfga.enabled {
             let start = std::time::Instant::now();
@@ -487,6 +495,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
 }
 
 #[cfg(feature = "enterprise")]
-fn format_role_name(role: String) -> String {
-    RE_ROLE_NAME.replace_all(&role, "_").to_string()
+fn format_role_name(org: &str, role: String) -> String {
+    let role = RE_ROLE_NAME.replace_all(&role, "_").to_string();
+    format!("{org}/{role}")
 }
