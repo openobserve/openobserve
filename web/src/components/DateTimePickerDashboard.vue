@@ -80,11 +80,16 @@ export default defineComponent({
       dateTimePicker.value.setCustomDate(type, dateObj);
     };
 
+    const getConsumableDateTime = () => {
+      return dateTimePicker.value.getConsumableDateTime();
+    };
+
     return {
       updateDateTime,
       refresh,
       dateTimePicker,
       setCustomDate,
+      getConsumableDateTime,
     };
   },
 });

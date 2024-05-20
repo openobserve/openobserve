@@ -397,23 +397,25 @@ export default defineComponent({
       // check if route has time realated query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
-
         // if dashboard has relative time settings
         if (
-          (currentDashboardData.data?.defaultDatetimeDuration?.type ?? "relative") ===
-          "relative"
+          (currentDashboardData.data?.defaultDatetimeDuration?.type ??
+            "relative") === "relative"
         ) {
           selectedDate.value = {
             valueType: "relative",
             relativeTimePeriod:
-              currentDashboardData.data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
+              currentDashboardData.data?.defaultDatetimeDuration
+                ?.relativeTimePeriod ?? "15m",
           };
         } else {
           // else, dashboard will have absolute time settings
           selectedDate.value = {
             valueType: "absolute",
-            startTime: currentDashboardData.data?.defaultDatetimeDuration?.startTime,
-            endTime: currentDashboardData.data?.defaultDatetimeDuration?.endTime,
+            startTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.startTime,
+            endTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.endTime,
           };
         }
       } else {
@@ -428,10 +430,14 @@ export default defineComponent({
 
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
-      currentTimeObj.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+
+        currentTimeObj.value = {
+          start_time: new Date(date.startTime),
+          end_time: new Date(date.endTime),
+        };
+      }
     });
 
     const getQueryParamsForDuration = (data: any) => {
