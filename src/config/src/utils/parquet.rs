@@ -19,15 +19,11 @@ use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
-    arrow::{
-        arrow_reader::{ArrowReaderMetadata, ParquetRecordBatchReaderBuilder},
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
-    },
+    arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
 };
-use rayon::{iter::IntoParallelRefIterator, prelude::ParallelIterator};
 
 use crate::{config::*, ider, meta::stream::FileMeta};
 
@@ -174,38 +170,6 @@ pub async fn read_recordbatch_from_file(
     let record_reader = arrow_reader.build()?;
     let batches = record_reader.try_collect().await?;
     Ok((schema, batches))
-}
-
-pub fn read_recordbatch_with_same_schema_from_dir(
-    file_dir: &str,
-) -> Result<Vec<RecordBatch>, anyhow::Error> {
-    // Read directory and collect paths of parquet files
-    let paths: Vec<_> = std::fs::read_dir(file_dir)?
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            if path.extension()? == "parquet" {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    // Process files in parallel using Rayon
-    let batches: Vec<RecordBatch> = paths
-        .par_iter()
-        .map(|path| {
-            let file = std::fs::File::open(path)?;
-            let reader = ParquetRecordBatchReaderBuilder::try_new(file)?.build()?;
-            let record_batches = reader.collect::<Result<Vec<RecordBatch>, _>>()?;
-            Ok(record_batches)
-        })
-        .collect::<Result<Vec<Vec<RecordBatch>>, anyhow::Error>>()?
-        .into_iter()
-        .flatten()
-        .collect();
-
-    Ok(batches)
 }
 
 pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow::Error> {
