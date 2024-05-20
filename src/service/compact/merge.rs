@@ -995,7 +995,7 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
 
-        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
+        let (schema, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
             log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
             log::error!(
                 "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
@@ -1004,6 +1004,25 @@ pub async fn merge_parquet_files(
             );
             DataFusionError::Execution(e.to_string())
         })?;
+        let field_num = schema.fields().len();
+        for i in 0..field_num {
+            let arrays = batches
+                .iter()
+                .map(|batch| batch.column(i).as_ref())
+                .collect::<Vec<_>>();
+            let d = arrays[0].data_type();
+            arrays.iter().skip(1).for_each(|array| {
+                let dt = array.data_type();
+                if dt != d {
+                    log::error!(
+                        "record_batch columns have different data type. {} vs. {}. schema {}",
+                        d,
+                        dt,
+                        schema
+                    );
+                }
+            });
+        }
         record_batches.extend(batches);
     }
 
