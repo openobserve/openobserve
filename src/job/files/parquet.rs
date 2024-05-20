@@ -31,7 +31,10 @@ use config::{
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files,
         json,
-        parquet::{read_metadata_from_file, read_recordbatch_from_bytes, read_schema_from_file},
+        parquet::{
+            read_metadata_from_file, read_recordbatch_from_bytes, read_schema_from_file,
+            write_recordbatch_to_parquet,
+        },
         schema_ext::SchemaExt,
     },
     FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
@@ -55,6 +58,7 @@ use crate::{
     common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
+        compact::merge::generate_inverted_idx_recordbatch,
         db,
         search::datafusion::{
             exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
@@ -516,44 +520,46 @@ async fn merge_files(
     // merge files
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
     let full_text_search_fields = get_stream_setting_fts_fields(latest_schema).unwrap();
-    let mut buf = Vec::new();
-    let mut fts_buf = Vec::new();
-    let start = std::time::Instant::now();
 
-    let merge_result = if new_file_list.len() == 1 {
+    let mut new_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: total_records,
+        original_size: new_file_size,
+        compressed_size: 0,
+    };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: records is 0 for org {} stream type {} stream {}",
+            org_id,
+            stream_type,
+            stream_name
+        ));
+    }
+
+    let start = std::time::Instant::now();
+    let mut buf = Vec::new();
+    let single_file = new_file_list.len() == 1;
+    let merge_result = if single_file {
         move_single_file(
             thread_id,
             tmp_dir.name(),
             file,
             stream_type,
             &stream_name,
-            &full_text_search_fields,
             &mut buf,
-            &mut fts_buf,
         )
         .await
     } else {
-        let in_file_meta = FileMeta {
-            min_ts,
-            max_ts,
-            records: total_records,
-            original_size: new_file_size,
-            compressed_size: 0,
-        };
         merge_parquet_files(
             tmp_dir.name(),
             stream_type,
             &stream_name,
-            &mut buf,
             Arc::new(file_schema.unwrap()),
-            &bloom_filter_fields,
-            &full_text_search_fields,
-            in_file_meta,
-            &mut fts_buf,
         )
         .await
     };
-    let (mut new_file_meta, _) = match merge_result {
+    let (new_schema, new_batches) = match merge_result {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -570,17 +576,17 @@ async fn merge_files(
             return Err(e.into());
         }
     };
-
-    new_file_meta.original_size = new_file_size;
-    new_file_meta.compressed_size = buf.len() as i64;
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!(
-            "merge_parquet_files error: records is 0 for org {} stream type {} stream {}",
-            org_id,
-            stream_type,
-            stream_name
-        ));
+    if !single_file {
+        buf = write_recordbatch_to_parquet(
+            new_schema.clone(),
+            &new_batches,
+            &bloom_filter_fields,
+            &full_text_search_fields,
+            &new_file_meta,
+        )
+        .await?;
     }
+    new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
@@ -597,15 +603,27 @@ async fn merge_files(
         start.elapsed().as_millis(),
     );
 
-    let buf = Bytes::from(buf);
+    // generate inverted index RecordBatch
+    let inverted_idx_batches = generate_inverted_idx_recordbatch(
+        new_schema.clone(),
+        &new_batches,
+        stream_type,
+        &full_text_search_fields,
+    );
 
     // upload file
+    let buf = Bytes::from(buf);
     match storage::put(&new_file_key, buf).await {
         Ok(_) => {
             if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
-                generate_index_on_ingester(fts_buf, new_file_key.clone(), &org_id, &stream_name)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
+                generate_index_on_ingester(
+                    inverted_idx_batches,
+                    new_file_key.clone(),
+                    &org_id,
+                    &stream_name,
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -615,7 +633,7 @@ async fn merge_files(
 
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_ingester(
-    buf: Vec<RecordBatch>,
+    batches: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
@@ -623,7 +641,7 @@ pub(crate) async fn generate_index_on_ingester(
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let index_record_batches =
-        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches(batches, org_id, stream_name, &new_file_key).await?;
     let record_batches: Vec<RecordBatch> = index_record_batches.into_iter().flatten().collect();
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(());
@@ -696,13 +714,13 @@ pub(crate) async fn generate_index_on_ingester(
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    buf: Vec<RecordBatch>,
+    batches: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
 ) -> Result<(String, FileMeta), anyhow::Error> {
     let index_record_batches =
-        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches(batches, org_id, stream_name, &new_file_key).await?;
     let mut record_batches: Vec<RecordBatch> = index_record_batches.into_iter().flatten().collect();
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok((String::new(), FileMeta::default()));
@@ -752,7 +770,7 @@ pub(crate) async fn generate_index_on_compactor(
     Ok((filename, filemeta))
 }
 
-async fn prepare_index_record_batches_v1(
+async fn prepare_index_record_batches(
     batches: Vec<RecordBatch>, // 10 fields index
     org_id: &str,
     stream_name: &str,
@@ -835,10 +853,8 @@ async fn move_single_file(
     file: &FileKey,
     stream_type: StreamType,
     stream_name: &str,
-    full_text_search_fields: &[String],
     buf: &mut Vec<u8>,
-    fts_buf: &mut Vec<RecordBatch>,
-) -> datafusion::error::Result<(FileMeta, Arc<Schema>)> {
+) -> datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let data = tmpfs::get(format!("{trace_id}/{}", &file.key).as_str()).map_err(|e| {
         log::error!(
             "[INGESTER:JOB:{thread_id}] merge small file: {}, err: {}",
@@ -848,11 +864,10 @@ async fn move_single_file(
         datafusion::error::DataFusionError::Execution(e.to_string())
     })?;
 
+    // copy data to buf
     buf.extend_from_slice(&data);
-    let mut new_file_meta = file.meta.clone();
-    new_file_meta.compressed_size = data.len() as i64;
 
-    let (schema, record_batches) = read_recordbatch_from_bytes(&data).await.map_err(|e| {
+    read_recordbatch_from_bytes(&data).await.map_err(|e| {
         log::error!(
             "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for stream -> '{}/{}/{}'",
             trace_id,
@@ -865,49 +880,5 @@ async fn move_single_file(
             e
         );
         datafusion::error::DataFusionError::Execution(e.to_string())
-    })?;
-
-    for batch in record_batches {
-        if stream_type == StreamType::Logs {
-            // for FTS
-            let mut columns_to_index = if !full_text_search_fields.is_empty() {
-                full_text_search_fields.to_vec()
-            } else {
-                config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-            };
-            let schema_fields = schema.as_ref().simple_fields();
-            let schema_fields: HashSet<&str> = schema_fields.iter().map(|f| f.0.as_str()).collect();
-            columns_to_index.retain(|f| schema_fields.contains(f.as_str()));
-
-            if !columns_to_index.is_empty() {
-                // add _timestamp column to columns_to_index
-                if !columns_to_index.contains(&CONFIG.common.column_timestamp) {
-                    columns_to_index.push(CONFIG.common.column_timestamp.to_string());
-                }
-
-                let selected_column_indices: Vec<usize> = columns_to_index
-                    .iter()
-                    .filter_map(|name| batch.schema().index_of(name).ok())
-                    .collect();
-
-                // Use the found indices to select the columns
-                let selected_columns = selected_column_indices
-                    .iter()
-                    .map(|&i| batch.column(i).clone())
-                    .collect();
-
-                // Create a new schema for the new RecordBatch based on the selected columns
-                let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
-                    .iter()
-                    .map(|&i| batch.schema().field(i).clone())
-                    .collect();
-                let new_schema = Arc::new(Schema::new(selected_fields));
-
-                // Create a new RecordBatch with the selected columns
-                fts_buf.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
-            }
-        }
-    }
-
-    Ok((new_file_meta.clone(), schema))
+    })
 }

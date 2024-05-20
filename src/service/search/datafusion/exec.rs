@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
@@ -24,7 +24,7 @@ use config::{
     },
     utils::{
         arrow::record_batches_to_json_rows, flatten, json, parquet::new_parquet_writer,
-        schema::infer_json_schema_from_values, schema_ext::SchemaExt,
+        schema::infer_json_schema_from_values,
     },
     CONFIG, PARQUET_BATCH_SIZE,
 };
@@ -1042,13 +1042,8 @@ pub async fn merge_parquet_files(
     trace_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    buf: &mut Vec<u8>,
     schema: Arc<Schema>,
-    bloom_filter_fields: &[String],
-    full_text_search_fields: &[String],
-    in_file_meta: FileMeta,
-    fts_buf: &mut Vec<RecordBatch>,
-) -> Result<(FileMeta, Arc<Schema>)> {
+) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
     // Configure listing options
@@ -1097,58 +1092,6 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let mut writer = new_parquet_writer(
-        buf,
-        &schema,
-        bloom_filter_fields,
-        full_text_search_fields,
-        &in_file_meta,
-    );
-    for batch in batches {
-        if stream_type == StreamType::Logs {
-            // for FTS
-            let mut columns_to_index = if !full_text_search_fields.is_empty() {
-                full_text_search_fields.to_vec()
-            } else {
-                config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-            };
-            let schema_fields = schema.as_ref().simple_fields();
-
-            let schema_fields: HashSet<&str> = schema_fields.iter().map(|f| f.0.as_str()).collect();
-
-            columns_to_index.retain(|f| schema_fields.contains(f.as_str()));
-
-            if !columns_to_index.is_empty() {
-                // add _timestamp column to columns_to_index
-                if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
-                    columns_to_index.push(CONFIG.common.column_timestamp.to_string());
-                }
-
-                let selected_column_indices: Vec<usize> = columns_to_index
-                    .iter()
-                    .filter_map(|name| batch.schema().index_of(name).ok())
-                    .collect();
-
-                // Use the found indices to select the columns
-                let selected_columns = selected_column_indices
-                    .iter()
-                    .map(|&i| batch.column(i).clone())
-                    .collect();
-
-                // Create a new schema for the new RecordBatch based on the selected columns
-                let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
-                    .iter()
-                    .map(|&i| batch.schema().field(i).clone())
-                    .collect();
-                let new_schema = Arc::new(Schema::new(selected_fields));
-
-                // Create a new RecordBatch with the selected columns
-                fts_buf.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
-            }
-        }
-        writer.write(&batch).await?;
-    }
-    writer.close().await?;
     ctx.deregister_table("tbl")?;
     drop(ctx);
 
@@ -1157,7 +1100,7 @@ pub async fn merge_parquet_files(
         start.elapsed().as_secs_f64()
     );
 
-    Ok((in_file_meta, schema))
+    Ok((schema, batches))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -109,6 +109,28 @@ pub fn new_parquet_writer<'a>(
     }
     let writer_props = writer_props.build();
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+}
+
+pub async fn write_recordbatch_to_parquet(
+    schema: Arc<Schema>,
+    record_batches: &[RecordBatch],
+    bloom_filter_fields: &[String],
+    full_text_search_fields: &[String],
+    metadata: &FileMeta,
+) -> Result<Vec<u8>, anyhow::Error> {
+    let mut buf = Vec::new();
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        full_text_search_fields,
+        metadata,
+    );
+    for batch in record_batches {
+        writer.write(batch).await?;
+    }
+    writer.close().await?;
+    Ok(buf)
 }
 
 // parse file key to get stream_key, date_key, file_name
