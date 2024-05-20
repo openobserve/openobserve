@@ -307,8 +307,9 @@ export const usePanelDataLoader = (
                     size: 0,
                   },
                 },
-                page_type: pageType,
-              })
+                page_type: pageType              
+              },
+              "dashboards")
               .then((res) => {
                 // Set searchQueryData.data to the API response hits
                 // state.data = res.data.hits;

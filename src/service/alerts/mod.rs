@@ -23,7 +23,7 @@ use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
 use config::{
     get_config, ider,
-    meta::stream::StreamType,
+    meta::{search::SearchEventType, stream::StreamType},
     utils::{
         base64,
         json::{Map, Value},
@@ -32,6 +32,7 @@ use config::{
 };
 use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
+use proto::cluster_rpc::search_server::Search;
 
 use super::promql;
 use crate::{
@@ -465,6 +466,7 @@ impl QueryCondition {
             regions: vec![],
             clusters: vec![],
             timeout: 0,
+            search_type: Some(SearchEventType::Alerts),
         };
         let trace_id = ider::uuid();
         let resp =

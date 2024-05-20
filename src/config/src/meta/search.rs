@@ -60,6 +60,8 @@ pub struct Request {
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     #[serde(default)]
     pub timeout: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_type: Option<SearchEventType>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -495,6 +497,29 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
     }
 }
 
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SearchEventType {
+    UI,
+    Dashboards,
+    Reports,
+    Alerts,
+    Values,
+    Other,
+}
+
+impl std::fmt::Display for SearchEventType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SearchEventType::UI => write!(f, "UI"),
+            SearchEventType::Dashboards => write!(f, "Dashboards"),
+            SearchEventType::Reports => write!(f, "Reports"),
+            SearchEventType::Alerts => write!(f, "Alerts"),
+            SearchEventType::Other => write!(f, "Other"),
+            SearchEventType::Values => write!(f, "_values"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -586,6 +611,7 @@ mod tests {
             regions: vec![],
             clusters: vec![],
             timeout: 0,
+            search_type: None,
         };
         req.aggs
             .insert("test".to_string(), "SELECT * FROM test".to_string());

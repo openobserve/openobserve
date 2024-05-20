@@ -20,7 +20,7 @@ use std::{
 
 use actix_web::web::Query;
 use awc::http::header::HeaderMap;
-use config::meta::stream::StreamType;
+use config::meta::{search::SearchEventType, stream::StreamType};
 use opentelemetry::propagation::Extractor;
 
 #[inline(always)]
@@ -54,6 +54,30 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
         Some(s) => s.to_string(),
         None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
     }
+}
+
+#[inline(always)]
+pub(crate) fn get_search_type_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Result<Option<SearchEventType>, Error> {
+    let event_type = match query.get("event_type") {
+        Some(s) => match s.to_lowercase().as_str() {
+            "ui" => Some(SearchEventType::UI),
+            "dashboards" => Some(SearchEventType::Dashboards),
+            "reports" => Some(SearchEventType::Reports),
+            "alerts" => Some(SearchEventType::Reports),
+            "values" => Some(SearchEventType::Values),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts'  or 'values' allowed",
+                ));
+            }
+        },
+        None => None,
+    };
+
+    Ok(event_type)
 }
 
 // Extractor for request headers
