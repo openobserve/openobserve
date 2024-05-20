@@ -26,7 +26,9 @@ use config::{
     metrics,
     utils::{
         json,
-        parquet::{parse_file_key_columns, write_recordbatch_to_parquet},
+        parquet::{
+            parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
+        },
     },
     CONFIG, FILE_EXT_PARQUET,
 };
@@ -661,14 +663,18 @@ pub async fn merge_files(
     }
 
     let start = std::time::Instant::now();
-    let (new_schema, new_batches) = datafusion::exec::merge_parquet_files(
-        tmp_dir.name(),
-        stream_type,
-        stream_name,
-        schema.clone(),
-    )
-    .await
-    .map_err(|e| {
+    let merge_result = if stream_type == StreamType::Logs {
+        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
+    } else {
+        datafusion::exec::merge_parquet_files(
+            tmp_dir.name(),
+            stream_type,
+            stream_name,
+            schema.clone(),
+        )
+        .await
+    };
+    let (new_schema, new_batches) = merge_result.map_err(|e| {
         let files = tmp_dir.list("all").unwrap();
         let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
         log::error!(
@@ -961,4 +967,81 @@ pub fn generate_inverted_idx_recordbatch(
     }
 
     inverted_idx_batches
+}
+
+pub async fn merge_parquet_files(
+    thread_id: usize,
+    trace_id: &str,
+    schema: Arc<Schema>,
+) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
+    let start = std::time::Instant::now();
+
+    // 1. get record batches from tmpfs
+    let temp_files = infra::cache::tmpfs::list(trace_id, "parquet").map_err(|e| {
+        log::error!(
+            "[INGESTER:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
+            e
+        );
+        DataFusionError::Execution(e.to_string())
+    })?;
+
+    let mut record_batches = Vec::new();
+    for file in temp_files {
+        let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
+            log::error!(
+                "[INGESTER:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
+                e
+            );
+            DataFusionError::Execution(e.to_string())
+        })?;
+
+        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
+            log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
+            log::error!(
+                "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
+                file.location,
+                e
+            );
+            DataFusionError::Execution(e.to_string())
+        })?;
+        record_batches.extend(batches);
+    }
+
+    // 2. concatenate all record batches into one single RecordBatch
+    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
+
+    // 3. sort concatenated record batch by timestamp col in desc order
+    let sort_indices = arrow::compute::sort_to_indices(
+        concatenated_record_batch
+            .column_by_name(&CONFIG.common.column_timestamp)
+            .ok_or_else(|| {
+                log::error!(
+                    "[INGESTER:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
+                );
+                DataFusionError::Execution(
+                    "No _timestamp column found in merged record batch".to_string(),
+                )
+            })?,
+        Some(arrow_schema::SortOptions {
+            descending: true,
+            nulls_first: false,
+        }),
+        None,
+    )?;
+
+    let sorted_columns = concatenated_record_batch
+        .columns()
+        .iter()
+        .map(|c| arrow::compute::take(c, &sort_indices, None))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    let final_record_batch = RecordBatch::try_new(schema.clone(), sorted_columns)?;
+    let schema = final_record_batch.schema();
+
+    log::info!(
+        "merge_parquet_files took {:.3} seconds.",
+        start.elapsed().as_secs_f64()
+    );
+
+    Ok((schema, vec![final_record_batch]))
 }
