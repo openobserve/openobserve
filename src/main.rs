@@ -392,7 +392,7 @@ fn init_router_grpc_server(
     Ok(())
 }
 
-async fn init_http_server(_tracer_flusher: Arc<WriteBufferFlusher>) -> Result<(), anyhow::Error> {
+async fn init_http_server(tracer_flusher: Arc<WriteBufferFlusher>) -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
@@ -408,7 +408,6 @@ async fn init_http_server(_tracer_flusher: Arc<WriteBufferFlusher>) -> Result<()
         format!("{}:{}", ip, CONFIG.http.port).parse()?
     };
 
-    let tracer_flusher = WriteBufferFlusher::new();
     let flush_shutdown_tx = tracer_flusher.get_shutdown_tx().unwrap();
     let tracer_flusher = web::Data::new(tracer_flusher);
 

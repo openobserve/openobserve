@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use actix_web::{HttpResponse, web};
+use actix_web::web;
 use config::{ider, CONFIG};
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use hashbrown::HashMap;
@@ -40,6 +40,7 @@ impl Default for WriteBufferFlusher {
 
 impl WriteBufferFlusher {
     pub fn new() -> Self {
+        info!("WriteBufferFlusher new start");
         let (trace_shutdown_tx, trace_shutdown_rx) = watch::channel(());
         let (buffer_tx, buffer_rx) = mpsc::channel::<BufferedWrite>(flusher::BUFFER_CHANNEL_LIMIT);
         let (io_flush_tx, io_flush_rx) = crossbeam_channel::bounded(1);
@@ -127,7 +128,10 @@ pub fn run_trace_io_flush(
     buffer_notify: CrossbeamSender<Result<(), Error>>,
 ) {
     loop {
-        info!("run_trace_io_flush loop start, buffer_rx len : {}", buffer_rx.len());
+        info!(
+            "run_trace_io_flush loop start, buffer_rx len : {}",
+            buffer_rx.len()
+        );
         let request = match buffer_rx.recv() {
             Ok(request) => request,
             Err(e) => {
@@ -138,7 +142,10 @@ pub fn run_trace_io_flush(
         };
 
         // let mut state = segment_state.write();
-        info!("run_trace_io_flush request for start, buffer_rx len : {}", buffer_rx.len());
+        info!(
+            "run_trace_io_flush request for start, buffer_rx len : {}",
+            buffer_rx.len()
+        );
         // write the ops to the segment files, or return on first error
         for (session_id, request) in request {
             let resp = match request {
@@ -171,18 +178,17 @@ pub fn run_trace_io_flush(
                     info!(
                         "[{session_id}]run_trace_io_flush ExportRequest::GrpcExportTraceServiceRequest RT.block_on start"
                     );
-                    // RT.block_on(async {
-                    //     handle_trace_request(
-                    //         org_id.unwrap().to_str().unwrap(),
-                    //         in_thread_id,
-                    //         in_req,
-                    //         true,
-                    //         in_stream_name,
-                    //         session_id.as_str(),
-                    //     )
-                    //     .await
-                    // })
-                    Ok(HttpResponse::Ok().json(crate::common::meta::traces::ExportTraceServiceResponse::default()))
+                    RT.block_on(async {
+                        handle_trace_request(
+                            org_id.unwrap().to_str().unwrap(),
+                            in_thread_id,
+                            in_req,
+                            true,
+                            in_stream_name,
+                            session_id.as_str(),
+                        )
+                        .await
+                    })
                 }
                 ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
                     let in_stream_name = r.3.unwrap_or("".to_string());
@@ -263,7 +269,7 @@ pub async fn run_trace_op_buffer(
                 }
                 info!("io_flush_tx send start, io_flush_tx len: {}", io_flush_tx.len());
                 // send ops into IO flush channel and wait for response
-                if let Err(e) = io_flush_tx.try_send(ops) {
+                if let Err(e) = io_flush_tx.send(ops) {
                     info!("io_flush_tx send e : {}, len: {}", e, io_flush_tx.len());
                 }
                 info!("io_flush_tx send done len: {}", io_flush_tx.len());
