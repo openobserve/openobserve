@@ -963,7 +963,7 @@ pub async fn merge_parquet_files(
 
     let mut record_batches = Vec::new();
     for (data, f) in bytes.iter().zip(temp_files.iter()) {
-        let (_, batches) = read_recordbatch_from_bytes(&data).await.map_err(|e| {
+        let (_, batches) = read_recordbatch_from_bytes(data).await.map_err(|e| {
             log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
             log::error!(
                 "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
@@ -1059,7 +1059,7 @@ pub async fn merge_parquet_files(
     writer.write(&final_record_batch).await?;
     writer.close().await?;
 
-    log::warn!(
+    log::info!(
         "merge_parquet_files took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
