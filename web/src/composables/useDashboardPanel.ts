@@ -214,6 +214,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const resetDashboardPanelData = () => {
     Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
+
+    // add _timestamp field in x axis as default
+    addXAxisItem({
+      name: store.state.zoConfig.timestamp_column ?? "_timestamp",
+    });
   };
 
   const generateLabelFromName = (name: string) => {
@@ -300,7 +305,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   });
 
-  const addXAxisItem = (row: any) => {
+  const addXAxisItem = (row: { name: string }) => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -2213,28 +2218,37 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
         );
         dashboardPanelData.meta.stream.customQueryFields = [];
-        dashboardPanelData.meta.parsedQuery.columns.forEach(
-          (item: any, index: any) => {
-            let val: any;
-            // if there is a lable, use that, else leave it
-            if (item["as"] === undefined || item["as"] === null) {
-              val = item["expr"]["column"];
-            } else {
-              val = item["as"];
-            }
-            if (
-              !dashboardPanelData.meta.stream.customQueryFields.find(
-                (it: any) => it.name == val
-              )
-            ) {
-              dashboardPanelData.meta.stream.customQueryFields.push({
-                name: val,
-                type: "",
-              });
-            }
+        dashboardPanelData.meta.parsedQuery.columns.forEach((item: any) => {
+          let val: any;
+          // if there is a lable, use that, else leave it
+          if (item["as"] === undefined || item["as"] === null) {
+            val = item["expr"]["column"];
+          } else {
+            val = item["as"];
           }
+          if (
+            !dashboardPanelData.meta.stream.customQueryFields.find(
+              (it: any) => it.name == val
+            )
+          ) {
+            dashboardPanelData.meta.stream.customQueryFields.push({
+              name: val,
+              type: "",
+            });
+          }
+        });
+
+        // Check if the query contains '*'
+        const selectAll = dashboardPanelData.meta.parsedQuery.columns.some(
+          (item: any) => item["expr"]["column"] === "*"
         );
 
+        // if the query contains '*' allow to select all fields
+        if (selectAll) {
+          dashboardPanelData.meta.stream.customQueryFields = [
+            ...dashboardPanelData.meta.stream.selectedStreamFields,
+          ];
+        }
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
       } else {

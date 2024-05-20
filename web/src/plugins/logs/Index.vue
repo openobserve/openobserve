@@ -254,6 +254,10 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import {
+  addHistogramToQuery,
+  removeHistogramFromQuery,
+} from "@/utils/query/sqlUtils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -842,13 +846,23 @@ export default defineComponent({
         searchObj.meta.logsVisualizeToggle,
         searchObj.data.query,
         searchObj.data.stream.selectedStream.value,
+        searchObj.data.stream.streamType,
       ],
-      () => {
+      async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           dashboardPanelData.data.queries[0].customQuery = true;
+          searchObj.data.query = addHistogramToQuery(searchObj.data.query);
+
           dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
           dashboardPanelData.data.queries[0].fields.stream =
             searchObj.data.stream.selectedStream.value ?? "default";
+          dashboardPanelData.data.queries[0].fields.streamType =
+            searchObj.data.stream.streamType ?? "logs";
+        } else if (searchObj.meta.logsVisualizeToggle == "logs") {
+          await nextTick();
+          searchObj.data.query = removeHistogramFromQuery(
+            searchObj.data.query ?? ""
+          );
         }
       }
     );
