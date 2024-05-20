@@ -1007,15 +1007,28 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
 
-        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
-            log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
-            log::error!(
-                "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
-                file.location,
-                e
-            );
-            DataFusionError::Execution(e.to_string())
-        })?;
+        let batches = match read_recordbatch_from_bytes(&bytes).await {
+            Ok((parquet_schema, batches)) if parquet_schema == schema => batches,
+            Ok((parquet_schema, _)) => {
+                log::warn!(
+                    "[INGESTER:JOB:{thread_id}] merge small files without DataFusion failed due to schema mismatch,expected {:?}, got {:?}",
+                    schema,
+                    parquet_schema
+                );
+                return Err(DataFusionError::NotImplemented(
+                    "Failed to concatenate record batch due to data type mismatch".to_string(),
+                ));
+            }
+            Err(e) => {
+                log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
+                log::error!(
+                    "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
+                    file.location,
+                    e
+                );
+                return Err(DataFusionError::Execution(e.to_string()));
+            }
+        };
         record_batches.extend(batches);
     }
 
