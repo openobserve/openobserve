@@ -46,7 +46,7 @@ use tokio::{
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::generate_index_on_compactor,
+    job::files::parquet::{generate_index_on_compactor, merge_parquet_files},
     service::{db, file_list, search::datafusion, stream},
 };
 
@@ -661,14 +661,18 @@ pub async fn merge_files(
     }
 
     let start = std::time::Instant::now();
-    let (new_schema, new_batches) = datafusion::exec::merge_parquet_files(
-        tmp_dir.name(),
-        stream_type,
-        stream_name,
-        schema.clone(),
-    )
-    .await
-    .map_err(|e| {
+    let merge_result = if stream_type == StreamType::Logs {
+        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
+    } else {
+        datafusion::exec::merge_parquet_files(
+            tmp_dir.name(),
+            stream_type,
+            stream_name,
+            schema.clone(),
+        )
+        .await
+    };
+    let (new_schema, new_batches) = merge_result.map_err(|e| {
         let files = tmp_dir.list("all").unwrap();
         let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
         log::error!(
@@ -680,6 +684,11 @@ pub async fn merge_files(
 
         DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
     })?;
+
+    log::warn!(
+        "TL: merge files on compactor took: {:.3}",
+        start.elapsed().as_secs_f64()
+    );
 
     let buf = write_recordbatch_to_parquet(
         new_schema.clone(),
