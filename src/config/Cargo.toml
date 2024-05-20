@@ -52,4 +52,3 @@ tracing.workspace = true
 tracing-log.workspace = true
 tracing-subscriber.workspace = true
 utoipa.workspace = true
-rayon.workspace = true

@@ -2296,7 +2296,6 @@ dependencies = [
  "prometheus",
  "proto",
  "rand",
- "rayon",
  "regex",
  "reqwest 0.12.4",
  "segment",
