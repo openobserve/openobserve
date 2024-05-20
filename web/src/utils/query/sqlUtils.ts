@@ -188,3 +188,71 @@ export const isGivenFieldInOrderBy = async (
 
   return null;
 };
+
+export const addHistogramToQuery = (query: any) => {
+  const parser = new Parser();
+  try {
+    const ast: any = parser.astify(query); // Parse the SQL query
+
+    // Check if the query selects the _timestamp field
+    for (let column of ast.columns) {
+      if (
+        column.expr.type === "column_ref" &&
+        column.expr.column === "_timestamp"
+      ) {
+        // If it does, replace it with histogram(_timestamp)
+        column.expr = {
+          type: "function",
+          name: "histogram",
+          args: {
+            type: "expr_list",
+            value: [
+              {
+                type: "column_ref",
+                column: "_timestamp",
+              },
+            ],
+          },
+        };
+        break;
+      }
+    }
+
+    // Convert the modified AST back to a SQL query
+    const newQuery = parser.sqlify(ast);
+    const quotedSql = newQuery.replace(/`/g, '"');
+
+    return quotedSql;
+  } catch (error) {
+    return query;
+  }
+};
+
+export const removeHistogramFromQuery = (query: any) => {
+  const parser = new Parser();
+  try {
+    const ast: any = parser.astify(query); // Parse the SQL query
+
+    if (!ast) return query;
+
+    // Iterate over the columns in the query
+    for (let column of ast.columns) {
+      // If the column is a function and its name is histogram
+      if (column.expr.type === "function" && column.expr.name === "histogram") {
+        // Replace the function with _timestamp
+        column.expr = {
+          type: "column_ref",
+          column: "_timestamp",
+        };
+      }
+    }
+
+    // Convert the modified AST back to a SQL query
+    const newQuery = parser.sqlify(ast);
+    const quotedSql = newQuery.replace(/`/g, '"');
+
+    return quotedSql;
+  } catch (error) {
+    return query;
+  }
+};
