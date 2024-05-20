@@ -551,16 +551,29 @@ async fn merge_files(
             &mut buf,
         )
         .await
-    } else if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), Arc::new(file_schema.unwrap())).await
     } else {
-        merge_parquet_files_by_datafusion(
+        match merge_parquet_files(
+            thread_id,
             tmp_dir.name(),
             stream_type,
-            &stream_name,
-            Arc::new(file_schema.unwrap()),
+            Arc::new(file_schema.clone().unwrap()),
         )
         .await
+        {
+            Ok(merge_result) => Ok(merge_result),
+            Err(datafusion::error::DataFusionError::NotImplemented(_)) => {
+                // fall back on DataFusion when stream_type != Logs or failed to concatenate due to
+                // data type mismatch
+                merge_parquet_files_by_datafusion(
+                    tmp_dir.name(),
+                    stream_type,
+                    &stream_name,
+                    Arc::new(file_schema.unwrap()),
+                )
+                .await
+            }
+            Err(e) => Err(e),
+        }
     };
     let (new_schema, new_batches) = match merge_result {
         Ok(v) => v,

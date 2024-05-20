@@ -663,17 +663,22 @@ pub async fn merge_files(
     }
 
     let start = std::time::Instant::now();
-    let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
-    } else {
-        datafusion::exec::merge_parquet_files(
-            tmp_dir.name(),
-            stream_type,
-            stream_name,
-            schema.clone(),
-        )
-        .await
-    };
+    let merge_result =
+        match merge_parquet_files(thread_id, tmp_dir.name(), stream_type, schema.clone()).await {
+            Ok(merge_result) => Ok(merge_result),
+            Err(DataFusionError::NotImplemented(_)) => {
+                // fall back on DataFusion when stream_type != Logs or failed to concatenate due to
+                // data type mismatch
+                datafusion::exec::merge_parquet_files(
+                    tmp_dir.name(),
+                    stream_type,
+                    stream_name,
+                    schema.clone(),
+                )
+                .await
+            }
+            Err(e) => Err(e),
+        };
     let (new_schema, new_batches) = merge_result.map_err(|e| {
         let files = tmp_dir.list("all").unwrap();
         let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
@@ -972,9 +977,16 @@ pub fn generate_inverted_idx_recordbatch(
 pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
+    stream_type: StreamType,
     schema: Arc<Schema>,
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
+
+    if stream_type != StreamType::Logs {
+        return Err(DataFusionError::NotImplemented(
+            "Merge parquet files without DataFusion only implemented for Logs".to_string(),
+        ));
+    }
 
     // 1. get record batches from tmpfs
     let temp_files = infra::cache::tmpfs::list(trace_id, "parquet").map_err(|e| {
@@ -995,7 +1007,7 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
 
-        let (schema, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
+        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
             log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
             log::error!(
                 "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
@@ -1004,30 +1016,21 @@ pub async fn merge_parquet_files(
             );
             DataFusionError::Execution(e.to_string())
         })?;
-        let field_num = schema.fields().len();
-        for i in 0..field_num {
-            let arrays = batches
-                .iter()
-                .map(|batch| batch.column(i).as_ref())
-                .collect::<Vec<_>>();
-            let d = arrays[0].data_type();
-            arrays.iter().skip(1).for_each(|array| {
-                let dt = array.data_type();
-                if dt != d {
-                    log::error!(
-                        "record_batch columns have different data type. {} vs. {}. schema {}",
-                        d,
-                        dt,
-                        schema
-                    );
-                }
-            });
-        }
         record_batches.extend(batches);
     }
 
-    // 2. concatenate all record batches into one single RecordBatch
-    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
+    // 2. concatenate all record batches into one single RecordBatch.
+    // concat_batches returns an error if the types of underlying arrays are different.
+    // TODO(taiming): figure out how to concatenate with different schemas
+    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)
+        .map_err(|_| {
+            log::warn!(
+                "[INGESTER:JOB:{thread_id}] merge small files without DataFusion failed due to data type mismatch",
+            );
+            DataFusionError::NotImplemented(
+                "Failed to concatenate record batch due to data type mismatch".to_string(),
+            )
+        })?;
 
     // 3. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
