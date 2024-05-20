@@ -181,7 +181,6 @@ infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
-openobserve = { path = "" }
 
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.5"

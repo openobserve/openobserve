@@ -50,20 +50,23 @@ impl TraceService for TraceServer {
             return Err(Status::invalid_argument(msg));
         }
 
-        let request = tonic::Request::new(ExportRequest::ExportTraceServiceRequest(
-            request.into_inner(),
-        ));
+        let request = ExportRequest::GrpcExportTraceServiceRequest(request);
+        log::info!("begin to export flusher write");
         match self.flusher.write(request).await {
             Ok(resp) => match resp {
                 flusher::BufferedWriteResult::Success(_) => {
+                    log::info!("flusher::BufferedWriteResult::Success");
                     Ok(Response::new(ExportTraceServiceResponse {
                         partial_success: None,
                     }))
                 }
-                flusher::BufferedWriteResult::Error(e) => Err(Status::internal(e)),
+                flusher::BufferedWriteResult::Error(e) => {
+                    log::info!("flusher::BufferedWriteResult::Error");
+                    Err(Status::internal(e))
+                }
             },
             Err(e) => {
-                println!("{}", e);
+                log::info!("flusher write error {}", e);
                 Err(Status::internal(e.to_string()))
             }
         }

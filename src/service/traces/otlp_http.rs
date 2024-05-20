@@ -35,7 +35,7 @@ pub async fn traces_proto(
     flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    let request = tonic::Request::new(ExportRequest::ExportTraceServiceRequest(request));
+    let request = tonic::Request::new(request);
 
     let (mut metadata, extensions, message) = request.into_parts();
     let session_id = ider::uuid();
@@ -52,19 +52,25 @@ pub async fn traces_proto(
         );
     };
 
-    let request = Request::from_parts(metadata, extensions, message);
+    let request = ExportRequest::GrpcExportTraceServiceRequest(Request::from_parts(
+        metadata, extensions, message,
+    ));
 
     match flusher.write(request).await {
         Ok(resp) => match resp {
             flusher::BufferedWriteResult::Success(_) => {
+                log::info!("flusher::BufferedWriteResult::Success");
                 Ok(HttpResponse::Ok().json(ExportTraceServiceResponse::default()))
             }
-            flusher::BufferedWriteResult::Error(e) => Ok(HttpResponse::ServiceUnavailable().json(
-                MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                    e.to_string(),
-                ),
-            )),
+            flusher::BufferedWriteResult::Error(e) => {
+                log::info!("flusher::BufferedWriteResult::Success");
+                Ok(
+                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                        http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                        e.to_string(),
+                    )),
+                )
+            }
         },
         Err(e) => Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -81,9 +87,44 @@ pub async fn traces_json(
     thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
-    _flusher: web::Data<WriteBufferFlusher>,
+    flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
-    super::handle_trace_json_request(org_id, thread_id, body, in_stream_name).await
+    let in_stream_name = in_stream_name.map(|name| name.to_string());
+
+    let request = ExportRequest::HttpJsonExportTraceServiceRequest((
+        org_id.to_string(),
+        thread_id,
+        body,
+        in_stream_name,
+    ));
+
+    match flusher.write(request).await {
+        Ok(resp) => match resp {
+            flusher::BufferedWriteResult::Success(_) => {
+                log::info!("flusher::BufferedWriteResult::Success");
+                Ok(HttpResponse::Ok().json(ExportTraceServiceResponse::default()))
+            }
+            flusher::BufferedWriteResult::Error(e) => {
+                log::info!("flusher::BufferedWriteResult::Success");
+                Ok(
+                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                        http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                        e.to_string(),
+                    )),
+                )
+            }
+        },
+        Err(e) => {
+            log::info!("flusher write error {}", e);
+            Ok(
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    }
+    // super::handle_trace_json_request(org_id, thread_id, body, in_stream_name).await
 }
 
 #[cfg(test)]

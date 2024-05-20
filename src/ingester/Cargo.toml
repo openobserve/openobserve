@@ -27,7 +27,6 @@ tokio.workspace = true
 async-walkdir.workspace = true
 tonic.workspace = true
 opentelemetry-proto.workspace = true
-futures-locks.workspace = true
 [[bin]]
 name = "wal-reader"
 path = "bin/wal-reader.rs"
