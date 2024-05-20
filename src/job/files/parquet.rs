@@ -19,7 +19,7 @@ use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
 };
-use arrow_schema::{DataType, Schema, SchemaRef, SortOptions};
+use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
@@ -58,7 +58,7 @@ use crate::{
     common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
-        compact::merge::generate_inverted_idx_recordbatch,
+        compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
         search::datafusion::{
             exec::merge_parquet_files as merge_parquet_files_by_datafusion,
@@ -884,81 +884,4 @@ async fn move_single_file(
         );
         datafusion::error::DataFusionError::Execution(e.to_string())
     })
-}
-
-pub async fn merge_parquet_files(
-    thread_id: usize,
-    trace_id: &str,
-    schema: Arc<Schema>,
-) -> datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
-    let start = std::time::Instant::now();
-
-    // 1. get record batches from tmpfs
-    let temp_files = tmpfs::list(trace_id, "parquet").map_err(|e| {
-        log::error!(
-            "[INGESTER:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
-            e
-        );
-        datafusion::error::DataFusionError::Execution(e.to_string())
-    })?;
-
-    let mut record_batches = Vec::new();
-    for file in temp_files {
-        let bytes = tmpfs::get(&file.location).map_err(|e| {
-            log::error!(
-                "[INGESTER:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
-                e
-            );
-            datafusion::error::DataFusionError::Execution(e.to_string())
-        })?;
-
-        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
-            log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
-            log::error!(
-                "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
-                file.location,
-                e
-            );
-            datafusion::error::DataFusionError::Execution(e.to_string())
-        })?;
-        record_batches.extend(batches);
-    }
-
-    // 2. concatenate all record batches into one single RecordBatch
-    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
-
-    // 3. sort concatenated record batch by timestamp col in desc order
-    let sort_indices = arrow::compute::sort_to_indices(
-        concatenated_record_batch
-            .column_by_name(&CONFIG.common.column_timestamp)
-            .ok_or_else(|| {
-                log::error!(
-                    "[INGESTER:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
-                );
-                datafusion::error::DataFusionError::Execution(
-                    "No _timestamp column found in merged record batch".to_string(),
-                )
-            })?,
-        Some(SortOptions {
-            descending: true,
-            nulls_first: false,
-        }),
-        None,
-    )?;
-
-    let sorted_columns = concatenated_record_batch
-        .columns()
-        .iter()
-        .map(|c| arrow::compute::take(c, &sort_indices, None))
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-
-    let final_record_batch = RecordBatch::try_new(schema.clone(), sorted_columns)?;
-    let schema = final_record_batch.schema();
-
-    log::info!(
-        "merge_parquet_files took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
-
-    Ok((schema, vec![final_record_batch]))
 }
