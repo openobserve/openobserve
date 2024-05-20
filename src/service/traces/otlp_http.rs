@@ -56,30 +56,7 @@ pub async fn traces_proto(
         metadata, extensions, message,
     ));
 
-    match flusher.write(request).await {
-        Ok(resp) => match resp {
-            flusher::BufferedWriteResult::Success(_) => {
-                log::info!("flusher::BufferedWriteResult::Success");
-                Ok(HttpResponse::Ok().json(ExportTraceServiceResponse::default()))
-            }
-            flusher::BufferedWriteResult::Error(e) => {
-                log::info!("flusher::BufferedWriteResult::Success");
-                Ok(
-                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                        http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                        e.to_string(),
-                    )),
-                )
-            }
-        },
-        Err(e) => Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        ),
-    }
-    // super::handle_trace_request(org_id, thread_id, request, false, in_stream_name, "").await
+    hanlde_resp(flusher, request).await
 }
 
 pub async fn traces_json(
@@ -98,6 +75,13 @@ pub async fn traces_json(
         in_stream_name,
     ));
 
+    hanlde_resp(flusher, request).await
+}
+
+async fn hanlde_resp(
+    flusher: web::Data<WriteBufferFlusher>,
+    request: ExportRequest,
+) -> Result<HttpResponse, Error> {
     match flusher.write(request).await {
         Ok(resp) => match resp {
             flusher::BufferedWriteResult::Success(_) => {
@@ -115,7 +99,7 @@ pub async fn traces_json(
             }
         },
         Err(e) => {
-            log::info!("flusher write error {}", e);
+            log::error!("flusher write error {}", e);
             Ok(
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE.into(),
@@ -124,7 +108,6 @@ pub async fn traces_json(
             )
         }
     }
-    // super::handle_trace_json_request(org_id, thread_id, body, in_stream_name).await
 }
 
 #[cfg(test)]
