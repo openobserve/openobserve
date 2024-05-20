@@ -685,11 +685,6 @@ pub async fn merge_files(
         DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
     })?;
 
-    log::warn!(
-        "TL: merge files on compactor took: {:.3}",
-        start.elapsed().as_secs_f64()
-    );
-
     let buf = write_recordbatch_to_parquet(
         new_schema.clone(),
         &new_batches,
