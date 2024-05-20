@@ -1037,9 +1037,9 @@ pub fn init() -> Config {
     if cfg.limit.query_thread_num == 0 {
         cfg.limit.query_thread_num = cpu_num * 4;
     }
-    // HACK for move_file_thread_num equal to CPU core * 2
+    // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num * 2;
+        cfg.limit.file_move_thread_num = cpu_num;
     }
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
