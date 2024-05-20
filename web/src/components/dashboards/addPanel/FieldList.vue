@@ -158,9 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].customQuery &&
-                props.pageIndex ==
-                  dashboardPanelData.meta.stream.customQueryFields.length
+                ].customQuery && props.pageIndex == customQueryFieldsLength
                   ? 'border: 1px solid black'
                   : ''
               "
@@ -186,9 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length)
+                        props.pageIndex >= customQueryFieldsLength)
                     )
                   "
                   @dragstart="onDragStart($event, props.row)"
@@ -203,9 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery &&
-                          props.pageIndex >=
-                            dashboardPanelData.meta.stream.customQueryFields
-                              .length)
+                          props.pageIndex >= customQueryFieldsLength)
                       )
                         ? 'drag_indicator'
                         : 'drag_disabled',
@@ -235,9 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length) ||
+                        props.pageIndex >= customQueryFieldsLength) ||
                       dashboardPanelData.data.type == 'geomap'
                     )
                   "
@@ -318,9 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length)
+                        props.pageIndex >= customQueryFieldsLength)
                     ) && dashboardPanelData.data.type == 'geomap'
                   "
                 >
@@ -383,9 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length)
+                        props.pageIndex >= customQueryFieldsLength)
                     ) && dashboardPanelData.data.type == 'sankey'
                   "
                 >
@@ -494,6 +482,10 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard"
     );
+
+    // custom query fields length
+    // will be updated when filter is applied
+    const customQueryFieldsLength = ref(0);
 
     const store = useStore();
     const router = useRouter();
@@ -711,6 +703,19 @@ export default defineComponent({
           ...dashboardPanelData.meta.stream.customQueryFields,
           ...dashboardPanelData.meta.stream.selectedStreamFields,
         ];
+
+        // set the custom query fields length
+        customQueryFieldsLength.value =
+          dashboardPanelData.meta.stream.customQueryFields.length;
+      }
+    );
+
+    watch(
+      () => dashboardPanelData.meta.stream.filterField,
+      () => {
+        // set the custom query fields length
+        customQueryFieldsLength.value =
+          dashboardPanelData.meta.stream.customQueryFields.length;
       }
     );
 
@@ -729,10 +734,29 @@ export default defineComponent({
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
-      let filtered = [...dashboardPanelData.meta.stream.customQueryFields];
+      let filtered = [];
 
       if (terms != "") {
         terms = terms.toLowerCase();
+
+        // loop on custom query fields
+        for (
+          let i = 0;
+          i < dashboardPanelData.meta.stream.customQueryFields.length;
+          i++
+        ) {
+          if (
+            dashboardPanelData.meta.stream.customQueryFields[i]["name"]
+              .toLowerCase()
+              .includes(terms)
+          ) {
+            filtered.push(dashboardPanelData.meta.stream.customQueryFields[i]);
+          }
+        }
+
+        // update custom query fields length
+        customQueryFieldsLength.value = filtered.length;
+
         for (
           let i = 0;
           i < dashboardPanelData.meta.stream.selectedStreamFields.length;
@@ -826,6 +850,7 @@ export default defineComponent({
       metricsIconMapping,
       selectedMetricTypeIcon,
       onDragEnd,
+      customQueryFieldsLength,
     };
   },
 });
