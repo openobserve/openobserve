@@ -1076,7 +1076,7 @@ pub fn generate_vertical_partition_recordbatch(
     if batches.num_rows() == 0 {
         return Ok(Vec::new());
     }
-    let record_len = batches.num_rows();
+    let records_len = batches.num_rows();
     let Ok(all_field_idx) = schema.index_of(&CONFIG.common.all_fields_name) else {
         return Ok(Vec::new());
     };
@@ -1091,13 +1091,13 @@ pub fn generate_vertical_partition_recordbatch(
     };
 
     let mut inserted_fields = HashSet::with_capacity(128);
-    for i in 0..record_len {
+    for i in 0..records_len {
         inserted_fields.clear();
         let data: json::Value = json::from_str(all_values.value(i))?;
         let items = data.as_object().unwrap();
         for (key, val) in items {
             let builder = builders.entry(key.to_string()).or_insert_with(|| {
-                let mut builder = make_builder(&DataType::Utf8, record_len);
+                let mut builder = make_builder(&DataType::Utf8, records_len);
                 if i > 0 {
                     let b = builder
                         .as_any_mut()
@@ -1135,7 +1135,7 @@ pub fn generate_vertical_partition_recordbatch(
     let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len() + builders.len());
     for i in 0..schema.fields().len() {
         if i == all_field_idx {
-            cols.push(new_null_array(&DataType::Utf8, record_len));
+            cols.push(new_null_array(&DataType::Utf8, records_len));
         } else {
             cols.push(batches.column(i).clone());
         }
