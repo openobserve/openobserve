@@ -190,6 +190,7 @@ const defaultObject = {
 };
 
 const searchObj = reactive(Object.assign({}, defaultObject));
+const searchObjDebug = reactive({});
 
 const useLogs = () => {
   const store = useStore();
@@ -1039,6 +1040,8 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+      console.log("=================== Start Debug ===================");
+      searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
       if (
@@ -1061,14 +1064,24 @@ const useLogs = () => {
         return;
       }
 
+      searchObjDebug["buildSearchStartTime"] = performance.now();
       const queryReq = buildSearch();
+      searchObjDebug["buildSearchEndTime"] = performance.now();
+      console.log(
+        `Build Search operation took ${searchObjDebug["buildSearchEndTime"] - searchObjDebug["buildSearchStartTime"]} milliseconds to complete`
+      );
       if (queryReq == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
       }
       // reset query data and get partition detail for given query.
       if (!isPagination) {
         resetQueryData();
+        searchObjDebug["partitionStartTime"] = performance.now();
         await getQueryPartitions(queryReq);
+        searchObjDebug["partitionEndTime"] = performance.now();
+        console.log(
+          `Partition operation took ${searchObjDebug["partitionEndTime"] - searchObjDebug["partitionStartTime"]} milliseconds to complete`
+        );
       }
 
       if (queryReq != null) {
@@ -1167,7 +1180,12 @@ const useLogs = () => {
         searchObj.data.queryResults.subpage = 1;
 
         // based on pagination request, get the data
+        searchObjDebug["paginatedDatawithAPIStartTime"] = performance.now();
         await getPaginatedData(queryReq);
+        searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
+        console.log(
+          `Get Paginated Data with API took ${searchObjDebug["paginatedDatawithAPIEndTime"] - searchObjDebug["paginatedDatawithAPIStartTime"]} milliseconds to complete`
+        );
         const parsedSQL: any = fnParsedSQL();
 
         if (
@@ -1200,13 +1218,23 @@ const useLogs = () => {
         } else {
           if (queryReq.query.from == 0) {
             setTimeout(async () => {
+              searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
+              searchObjDebug["pagecountEndTime"] = performance.now();
+              console.log(
+                `Total count took ${searchObjDebug["pagecountEndTime"] - searchObjDebug["pagecountStartTime"]} milliseconds to complete`
+              );
             }, 0);
           }
         }
       } else {
         searchObj.loading = false;
       }
+      searchObjDebug["queryDataEndTime"] = performance.now();
+      console.log(
+        `Entire operation took ${searchObjDebug["queryDataEndTime"] - searchObjDebug["queryDataStartTime"]} milliseconds to complete`
+      );
+      console.log("=================== getQueryData Debug ===================");
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(notificationMsg.value || "Something went wrong.");
@@ -1373,7 +1401,7 @@ const useLogs = () => {
           page_type: searchObj.data.stream.streamType,
         })
         .then(async (res) => {
-          const startTime = performance.now();
+          searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
@@ -1506,9 +1534,9 @@ const useLogs = () => {
           }
 
           searchObj.loading = false;
-          const endTime = performance.now();
+          searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
           console.log(
-            `Query took ${endTime - startTime} milliseconds to complete`
+            `Paginated data time after response received from server took ${searchObjDebug["paginatedDataReceivedEndTime"] - searchObjDebug["paginatedDataReceivedStartTime"]} milliseconds to complete`
           );
           resolve(true);
         })
@@ -1562,6 +1590,7 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
+        searchObjDebug["histogramStartTime"] = performance.now();
         searchObj.data.histogram.errorMsg = "";
         searchObj.data.histogram.errorCode = 0;
         searchObj.data.histogram.errorDetail = "";
@@ -1575,6 +1604,7 @@ const useLogs = () => {
             page_type: searchObj.data.stream.streamType,
           })
           .then((res) => {
+            searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
@@ -1610,6 +1640,16 @@ const useLogs = () => {
 
             searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
+
+            searchObjDebug["histogramProcessingEndTime"] = performance.now();
+            searchObjDebug["histogramEndTime"] = performance.now();
+            console.log(
+              `Histogram processing after data received took ${searchObjDebug["histogramProcessingEndTime"] - searchObjDebug["histogramProcessingStartTime"]} milliseconds to complete`
+            );
+            console.log(
+              `Entire Histogram took ${searchObjDebug["histogramEndTime"] - searchObjDebug["histogramStartTime"]} milliseconds to complete`
+            );
+            console.log("=================== End Debug ===================");
             dismiss();
             resolve(true);
           })
@@ -1679,6 +1719,8 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
+      searchObjDebug["extractFieldsStartTime"] = performance.now();
+      searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
@@ -1695,6 +1737,7 @@ const useLogs = () => {
             // check for schema exist in the object or not
             // if not pull the schema from server.
             if (!stream.hasOwnProperty("schema")) {
+              searchObjDebug["extractFieldsWithAPI"] = " with API ";
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
               if (streamSchema == undefined) {
@@ -1870,6 +1913,10 @@ const useLogs = () => {
         )
           updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
       }
+      searchObjDebug["extractFieldsEndTime"] = performance.now();
+      console.log(
+        `ExtractFields ${searchObjDebug["extractFieldsWithAPI"]} operation took ${searchObjDebug["extractFieldsEndTime"] - searchObjDebug["extractFieldsStartTime"]} milliseconds to complete`
+      );
     } catch (e: any) {
       console.log("Error while extracting fields");
     }
