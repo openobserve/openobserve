@@ -190,7 +190,27 @@ const defaultObject = {
 };
 
 const searchObj = reactive(Object.assign({}, defaultObject));
-const searchObjDebug = reactive({});
+const searchObjDebug = reactive({
+  queryDataStartTime: 0,
+  queryDataEndTime: 0,
+  buildSearchStartTime: 0,
+  buildSearchEndTime: 0,
+  partitionStartTime: 0,
+  partitionEndTime: 0,
+  paginatedDatawithAPIStartTime: 0,
+  paginatedDatawithAPIEndTime: 0,
+  pagecountStartTime: 0,
+  pagecountEndTime: 0,
+  paginatedDataReceivedStartTime: 0,
+  paginatedDataReceivedEndTime: 0,
+  histogramStartTime: 0,
+  histogramEndTime: 0,
+  histogramProcessingStartTime: 0,
+  histogramProcessingEndTime: 0,
+  extractFieldsStartTime: 0,
+  extractFieldsEndTime: 0,
+  extractFieldsWithAPI: "",
+});
 
 const useLogs = () => {
   const store = useStore();
