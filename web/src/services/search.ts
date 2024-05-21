@@ -25,7 +25,7 @@ const search = {
     query: any;
     page_type: string;
   },
-   search_type_type: string,
+   search_type: string,
 ) => {
     const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     return http().post(url, query);

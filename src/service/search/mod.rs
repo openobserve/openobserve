@@ -21,6 +21,7 @@ use config::{
     meta::{
         search,
         stream::{FileKey, StreamType},
+        usage::{RequestStats, UsageType},
     },
     utils::str::find,
 };
@@ -43,6 +44,7 @@ use {
 #[cfg(not(feature = "enterprise"))]
 use {std::sync::Arc, tokio::sync::Mutex};
 
+use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
@@ -63,13 +65,13 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 static RE_SELECT_WILDCARD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
 
-#[tracing::instrument(name = "service:search:enter", skip(req))]
+#[tracing::instrument(name = "service:search:enter", skip(in_req))]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     user_id: Option<String>,
-    req: &search::Request,
+    in_req: &search::Request,
 ) -> Result<search::Response, Error> {
     let cfg = get_config();
     let trace_id = if trace_id.is_empty() {
@@ -85,9 +87,9 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        let sql = Some(req.query.sql.clone());
-        let start_time = Some(req.query.start_time);
-        let end_time = Some(req.query.end_time);
+        let sql = Some(in_req.query.sql.clone());
+        let start_time = Some(in_req.query.start_time);
+        let end_time = Some(in_req.query.end_time);
         // set search task
         SEARCH_SERVER
             .insert(
@@ -95,7 +97,7 @@ pub async fn search(
                 TaskStatus::new(
                     vec![],
                     true,
-                    user_id,
+                    user_id.clone(),
                     Some(org_id.to_string()),
                     Some(stream_type.to_string()),
                     sql,
@@ -107,19 +109,21 @@ pub async fn search(
     }
 
     #[cfg(feature = "enterprise")]
-    let req_regions = req.regions.clone();
+    let req_regions = in_req.regions.clone();
     #[cfg(feature = "enterprise")]
-    let req_clusters = req.clusters.clone();
+    let req_clusters = in_req.clusters.clone();
     #[cfg(feature = "enterprise")]
     let local_cluster_search = req_regions == vec!["local"]
         && !req_clusters.is_empty()
         && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
-    let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
+    let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
     req.job.as_mut().unwrap().trace_id = trace_id.clone();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::Cluster as _;
     req.stream_type = stream_type.to_string();
+
+    let req_query = req.clone().query.unwrap();
 
     let res = {
         #[cfg(feature = "enterprise")]
@@ -140,7 +144,53 @@ pub async fn search(
 
     // do this because of clippy warning
     match res {
-        Ok(res) => Ok(res),
+        Ok(res) => {
+            let time = start.elapsed().as_secs_f64();
+            let (report_usage, search_type) = match in_req.search_type {
+                Some(search_type) => match search_type {
+                    search::SearchEventType::UI => (false, None),
+                    search::SearchEventType::Dashboards => (true, in_req.search_type),
+                    search::SearchEventType::Reports => (true, in_req.search_type),
+                    search::SearchEventType::Alerts => (true, in_req.search_type),
+                    search::SearchEventType::Values => (false, None),
+                    search::SearchEventType::Other => (false, None),
+                },
+                None => (false, None),
+            };
+
+            if report_usage {
+                let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
+                    Ok(v) => v.source.to_string(),
+                    Err(e) => {
+                        log::error!("parse sql error: {:?}", e);
+                        "".to_string()
+                    }
+                };
+                let req_stats = RequestStats {
+                    records: res.hits.len() as i64,
+                    response_time: time,
+                    size: res.scan_size as f64,
+                    request_body: Some(req_query.sql.clone()),
+                    user_email: user_id,
+                    min_ts: Some(req_query.start_time),
+                    max_ts: Some(req_query.end_time),
+                    cached_ratio: Some(res.cached_ratio),
+                    search_type,
+                    ..Default::default()
+                };
+                report_request_usage_stats(
+                    req_stats,
+                    &org_id,
+                    &stream_name,
+                    StreamType::Logs,
+                    UsageType::Search,
+                    0,
+                )
+                .await;
+            }
+
+            Ok(res)
+        }
         Err(e) => Err(e),
     }
 }

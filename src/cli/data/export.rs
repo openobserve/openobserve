@@ -18,7 +18,7 @@ use std::{collections::HashMap, fs, path::Path};
 use actix_web::web::Query;
 use async_trait::async_trait;
 use config::meta::{
-    search::{self, SearchEventType},
+    search::{self},
     stream::StreamType,
 };
 
@@ -43,7 +43,7 @@ impl Context for Export {
         let cfg = config::get_config();
         let search_type = match get_search_type_from_request(&Query(map.clone())) {
             Ok(v) => v,
-            Err(e) => return Ok(false),
+            Err(_) => return Ok(false),
         };
 
         let table = c.stream_name;

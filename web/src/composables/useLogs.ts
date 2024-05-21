@@ -15,10 +15,11 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
+import { reactive, ref, type Ref, toRaw, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import {
   useLocalLogFilterField,
@@ -35,7 +36,6 @@ import {
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
 import { logsErrorMessage } from "@/utils/common";
-import useSqlSuggestions from "@/composables/useSuggestions";
 // import {
 //   b64EncodeUnicode,
 //   useLocalLogFilterField,
@@ -120,9 +120,6 @@ const defaultObject = {
     flagWrapContent: false,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
-    clusters: [],
-    useUserDefinedSchemas: "user_defined_schema",
-    hasUserDefinedSchemas: false,
   },
   data: {
     query: <any>"",
@@ -143,7 +140,6 @@ const defaultObject = {
       functions: <any>[],
       streamType: "logs",
       interestingFieldList: <string[]>[],
-      userDefinedSchema: <any>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -190,27 +186,6 @@ const defaultObject = {
 };
 
 const searchObj = reactive(Object.assign({}, defaultObject));
-const searchObjDebug = reactive({
-  queryDataStartTime: 0,
-  queryDataEndTime: 0,
-  buildSearchStartTime: 0,
-  buildSearchEndTime: 0,
-  partitionStartTime: 0,
-  partitionEndTime: 0,
-  paginatedDatawithAPIStartTime: 0,
-  paginatedDatawithAPIEndTime: 0,
-  pagecountStartTime: 0,
-  pagecountEndTime: 0,
-  paginatedDataReceivedStartTime: 0,
-  paginatedDataReceivedEndTime: 0,
-  histogramStartTime: 0,
-  histogramEndTime: 0,
-  histogramProcessingStartTime: 0,
-  histogramProcessingEndTime: 0,
-  extractFieldsStartTime: 0,
-  extractFieldsEndTime: 0,
-  extractFieldsWithAPI: "",
-});
 
 const useLogs = () => {
   const store = useStore();
@@ -220,22 +195,10 @@ const useLogs = () => {
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream } = useStreams();
   const router = useRouter();
-  let parser: any;
+  const parser = new Parser();
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
-
-  const { updateFieldKeywords } = useSqlSuggestions();
-
-  onBeforeMount(async () => {
-    await importSqlParser();
-  });
-
-  const importSqlParser = async () => {
-    const useSqlParser: any = await import("@/composables/useParser");
-    const { sqlParser }: any = useSqlParser.default();
-    parser = await sqlParser();
-  };
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
   const resetSearchObj = () => {
@@ -486,7 +449,6 @@ const useLogs = () => {
       query["type"] = searchObj.meta.pageType;
     }
 
-    query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
@@ -520,7 +482,7 @@ const useLogs = () => {
           histogram:
             "select histogram(" +
             store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
@@ -529,7 +491,6 @@ const useLogs = () => {
         store.state.zoConfig.super_cluster_enabled
       ) {
         req["regions"] = searchObj.meta.regions;
-        req["clusters"] = searchObj.meta.clusters;
       }
 
       if (searchObj.data.stream.selectedStreamFields.length == 0) {
@@ -629,22 +590,8 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        req.aggs.histogram = req.aggs.histogram.replace(
-          "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.value
-        );
-
-        req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
-
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
-        const histogramParsedSQL: any = fnHistogramParsedSQL(req.aggs.histogram);
-
-        histogramParsedSQL.where = parsedSQL.where;
-
-        let histogramQuery = parser.sqlify(histogramParsedSQL)
-        histogramQuery = histogramQuery.replace(/`/g, '"');
-        req.aggs.histogram = histogramQuery;
 
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
@@ -737,14 +684,8 @@ const useLogs = () => {
             "[WHERE_CLAUSE]",
             " WHERE " + whereClause
           );
-
-          req.aggs.histogram = req.aggs.histogram.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause
-          );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-          req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
         }
 
         req.query.sql = req.query.sql.replace(
@@ -753,11 +694,6 @@ const useLogs = () => {
         );
 
         req.query.sql = req.query.sql.replace(
-          "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.value
-        );
-
-        req.aggs.histogram = req.aggs.histogram.replace(
           "[INDEX_NAME]",
           searchObj.data.stream.selectedStream.value
         );
@@ -823,7 +759,11 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(parsedSQL?.limit);
+    return !(
+      parsedSQL?.groupby ||
+      hasAggregation(parsedSQL?.columns) ||
+      parsedSQL?.limit
+    );
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -854,21 +794,13 @@ const useLogs = () => {
         end_time: queryReq.query.end_time,
         sql_mode: searchObj.meta.sqlMode ? "full" : "context",
       };
-      if (store.state.zoConfig.sql_base64_enabled) {
-        partitionQueryReq["encoding"] = "base64";
-      }
 
       if (
         config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
+        store.state.zoConfig.super_cluster_enabled &&
+        queryReq.query.hasOwnProperty("regions")
       ) {
-        if (queryReq.query.hasOwnProperty("regions")) {
-          partitionQueryReq["regions"] = queryReq.query.regions;
-        }
-
-        if (queryReq.query.hasOwnProperty("clusters")) {
-          partitionQueryReq["clusters"] = queryReq.query.clusters;
-        }
+        partitionQueryReq["regions"] = queryReq.query.regions;
       }
 
       await searchService
@@ -987,41 +919,12 @@ const useLogs = () => {
       let recordSize = 0;
       let from = 0;
       let lastPage = 0;
+      searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
+        (accumulator: number, currentValue: number) =>
+          accumulator + currentValue,
+        0
+      );
 
-      const parsedSQL: any = fnParsedSQL();
-
-      if (
-        (searchObj.data.queryResults.aggs !== undefined &&
-          searchObj.data.resultGrid.currentPage == 1 &&
-          searchObj.meta.showHistogram == true &&
-          (!searchObj.meta.sqlMode ||
-            (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
-        (searchObj.loadingHistogram == false &&
-          searchObj.meta.showHistogram == true &&
-          searchObj.meta.sqlMode == false &&
-          searchObj.data.resultGrid.currentPage == 1)
-      ) {
-        if (
-          searchObj.data.queryResults.hasOwnProperty("aggs") &&
-          searchObj.data.queryResults.aggs != null
-        ) {
-          searchObj.data.queryResults.total =
-            searchObj.data.queryResults.aggs.reduce(
-              (accumulator: number, currentValue: any) =>
-                accumulator +
-                Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-              0
-            );
-          partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
-        }
-      } else {
-        searchObj.data.queryResults.total =
-          partitionDetail.partitionTotal.reduce(
-            (accumulator: number, currentValue: number) =>
-              accumulator + Math.max(currentValue, 0),
-            0
-          );
-      }
       // partitionDetail.partitions.forEach((item: any, index: number) => {
       for (const [index, item] of partitionDetail.partitions.entries()) {
         total = partitionDetail.partitionTotal[index];
@@ -1129,8 +1032,6 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-      console.log("=================== Start Debug ===================");
-      searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
       if (
@@ -1153,30 +1054,14 @@ const useLogs = () => {
         return;
       }
 
-      searchObjDebug["buildSearchStartTime"] = performance.now();
       const queryReq = buildSearch();
-      searchObjDebug["buildSearchEndTime"] = performance.now();
-      console.log(
-        `Build Search operation took ${
-          searchObjDebug["buildSearchEndTime"] -
-          searchObjDebug["buildSearchStartTime"]
-        } milliseconds to complete`
-      );
       if (queryReq == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
       }
       // reset query data and get partition detail for given query.
       if (!isPagination) {
         resetQueryData();
-        searchObjDebug["partitionStartTime"] = performance.now();
         await getQueryPartitions(queryReq);
-        searchObjDebug["partitionEndTime"] = performance.now();
-        console.log(
-          `Partition operation took ${
-            searchObjDebug["partitionEndTime"] -
-            searchObjDebug["partitionStartTime"]
-          } milliseconds to complete`
-        );
       }
 
       if (queryReq != null) {
@@ -1208,10 +1093,10 @@ const useLogs = () => {
               router.currentRoute.value.name == "logs" &&
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
-              const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
-              const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
-              queryReq.query.start_time = start_time;
-              queryReq.query.end_time = end_time;
+              queryReq.query.start_time =
+                initialQueryPayload.value?.query?.start_time;
+              queryReq.query.end_time =
+                initialQueryPayload.value?.query?.end_time;
             }
           }
         }
@@ -1222,20 +1107,9 @@ const useLogs = () => {
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
 
-        searchObj.data.histogramQuery.query.sql =
-          searchObj.data.histogramQuery.aggs.histogram;
-        searchObj.data.histogramQuery.query.sql_mode = "full";
-
-        searchObj.data.histogramQuery.query.start_time =
-          searchObj.data.datetime.startTime;
-        searchObj.data.histogramQuery.query.end_time =
-          searchObj.data.datetime.endTime;
-        delete searchObj.data.histogramQuery.query.quick_mode;
-        delete searchObj.data.histogramQuery.query.from;
-
         // Removing sql_mode from histogram query, as it is not required
-        //delete searchObj.data.histogramQuery.query.sql_mode;
-        delete searchObj.data.histogramQuery.aggs;
+        delete searchObj.data.histogramQuery.query.sql_mode;
+
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
         // get the current page detail and set it into query request
@@ -1286,15 +1160,7 @@ const useLogs = () => {
         searchObj.data.queryResults.subpage = 1;
 
         // based on pagination request, get the data
-        searchObjDebug["paginatedDatawithAPIStartTime"] = performance.now();
         await getPaginatedData(queryReq);
-        searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
-        console.log(
-          `Get Paginated Data with API took ${
-            searchObjDebug["paginatedDatawithAPIEndTime"] -
-            searchObjDebug["paginatedDatawithAPIStartTime"]
-          } milliseconds to complete`
-        );
         const parsedSQL: any = fnParsedSQL();
 
         if (
@@ -1309,8 +1175,7 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          await getHistogramQueryData(searchObj.data.histogramQuery);
-          refreshPartitionPagination(true);
+          getHistogramQueryData(searchObj.data.histogramQuery);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
             xData: [],
@@ -1327,30 +1192,12 @@ const useLogs = () => {
           };
         } else {
           if (queryReq.query.from == 0) {
-            setTimeout(async () => {
-              searchObjDebug["pagecountStartTime"] = performance.now();
-              await getPageCount(queryReq);
-              searchObjDebug["pagecountEndTime"] = performance.now();
-              console.log(
-                `Total count took ${
-                  searchObjDebug["pagecountEndTime"] -
-                  searchObjDebug["pagecountStartTime"]
-                } milliseconds to complete`
-              );
-            }, 0);
+            await getPageCount(queryReq);
           }
         }
       } else {
         searchObj.loading = false;
       }
-      searchObjDebug["queryDataEndTime"] = performance.now();
-      console.log(
-        `Entire operation took ${
-          searchObjDebug["queryDataEndTime"] -
-          searchObjDebug["queryDataStartTime"]
-        } milliseconds to complete`
-      );
-      console.log("=================== getQueryData Debug ===================");
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(notificationMsg.value || "Something went wrong.");
@@ -1403,44 +1250,20 @@ const useLogs = () => {
     }
   };
 
-  const fnHistogramParsedSQL = (query: string) => {
-    try {
-      const filteredQuery = query
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
-      return parser.astify(filteredQuery);
-    } catch (e: any) {
-      return {
-        columns: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
-    }
-  };
-
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       queryReq.query.size = 0;
-      delete queryReq.query.from;
-      delete queryReq.query.quick_mode;
-      queryReq.query["sql_mode"] = "full";
-
       queryReq.query.track_total_hits = true;
       searchService
         .search({
           org_identifier: searchObj.organizationIdetifier,
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
-        })
+        }, "UI")
         .then(async (res) => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
-          searchObj.data.queryResults.scan_size = res.data.scan_size;
-          searchObj.data.queryResults.took += res.data.took;
           for (const [
             index,
             item,
@@ -1526,10 +1349,10 @@ const useLogs = () => {
         }
 
         // for group by query no need to get total.
-        // if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
-        //   searchObj.meta.resultGrid.showPagination = false;
-        //   delete queryReq.query.track_total_hits;
-        // }
+        if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
+          searchObj.meta.resultGrid.showPagination = false;
+          delete queryReq.query.track_total_hits;
+        }
       }
 
       searchService
@@ -1537,9 +1360,8 @@ const useLogs = () => {
           org_identifier: searchObj.organizationIdetifier,
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
-        })
+        }, "UI")
         .then(async (res) => {
-          searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
@@ -1592,9 +1414,7 @@ const useLogs = () => {
               searchObj.data.queryResults.took = res.data.took;
               searchObj.data.queryResults.aggs = res.data.aggs;
               const lastRecordTimeStamp = parseInt(
-                searchObj.data.queryResults.hits[0][
-                  store.state.zoConfig.timestamp_column
-                ]
+                searchObj.data.queryResults.hits[0]._timestamp
               );
               searchObj.data.queryResults.hits = res.data.hits;
             } else {
@@ -1672,13 +1492,6 @@ const useLogs = () => {
           }
 
           searchObj.loading = false;
-          searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
-          console.log(
-            `Paginated data time after response received from server took ${
-              searchObjDebug["paginatedDataReceivedEndTime"] -
-              searchObjDebug["paginatedDataReceivedStartTime"]
-            } milliseconds to complete`
-          );
           resolve(true);
         })
         .catch((err) => {
@@ -1717,8 +1530,7 @@ const useLogs = () => {
             itemHits[field] = hit[field];
           }
         }
-        itemHits[store.state.zoConfig.timestamp_column] =
-          hit[store.state.zoConfig.timestamp_column];
+        itemHits["_timestamp"] = hit["_timestamp"];
         searchObj.data.queryResults.filteredHit.push(itemHits);
       });
     } else {
@@ -1731,39 +1543,42 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
-        searchObjDebug["histogramStartTime"] = performance.now();
         searchObj.data.histogram.errorMsg = "";
         searchObj.data.histogram.errorCode = 0;
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
-        const parsedSQL: any = fnParsedSQL();
-
-        let hasAggregationFlag = false;
-        if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-          hasAggregationFlag = hasAggregation(parsedSQL?.columns);
-          if (hasAggregationFlag) {
-            queryReq.query.track_total_hits = true;
-          }
-        }
-
+        queryReq.query.track_total_hits = true;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
-          })
-          .then(async (res) => {
-            searchObjDebug["histogramProcessingStartTime"] = performance.now();
+          }, "UI")
+          .then((res) => {
             searchObj.loading = false;
-            searchObj.data.queryResults.aggs = res.data.hits;
-            searchObj.data.queryResults.scan_size = res.data.scan_size;
-            searchObj.data.queryResults.took += res.data.took;
-            if (hasAggregationFlag) {
-              searchObj.data.queryResults.total = res.data.total;
-            }
-            await generateHistogramData();
+            searchObj.data.queryResults.aggs = res.data.aggs;
+            searchObj.data.queryResults.total = res.data.total;
+            generateHistogramData();
 
+            for (const [
+              index,
+              item,
+            ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+              if (
+                (searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] == -1 ||
+                  searchObj.data.queryResults.partitionDetail.partitionTotal[
+                    index
+                  ] < res.data.total) &&
+                queryReq.query.start_time == item[0]
+              ) {
+                searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] = res.data.total;
+              }
+            }
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
@@ -1772,24 +1587,8 @@ const useLogs = () => {
             // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
             refreshPartitionPagination(regeratePaginationFlag);
 
-            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
-
-            searchObjDebug["histogramProcessingEndTime"] = performance.now();
-            searchObjDebug["histogramEndTime"] = performance.now();
-            console.log(
-              `Histogram processing after data received took ${
-                searchObjDebug["histogramProcessingEndTime"] -
-                searchObjDebug["histogramProcessingStartTime"]
-              } milliseconds to complete`
-            );
-            console.log(
-              `Entire Histogram took ${
-                searchObjDebug["histogramEndTime"] -
-                searchObjDebug["histogramStartTime"]
-              } milliseconds to complete`
-            );
-            console.log("=================== End Debug ===================");
             dismiss();
             resolve(true);
           })
@@ -1859,29 +1658,30 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
-      searchObjDebug["extractFieldsStartTime"] = performance.now();
-      searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
-      const schemaFields: any = [];
+      let ftsKeys: Set<any> = new Set();
+      let schemaFields: Set<any> = new Set();
       if (searchObj.data.streamResults.list.length > 0) {
+        const queryResult: {
+          name: string;
+          type: string;
+        }[] = [];
+        const tempFieldsName: string[] = [];
+        const ignoreFields = [store.state.zoConfig.timestamp_column];
         const timestampField = store.state.zoConfig.timestamp_column;
-        const allField = store.state.zoConfig?.all_fields_name;
-        const schemaInterestingFields: string[] = [];
-        let userDefineSchemaSettings: any = [];
-        const schemaMaps: any = [];
-        let fieldObj: any = {};
-        const localInterestingFields: any = useLocalInterestingFields();
+        let schemaInterestingFields: string[] = [];
 
+        // searchObj.data.streamResults.list.forEach((stream: any) => {
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
-            userDefineSchemaSettings =
-              stream.settings?.defined_schema_fields?.slice() || [];
-            // check for schema exist in the object or not
-            // if not pull the schema from server.
-            if (!stream.hasOwnProperty("schema")) {
-              searchObjDebug["extractFieldsWithAPI"] = " with API ";
+            if (stream.hasOwnProperty("schema")) {
+              queryResult.push(...stream.schema);
+              schemaFields = new Set([
+                ...stream.schema.map((e: any) => e.name),
+              ]);
+            } else {
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
               if (streamSchema == undefined) {
@@ -1890,189 +1690,197 @@ const useLogs = () => {
                 return;
               }
               stream.settings = streamData.settings;
-              stream.schema = streamSchema;
+              queryResult.push(...streamSchema);
+              schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
             }
 
-            let environmentInterestingFields = [];
-            if (
-              store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
-            ) {
-              environmentInterestingFields =
-                store.state?.zoConfig?.default_quick_mode_fields;
+            ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+            if (stream.settings.hasOwnProperty("interesting_fields")) {
+              schemaInterestingFields = stream.settings.interesting_fields;
             }
-
-            if (
-              stream.settings.hasOwnProperty("defined_schema_fields") &&
-              userDefineSchemaSettings.length > 0
-            ) {
-              searchObj.meta.hasUserDefinedSchemas = true;
-              if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
-                userDefineSchemaSettings.push(
-                  store.state.zoConfig?.timestamp_column
-                );
-              }
-
-              if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
-                userDefineSchemaSettings.push(
-                  store.state.zoConfig?.all_fields_name
-                );
-              }
-            } else {
-              searchObj.meta.hasUserDefinedSchemas = false;
-            }
-
-            searchObj.data.stream.interestingFieldList =
-              localInterestingFields.value != null &&
-              localInterestingFields.value[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream.value
-              ] !== undefined &&
-              localInterestingFields.value[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream.value
-              ].length > 0
-                ? localInterestingFields.value[
-                    searchObj.organizationIdetifier +
-                      "_" +
-                      searchObj.data.stream.selectedStream.value
-                  ]
-                : environmentInterestingFields.length > 0
-                ? [...environmentInterestingFields]
-                : [...schemaInterestingFields];
-
-            // create a schema field mapping based on field name to avoind iteration over object.
-            // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
-            for (const field of stream.schema) {
-              fieldObj = {
-                ...field,
-                ftsKey:
-                  stream.settings.full_text_search_keys.indexOf > -1
-                    ? true
-                    : false,
-                isSchemaField: true,
-                showValues:
-                  field.name !== timestampField && field.name !== allField,
-                isInterestingField:
-                  searchObj.data.stream.interestingFieldList.includes(
-                    field.name
-                  )
-                    ? true
-                    : false,
-              };
-              if (
-                store.state.zoConfig.user_defined_schemas_enabled &&
-                searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
-                userDefineSchemaSettings.length > 0
-              ) {
-                if (userDefineSchemaSettings.includes(field.name)) {
-                  schemaMaps.push(fieldObj);
-                  schemaFields.push(field.name);
-                }
-
-                if (schemaMaps.length == userDefineSchemaSettings.length) {
-                  break;
-                }
-              } else {
-                schemaMaps.push(fieldObj);
-                schemaFields.push(field.name);
-              }
-            }
-
-            // check for user defined schema is false then only consider checking new fields from result set
-            if (
-              searchObj.data.queryResults.hasOwnProperty("hits") &&
-              searchObj.data.queryResults?.hits.length > 0 &&
-              (!store.state.zoConfig.user_defined_schemas_enabled ||
-                searchObj.meta.useUserDefinedSchemas != "user_defined_schema")
-            ) {
-              // Find the index of the record with max attributes
-              const maxAttributesIndex =
-                searchObj.data.queryResults.hits.reduce(
-                  (
-                    maxIndex: string | number,
-                    obj: {},
-                    currentIndex: any,
-                    array: { [x: string]: {} }
-                  ) => {
-                    const numAttributes = Object.keys(obj).length;
-                    const maxNumAttributes = Object.keys(
-                      array[maxIndex]
-                    ).length;
-                    return numAttributes > maxNumAttributes
-                      ? currentIndex
-                      : maxIndex;
-                  },
-                  0
-                );
-              const recordwithMaxAttribute =
-                searchObj.data.queryResults.hits[maxAttributesIndex];
-
-              // Object.keys(recordwithMaxAttribute).forEach((key) => {
-              for (const key of Object.keys(recordwithMaxAttribute)) {
-                if (!schemaFields.includes(key)) {
-                  fieldObj = {
-                    name: key,
-                    type: "Utf8",
-                    ftsKey: false,
-                    isSchemaField: false,
-                    showValues: false,
-                    isInterestingField:
-                      searchObj.data.stream.interestingFieldList.includes(key)
-                        ? true
-                        : false,
-                  };
-                  schemaMaps.push(fieldObj);
-                  schemaFields.push(key);
-                }
-              }
-            }
-
-            // cross verify list of interesting fields belowgs to selected stream fields
-            for (
-              let i = searchObj.data.stream.interestingFieldList.length - 1;
-              i >= 0;
-              i--
-            ) {
-              const fieldName = searchObj.data.stream.interestingFieldList[i];
-              if (!schemaFields.includes(fieldName)) {
-                searchObj.data.stream.interestingFieldList.splice(i, 1);
-              }
-            }
-
-            let localFields: any = {};
-            if (localInterestingFields.value != null) {
-              localFields = localInterestingFields.value;
-            }
-            localFields[
-              searchObj.organizationIdetifier +
-                "_" +
-                searchObj.data.stream.selectedStream.value
-            ] = searchObj.data.stream.interestingFieldList;
-            useLocalInterestingFields(localFields);
-            searchObj.data.stream.userDefinedSchema =
-              userDefineSchemaSettings || [];
           }
         }
 
-        searchObj.data.stream.selectedStreamFields = schemaMaps;
+        // queryResult.forEach((field: any) => {
+        for (const field of queryResult) {
+          tempFieldsName.push(field.name);
+        }
+
         if (
-          searchObj.data.stream.selectedStreamFields != undefined &&
-          searchObj.data.stream.selectedStreamFields.length
-        )
-          updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
+          searchObj.data.queryResults.hasOwnProperty("hits") &&
+          searchObj.data.queryResults?.hits.length > 0
+        ) {
+          // Find the index of the record with max attributes
+          const maxAttributesIndex = searchObj.data.queryResults.hits.reduce(
+            (
+              maxIndex: string | number,
+              obj: {},
+              currentIndex: any,
+              array: { [x: string]: {} }
+            ) => {
+              const numAttributes = Object.keys(obj).length;
+              const maxNumAttributes = Object.keys(array[maxIndex]).length;
+              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
+            },
+            0
+          );
+          const recordwithMaxAttribute =
+            searchObj.data.queryResults.hits[maxAttributesIndex];
+
+          // Object.keys(recordwithMaxAttribute).forEach((key) => {
+          for (const key of Object.keys(recordwithMaxAttribute)) {
+            if (!tempFieldsName.includes(key)) {
+              queryResult.push({
+                name: key,
+                type: "Utf8",
+              });
+            }
+          }
+        }
+
+        let environmentInterestingFields = [];
+        if (store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")) {
+          environmentInterestingFields =
+            store.state?.zoConfig?.default_quick_mode_fields;
+        }
+
+        const localInterestingFields: any = useLocalInterestingFields();
+        searchObj.data.stream.interestingFieldList =
+          localInterestingFields.value != null &&
+          localInterestingFields.value[
+            searchObj.organizationIdetifier +
+              "_" +
+              searchObj.data.stream.selectedStream.value
+          ] !== undefined &&
+          localInterestingFields.value[
+            searchObj.organizationIdetifier +
+              "_" +
+              searchObj.data.stream.selectedStream.value
+          ].length > 0
+            ? localInterestingFields.value[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream.value
+              ]
+            : environmentInterestingFields.length > 0
+            ? [...environmentInterestingFields]
+            : [...schemaInterestingFields];
+
+        if (searchObj.data.stream.selectedStreamFields.length == 0) {
+          const streamData: any = await getStream(
+            searchObj.data.stream.selectedStream.value,
+            searchObj.data.stream.streamType || "logs",
+            true
+          );
+          searchObj.data.stream.selectedStreamFields = streamData.schema;
+        }
+
+        const streamFieldNames: any =
+          searchObj.data.stream.selectedStreamFields.map(
+            (item: any) => item.name
+          );
+
+        for (
+          let i = searchObj.data.stream.interestingFieldList.length - 1;
+          i >= 0;
+          i--
+        ) {
+          const fieldName = searchObj.data.stream.interestingFieldList[i];
+          if (!streamFieldNames.includes(fieldName)) {
+            searchObj.data.stream.interestingFieldList.splice(i, 1);
+          }
+        }
+
+        let index = -1;
+        const fields: any = {};
+        // queryResult.forEach((row: any) => {
+        for (const row of queryResult) {
+          if (
+            fields[row.name] == undefined &&
+            !streamFieldNames.includes(row.name)
+          ) {
+            fields[row.name] = {};
+            searchObj.data.stream.selectedStreamFields.push({
+              name: row.name,
+              ftsKey: ftsKeys?.has(row.name),
+              isSchemaField: schemaFields.has(row.name),
+              showValues: row.name !== timestampField,
+              isInterestingField:
+                searchObj.data.stream.interestingFieldList.includes(row.name)
+                  ? true
+                  : false,
+            });
+          } else {
+            index = streamFieldNames.indexOf(row.name);
+            if (index > -1) {
+              (searchObj.data.stream.selectedStreamFields[index].ftsKey =
+                ftsKeys?.has(row.name)),
+                (searchObj.data.stream.selectedStreamFields[
+                  index
+                ].isSchemaField = schemaFields.has(row.name)),
+                (searchObj.data.stream.selectedStreamFields[index].showValues =
+                  row.name !== timestampField),
+                (searchObj.data.stream.selectedStreamFields[
+                  index
+                ].isInterestingField =
+                  searchObj.data.stream.interestingFieldList.includes(row.name)
+                    ? true
+                    : false);
+            }
+          }
+        }
+
+        let localFields: any = {};
+        if (localInterestingFields.value != null) {
+          localFields = localInterestingFields.value;
+        }
+        localFields[
+          searchObj.organizationIdetifier +
+            "_" +
+            searchObj.data.stream.selectedStream.value
+        ] = searchObj.data.stream.interestingFieldList;
+        useLocalInterestingFields(localFields);
+
+        // fields = {};
+        // for (const row of queryResult) {
+        //   // let keys = deepKeys(row);
+        //   // for (let i in row) {
+        //   if (fields[row.name] == undefined) {
+        //     fields[row.name] = {};
+        //     if (environmentInterestingFields.includes(row.name)) {
+        //       index = searchObj.data.stream.interestingFieldList.indexOf(
+        //         row.name
+        //       );
+        //       if (index == -1 && row.name != "*") {
+        //         for (const [
+        //           index,
+        //           stream,
+        //         ] of searchObj.data.stream.selectedStreamFields.entries()) {
+        //           if ((stream as { name: string }).name == row.name) {
+        //             searchObj.data.stream.interestingFieldList.push(row.name);
+        //             searchObj.data.stream.selectedStreamFields[
+        //               index
+        //             ].isInterestingField = true;
+        //           }
+        //         }
+
+        //         const localInterestingFields: any = useLocalInterestingFields();
+        //         let localFields: any = {};
+        //         if (localInterestingFields.value != null) {
+        //           localFields = localInterestingFields.value;
+        //         }
+        //         localFields[
+        //           searchObj.organizationIdetifier +
+        //             "_" +
+        //             searchObj.data.stream.selectedStream.value
+        //         ] = searchObj.data.stream.interestingFieldList;
+        //         useLocalInterestingFields(localFields);
+        //       }
+        //     }
+        //   }
+        //   // }
+        // }
       }
-      searchObjDebug["extractFieldsEndTime"] = performance.now();
-      console.log(
-        `ExtractFields ${
-          searchObjDebug["extractFieldsWithAPI"]
-        } operation took ${
-          searchObjDebug["extractFieldsEndTime"] -
-          searchObjDebug["extractFieldsStartTime"]
-        } milliseconds to complete`
-      );
     } catch (e: any) {
       console.log("Error while extracting fields");
     }
@@ -2161,7 +1969,7 @@ const useLogs = () => {
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
 
-    let totalCount = searchObj.data.queryResults.total || 0;
+    let totalCount = searchObj.data.queryResults.total;
     if (searchObj.meta.resultGrid.showPagination == false) {
       endCount = searchObj.data.queryResults.hits.length;
       totalCount = searchObj.data.queryResults.hits.length;
@@ -2195,28 +2003,19 @@ const useLogs = () => {
 
   function generateHistogramData() {
     try {
-      let num_records: number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
-      let hasAggregationFlag = false;
-
-      const parsedSQL: any = fnParsedSQL();
-      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        hasAggregationFlag = hasAggregation(parsedSQL.columns);
-      }
 
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
-        searchObj.data.queryResults.aggs &&
-        !hasAggregationFlag
+        searchObj.data.queryResults.aggs
       ) {
-        searchObj.data.queryResults.aggs.map(
+        searchObj.data.queryResults.aggs.histogram.map(
           (bucket: {
             zo_sql_key: string | number | Date;
             zo_sql_num: string;
           }) => {
-            num_records = num_records + parseInt(bucket.zo_sql_num, 10);
             unparsed_x_data.push(bucket.zo_sql_key);
             // const histDate = new Date(bucket.zo_sql_key);
             xData.push(
@@ -2226,7 +2025,6 @@ const useLogs = () => {
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }
         );
-        searchObj.data.queryResults.total = num_records;
       }
 
       const chartParams = {
@@ -2325,9 +2123,6 @@ const useLogs = () => {
           stream_type: searchObj.data.stream.streamType,
           regions: searchObj.meta.hasOwnProperty("regions")
             ? searchObj.meta.regions.join(",")
-            : "",
-          clusters: searchObj.meta.hasOwnProperty("clusters")
-            ? searchObj.meta.clusters.join(",")
             : "",
         })
         .then((res) => {
@@ -2523,13 +2318,6 @@ const useLogs = () => {
       searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       searchObj.data.query = b64DecodeUnicode(queryParams.query);
     }
-
-    if (
-      queryParams.hasOwnProperty("defined_schemas") &&
-      queryParams.defined_schemas != ""
-    ) {
-      searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
-    }
     if (queryParams.refresh) {
       searchObj.meta.refreshInterval = queryParams.refresh;
     }
@@ -2578,7 +2366,6 @@ const useLogs = () => {
         to: date.endTime,
         period: date.relativeTimePeriod,
         sql_mode: searchObj.meta.sqlMode,
-        defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
   };
@@ -2678,17 +2465,17 @@ const useLogs = () => {
   };
 
   const onStreamChange = async (queryStr: string) => {
-    searchObj.loadingStream = true;
     searchObj.data.queryResults = {
       hits: [],
     };
-    searchObj.data.stream.selectedStreamFields = [];
 
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
         ? queryStr
         : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
       : "";
+
+    await extractFields();
 
     if (searchObj.data.stream.selectedStreamFields.length == 0) {
       const streamData: any = await getStream(
@@ -2703,7 +2490,6 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields == undefined ||
       searchObj.data.stream.selectedStreamFields.length == 0
     ) {
-      searchObj.loadingStream = false;
       searchObj.data.errorMsg = t("search.noFieldFound");
       return;
     }
@@ -2761,7 +2547,6 @@ const useLogs = () => {
         errorDetail: "",
       };
       extractFields();
-      searchObj.loadingStream = false;
     }
   };
 
@@ -2828,21 +2613,7 @@ const useLogs = () => {
 
   const getRegionInfo = () => {
     searchService.get_regions().then((res) => {
-      const clusterData = [];
-      let regionObj: any = {};
-      const apiData = res.data;
-      for (const region in apiData) {
-        regionObj = {
-          label: region,
-          children: [],
-        };
-        for (const cluster of apiData[region]) {
-          regionObj.children.push({ label: cluster });
-        }
-        clusterData.push(regionObj);
-      }
-
-      store.dispatch("setRegionInfo", clusterData);
+      store.dispatch("setRegionInfo", res.data);
     });
   };
 

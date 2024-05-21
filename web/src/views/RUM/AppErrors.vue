@@ -19,98 +19,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="text-right q-py-sm flex align-center justify-between">
       <syntax-guide class="q-mr-sm" />
       <div class="flex align-center justify-end metrics-date-time q-mr-md">
-        <date-time
-          auto-apply
-          :default-type="errorTrackingState.data.datetime?.valueType"
-          :default-absolute-time="{
-            startTime: errorTrackingState.data.datetime.startTime,
-            endTime: errorTrackingState.data.datetime.endTime,
-          }"
-          :default-relative-time="
-            errorTrackingState.data.datetime.relativeTimePeriod
-          "
-          data-test="logs-search-bar-date-time-dropdown"
-          class="q-mr-md"
-          @on:date-change="updateDateChange"
-        />
-        <q-btn
-          data-test="metrics-explorer-run-query-button"
-          data-cy="metrics-explorer-run-query-button"
-          dense
-          flat
-          title="Run query"
-          class="q-pa-none search-button"
-          @click="runQuery"
-        >
+        <date-time auto-apply :default-type="errorTrackingState.data.datetime?.valueType" :default-absolute-time="{
+          startTime: errorTrackingState.data.datetime.startTime,
+          endTime: errorTrackingState.data.datetime.endTime,
+        }" :default-relative-time="errorTrackingState.data.datetime.relativeTimePeriod
+          " data-test="logs-search-bar-date-time-dropdown" class="q-mr-md" @on:date-change="updateDateChange" />
+        <q-btn data-test="metrics-explorer-run-query-button" data-cy="metrics-explorer-run-query-button" dense flat
+          title="Run query" class="q-pa-none search-button" @click="runQuery">
           Run query
         </q-btn>
       </div>
     </div>
-    <div
-      style="
+    <div style="
         border-top: 1px solid rgb(219, 219, 219);
         border-bottom: 1px solid rgb(219, 219, 219);
-      "
-    >
-      <query-editor
-        editor-id="rum-errors-query-editor"
-        class="monaco-editor"
-        v-model:query="errorTrackingState.data.editorValue"
-        style="height: 40px !important"
-        :debounce-time="300"
-      />
+      ">
+      <query-editor editor-id="rum-errors-query-editor" class="monaco-editor"
+        v-model:query="errorTrackingState.data.editorValue" style="height: 40px !important" :debounce-time="300" />
     </div>
-    <q-splitter
-      class="logs-horizontal-splitter full-height"
-      v-model="splitterModel"
-      unit="px"
-      vertical
-    >
+    <q-splitter class="logs-horizontal-splitter full-height" v-model="splitterModel" unit="px" vertical>
       <template #before>
-        <FieldList
-          :fields="streamFields"
-          :time-stamp="{
-            startTime: dateTime.startTime,
-            endTime: dateTime.endTime,
-          }"
-          :stream-name="errorTrackingState.data.stream.errorStream"
-          @event-emitted="handleSidebarEvent"
-        />
+        <FieldList :fields="streamFields" :time-stamp="{
+          startTime: dateTime.startTime,
+          endTime: dateTime.endTime,
+        }" :stream-name="errorTrackingState.data.stream.errorStream" @event-emitted="handleSidebarEvent" />
       </template>
       <template #separator>
-        <q-avatar
-          color="primary"
-          text-color="white"
-          size="20px"
-          icon="drag_indicator"
-          style="top: 10px"
-        />
+        <q-avatar color="primary" text-color="white" size="20px" icon="drag_indicator" style="top: 10px" />
       </template>
       <template #after>
         <div class="q-mt-xs">
           <template v-if="isLoading.length">
-            <div
-              class="q-pb-lg flex items-center justify-center text-center"
-              style="height: calc(100vh - 200px)"
-            >
+            <div class="q-pb-lg flex items-center justify-center text-center" style="height: calc(100vh - 200px)">
               <div>
-                <q-spinner-hourglass
-                  color="primary"
-                  size="40px"
-                  style="margin: 0 auto; display: block"
-                />
+                <q-spinner-hourglass color="primary" size="40px" style="margin: 0 auto; display: block" />
                 <div class="text-center full-width">
                   Hold on tight, we're fetching your application errors.
                 </div>
               </div>
             </div>
           </template>
-          <AppTable
-            :columns="columns"
-            :rows="errorTrackingState.data.errors"
-            class="app-table-container"
-            @event-emitted="handleTableEvent"
-          >
+          <AppTable :columns="columns" :rows="errorTrackingState.data.errors" class="app-table-container"
+            @event-emitted="handleTableEvent">
             <template v-slot:error_details="slotProps">
               <ErrorDetail :column="slotProps.column.row" />
             </template>
@@ -351,13 +301,11 @@ const getErrorLogs = () => {
     errorFields += "error_stack, ";
   }
 
-  req.query.sql = `select max(${
-    store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error'${
-    errorTrackingState.data.editorValue.length
+  req.query.sql = `select max(${store.state.zoConfig.timestamp_column
+    }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error'${errorTrackingState.data.editorValue.length
       ? " and " + errorTrackingState.data.editorValue
       : ""
-  } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
+    } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
 
   req.query.sql.replace("\n", " ");
   req.query.sql_mode = "full";
@@ -371,7 +319,7 @@ const getErrorLogs = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       errorTrackingState.data.errors = res.data.hits;
       totalErrorsCount.value = res.data.hits.reduce(
@@ -488,6 +436,7 @@ function updateUrlQueryParams() {
 </style>
 <style lang="scss">
 .sessions_page {
+
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,

@@ -17,16 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="error-viewer-container">
     <template v-if="isLoading.length">
-      <div
-        class="q-pb-lg flex items-center justify-center text-center"
-        style="height: calc(100vh - 200px)"
-      >
+      <div class="q-pb-lg flex items-center justify-center text-center" style="height: calc(100vh - 200px)">
         <div>
-          <q-spinner-hourglass
-            color="primary"
-            size="40px"
-            style="margin: 0 auto; display: block"
-          />
+          <q-spinner-hourglass color="primary" size="40px" style="margin: 0 auto; display: block" />
           <div class="text-center full-width">
             Hold on tight, we're fetching error details.
           </div>
@@ -40,10 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="full-width" />
       <div class="q-px-lg q-py-md">
         <ErrorTags :error="errorDetails" />
-        <ErrorStackTrace
-          :error_stack="errorDetails.error_stack || []"
-          :error="errorDetails"
-        />
+        <ErrorStackTrace :error_stack="errorDetails.error_stack || []" :error="errorDetails" />
         <ErrorSessionReplay :error="errorDetails" />
         <ErrorEvents :error="errorDetails" />
       </div>
@@ -99,7 +89,7 @@ const getErrorLogs = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       const errorIndex = res.data.hits.findIndex(
         (hit: any) => hit.error_id === errorDetails.value.error_id
@@ -149,7 +139,9 @@ const getError = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
-      })
+      },
+        "UI",
+      )
       .then((res) => {
         errorDetails.value = { ...res.data.hits[0] };
         errorDetails.value["category"] = [];

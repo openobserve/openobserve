@@ -60,12 +60,12 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
 pub(crate) fn get_search_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Result<Option<SearchEventType>, Error> {
-    let event_type = match query.get("event_type") {
+    let event_type = match query.get("search_type") {
         Some(s) => match s.to_lowercase().as_str() {
             "ui" => Some(SearchEventType::UI),
             "dashboards" => Some(SearchEventType::Dashboards),
             "reports" => Some(SearchEventType::Reports),
-            "alerts" => Some(SearchEventType::Reports),
+            "alerts" => Some(SearchEventType::Alerts),
             "values" => Some(SearchEventType::Values),
             _ => {
                 return Err(Error::new(

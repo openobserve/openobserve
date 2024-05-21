@@ -32,7 +32,6 @@ use config::{
 };
 use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
-use proto::cluster_rpc::search_server::Search;
 
 use super::promql;
 use crate::{

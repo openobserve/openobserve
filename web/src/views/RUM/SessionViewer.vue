@@ -18,17 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="row qp-2 full-height">
     <div class="col-12 q-px-sm q-pt-md row items-end">
       <div class="col-9 row">
-        <div
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
+        <div class="flex justify-center items-center q-mr-md cursor-pointer" style="
             border: 1.5px solid;
             border-radius: 50%;
             width: 22px;
             height: 22px;
-          "
-          title="Go Back"
-          @click="router.back()"
-        >
+          " title="Go Back" @click="router.back()">
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
@@ -56,20 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="col-12 row" style="height: calc(100vh - 104px)">
       <div class="col-9 full-height">
-        <VideoPlayer
-          ref="videoPlayerRef"
-          :events="segmentEvents"
-          :segments="segments"
-          :is-loading="!!isLoading.length"
-        />
+        <VideoPlayer ref="videoPlayerRef" :events="segmentEvents" :segments="segments"
+          :is-loading="!!isLoading.length" />
       </div>
       <div class="col-3 row">
         <q-separator vertical class="full-height" />
-        <PlayerEventsSidebar
-          :events="segmentEvents"
-          :sessionDetails="sessionDetails"
-          @event-emitted="handleSidebarEvent"
-        />
+        <PlayerEventsSidebar :events="segmentEvents" :sessionDetails="sessionDetails"
+          @event-emitted="handleSidebarEvent" />
       </div>
     </div>
   </div>
@@ -157,7 +145,7 @@ const getSession = () => {
 
     if (
       performanceState.data.streams["_sessionreplay"]["schema"][
-        "geo_info_country"
+      "geo_info_country"
       ]
     ) {
       geoFields += "min(geo_info_city) as city,";
@@ -188,7 +176,7 @@ const getSession = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
-      })
+      }, "UI")
       .then((res) => {
         if (res.data.hits.length === 0) {
           return;
@@ -238,7 +226,7 @@ const getSessionSegments = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       // const segmentsCopy = [];
       // const viewIds = [];
@@ -288,7 +276,7 @@ const getSessionEvents = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       const events = ["action", "view", "error"];
 
@@ -336,7 +324,7 @@ const getSessionErrorLogs = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       const events = res.data.hits.filter((hit: any) => {
         return hit.date >= Number(sessionState.data.selectedSession.start_time);

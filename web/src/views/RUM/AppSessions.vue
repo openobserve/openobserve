@@ -20,86 +20,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-right q-py-sm flex align-center justify-between">
         <syntax-guide class="q-mr-sm" />
         <div class="flex align-center justify-end metrics-date-time q-mr-md">
-          <date-time
-            auto-apply
-            :default-type="sessionState.data.datetime.valueType"
-            :default-absolute-time="{
-              startTime: sessionState.data.datetime.startTime,
-              endTime: sessionState.data.datetime.endTime,
-            }"
-            :default-relative-time="
-              sessionState.data.datetime.relativeTimePeriod
-            "
-            data-test="logs-search-bar-date-time-dropdown"
-            class="q-mr-md"
-            @on:date-change="updateDateChange"
-          />
-          <q-btn
-            data-test="metrics-explorer-run-query-button"
-            data-cy="metrics-explorer-run-query-button"
-            dense
-            flat
-            title="Run query"
-            class="q-pa-none search-button"
-            @click="runQuery"
-          >
+          <date-time auto-apply :default-type="sessionState.data.datetime.valueType" :default-absolute-time="{
+      startTime: sessionState.data.datetime.startTime,
+      endTime: sessionState.data.datetime.endTime,
+    }" :default-relative-time="sessionState.data.datetime.relativeTimePeriod
+      " data-test="logs-search-bar-date-time-dropdown" class="q-mr-md" @on:date-change="updateDateChange" />
+          <q-btn data-test="metrics-explorer-run-query-button" data-cy="metrics-explorer-run-query-button" dense flat
+            title="Run query" class="q-pa-none search-button" @click="runQuery">
             Run query
           </q-btn>
         </div>
       </div>
-      <div
-        style="
+      <div style="
           border-top: 1px solid rgb(219, 219, 219);
           border-bottom: 1px solid rgb(219, 219, 219);
-        "
-      >
-        <query-editor
-          editor-id="session-replay-query-editor"
-          class="monaco-editor"
-          v-model:query="sessionState.data.editorValue"
-          :debounce-time="300"
-          style="height: 40px !important"
-        />
+        ">
+        <query-editor editor-id="session-replay-query-editor" class="monaco-editor"
+          v-model:query="sessionState.data.editorValue" :debounce-time="300" style="height: 40px !important" />
       </div>
-      <q-splitter
-        class="logs-horizontal-splitter full-height"
-        v-model="splitterModel"
-        unit="px"
-        vertical
-      >
+      <q-splitter class="logs-horizontal-splitter full-height" v-model="splitterModel" unit="px" vertical>
         <template #before>
-          <FieldList
-            :fields="streamFields"
-            :time-stamp="{
-              startTime: dateTime.startTime,
-              endTime: dateTime.endTime,
-            }"
-            :stream-name="rumSessionStreamName"
-            @event-emitted="handleSidebarEvent"
-          />
+          <FieldList :fields="streamFields" :time-stamp="{
+      startTime: dateTime.startTime,
+      endTime: dateTime.endTime,
+    }" :stream-name="rumSessionStreamName" @event-emitted="handleSidebarEvent" />
         </template>
         <template #separator>
-          <q-avatar
-            color="primary"
-            text-color="white"
-            size="20px"
-            icon="drag_indicator"
-            style="top: 10px"
-          />
+          <q-avatar color="primary" text-color="white" size="20px" icon="drag_indicator" style="top: 10px" />
         </template>
         <template #after>
           <div class="q-mt-xs">
             <template v-if="isLoading.length">
-              <div
-                class="q-pb-lg flex items-center justify-center text-center"
-                style="height: calc(100vh - 200px)"
-              >
+              <div class="q-pb-lg flex items-center justify-center text-center" style="height: calc(100vh - 200px)">
                 <div>
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="40px"
-                    style="margin: 0 auto; display: block"
-                  />
+                  <q-spinner-hourglass color="primary" size="40px" style="margin: 0 auto; display: block" />
                   <div class="text-center full-width">
                     Hold on tight, we're fetching your sessions.
                   </div>
@@ -107,13 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <AppTable
-                :columns="columns"
-                :rows="rows"
-                class="app-table-container"
-                :bordered="false"
-                @event-emitted="handleTableEvents"
-              >
+              <AppTable :columns="columns" :rows="rows" class="app-table-container" :bordered="false"
+                @event-emitted="handleTableEvents">
                 <template v-slot:session_location_column="slotProps">
                   <SessionLocationColumn :column="slotProps.column.row" />
                 </template>
@@ -139,12 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div></div>
           </div>
         </div>
-        <q-btn
-          class="bg-secondary rounded text-white"
-          no-caps
-          title="Get started with Real User Monitoring"
-          @click="getStarted"
-        >
+        <q-btn class="bg-secondary rounded text-white" no-caps title="Get started with Real User Monitoring"
+          @click="getStarted">
           Get Started
           <q-icon name="arrow_forward" size="20px" class="q-ml-xs" />
         </q-btn>
@@ -422,13 +367,11 @@ const getSessions = () => {
 
   const req = buildQueryPayload(queryPayload);
 
-  req.query.sql = `select min(${
-    store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, session_id from "_sessionreplay" ${
-    sessionState.data.editorValue.length
+  req.query.sql = `select min(${store.state.zoConfig.timestamp_column
+    }) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, session_id from "_sessionreplay" ${sessionState.data.editorValue.length
       ? " where " + sessionState.data.editorValue
       : ""
-  } group by session_id order by zo_sql_timestamp DESC`;
+    } group by session_id order by zo_sql_timestamp DESC`;
   req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);
@@ -440,7 +383,7 @@ const getSessions = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       res.data.hits.forEach((hit: any) => {
         sessionState.data.sessions[hit.session_id] = hit;
@@ -493,7 +436,7 @@ const getSessionLogs = (req: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "UI")
     .then((res) => {
       const hits = res.data.hits;
       hits.forEach((hit: any) => {
@@ -660,6 +603,7 @@ const getStarted = () => {
 </style>
 <style lang="scss">
 .sessions_page {
+
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,

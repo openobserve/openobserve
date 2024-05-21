@@ -16,13 +16,7 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::{
-    ider,
-    meta::{search::SearchEventType, stream::StreamType},
-    metrics,
-    utils::json,
-    CONFIG,
-};
+use config::{ider, meta::stream::StreamType, metrics, utils::json, CONFIG};
 use infra::errors;
 use opentelemetry::{global, trace::TraceContextExt};
 use serde::Serialize;
