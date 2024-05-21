@@ -648,16 +648,14 @@ export default defineComponent({
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
 
-      settings.defined_schema_fields.push(
-        ...newSchemaFields.value.map((field) => {
-          field.name = field.name
-            .trim()
-            .toLowerCase()
-            .replace(/ /g, "_")
-            .replace(/-/g, "_");
-          return field.name;
-        })
+      const newSchemaFieldsSet = new Set(
+        newSchemaFields.value.map((field) =>
+          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
+        )
       );
+
+      // Push unique and normalized field names to settings.defined_schema_fields
+      settings.defined_schema_fields.push(...newSchemaFieldsSet);
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -890,8 +888,10 @@ export default defineComponent({
         }
       } else {
         indexData.value.defined_schema_fields = [
-          ...indexData.value.defined_schema_fields,
-          ...selectedFields.value.map((field) => field),
+          ...new Set([
+            ...indexData.value.defined_schema_fields,
+            ...selectedFields.value,
+          ]),
         ];
       }
 
