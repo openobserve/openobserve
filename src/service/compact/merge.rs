@@ -1008,7 +1008,7 @@ pub async fn merge_parquet_files(
         })?;
 
         let batches = match read_recordbatch_from_bytes(&bytes).await {
-            Ok((parquet_schema, batches)) if parquet_schema == schema => batches,
+            Ok((parquet_schema, batches)) if parquet_schema.fields == schema.fields => batches,
             Ok((parquet_schema, _)) => {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] merge small files without DataFusion failed due to schema mismatch,expected {:?}, got {:?}",
