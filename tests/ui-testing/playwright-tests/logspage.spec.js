@@ -138,8 +138,9 @@ test.describe("Logs UI testcases", () => {
       });
     await applyQueryButton(page);
 
-    await page.click("#fnEditor > .monaco-editor");
-    await page.keyboard.type(".a=2");
+
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a:2');
+    await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page
       .locator('[data-test="table-row-expand-menu"]')
@@ -450,6 +451,7 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').click();
     await page.locator('[data-test="saved-function-name-input"]').fill('e2efunction');
@@ -465,6 +467,7 @@ test.describe("Logs UI testcases", () => {
   test('should display click save directly while creating a function', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
     await page.getByText('Function name is not valid.').click();
@@ -472,7 +475,8 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding only blank spaces under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByRole('textarea').fill('.a=2');
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill(' ');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
@@ -482,7 +486,8 @@ test.describe("Logs UI testcases", () => {
 
   test('should display error on adding invalid characters under function name', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('#fnEditor').getByRole('textarea').fill('.a=2');
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
     await page.locator('[data-test="saved-function-name-input"]').fill('e2e@@@');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
@@ -492,6 +497,7 @@ test.describe("Logs UI testcases", () => {
   test('should display added function on switching between tabs and again navigate to log', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="menu-link-\\/metrics-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
@@ -536,6 +542,7 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(1000);
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
     await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=1');
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
