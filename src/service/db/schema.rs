@@ -274,44 +274,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let r = STREAM_SCHEMAS_LATEST.read().await;
-                let prev_schema_start_dt = if let Some(schema) = r.get(&item_key.to_owned()) {
-                    schema
-                        .schema()
-                        .metadata()
-                        .get("start_dt")
-                        .unwrap_or(&"0".to_string())
-                        .parse::<i64>()
-                        .unwrap()
-                } else {
-                    0
-                };
-                drop(r);
-
-                let ts_range = match ev.value {
-                    Some(val) => {
-                        let start_dt = match String::from_utf8(val.to_vec()) {
-                            Ok(date_string) => {
-                                if date_string.is_empty() {
-                                    0
-                                } else {
-                                    date_string.parse::<i64>().unwrap_or(0)
-                                }
-                            }
-                            Err(_) => 0,
-                        };
-
-                        if start_dt > 0 {
-                            Some((prev_schema_start_dt, start_dt))
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
-                };
-
-                let schema_versions =
-                    match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
+                let mut schema_versions =
+                    match db::list_values_by_start_dt(&format!("{ev_key}/"), None).await {
                         Ok(val) => val,
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
@@ -321,19 +285,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if schema_versions.is_empty() {
                     continue;
                 }
-                let schema_data = schema_versions.last().unwrap().1.as_ref();
-                let latest_schema: Vec<Schema> = match json::from_slice(schema_data) {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
-                        continue;
-                    }
-                };
+                let latest_start_dt = schema_versions.last().unwrap().0;
+                let mut latest_schema: Vec<Schema> =
+                    match json::from_slice(&schema_versions.last().unwrap().1) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
+                            continue;
+                        }
+                    };
                 if latest_schema.is_empty() {
                     continue;
                 }
-                let latest_schema = latest_schema.last().unwrap();
-                let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
+                let latest_schema = latest_schema.pop().unwrap();
+                let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
@@ -361,9 +326,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     w.shrink_to_fit();
                     drop(w);
                 } else {
-                    let schema_versions = schema_versions
-                        .into_iter()
-                        .map(|(start_dt, data)| {
+                    // remove latest, already parsed it
+                    _ = schema_versions.pop().unwrap();
+                    // parse other versions
+                    let schema_versions = itertools::chain(
+                        schema_versions.into_iter().map(|(start_dt, data)| {
                             (
                                 start_dt,
                                 json::from_slice::<Vec<Schema>>(&data)
@@ -371,16 +338,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     .pop()
                                     .unwrap(),
                             )
-                        })
-                        .collect::<Vec<_>>();
+                        }),
+                        // add latest version here
+                        vec![(latest_start_dt, latest_schema)],
+                    )
+                    .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS.write().await;
-                    w.entry(item_key.to_string())
-                        .and_modify(|existing_vec| {
-                            let _ = existing_vec.pop();
-                            existing_vec.extend(schema_versions.clone())
-                        })
-                        .or_insert(schema_versions);
-                    w.shrink_to_fit();
+                    w.insert(item_key.to_string(), schema_versions);
                     drop(w);
                 }
 
