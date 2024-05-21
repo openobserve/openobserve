@@ -274,9 +274,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let prev_schema_start_dt = if let Some(schema) =
-                    STREAM_SCHEMAS_LATEST.read().await.get(&item_key.to_owned())
-                {
+                let r = STREAM_SCHEMAS_LATEST.read().await;
+                let prev_schema_start_dt = if let Some(schema) = r.get(&item_key.to_owned()) {
                     schema
                         .schema()
                         .metadata()
@@ -287,6 +286,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     0
                 };
+                drop(r);
 
                 let ts_range = match ev.value {
                     Some(val) => {
