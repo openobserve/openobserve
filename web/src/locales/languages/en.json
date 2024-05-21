@@ -111,7 +111,10 @@
     "searchSavedView": "Search Saved View",
     "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist.",
     "noFieldFound": "No fields found for selected stream",
-    "regionTitle": "Select Region"
+    "regionTitle": "Select Region",
+    "userDefinedSchemaLabel": "User Defined Schema",
+    "allFieldsLabel": "All Fields",
+    "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately."
   },
   "menu": {
     "home": "Home",
