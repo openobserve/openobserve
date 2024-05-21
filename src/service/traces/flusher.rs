@@ -87,14 +87,16 @@ impl WriteBufferFlusher {
             .await
         {
             Ok(_) => {
+                info!("flusher success ,start to response_rx.await");
                 let resp = response_rx.await.expect("wal op buffer thread is dead");
+                info!("flusher success ,response_rx.await done , resp : {:?}", resp);
                 match resp {
                     BufferedWriteResult::Success(_) => Ok(resp),
                     BufferedWriteResult::Error(e) => Err(Error::new(ErrorKind::Other, e)),
                 }
             }
             Err(e) => {
-                println!("{}", e);
+                info!("flusher write error : {}", e);
                 Err(Error::new(ErrorKind::Other, e))
             }
         }
