@@ -332,6 +332,9 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
                 );
                 db::scheduler::update_trigger(new_trigger).await?;
             } else {
+                if run_once {
+                    report.enabled = true;
+                }
                 // Otherwise update its status only
                 db::scheduler::update_status(
                     &new_trigger.org,
