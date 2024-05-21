@@ -89,7 +89,10 @@ impl WriteBufferFlusher {
             Ok(_) => {
                 info!("flusher success ,start to response_rx.await");
                 let resp = response_rx.await.expect("wal op buffer thread is dead");
-                info!("flusher success ,response_rx.await done , resp : {:?}", resp);
+                info!(
+                    "flusher success ,response_rx.await done , resp : {:?}",
+                    resp
+                );
                 match resp {
                     BufferedWriteResult::Success(_) => Ok(resp),
                     BufferedWriteResult::Error(e) => Err(Error::new(ErrorKind::Other, e)),
@@ -126,15 +129,15 @@ type RequestOps = HashMap<String, ExportRequest>;
 pub static RT: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
 pub fn run_trace_io_flush(
-    buffer_rx: CrossbeamReceiver<RequestOps>,
-    buffer_notify: CrossbeamSender<Result<(), Error>>,
+    io_flush_rx: CrossbeamReceiver<RequestOps>,
+    io_flush_notify_tx: CrossbeamSender<Result<(), Error>>,
 ) {
     loop {
         info!(
             "run_trace_io_flush loop start, buffer_rx len : {}",
-            buffer_rx.len()
+            io_flush_rx.len()
         );
-        let request = match buffer_rx.recv() {
+        let request = match io_flush_rx.recv() {
             Ok(request) => request,
             Err(e) => {
                 // the buffer channel has closed, it's shutdown
@@ -146,7 +149,7 @@ pub fn run_trace_io_flush(
         // let mut state = segment_state.write();
         info!(
             "run_trace_io_flush request for start, buffer_rx len : {}",
-            buffer_rx.len()
+            io_flush_rx.len()
         );
         // write the ops to the segment files, or return on first error
         for (session_id, request) in request {
@@ -160,7 +163,7 @@ pub fn run_trace_io_flush(
                     let in_req = r.into_inner();
                     let org_id = metadata.get(&CONFIG.grpc.org_header_key);
                     if org_id.is_none() {
-                        buffer_notify
+                        io_flush_notify_tx
                             .send(Err(Error::new(std::io::ErrorKind::Other, msg)))
                             .expect("buffer flusher is dead");
                         continue;
@@ -209,22 +212,30 @@ pub fn run_trace_io_flush(
                 }
             };
 
-            info!("[{session_id}]run_trace_io_flush match resp: {:?}, buffer_notify len: {}", resp, buffer_notify.len());
+            info!(
+                "[{session_id}]run_trace_io_flush match resp: {:?}, io_flush_notify_tx len: {}",
+                resp,
+                io_flush_notify_tx.len()
+            );
             match resp {
                 Ok(_) => {
-                    buffer_notify.send(Ok(())).expect("buffer flusher is dead");
-                    continue;
+                    io_flush_notify_tx
+                        .send(Ok(()))
+                        .expect("buffer flusher is dead");
                 }
-                Err(_) => {
-                    // the buffer channel has closed, it's shutdown
-                    info!("stopping wal io thread");
-                    return;
+                Err(e) => {
+                    io_flush_notify_tx
+                        .send(Err(Error::new(ErrorKind::Other, e.to_string())))
+                        .expect("buffer flusher is dead");
                 }
             }
         }
 
-        info!("run_trace_io_flush for request done, buffer_notify len: {} ", buffer_notify.len());
-        buffer_notify.send(Ok(())).expect("buffer flusher is dead");
+        info!(
+            "run_trace_io_flush for request done, io_flush_notify_tx len: {} ",
+            io_flush_notify_tx.len()
+        );
+        // io_flush_notify_tx.send(Ok(())).expect("buffer flusher is dead");
     }
 }
 
