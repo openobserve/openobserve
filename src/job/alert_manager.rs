@@ -83,7 +83,7 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = infra::scheduler::clean_complete().await {
+        if let Err(e) = infra::scheduler::watch_timeout().await {
             log::error!("[ALERT MANAGER] watch timeout jobs error: {}", e);
         }
     }

@@ -349,6 +349,11 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     }
 
     report.last_triggered_at = Some(now);
+    // Check if the report has been disabled in the mean time
+    let old_report = db::dashboards::reports::get(org_id, report_name).await?;
+    if !old_report.enabled {
+        report.enabled = old_report.enabled;
+    }
     let result = db::dashboards::reports::set_without_updating_trigger(org_id, &report).await;
     if result.is_err() {
         log::error!(
