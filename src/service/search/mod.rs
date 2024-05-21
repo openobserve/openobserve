@@ -180,7 +180,7 @@ pub async fn search(
                 };
                 report_request_usage_stats(
                     req_stats,
-                    &org_id,
+                    org_id,
                     &stream_name,
                     StreamType::Logs,
                     UsageType::Search,
