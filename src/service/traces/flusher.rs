@@ -223,7 +223,7 @@ pub fn run_trace_io_flush(
             }
         }
 
-        info!("[{session_id}]run_trace_io_flush for request done, buffer_notify len: {} ", buffer_notify.len());
+        info!("run_trace_io_flush for request done, buffer_notify len: {} ", buffer_notify.len());
         buffer_notify.send(Ok(())).expect("buffer flusher is dead");
     }
 }
