@@ -148,11 +148,13 @@ pub fn run_trace_io_flush(
 
         // let mut state = segment_state.write();
         info!(
-            "run_trace_io_flush request for start, buffer_rx len : {}",
-            io_flush_rx.len()
+            "run_trace_io_flush request for start, buffer_rx len : {}, request len: {}",
+            io_flush_rx.len(),
+            request.len()
         );
         // write the ops to the segment files, or return on first error
         for (session_id, request) in request {
+            info!("[{session_id}]run_trace_io_flush start request handle");
             let resp = match request {
                 ExportRequest::GrpcExportTraceServiceRequest(r) => {
                     let msg = format!(
@@ -163,6 +165,7 @@ pub fn run_trace_io_flush(
                     let in_req = r.into_inner();
                     let org_id = metadata.get(&CONFIG.grpc.org_header_key);
                     if org_id.is_none() {
+                        info!("[{session_id}]run_trace_io_flush org_id is none");
                         io_flush_notify_tx
                             .send(Err(Error::new(std::io::ErrorKind::Other, msg)))
                             .expect("buffer flusher is dead");
