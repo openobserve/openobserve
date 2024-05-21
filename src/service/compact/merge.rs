@@ -29,6 +29,7 @@ use config::{
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
+        record_batch_ext::format_recordbatch_by_schema,
     },
     CONFIG, FILE_EXT_PARQUET,
 };
@@ -37,7 +38,7 @@ use infra::{
     cache, dist_lock, file_list as infra_file_list,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        unwrap_partition_time_level, unwrap_stream_settings,
+        unwrap_partition_time_level, unwrap_stream_settings, SchemaCache,
     },
     storage,
 };
@@ -49,7 +50,10 @@ use tokio::{
 use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::generate_index_on_compactor,
-    service::{db, file_list, search::datafusion, stream},
+    service::{
+        db, file_list, schema::generate_schema_for_defined_schema_fields, search::datafusion,
+        stream,
+    },
 };
 
 #[derive(Clone)]
@@ -58,7 +62,6 @@ pub struct MergeBatch {
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
-    pub schema: Arc<Schema>,
     pub prefix: String,
     pub files: Vec<FileKey>,
 }
@@ -119,13 +122,11 @@ pub async fn merge_by_stream(
     }
 
     // get schema
-    let mut schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let stream_created = stream::stream_created(&schema).unwrap_or_default();
-    std::mem::take(&mut schema.metadata);
-    let schema = Arc::new(schema);
     if offset == 0 {
         offset = stream_created
     }
@@ -304,7 +305,6 @@ pub async fn merge_by_stream(
     for (prefix, files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
         let stream_name = stream_name.to_string();
-        let schema = schema.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
@@ -332,7 +332,6 @@ pub async fn merge_by_stream(
                         org_id: org_id.clone(),
                         stream_type,
                         stream_name: stream_name.clone(),
-                        schema: schema.clone(),
                         prefix: prefix.clone(),
                         files: new_file_list.clone(),
                     });
@@ -355,7 +354,6 @@ pub async fn merge_by_stream(
                     org_id: org_id.clone(),
                     stream_type,
                     stream_name: stream_name.clone(),
-                    schema: schema.clone(),
                     prefix: prefix.clone(),
                     files: new_file_list.clone(),
                 });
@@ -494,7 +492,6 @@ pub async fn merge_files(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    schema: Arc<Schema>,
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
@@ -569,6 +566,19 @@ pub async fn merge_files(
 
     // convert the file to the latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let defined_schema_fields = stream_setting
+        .and_then(|s| s.defined_schema_fields)
+        .unwrap_or_default();
+    let schema_latest = if !defined_schema_fields.is_empty() {
+        let schema_latest = SchemaCache::new(schema_latest);
+        let schema_latest =
+            generate_schema_for_defined_schema_fields(&schema_latest, &defined_schema_fields);
+        Arc::new(schema_latest.schema().clone())
+    } else {
+        Arc::new(schema_latest)
+    };
+
     let schema_versions =
         infra::schema::get_versions(org_id, stream_name, stream_type, Some((min_ts, max_ts)))
             .await?;
@@ -664,13 +674,13 @@ pub async fn merge_files(
 
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
     } else {
         datafusion::exec::merge_parquet_files(
             tmp_dir.name(),
             stream_type,
             stream_name,
-            schema.clone(),
+            schema_latest.clone(),
         )
         .await
     };
@@ -681,7 +691,7 @@ pub async fn merge_files(
             "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
             e,
             files,
-            schema
+            schema_latest
         );
 
         DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
@@ -704,7 +714,7 @@ pub async fn merge_files(
 
     // generate inverted index RecordBatch
     let inverted_idx_batches = generate_inverted_idx_recordbatch(
-        schema.clone(),
+        schema_latest.clone(),
         &new_batches,
         stream_type,
         &full_text_search_fields,
@@ -1006,6 +1016,12 @@ pub async fn merge_parquet_files(
         })?;
         record_batches.extend(batches);
     }
+
+    // format recordbatch
+    let record_batches = record_batches
+        .into_iter()
+        .map(|b| format_recordbatch_by_schema(schema.clone(), b))
+        .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
     let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;

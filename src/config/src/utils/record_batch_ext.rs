@@ -213,3 +213,30 @@ pub fn convert_json_to_record_batch(
 
     RecordBatch::try_new(schema.clone(), cols)
 }
+
+pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
+    if schema.fields() == batch.schema().fields() {
+        return batch;
+    }
+    let records_len = batch.num_rows();
+    if records_len == 0 {
+        return RecordBatch::new_empty(schema);
+    }
+
+    let batch_schema = batch.schema();
+    let batch_fields = batch_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
+    for field in schema.fields() {
+        if batch_fields.contains(field.name()) {
+            cols.push(batch.column_by_name(field.name()).unwrap().clone());
+        } else {
+            cols.push(new_null_array(field.data_type(), records_len))
+        }
+    }
+    RecordBatch::try_new(schema, cols).unwrap()
+}
