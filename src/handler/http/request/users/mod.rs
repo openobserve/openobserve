@@ -232,7 +232,7 @@ pub async fn authentication(
     let auth = match auth {
         Some(auth) => auth.into_inner(),
         None => {
-            // get Authorization header
+            // get Authorization header from request
             #[cfg(feature = "enterprise")]
             {
                 let auth_header = _req.headers().get("Authorization");
