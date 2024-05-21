@@ -258,7 +258,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
-import MetricList from "./MetricList.vue";
 import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser/build/mysql";
 
@@ -266,33 +265,33 @@ import streamService from "@/services/stream";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import DateTime from "@/components/DateTime.vue";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
-import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import useStreams from "@/composables/useStreams";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "AppMetrics",
   components: {
-    MetricList,
-    DateTime,
-    AutoRefreshInterval,
+    MetricList: defineAsyncComponent(() => import("./MetricList.vue")),
+    DateTime: defineAsyncComponent(() => import("@/components/DateTime.vue")),
+    AutoRefreshInterval: defineAsyncComponent(
+      () => import("@/components/AutoRefreshInterval.vue")
+    ),
     QueryEditor: defineAsyncComponent(
       () => import("@/components/QueryEditor.vue")
     ),
-    AddToDashboard,
+    AddToDashboard: defineAsyncComponent(() => import("./AddToDashboard.vue")),
     SyntaxGuideMetrics,
-    PanelSchemaRenderer,
+    PanelSchemaRenderer: defineAsyncComponent(
+      () => import("@/components/dashboards/PanelSchemaRenderer.vue")
+    ),
     SanitizedHtmlRenderer,
   },
   methods: {
