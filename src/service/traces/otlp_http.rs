@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, web, HttpResponse};
-use config::{ider, CONFIG};
+use config::ider;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use tonic::Request;
@@ -40,20 +40,12 @@ pub async fn traces_proto(
     let (mut metadata, extensions, message) = request.into_parts();
     let session_id = ider::uuid();
     metadata.insert("session_id", session_id.parse().unwrap());
-    metadata.insert("thread_id", tonic::metadata::MetadataValue::from(thread_id));
-    metadata.insert(
-        CONFIG.grpc.org_header_key.as_str(),
-        org_id.to_string().parse().unwrap(),
-    );
-    if let Some(stream_name) = in_stream_name {
-        metadata.insert(
-            CONFIG.grpc.stream_header_key.as_str(),
-            stream_name.to_string().parse().unwrap(),
-        );
-    };
-
-    let request = ExportRequest::GrpcExportTraceServiceRequest(Request::from_parts(
-        metadata, extensions, message,
+    let req = Request::from_parts(metadata, extensions, message);
+    let request = ExportRequest::GrpcExportTraceServiceRequest((
+        org_id.to_string(),
+        thread_id,
+        req,
+        Some(in_stream_name.unwrap_or("").to_string()),
     ));
 
     hanlde_resp(flusher, request).await

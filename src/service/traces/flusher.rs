@@ -4,7 +4,7 @@ use std::{
 };
 
 use actix_web::web;
-use config::{ider, CONFIG};
+use config::ider;
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use hashbrown::HashMap;
 use log::info;
@@ -111,7 +111,14 @@ impl WriteBufferFlusher {
 }
 #[derive(Debug)]
 pub enum ExportRequest {
-    GrpcExportTraceServiceRequest(tonic::Request<ExportTraceServiceRequest>),
+    GrpcExportTraceServiceRequest(
+        (
+            String,
+            usize,
+            tonic::Request<ExportTraceServiceRequest>,
+            Option<String>,
+        ),
+    ),
     HttpJsonExportTraceServiceRequest((String, usize, web::Bytes, Option<String>)),
 }
 #[derive(Debug)]
@@ -132,7 +139,7 @@ pub fn run_trace_io_flush(
     io_flush_rx: CrossbeamReceiver<RequestOps>,
     io_flush_notify_tx: CrossbeamSender<Result<(), Error>>,
 ) {
-    loop {
+    'IOLOOP: loop {
         info!(
             "run_trace_io_flush loop start, buffer_rx len : {}",
             io_flush_rx.len()
@@ -157,42 +164,18 @@ pub fn run_trace_io_flush(
             info!("[{session_id}]run_trace_io_flush start request handle");
             let resp = match request {
                 ExportRequest::GrpcExportTraceServiceRequest(r) => {
-                    let msg = format!(
-                        "[{session_id}]Please specify organization id with header key '{}' ",
-                        &CONFIG.grpc.org_header_key
-                    );
-                    let metadata = r.metadata().clone();
-                    let in_req = r.into_inner();
-                    let org_id = metadata.get(&CONFIG.grpc.org_header_key);
-                    if org_id.is_none() {
-                        info!("[{session_id}]run_trace_io_flush org_id is none");
-                        io_flush_notify_tx
-                            .send(Err(Error::new(std::io::ErrorKind::Other, msg)))
-                            .expect("buffer flusher is dead");
-                        continue;
-                    }
-
-                    let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
-                    let mut in_stream_name: Option<&str> = None;
-                    if let Some(stream_name) = stream_name {
-                        in_stream_name = Some(stream_name.to_str().unwrap());
-                    };
-
-                    let thread_id = metadata.get("thread_id");
-                    let mut in_thread_id: usize = 0;
-                    if let Some(thread_id) = thread_id {
-                        in_thread_id = thread_id.to_str().unwrap().parse::<usize>().unwrap();
-                    };
                     info!(
                         "[{session_id}]run_trace_io_flush ExportRequest::GrpcExportTraceServiceRequest RT.block_on start"
                     );
+                    let req = r.2.into_inner();
+                    let in_stream_name = r.3.unwrap_or("".to_string());
                     RT.block_on(async {
                         handle_trace_request(
-                            org_id.unwrap().to_str().unwrap(),
-                            in_thread_id,
-                            in_req,
+                            r.0.as_str(),
+                            r.1,
+                            req,
                             true,
-                            in_stream_name,
+                            Some(in_stream_name.as_str()),
                             session_id.as_str(),
                         )
                         .await
@@ -220,17 +203,12 @@ pub fn run_trace_io_flush(
                 resp,
                 io_flush_notify_tx.len()
             );
-            match resp {
-                Ok(_) => {
-                    io_flush_notify_tx
-                        .send(Ok(()))
-                        .expect("buffer flusher is dead");
-                }
-                Err(e) => {
-                    io_flush_notify_tx
-                        .send(Err(Error::new(ErrorKind::Other, e.to_string())))
-                        .expect("buffer flusher is dead");
-                }
+
+            if let Err(e) = resp {
+                io_flush_notify_tx
+                    .send(Err(Error::new(ErrorKind::Other, e.to_string())))
+                    .expect("buffer flusher is dead");
+                continue 'IOLOOP;
             }
         }
 
@@ -238,7 +216,9 @@ pub fn run_trace_io_flush(
             "run_trace_io_flush for request done, io_flush_notify_tx len: {} ",
             io_flush_notify_tx.len()
         );
-        // io_flush_notify_tx.send(Ok(())).expect("buffer flusher is dead");
+        io_flush_notify_tx
+            .send(Ok(()))
+            .expect("buffer flusher is dead");
     }
 }
 
@@ -260,7 +240,7 @@ pub async fn run_trace_op_buffer(
                 info!("buffer_rx.recv success");
                 match buffered_write.request {
                     ExportRequest::GrpcExportTraceServiceRequest(r) => {
-                        let metadata = r.metadata().clone();
+                        let metadata = r.2.metadata().clone();
                         let default_session_id = tonic::metadata::MetadataValue::try_from(ider::uuid()).unwrap();
                         let session_id = metadata
                             .get("session_id")
@@ -291,7 +271,7 @@ pub async fn run_trace_op_buffer(
                 }
                 info!("io_flush_tx send done len: {}", io_flush_tx.len());
                 let res = match io_flush_notify_rx.recv().expect("wal io thread is dead") {
-                  Ok(_resp) => {
+                    Ok(_resp) => {
                        BufferedWriteResult::Success(())
                     },
                     Err(e) => BufferedWriteResult::Error(e.to_string()),
