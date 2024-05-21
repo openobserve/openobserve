@@ -2403,9 +2403,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.meta.stream.customQueryFields = [];
         dashboardPanelData.meta.parsedQuery.columns.forEach((item: any) => {
           let val: any;
-          // if there is a lable, use that, else leave it
+          // if there is a label, use that
+          // else use the column or value
           if (item["as"] === undefined || item["as"] === null) {
-            val = item["expr"]["column"];
+            val = item["expr"]["column"] ?? item["expr"]["value"];
           } else {
             val = item["as"];
           }
