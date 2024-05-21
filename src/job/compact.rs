@@ -58,7 +58,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             &msg.org_id,
                             msg.stream_type,
                             &msg.stream_name,
-                            msg.schema,
                             &msg.prefix,
                             &msg.files,
                         )
