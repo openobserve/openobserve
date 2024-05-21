@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use actix_web::web;
+use actix_web::{http, HttpResponse, web};
 use config::ider;
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use hashbrown::HashMap;
@@ -169,32 +169,38 @@ pub fn run_trace_io_flush(
                     );
                     let req = r.2.into_inner();
                     let in_stream_name = r.3.unwrap_or("".to_string());
-                    RT.block_on(async {
-                        handle_trace_request(
-                            r.0.as_str(),
-                            r.1,
-                            req,
-                            true,
-                            Some(in_stream_name.as_str()),
-                            session_id.as_str(),
-                        )
-                        .await
-                    })
+                    // RT.block_on(async {
+                    //     handle_trace_request(
+                    //         r.0.as_str(),
+                    //         r.1,
+                    //         req,
+                    //         true,
+                    //         Some(in_stream_name.as_str()),
+                    //         session_id.as_str(),
+                    //     )
+                    //     .await
+                    // })
+                    Ok(HttpResponse::Ok()
+                        .status(http::StatusCode::OK)
+                        .content_type("application/x-protobuf"))
                 }
                 ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
                     let in_stream_name = r.3.unwrap_or("".to_string());
                     info!(
                         "[{session_id}]run_trace_io_flush ExportRequest::HttpJsonExportTraceServiceRequest RT.block_on start"
                     );
-                    RT.block_on(async {
-                        handle_trace_json_request(
-                            r.0.as_str(),
-                            r.1,
-                            r.2,
-                            Some(in_stream_name.as_str()),
-                        )
-                        .await
-                    })
+                    // RT.block_on(async {
+                    //     handle_trace_json_request(
+                    //         r.0.as_str(),
+                    //         r.1,
+                    //         r.2,
+                    //         Some(in_stream_name.as_str()),
+                    //     )
+                    //     .await
+                    // })
+                    Ok(HttpResponse::Ok()
+                        .status(http::StatusCode::OK)
+                        .content_type("application/x-protobuf"))
                 }
             };
 
