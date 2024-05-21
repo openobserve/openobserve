@@ -285,7 +285,7 @@ pub async fn run_trace_op_buffer(
                 info!("io_flush_tx get buffer write result done, notifies len : {}, res: {:?}", notifies.len(), res);
                 // notify the watchers of the write response
                 for response_tx in notifies {
-                    info!("io_flush_tx response_tx len : {}, res: {:?}", response_tx.len(), res);
+                    info!("io_flush_tx response_tx, res: {:?}", res);
                     let _ = response_tx.send(res.clone());
                 }
                 info!("io_flush_tx response_tx send done");
