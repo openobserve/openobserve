@@ -1131,11 +1131,7 @@ pub fn generate_vertical_partition_recordbatch(
         }
     }
 
-    let mut fields = schema
-        .fields()
-        .iter()
-        .map(|f| f.clone())
-        .collect::<Vec<_>>();
+    let mut fields = schema.fields().iter().cloned().collect::<Vec<_>>();
     let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len() + builders.len());
     for i in 0..schema.fields().len() {
         if i == all_field_idx {
