@@ -46,18 +46,30 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), anyhow::Error> {
-    // Check if SMTP is enabled, otherwise don't save the report
-    // if !CONFIG.smtp.smtp_enabled {
-    //     return Err(anyhow::anyhow!("SMTP configuration not enabled"));
-    // }
+    if !CONFIG.common.report_server_url.is_empty() {
+        // Check if report username and password are present in the report server
+    } else {
+        if !CONFIG.common.local_mode {
+            return Err(anyhow::anyhow!(
+                "Report server URL must be specified for cluster mode"
+            ));
+        }
 
-    // // Check if Chrome is enabled, otherwise don't save the report
-    // if !CONFIG.chrome.chrome_enabled {
-    //     return Err(anyhow::anyhow!("Chrome not enabled"));
-    // }
+        // Check if SMTP is enabled, otherwise don't save the report
+        if !CONFIG.smtp.smtp_enabled {
+            return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+        }
 
-    if CONFIG.common.report_user_name.is_empty() || CONFIG.common.report_user_password.is_empty() {
-        return Err(anyhow::anyhow!("Report username and password ENVs not set"));
+        // Check if Chrome is enabled, otherwise don't save the report
+        if !CONFIG.chrome.chrome_enabled {
+            return Err(anyhow::anyhow!("Chrome not enabled"));
+        }
+
+        if CONFIG.common.report_user_name.is_empty()
+            || CONFIG.common.report_user_password.is_empty()
+        {
+            return Err(anyhow::anyhow!("Report username and password ENVs not set"));
+        }
     }
 
     if !name.is_empty() {
@@ -236,12 +248,7 @@ impl Report {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
 
-        // if !CONFIG.common.local_mode {
-        if true {
-            if CONFIG.common.report_server_url.is_empty() {
-                return Err(anyhow::anyhow!("Report server url not specified"));
-            }
-
+        if !CONFIG.common.report_server_url.is_empty() {
             let mut recepients = vec![];
             for recepient in &self.destinations {
                 match recepient {
@@ -291,6 +298,9 @@ impl Report {
             }
             Ok(())
         } else {
+            if !CONFIG.common.local_mode {
+                return Err(anyhow::anyhow!("Report server url not specified"));
+            }
             // Currently only one `ReportDashboard` can be captured and sent
             let dashboard = &self.dashboards[0];
             let report = generate_report(
