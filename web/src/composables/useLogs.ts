@@ -1088,7 +1088,10 @@ const useLogs = () => {
       const queryReq = buildSearch();
       searchObjDebug["buildSearchEndTime"] = performance.now();
       console.log(
-        `Build Search operation took ${searchObjDebug["buildSearchEndTime"] - searchObjDebug["buildSearchStartTime"]} milliseconds to complete`
+        `Build Search operation took ${
+          searchObjDebug["buildSearchEndTime"] -
+          searchObjDebug["buildSearchStartTime"]
+        } milliseconds to complete`
       );
       if (queryReq == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
@@ -1100,7 +1103,10 @@ const useLogs = () => {
         await getQueryPartitions(queryReq);
         searchObjDebug["partitionEndTime"] = performance.now();
         console.log(
-          `Partition operation took ${searchObjDebug["partitionEndTime"] - searchObjDebug["partitionStartTime"]} milliseconds to complete`
+          `Partition operation took ${
+            searchObjDebug["partitionEndTime"] -
+            searchObjDebug["partitionStartTime"]
+          } milliseconds to complete`
         );
       }
 
@@ -1204,7 +1210,10 @@ const useLogs = () => {
         await getPaginatedData(queryReq);
         searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
         console.log(
-          `Get Paginated Data with API took ${searchObjDebug["paginatedDatawithAPIEndTime"] - searchObjDebug["paginatedDatawithAPIStartTime"]} milliseconds to complete`
+          `Get Paginated Data with API took ${
+            searchObjDebug["paginatedDatawithAPIEndTime"] -
+            searchObjDebug["paginatedDatawithAPIStartTime"]
+          } milliseconds to complete`
         );
         const parsedSQL: any = fnParsedSQL();
 
@@ -1242,7 +1251,10 @@ const useLogs = () => {
               await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
               console.log(
-                `Total count took ${searchObjDebug["pagecountEndTime"] - searchObjDebug["pagecountStartTime"]} milliseconds to complete`
+                `Total count took ${
+                  searchObjDebug["pagecountEndTime"] -
+                  searchObjDebug["pagecountStartTime"]
+                } milliseconds to complete`
               );
             }, 0);
           }
@@ -1252,7 +1264,10 @@ const useLogs = () => {
       }
       searchObjDebug["queryDataEndTime"] = performance.now();
       console.log(
-        `Entire operation took ${searchObjDebug["queryDataEndTime"] - searchObjDebug["queryDataStartTime"]} milliseconds to complete`
+        `Entire operation took ${
+          searchObjDebug["queryDataEndTime"] -
+          searchObjDebug["queryDataStartTime"]
+        } milliseconds to complete`
       );
       console.log("=================== getQueryData Debug ===================");
     } catch (e: any) {
@@ -1556,7 +1571,10 @@ const useLogs = () => {
           searchObj.loading = false;
           searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
           console.log(
-            `Paginated data time after response received from server took ${searchObjDebug["paginatedDataReceivedEndTime"] - searchObjDebug["paginatedDataReceivedStartTime"]} milliseconds to complete`
+            `Paginated data time after response received from server took ${
+              searchObjDebug["paginatedDataReceivedEndTime"] -
+              searchObjDebug["paginatedDataReceivedStartTime"]
+            } milliseconds to complete`
           );
           resolve(true);
         })
@@ -1664,10 +1682,16 @@ const useLogs = () => {
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
             searchObjDebug["histogramEndTime"] = performance.now();
             console.log(
-              `Histogram processing after data received took ${searchObjDebug["histogramProcessingEndTime"] - searchObjDebug["histogramProcessingStartTime"]} milliseconds to complete`
+              `Histogram processing after data received took ${
+                searchObjDebug["histogramProcessingEndTime"] -
+                searchObjDebug["histogramProcessingStartTime"]
+              } milliseconds to complete`
             );
             console.log(
-              `Entire Histogram took ${searchObjDebug["histogramEndTime"] - searchObjDebug["histogramStartTime"]} milliseconds to complete`
+              `Entire Histogram took ${
+                searchObjDebug["histogramEndTime"] -
+                searchObjDebug["histogramStartTime"]
+              } milliseconds to complete`
             );
             console.log("=================== End Debug ===================");
             dismiss();
@@ -1935,7 +1959,12 @@ const useLogs = () => {
       }
       searchObjDebug["extractFieldsEndTime"] = performance.now();
       console.log(
-        `ExtractFields ${searchObjDebug["extractFieldsWithAPI"]} operation took ${searchObjDebug["extractFieldsEndTime"] - searchObjDebug["extractFieldsStartTime"]} milliseconds to complete`
+        `ExtractFields ${
+          searchObjDebug["extractFieldsWithAPI"]
+        } operation took ${
+          searchObjDebug["extractFieldsEndTime"] -
+          searchObjDebug["extractFieldsStartTime"]
+        } milliseconds to complete`
       );
     } catch (e: any) {
       console.log("Error while extracting fields");
@@ -2533,6 +2562,7 @@ const useLogs = () => {
     searchObj.data.queryResults = {
       hits: [],
     };
+    searchObj.data.stream.selectedStreamFields = [];
 
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
@@ -2553,6 +2583,7 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields == undefined ||
       searchObj.data.stream.selectedStreamFields.length == 0
     ) {
+      searchObj.loadingStream = false;
       searchObj.data.errorMsg = t("search.noFieldFound");
       return;
     }
