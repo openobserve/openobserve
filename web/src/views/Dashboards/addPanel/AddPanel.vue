@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <DateTimePickerDashboard
+          v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
         />
@@ -173,7 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="layout-panel-container col"
                       style="height: 100%"
                     >
-                      <DashboardQueryBuilder :dashboardData="currentDashboardData.data"/>
+                      <DashboardQueryBuilder
+                        :dashboardData="currentDashboardData.data"
+                      />
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
@@ -376,7 +379,7 @@ export default defineComponent({
       resetAggregationFunction,
     } = useDashboardPanelData();
     const editMode = ref(false);
-    const selectedDate = ref();
+    const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: [],
@@ -394,7 +397,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
-    
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -497,7 +500,22 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
-      // console.timeEnd("AddPanel:loadDashboard:after");
+
+      // get default time for dashboard
+      // if dashboard has relative time settings
+      if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
+        selectedDate.value = {
+          valueType: "relative",
+          relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
+        };
+      } else {
+        // else, dashboard will have absolute time settings
+        selectedDate.value = {
+          valueType: "absolute",
+          startTime: data?.defaultDatetimeDuration?.startTime,
+          endTime: data?.defaultDatetimeDuration?.endTime,
+        };
+      }
     };
 
     const isInitailDashboardPanelData = () => {
@@ -597,10 +615,12 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
-      dashboardPanelData.meta.dateTime = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      if (selectedDate.value) {
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        };
+      }
     };
     const goBack = () => {
       return router.push({

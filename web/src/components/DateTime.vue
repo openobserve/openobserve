@@ -779,6 +779,7 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
+      getConsumableDateTime,
     };
   },
 });
