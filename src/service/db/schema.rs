@@ -380,7 +380,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     )
                     .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS.write().await;
-                    w.insert(item_key.to_string(), schema_versions);
+                    w.entry(item_key.to_string())
+                        .and_modify(|existing_vec| {
+                            let _ = existing_vec.pop();
+                            existing_vec.extend(schema_versions.clone())
+                        })
+                        .or_insert(schema_versions);
                     drop(w);
                 }
 
@@ -418,15 +423,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
