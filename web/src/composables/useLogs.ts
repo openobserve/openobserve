@@ -2718,9 +2718,10 @@ const useLogs = () => {
 
   const getRegionInfo = () => {
     searchService.get_regions().then((res) => {
-      const clusterData = [];
+      const clusterData: any = [];
+      let regionObj: any = {};
       for (const region in res.data) {
-        const regionObj = {
+        regionObj = {
           label: region,
           children: [],
         };
