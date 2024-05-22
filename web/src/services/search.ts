@@ -37,6 +37,7 @@ const search = {
     query_fn,
     stream_type,
     regions,
+    clusters,
   }: {
     org_identifier: string;
     index: string;
@@ -46,6 +47,7 @@ const search = {
     query_fn: any;
     stream_type: string;
     regions: string;
+    clusters: string;
   }) => {
     let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     if (query_fn.trim() != "") {
@@ -54,6 +56,10 @@ const search = {
 
     if (regions.trim()!= "") {
       url = url + `&regions=${regions}`;
+    }
+
+    if (clusters.trim()!= "") {
+      url = url + `&clusters=${clusters}`;
     }
     return http().get(url);
   },
