@@ -109,6 +109,12 @@ pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger>
     infra_scheduler::get(org, module, key).await
 }
 
+/// Returns the scheduled job associated with the given id in read-only fashion
+#[inline]
+pub async fn exists(org: &str, module: TriggerModule, key: &str) -> bool {
+    infra_scheduler::get(org, module, key).await.is_ok()
+}
+
 /// The count of jobs for the given module (Report/Alert etc.)
 #[inline]
 pub async fn len_module(module: TriggerModule) -> usize {
