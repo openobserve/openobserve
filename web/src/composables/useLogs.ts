@@ -2720,12 +2720,13 @@ const useLogs = () => {
     searchService.get_regions().then((res) => {
       const clusterData = [];
       let regionObj: any = {};
-      for (const region in res.data) {
+      const apiData = JSON.parse(res.data);
+      for (const region in apiData) {
         regionObj = {
           label: region,
           children: [],
         };
-        for (const cluster of res.data[region]) {
+        for (const cluster of apiData[region]) {
           regionObj.children.push({ label: cluster });
         }
         clusterData.push(regionObj);
