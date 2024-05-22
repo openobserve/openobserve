@@ -181,7 +181,7 @@ pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
-    if !CONFIG.chrome.chrome_enabled {
+    if !CONFIG.chrome.chrome_enabled || !CONFIG.common.report_server_url.is_empty() {
         None
     } else {
         let mut browser_config = BrowserConfig::builder()
@@ -641,7 +641,7 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
-    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "http://localhost:5090/api")]
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "")]
     pub report_server_url: String,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,
