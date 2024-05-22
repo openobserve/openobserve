@@ -265,6 +265,7 @@ color="grey" size="xs" />
             { label: 'Logs', value: 'logs' },
             { label: 'Visualize', value: 'visualize' },
           ]"
+          :disable="searchObj.data.stream.selectedStream.value"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">

@@ -848,21 +848,18 @@ export default defineComponent({
         searchObj.data.stream.selectedStream.value,
         searchObj.data.stream.streamType,
       ],
-      async () => {
+      () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          // enable sql mode
+          searchObj.meta.sqlMode = true;
           dashboardPanelData.data.queries[0].customQuery = true;
           // searchObj.data.query = addHistogramToQuery(searchObj.data.query);
 
-          dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+          dashboardPanelData.data.queries[0].fields.stream_type =
+            searchObj.data.stream.streamType ?? "logs";
           dashboardPanelData.data.queries[0].fields.stream =
             searchObj.data.stream.selectedStream.value ?? "default";
-          dashboardPanelData.data.queries[0].fields.streamType =
-            searchObj.data.stream.streamType ?? "logs";
-        } else if (searchObj.meta.logsVisualizeToggle == "logs") {
-          await nextTick();
-          // searchObj.data.query = removeHistogramFromQuery(
-          //   searchObj.data.query ?? ""
-          // );
+          dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
         }
       }
     );
