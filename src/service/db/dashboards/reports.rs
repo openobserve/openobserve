@@ -53,28 +53,26 @@ pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyh
                         Ok(())
                     }
                 }
-            } else {
-                if db::scheduler::exists(
-                    org_id,
-                    db::scheduler::TriggerModule::Report,
-                    &schedule_key,
-                )
-                .await
-                {
-                    match db::scheduler::update_trigger(trigger).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            log::error!("Failed to update trigger: {}", e);
-                            Ok(())
-                        }
+            } else if db::scheduler::exists(
+                org_id,
+                db::scheduler::TriggerModule::Report,
+                &schedule_key,
+            )
+            .await
+            {
+                match db::scheduler::update_trigger(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to update trigger: {}", e);
+                        Ok(())
                     }
-                } else {
-                    match db::scheduler::push(trigger).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            log::error!("Failed to save trigger: {}", e);
-                            Ok(())
-                        }
+                }
+            } else {
+                match db::scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger: {}", e);
+                        Ok(())
                     }
                 }
             }
