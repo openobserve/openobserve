@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::web;
 use config::ider;
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use hashbrown::HashMap;
@@ -18,7 +18,7 @@ use tokio::{
     time::MissedTickBehavior,
 };
 
-use crate::service::traces::flusher;
+use crate::service::traces::{flusher, handle_trace_json_request, handle_trace_request};
 
 const BUFFER_FLUSH_INTERVAL: Duration = Duration::from_millis(10);
 // The maximum number of buffered writes that can be queued up before backpressure is applied
@@ -160,51 +160,52 @@ pub fn run_trace_io_flush(
             request.len()
         );
         // write the ops to the segment files, or return on first error
-        // for (session_id, request) in request {
-        //     info!("[{session_id}]run_trace_io_flush start request handle");
-        //     let resp = match request {
-        //         ExportRequest::GrpcExportTraceServiceRequest(r) => {
-        //             info!(
-        //                 "[{session_id}]run_trace_io_flush
-        // ExportRequest::GrpcExportTraceServiceRequest RT.block_on start"             );
-        //             let req = r.2.into_inner();
-        //             let in_stream_name = r.3.unwrap_or("".to_string());
-        //             RT.block_on(async {
-        //                 handle_trace_request(
-        //                     r.0.as_str(),
-        //                     r.1,
-        //                     req,
-        //                     true,
-        //                     Some(in_stream_name.as_str()),
-        //                     session_id.as_str(),
-        //                 )
-        //                 .await
-        //             })
-        //         }
-        //         ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
-        //             let in_stream_name = r.3.unwrap_or("".to_string());
-        //             info!(
-        //                 "[{session_id}]run_trace_io_flush
-        // ExportRequest::HttpJsonExportTraceServiceRequest RT.block_on start"             
-        // );             RT.block_on(async {
-        //                 handle_trace_json_request(
-        //                     r.0.as_str(),
-        //                     r.1,
-        //                     r.2,
-        //                     Some(in_stream_name.as_str()),
-        //                 )
-        //                 .await
-        //             })
-        //         }
-        //     };
-        //
-        //     if let Err(e) = resp {
-        //         io_flush_notify_tx
-        //             .send(Err(Error::new(ErrorKind::Other, e.to_string())))
-        //             .expect("buffer flusher is dead");
-        //         continue 'IOLOOP;
-        //     }
-        // }
+        for (session_id, request) in request {
+            info!("[{session_id}]run_trace_io_flush start request handle");
+            let resp = match request {
+                ExportRequest::GrpcExportTraceServiceRequest(r) => {
+                    info!(
+                        "[{session_id}]run_trace_io_flush
+        ExportRequest::GrpcExportTraceServiceRequest RT.block_on start"
+                    );
+
+                    RT.block_on(async {
+                        handle_trace_request(
+                            r.0.as_str(),
+                            r.1,
+                            r.2.into_inner(),
+                            true,
+                            r.3.as_deref(),
+                            session_id.as_str(),
+                        )
+                        .await
+                    })
+                }
+                ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
+                    let in_stream_name = r.3.unwrap_or("".to_string());
+                    info!(
+                        "[{session_id}]run_trace_io_flush
+        ExportRequest::HttpJsonExportTraceServiceRequest RT.block_on start"
+                    );
+                    RT.block_on(async {
+                        handle_trace_json_request(
+                            r.0.as_str(),
+                            r.1,
+                            r.2,
+                            Some(in_stream_name.as_str()),
+                        )
+                        .await
+                    })
+                }
+            };
+
+            if let Err(e) = resp {
+                io_flush_notify_tx
+                    .send(Err(Error::new(ErrorKind::Other, e.to_string())))
+                    .expect("buffer flusher is dead");
+                continue 'IOLOOP;
+            }
+        }
 
         info!(
             "run_trace_io_flush for request done, io_flush_notify_tx len: {} ",
