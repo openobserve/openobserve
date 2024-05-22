@@ -1337,7 +1337,7 @@ const useLogs = () => {
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
           searchObj.data.queryResults.scan_size = res.data.scan_size;
-          searchObj.data.queryResults.took = res.data.took;
+          searchObj.data.queryResults.took += res.data.took;
           for (const [
             index,
             item,
@@ -2054,7 +2054,7 @@ const useLogs = () => {
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
 
-    let totalCount = searchObj.data.queryResults.total;
+    let totalCount = searchObj.data.queryResults.total || 0;
     if (searchObj.meta.resultGrid.showPagination == false) {
       endCount = searchObj.data.queryResults.hits.length;
       totalCount = searchObj.data.queryResults.hits.length;
