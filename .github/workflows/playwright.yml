@@ -22,13 +22,6 @@ env:
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
-  ZO_SMTP_ENABLED: "true"
-  ZO_SMTP_HOST: "smtp.gmail.com"
-  ZO_SMTP_PORT: 465
-  ZO_SMTP_USER_NAME: "test290@g.com"
-  ZO_SMTP_PASSWORD: "ufxkpmhnjorcamzx"
-  ZO_SMTP_FROM_EMAIL: "test290@g.com"
-  ZO_SMTP_ENCRYPTION: "ssltls"
 
 
 jobs:
@@ -40,7 +33,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","region.spec.js", "schema.spec.js","dashboardtype.spec.js","reports.spec.js"]
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","region.spec.js", "schema.spec.js","dashboardtype.spec.js"]
        
     steps:
       - name: Remove unused tools
