@@ -121,6 +121,7 @@ const defaultObject = {
     flagWrapContent: false,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
+    clusters: [],
     useUserDefinedSchemas: "user_defined_schema",
     hasUserDefinedSchemas: false,
   },
@@ -519,6 +520,7 @@ const useLogs = () => {
         store.state.zoConfig.super_cluster_enabled
       ) {
         req["regions"] = searchObj.meta.regions;
+        req["clusters"] = searchObj.meta.clusters;
       }
 
       if (searchObj.data.stream.selectedStreamFields.length == 0) {
@@ -825,10 +827,15 @@ const useLogs = () => {
 
       if (
         config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled &&
-        queryReq.query.hasOwnProperty("regions")
+        store.state.zoConfig.super_cluster_enabled
       ) {
+        if(queryReq.query.hasOwnProperty("regions")) {
         partitionQueryReq["regions"] = queryReq.query.regions;
+        }
+
+        if(queryReq.query.hasOwnProperty("clusters")) {
+          partitionQueryReq["clusters"] = queryReq.query.clusters;
+        }
       }
 
       await searchService
@@ -2209,6 +2216,9 @@ const useLogs = () => {
           regions: searchObj.meta.hasOwnProperty("regions")
             ? searchObj.meta.regions.join(",")
             : "",
+          clusters: searchObj.meta.hasOwnProperty("clusters")
+            ? searchObj.meta.clusters.join(",")
+            : "",
         })
         .then((res) => {
           searchObj.loading = false;
@@ -2708,6 +2718,18 @@ const useLogs = () => {
 
   const getRegionInfo = () => {
     searchService.get_regions().then((res) => {
+      const clusterData = [];
+      for (const region in res.data) {
+        const regionObj = {
+          label: region,
+          children: [],
+        };
+        for (const cluster of res.data[region]) {
+          regionObj.children.push({ label: cluster });
+        }
+        clusterData.push(regionObj);
+      }
+
       store.dispatch("setRegionInfo", res.data);
     });
   };
