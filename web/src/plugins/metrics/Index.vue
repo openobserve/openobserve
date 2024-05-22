@@ -259,7 +259,6 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import useMetrics from "@/composables/useMetrics";
-import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -321,7 +320,7 @@ export default defineComponent({
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
-    const parser = new Parser();
+    let parser: any;
     const metricsQueryEditorRef = ref(null);
     const { dashboardPanelData, resetDashboardPanelData } =
       useMetricsExplorer();
@@ -350,6 +349,12 @@ export default defineComponent({
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
 
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
     const updateStreams = () => {
       if (searchObj.data.streamResults?.list?.length) {
         const streamType = "metrics";
@@ -373,6 +378,7 @@ export default defineComponent({
     const showAddToDashboardDialog = ref(false);
 
     onBeforeMount(async () => {
+      await importSqlParser();
       restoreUrlQueryParams();
       verifyOrganizationStatus(store.state.organizations, router);
       await getLogStreams();

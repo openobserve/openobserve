@@ -549,7 +549,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch, computed, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  type Ref,
+  watch,
+  computed,
+  onBeforeMount,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -563,7 +570,6 @@ import {
   useLocalInterestingFields,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
-import { Parser } from "node-sql-parser/build/mysql";
 import {
   outlinedAdd,
   outlinedVisibility,
@@ -615,7 +621,7 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
-    const parser = new Parser();
+    let parser: any;
 
     const streamTypes = [
       { label: t("search.logs"), value: "logs" },
@@ -630,6 +636,16 @@ export default defineComponent({
           (v: any) => v.label.toLowerCase().indexOf(needle) > -1
         );
       });
+    };
+
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
     };
 
     watch(

@@ -427,6 +427,7 @@ import {
   computed,
   nextTick,
   defineAsyncComponent,
+  onBeforeMount,
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
@@ -438,7 +439,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, debounce } from "quasar";
 import streamService from "../../services/stream";
-import { Parser } from "node-sql-parser/build/mysql";
 import segment from "../../services/segment_analytics";
 import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
@@ -570,6 +570,18 @@ export default defineComponent({
 
     const previewAlertRef: any = ref(null);
 
+    let parser: any = null;
+
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
     const streamFieldsMap = computed(() => {
       const map: any = {};
       originalStreamFields.value.forEach((field: any) => {
@@ -610,7 +622,6 @@ export default defineComponent({
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
-    let parser = new Parser();
 
     onMounted(async () => {});
 

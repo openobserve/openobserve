@@ -171,7 +171,6 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
-import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
@@ -264,7 +263,7 @@ export default defineComponent({
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
-    const parser = new Parser();
+    let parser: any;
     const fieldValues = ref({});
     const { showErrorNotification } = useNotifications();
     const serviceColorIndex = ref(0);
@@ -278,6 +277,12 @@ export default defineComponent({
     const selectedStreamName = computed(
       () => searchObj.data.stream.selectedStream.value
     );
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
 
     function getQueryTransform() {
       try {
@@ -1117,7 +1122,8 @@ export default defineComponent({
       // getStreamList();
     }
 
-    onBeforeMount(() => {
+    onBeforeMount(async () => {
+      await importSqlParser();
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
         loadPageData();
@@ -1288,7 +1294,6 @@ export default defineComponent({
 
     const restoreFilters = (query: string) => {
       // const filters = searchObj.data.stream.filters;
-      const parser = new Parser();
 
       const defaultQuery = `SELECT * FROM '${selectedStreamName.value}' WHERE `;
 

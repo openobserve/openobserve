@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref, type Ref, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -192,7 +192,7 @@ import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
-import { Parser } from "node-sql-parser/build/mysql";
+
 import streamService from "@/services/stream";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { watch } from "vue";
@@ -215,6 +215,18 @@ export default defineComponent({
     const valuesSize = 5;
 
     const fieldValues = computed(() => searchObj.data.stream.fieldValues);
+
+    let parser: any;
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
+    onBeforeUnmount(async () => {
+      await importSqlParser();
+    });
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -430,8 +442,6 @@ export default defineComponent({
       prevValues: string[]
     ) => {
       try {
-        const parser = new Parser();
-
         const valuesString = values
           .map((value: string) => "'" + value + "'")
           .join(",");

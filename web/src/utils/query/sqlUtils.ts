@@ -1,20 +1,27 @@
-import { Parser } from "node-sql-parser/build/mysql";
+let parser: any;
+
+const importSqlParser = async () => {
+  const useSqlParser: any = await import("@/composables/useParser");
+  const { sqlParser }: any = useSqlParser.default();
+  parser = await sqlParser();
+};
+
+importSqlParser();
 
 export const addLabelsToSQlQuery = (originalQuery: any, labels: any) => {
-    let dummyQuery = "select * from 'default'";
-    labels.forEach((label: any) => {
-      dummyQuery = addLabelToSQlQuery(
-        dummyQuery,
-        label.name,
-        label.value,
-        label.operator
-      );
-    });
+  let dummyQuery = "select * from 'default'";
+  labels.forEach((label: any) => {
+    dummyQuery = addLabelToSQlQuery(
+      dummyQuery,
+      label.name,
+      label.value,
+      label.operator
+    );
+  });
 
-    const parser = new Parser();
-    const astOfOriginalQuery: any = parser.astify(originalQuery);
-    const astOfDummy: any = parser.astify(dummyQuery);
-  
+  const astOfOriginalQuery: any = parser.astify(originalQuery);
+  const astOfDummy: any = parser.astify(dummyQuery);
+
   // if ast already has a where clause
   if (astOfOriginalQuery.where) {
     const newWhereClause = {
@@ -45,7 +52,6 @@ export const addLabelsToSQlQuery = (originalQuery: any, labels: any) => {
     const quotedSql = sql.replace(/`/g, '"');
     return quotedSql;
   }
- 
 };
 
 export const addLabelToSQlQuery = (
@@ -54,8 +60,7 @@ export const addLabelToSQlQuery = (
   value: any,
   operator: any
 ) => {
-  const parser = new Parser();
-  const ast: any = parser.astify(originalQuery)
+  const ast: any = parser.astify(originalQuery);
 
   let query = "";
   if (!ast.where) {
@@ -116,16 +121,15 @@ export const addLabelToSQlQuery = (
 
     query = quotedSql;
   }
- 
+
   return query;
 };
 
 export const getStreamFromQuery = (query: any) => {
-  const parser = new Parser();
-  try{
+  try {
     const ast: any = parser.astify(query);
-    return ast?.from[0]?.table || '';
-  } catch(e: any) {
+    return ast?.from[0]?.table || "";
+  } catch (e: any) {
     return "";
   }
-} 
+};

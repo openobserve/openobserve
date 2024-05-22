@@ -219,8 +219,6 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import { Parser } from "node-sql-parser/build/mysql";
-
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
@@ -376,7 +374,7 @@ export default defineComponent({
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
-    const parser = new Parser();
+    let parser: any;
     const expandedLogs = ref({});
 
     // function restoreUrlQueryParams() {
@@ -446,6 +444,8 @@ export default defineComponent({
     });
 
     onBeforeMount(async () => {
+      await importSqlParser();
+
       searchObj.loading = true;
       searchObj.meta.pageType = "logs";
       if (
@@ -486,6 +486,12 @@ export default defineComponent({
         }
       }
     );
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
 
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;

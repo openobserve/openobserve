@@ -153,12 +153,13 @@ import {
   onActivated,
   computed,
   onMounted,
+  onBeforeMount,
   defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import { Parser } from "node-sql-parser/build/mysql";
+
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -189,11 +190,22 @@ export default defineComponent({
       removeQuery,
     } = useDashboardPanelData();
     const confirmQueryModeChangeDialog = ref(false);
-    const parser = new Parser();
+    let parser: any;
+
     let streamName = "";
     const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
       usePromqlSuggestions();
     const queryEditorRef = ref(null);
+
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
 
     const addTab = () => {
       addQuery();

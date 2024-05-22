@@ -163,6 +163,7 @@ import {
   watch,
   nextTick,
   defineAsyncComponent,
+  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -172,7 +173,6 @@ import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
-import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -224,7 +224,7 @@ export default defineComponent({
 
     const showWarningDialog = ref(false);
 
-    const parser = new Parser();
+    let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
 
@@ -236,6 +236,16 @@ export default defineComponent({
       getSuggestions,
       updateFieldKeywords,
     } = useSqlSuggestions();
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
+    onBeforeUnmount(async () => {
+      await importSqlParser();
+    });
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;

@@ -820,6 +820,7 @@ import {
   onUnmounted,
   onDeactivated,
   defineAsyncComponent,
+  onBeforeMount,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -832,7 +833,6 @@ import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
 
-import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
@@ -1009,7 +1009,7 @@ export default defineComponent({
     let confirmCallback;
     let streamName = "";
 
-    const parser = new Parser();
+    let parser: any;
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
     const favoriteViews = ref([]);
@@ -1063,6 +1063,16 @@ export default defineComponent({
       },
       { immediate: true, deep: true }
     );
+
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
 
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
