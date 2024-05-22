@@ -2720,7 +2720,7 @@ const useLogs = () => {
     searchService.get_regions().then((res) => {
       const clusterData = [];
       let regionObj: any = {};
-      const apiData = JSON.parse(res.data);
+      const apiData = res.data;
       for (const region in apiData) {
         regionObj = {
           label: region,
@@ -2732,7 +2732,7 @@ const useLogs = () => {
         clusterData.push(regionObj);
       }
 
-      store.dispatch("setRegionInfo", res.data);
+      store.dispatch("setRegionInfo", clusterData);
     });
   };
 
