@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
     >
-      <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+      <div class="my-card">
+        <div align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="row justify-center" v-if="isCloud == 'false'">
@@ -44,11 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
             <div class="text-h6">{{ summary.ingested_data }}</div>
           </div>
-        </q-card-section>
+        </div>
 
         <q-separator />
 
-        <q-card-actions align="center">
+        <div align="center">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
@@ -57,18 +57,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
 
-      <q-card align="center" class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+      <div align="center" class="my-card">
+        <div align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
           <div class="text-h6">{{ summary.query_fns }}</div>
           <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
           <div class="text-h6">{{ summary.ingest_fns }}</div>
-        </q-card-section>
+        </div>
         <q-separator />
-        <q-card-actions align="center">
+        <div align="center">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
@@ -77,18 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
 
-      <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+      <div class="my-card">
+        <div align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
           <div class="text-h6">{{ summary.scheduled_alerts }}</div>
           <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
           <div class="text-h6">{{ summary.rt_alerts }}</div>
-        </q-card-section>
+        </div>
         <q-separator />
-        <q-card-actions align="center">
+        <div align="center">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
     </div>
 
     <div
@@ -106,15 +106,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
     >
-      <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card">
+      <div class="my-card">
+        <div align="center" flat bordered class="my-card">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
-        </q-card-section>
+        </div>
 
         <q-separator />
 
-        <q-card-actions align="center">
+        <div align="center">
           <q-btn
             no-caps
             color="primary"
@@ -122,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             >{{ t("home.findIngestion") }}
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
     </div>
   </q-page>
 </template>

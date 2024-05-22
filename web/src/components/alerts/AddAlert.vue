@@ -426,6 +426,7 @@ import {
   type Ref,
   computed,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
@@ -439,13 +440,9 @@ import { useQuasar, debounce } from "quasar";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser/build/mysql";
 import segment from "../../services/segment_analytics";
-import ScheduledAlert from "./ScheduledAlert.vue";
-import RealTimeAlert from "./RealTimeAlert.vue";
-import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
-import PreviewAlert from "./PreviewAlert.vue";
 import useStreams from "@/composables/useStreams";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
@@ -516,10 +513,10 @@ export default defineComponent({
   },
   emits: ["update:list", "cancel:hideform"],
   components: {
-    ScheduledAlert,
-    RealTimeAlert,
-    VariablesInput,
-    PreviewAlert,
+    ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlert.vue")),
+    RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
+    VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
+    PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
   },
   setup(props) {
     const store: any = useStore();

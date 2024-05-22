@@ -163,15 +163,13 @@ import {
   onActivated,
   onBeforeMount,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
-import SearchBar from "./SearchBar.vue";
-import IndexList from "./IndexList.vue";
-import SearchResult from "./SearchResult.vue";
 import useTraces from "@/composables/useTraces";
 import { Parser } from "node-sql-parser/build/mysql";
 
@@ -198,9 +196,9 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 export default defineComponent({
   name: "PageSearch",
   components: {
-    SearchBar,
-    IndexList,
-    SearchResult,
+    SearchBar: defineAsyncComponent(() => import("./SearchBar.vue")),
+    IndexList: defineAsyncComponent(() => import("./IndexList.vue")),
+    SearchResult: defineAsyncComponent(() => import("./SearchResult.vue")),
     SanitizedHtmlRenderer,
   },
   methods: {

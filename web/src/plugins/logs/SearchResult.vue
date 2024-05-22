@@ -447,22 +447,20 @@ import { useI18n } from "vue-i18n";
 
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
-import DetailTable from "./DetailTable.vue";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
-import JsonPreview from "./JsonPreview.vue";
 import { convertLogData } from "@/utils/logs/convertLogData";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     HighLight,
-    DetailTable,
+    DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     EqualIcon,
     NotEqualIcon,
-    JsonPreview,
+    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue")
     ),
