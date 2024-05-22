@@ -293,7 +293,15 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if url_len == 4 {
-            if method.eq("PUT") && path_columns[1] != "streams" || method.eq("DELETE") {
+            if method.eq("PUT") && path_columns[1].eq("reports") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            } else if method.eq("PUT") && path_columns[1] != "streams" || method.eq("DELETE") {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
