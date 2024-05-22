@@ -16,14 +16,17 @@
 use std::io::Error;
 
 use actix_web::{http, web, HttpResponse};
+use bytes::BytesMut;
 use config::ider;
-use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::collector::trace::v1::{
+    ExportTracePartialSuccess, ExportTraceServiceRequest,
+};
 use prost::Message;
 use tonic::Request;
 
 use super::flusher;
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, traces::ExportTraceServiceResponse},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     service::traces::flusher::{ExportRequest, WriteBufferFlusher},
 };
 
@@ -48,7 +51,7 @@ pub async fn traces_proto(
         Some(in_stream_name.unwrap_or("").to_string()),
     ));
 
-    hanlde_resp(flusher, request).await
+    hanlde_resp(flusher, request, true).await
 }
 
 pub async fn traces_json(
@@ -67,21 +70,51 @@ pub async fn traces_json(
         in_stream_name,
     ));
 
-    hanlde_resp(flusher, request).await
+    hanlde_resp(flusher, request, false).await
 }
 
 async fn hanlde_resp(
     flusher: web::Data<WriteBufferFlusher>,
     request: ExportRequest,
+    is_protobuf: bool,
 ) -> Result<HttpResponse, Error> {
     match flusher.write(request).await {
         Ok(resp) => match resp {
-            flusher::BufferedWriteResult::Success(_) => {
-                log::info!("flusher::BufferedWriteResult::Success");
-                Ok(HttpResponse::Ok().json(ExportTraceServiceResponse::default()))
-            }
+            flusher::BufferedWriteResult::Success(r) => match r.partial_success {
+                None => {
+                    if is_protobuf {
+                        let res = opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse::default();
+                        let mut out = BytesMut::with_capacity(res.encoded_len());
+                        res.encode(&mut out).expect("Out of memory");
+                        Ok(HttpResponse::Ok()
+                            .status(http::StatusCode::OK)
+                            .content_type("application/x-protobuf")
+                            .body(out))
+                    } else {
+                        Ok(HttpResponse::Ok().json(r))
+                    }
+                }
+                Some(ref success) => {
+                    if is_protobuf {
+                        let res = opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse {
+                            partial_success: Some(ExportTracePartialSuccess {
+                                rejected_spans: success.rejected_spans,
+                                error_message: success.error_message.clone(),
+                            })
+                        };
+                        let mut out = BytesMut::with_capacity(res.encoded_len());
+                        res.encode(&mut out).expect("Out of memory");
+                        Ok(HttpResponse::Ok()
+                            .status(http::StatusCode::OK)
+                            .content_type("application/x-protobuf")
+                            .body(out))
+                    } else {
+                        Ok(HttpResponse::PartialContent().json(r))
+                    }
+                }
+            },
             flusher::BufferedWriteResult::Error(e) => {
-                log::info!("flusher::BufferedWriteResult::Error e: {}", e);
+                log::info!("flusher::BufferedWriteResult::Error e: {e}");
                 Ok(
                     HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                         http::StatusCode::SERVICE_UNAVAILABLE.into(),
@@ -91,7 +124,7 @@ async fn hanlde_resp(
             }
         },
         Err(e) => {
-            log::error!("flusher write error {}", e);
+            log::error!("flusher write error {e}");
             Ok(
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE.into(),

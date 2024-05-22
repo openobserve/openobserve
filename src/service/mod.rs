@@ -94,7 +94,10 @@ pub async fn get_formatted_stream_name(
 
 // format stream name
 pub fn format_stream_name(stream_name: &str) -> String {
-    RE_CORRECT_STREAM_NAME
-        .replace_all(stream_name, "_")
-        .to_string()
+    match stream_name.is_empty() {
+        true => "default".to_string(),
+        false => RE_CORRECT_STREAM_NAME
+            .replace_all(stream_name, "_")
+            .to_string(),
+    }
 }

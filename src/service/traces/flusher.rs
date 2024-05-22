@@ -7,7 +7,8 @@ use actix_web::web;
 use config::ider;
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use hashbrown::HashMap;
-use log::info;
+use infra::errors::BufferWriteError;
+use log::{info, warn};
 use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use parking_lot::Mutex;
@@ -18,7 +19,10 @@ use tokio::{
     time::MissedTickBehavior,
 };
 
-use crate::service::traces::{flusher, handle_trace_json_request, handle_trace_request};
+use crate::{
+    common::meta::traces::ExportTraceServiceResponse,
+    service::traces::{flusher, handle_trace_json_request, handle_trace_request},
+};
 
 const BUFFER_FLUSH_INTERVAL: Duration = Duration::from_millis(10);
 // The maximum number of buffered writes that can be queued up before backpressure is applied
@@ -40,7 +44,6 @@ impl Default for WriteBufferFlusher {
 
 impl WriteBufferFlusher {
     pub fn new() -> Self {
-        info!("WriteBufferFlusher new start");
         let (trace_shutdown_tx, trace_shutdown_rx) = watch::channel(());
         let (buffer_tx, buffer_rx) = mpsc::channel::<BufferedWrite>(flusher::BUFFER_CHANNEL_LIMIT);
         let (io_flush_tx, io_flush_rx) = crossbeam_channel::bounded(1);
@@ -87,12 +90,7 @@ impl WriteBufferFlusher {
             .await
         {
             Ok(_) => {
-                info!("flusher success ,start to response_rx.await");
                 let resp = response_rx.await.expect("wal op buffer thread is dead");
-                info!(
-                    "flusher success ,response_rx.await done , resp : {:?}",
-                    resp
-                );
                 match resp {
                     BufferedWriteResult::Success(_) => Ok(resp),
                     BufferedWriteResult::Error(e) => Err(Error::new(ErrorKind::Other, e)),
@@ -128,22 +126,20 @@ pub struct BufferedWrite {
 }
 #[derive(Debug, Clone)]
 pub enum BufferedWriteResult {
-    Success(()),
-    Error(String),
+    Success(ExportTraceServiceResponse),
+    Error(BufferWriteError),
 }
 
 type RequestOps = HashMap<String, ExportRequest>;
+type NotifyResult = HashMap<String, Result<ExportTraceServiceResponse, BufferWriteError>>;
+type IoFlushNotifyResult = Result<NotifyResult, BufferWriteError>;
 pub static RT: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
 pub fn run_trace_io_flush(
     io_flush_rx: CrossbeamReceiver<RequestOps>,
-    io_flush_notify_tx: CrossbeamSender<Result<(), Error>>,
+    io_flush_notify_tx: CrossbeamSender<IoFlushNotifyResult>,
 ) {
-    'IOLOOP: loop {
-        info!(
-            "run_trace_io_flush loop start, buffer_rx len : {}",
-            io_flush_rx.len()
-        );
+    loop {
         let request = match io_flush_rx.recv() {
             Ok(request) => request,
             Err(e) => {
@@ -153,40 +149,23 @@ pub fn run_trace_io_flush(
             }
         };
 
-        // let mut state = segment_state.write();
-        info!(
-            "run_trace_io_flush request for start, buffer_rx len : {}, request len: {}",
-            io_flush_rx.len(),
-            request.len()
-        );
+        let mut res = HashMap::new();
         // write the ops to the segment files, or return on first error
         for (session_id, request) in request {
-            info!("[{session_id}]run_trace_io_flush start request handle");
             let resp = match request {
-                ExportRequest::GrpcExportTraceServiceRequest(r) => {
-                    info!(
-                        "[{session_id}]run_trace_io_flush
-        ExportRequest::GrpcExportTraceServiceRequest RT.block_on start"
-                    );
-
-                    RT.block_on(async {
-                        handle_trace_request(
-                            r.0.as_str(),
-                            r.1,
-                            r.2.into_inner(),
-                            true,
-                            r.3.as_deref(),
-                            session_id.as_str(),
-                        )
-                        .await
-                    })
-                }
+                ExportRequest::GrpcExportTraceServiceRequest(r) => RT.block_on(async {
+                    handle_trace_request(
+                        r.0.as_str(),
+                        r.1,
+                        r.2.into_inner(),
+                        true,
+                        r.3.as_deref(),
+                        session_id.as_str(),
+                    )
+                    .await
+                }),
                 ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
                     let in_stream_name = r.3.unwrap_or("".to_string());
-                    info!(
-                        "[{session_id}]run_trace_io_flush
-        ExportRequest::HttpJsonExportTraceServiceRequest RT.block_on start"
-                    );
                     RT.block_on(async {
                         handle_trace_json_request(
                             r.0.as_str(),
@@ -199,20 +178,12 @@ pub fn run_trace_io_flush(
                 }
             };
 
-            if let Err(e) = resp {
-                io_flush_notify_tx
-                    .send(Err(Error::new(ErrorKind::Other, e.to_string())))
-                    .expect("buffer flusher is dead");
-                continue 'IOLOOP;
-            }
+            // Httpresponse may be partial_success, it must handle every response result
+            res.insert(session_id, resp);
         }
 
-        info!(
-            "run_trace_io_flush for request done, io_flush_notify_tx len: {} ",
-            io_flush_notify_tx.len()
-        );
         io_flush_notify_tx
-            .send(Ok(()))
+            .send(Ok(res))
             .expect("buffer flusher is dead");
     }
 }
@@ -220,19 +191,17 @@ pub fn run_trace_io_flush(
 pub async fn run_trace_op_buffer(
     mut buffer_rx: mpsc::Receiver<BufferedWrite>,
     io_flush_tx: CrossbeamSender<RequestOps>,
-    io_flush_notify_rx: CrossbeamReceiver<Result<(), Error>>,
+    io_flush_notify_rx: CrossbeamReceiver<IoFlushNotifyResult>,
     mut shutdown: tokio::sync::watch::Receiver<()>,
 ) {
     let mut ops = RequestOps::new();
     let mut notifies = Vec::new();
     let mut interval = tokio::time::interval(BUFFER_FLUSH_INTERVAL);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-    info!("run_trace_op_buffer start");
     loop {
         // select on either buffering an op, ticking the flush interval, or shutting down
         select! {
             Some(buffered_write) = buffer_rx.recv() => {
-                info!("buffer_rx.recv success");
                 match buffered_write.request {
                     ExportRequest::GrpcExportTraceServiceRequest(r) => {
                         let metadata = r.2.metadata().clone();
@@ -243,15 +212,13 @@ pub async fn run_trace_op_buffer(
                             .to_str()
                             .unwrap();
                         let _ = ops.insert(session_id.to_string(), ExportRequest::GrpcExportTraceServiceRequest(r));
-                        notifies.push(buffered_write.response_tx);
-                        info!("GrpcExportTraceServiceRequest push done");
+                        notifies.push((session_id.to_string(), buffered_write.response_tx));
                     }
 
                     ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
                         let session_id = ider::uuid();
                         let _ = ops.insert(session_id.to_string(), ExportRequest::HttpJsonExportTraceServiceRequest(r));
-                        notifies.push(buffered_write.response_tx);
-                        info!("HttpJsonExportTraceServiceRequest push done");
+                        notifies.push((session_id.to_string(), buffered_write.response_tx));
                     }
                 }
             },
@@ -259,25 +226,35 @@ pub async fn run_trace_op_buffer(
                 if ops.is_empty() {
                     continue;
                 }
-                info!("io_flush_tx send start, io_flush_tx len: {}", io_flush_tx.len());
                 // send ops into IO flush channel and wait for response
                 if let Err(e) = io_flush_tx.send(ops) {
                     info!("io_flush_tx send e : {}, len: {}", e, io_flush_tx.len());
                 }
-                info!("io_flush_tx send done len: {}", io_flush_tx.len());
-                let res = match io_flush_notify_rx.recv().expect("wal io thread is dead") {
-                    Ok(_resp) => {
-                       BufferedWriteResult::Success(())
+                match io_flush_notify_rx.recv().expect("wal io thread is dead") {
+                    Ok(mut resp) => {
+                        // notify the watchers of the write response
+                        for (sid, response_tx) in notifies {
+                            match resp.remove(&sid) {
+                                Some(r) => {
+                                    let bwr = match r {
+                                        Ok(ets) => {
+                                            BufferedWriteResult::Success(ets)
+                                        }
+                                        Err(e) => {
+                                            BufferedWriteResult::Error(e)
+                                        }
+                                    };
+
+                                    let _ = response_tx.send(bwr);
+                                }
+                                None => { warn!("[{sid}] ingest not found") }
+                            }
+
+                        }
                     },
-                    Err(e) => BufferedWriteResult::Error(e.to_string()),
+                    Err(_) => unimplemented!(),
                 };
-                info!("io_flush_tx get buffer write result done, notifies len : {}, res: {:?}", notifies.len(), res);
-                // notify the watchers of the write response
-                for response_tx in notifies {
-                    info!("io_flush_tx response_tx, res: {:?}", res);
-                    let _ = response_tx.send(res.clone());
-                }
-                info!("io_flush_tx response_tx send done");
+
                 // reset the buffers
                 ops = RequestOps::new();
                 notifies = Vec::new();

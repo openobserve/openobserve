@@ -76,6 +76,21 @@ pub enum Error {
     Unknown,
 }
 
+#[derive(ThisError, Debug, Clone)]
+pub enum BufferWriteError {
+    // ingest
+    #[error("IoError# {0}")]
+    IoError(String),
+    #[error("not an ingester")]
+    InternalServerError,
+    #[error("Quota exceeded for this organization [{0}]")]
+    HttpForbidden(String),
+    #[error("{0}")]
+    HttpServiceUnavailable(String),
+    #[error("Invalid json: {0}")]
+    HttpBadRequest(String),
+}
+
 unsafe impl Send for Error {}
 
 #[derive(ThisError, Debug)]

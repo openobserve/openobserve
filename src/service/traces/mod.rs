@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use actix_web::{http, web, HttpResponse};
-use bytes::BytesMut;
+use actix_web::web;
 use chrono::{Duration, Utc};
 use config::{
     cluster,
@@ -28,20 +27,19 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG, DISTINCT_FIELDS,
 };
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::{
+    errors::BufferWriteError,
+    schema::{unwrap_partition_time_level, SchemaCache},
+};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
-    collector::trace::v1::{
-        ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
-    },
+    collector::trace::v1::ExportTraceServiceRequest,
     trace::v1::{status::StatusCode, Status},
 };
-use prost::Message;
 
 use crate::{
     common::meta::{
         alerts::Alert,
-        http::HttpResponse as MetaHttpResponse,
         stream::{SchemaRecords, StreamParams},
         traces::{Event, Span, SpanRefType},
     },
@@ -78,32 +76,22 @@ pub async fn handle_trace_request(
     is_grpc: bool,
     in_stream_name: Option<&str>,
     session_id: &str,
-) -> Result<HttpResponse, Error> {
+) -> Result<crate::common::meta::traces::ExportTraceServiceResponse, BufferWriteError> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(BufferWriteError::InternalServerError);
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            format!("Quota exceeded for this organization [{}]", org_id),
+        return Err(BufferWriteError::HttpForbidden(format!(
+            "Quota exceeded for this organization [{}]",
+            org_id
         )));
     }
 
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
+        return Err(BufferWriteError::HttpServiceUnavailable(e.to_string()));
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -164,7 +152,7 @@ pub async fn handle_trace_request(
 
     let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
-    let mut partial_success = ExportTracePartialSuccess::default();
+    let mut partial_success = crate::common::meta::traces::ExportTracePartialSuccess::default();
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
@@ -267,9 +255,8 @@ pub async fn handle_trace_request(
                 let value: json::Value = json::to_value(local_val).unwrap();
 
                 // JSON Flattening
-                let mut value = flatten::flatten(value).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                })?;
+                let mut value = flatten::flatten(value)
+                    .map_err(|e| BufferWriteError::IoError(e.to_string()))?;
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_functions(
@@ -279,9 +266,7 @@ pub async fn handle_trace_request(
                         &traces_stream_name,
                         &mut runtime,
                     )
-                    .map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                    })?;
+                    .map_err(|e| BufferWriteError::IoError(e.to_string()))?;
                 }
                 // End row based transform */
                 // get json object
@@ -470,7 +455,7 @@ pub async fn handle_trace_request(
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;
 
-    let res = ExportTraceServiceResponse {
+    let res = crate::common::meta::traces::ExportTraceServiceResponse {
         partial_success: if partial_success.rejected_spans > 0 {
             partial_success.error_message =
                 "Some spans were rejected due to exceeding the allowed retention period"
@@ -480,12 +465,14 @@ pub async fn handle_trace_request(
             None
         },
     };
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
-    return Ok(HttpResponse::Ok()
-        .status(http::StatusCode::OK)
-        .content_type("application/x-protobuf")
-        .body(out));
+
+    Ok(res)
+    // let mut out = BytesMut::with_capacity(res.encoded_len());
+    // res.encode(&mut out).expect("Out of memory");
+    // return Ok(HttpResponse::Ok()
+    //     .status(http::StatusCode::OK)
+    //     .content_type("application/x-protobuf")
+    //     .body(out));
 }
 
 fn get_span_status(status: Option<Status>) -> String {
@@ -504,32 +491,22 @@ pub async fn handle_trace_json_request(
     thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
-) -> Result<HttpResponse, Error> {
+) -> Result<crate::common::meta::traces::ExportTraceServiceResponse, BufferWriteError> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(BufferWriteError::InternalServerError);
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            format!("Quota exceeded for this organization [{}]", org_id),
+        return Err(BufferWriteError::HttpForbidden(format!(
+            "Quota exceeded for this organization [{}]",
+            org_id
         )));
     }
 
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
+        return Err(BufferWriteError::HttpServiceUnavailable(e.to_string()));
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -601,19 +578,18 @@ pub async fn handle_trace_json_request(
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid json: {}", e),
+            return Err(BufferWriteError::HttpBadRequest(format!(
+                "Invalid json: {}",
+                e
             )));
         }
     };
     let spans = match body.get("resourceSpans") {
         Some(json::Value::Array(v)) => v,
         _ => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+            return Err(BufferWriteError::HttpBadRequest(
                 "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
-            )));
+            ));
         }
     };
     let mut trace_index = Vec::with_capacity(spans.len());
@@ -750,9 +726,8 @@ pub async fn handle_trace_json_request(
                     let mut value: json::Value = json::to_value(local_val).unwrap();
 
                     // JSON Flattening
-                    value = flatten::flatten(value).map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                    })?;
+                    value = flatten::flatten(value)
+                        .map_err(|e| BufferWriteError::IoError(e.to_string()))?;
 
                     if !local_trans.is_empty() {
                         value = crate::service::ingestion::apply_stream_functions(
@@ -762,9 +737,7 @@ pub async fn handle_trace_json_request(
                             &traces_stream_name,
                             &mut runtime,
                         )
-                        .map_err(|e| {
-                            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                        })?;
+                        .map_err(|e| BufferWriteError::IoError(e.to_string()))?;
                     }
                     // End row based transform */
                     // get json object
@@ -923,16 +896,27 @@ pub async fn handle_trace_json_request(
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;
 
+    // let resp = if partial_success.rejected_spans > 0 {
+    //     partial_success.error_message =
+    //         "Some spans were rejected due to exceeding the allowed retention period".to_string();
+    //     HttpResponse::PartialContent().json(
+    //         crate::common::meta::traces::ExportTraceServiceResponse {
+    //             partial_success: Some(partial_success),
+    //         },
+    //     )
+    // } else {
+    //     HttpResponse::Ok().
+    // json(crate::common::meta::traces::ExportTraceServiceResponse::default()) };
+
     let resp = if partial_success.rejected_spans > 0 {
         partial_success.error_message =
             "Some spans were rejected due to exceeding the allowed retention period".to_string();
-        HttpResponse::PartialContent().json(
-            crate::common::meta::traces::ExportTraceServiceResponse {
-                partial_success: Some(partial_success),
-            },
-        )
+        crate::common::meta::traces::ExportTraceServiceResponse {
+            partial_success: Some(partial_success),
+        }
     } else {
-        HttpResponse::Ok().json(crate::common::meta::traces::ExportTraceServiceResponse::default())
+        crate::common::meta::traces::ExportTraceServiceResponse::default()
     };
+
     Ok(resp)
 }

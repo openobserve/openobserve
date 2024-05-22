@@ -68,18 +68,17 @@ impl TraceService for TraceServer {
             request,
             in_stream_name,
         ));
-        log::info!("begin to export flusher write");
+
         match self.flusher.write(request).await {
             Ok(resp) => match resp {
                 flusher::BufferedWriteResult::Success(_) => {
-                    log::info!("flusher::BufferedWriteResult::Success");
                     Ok(Response::new(ExportTraceServiceResponse {
                         partial_success: None,
                     }))
                 }
                 flusher::BufferedWriteResult::Error(e) => {
-                    log::info!("flusher::BufferedWriteResult::Error");
-                    Err(Status::internal(e))
+                    log::error!("flusher::BufferedWriteResult::Error {e}");
+                    Err(Status::internal(e.to_string()))
                 }
             },
             Err(e) => {

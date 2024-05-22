@@ -61,7 +61,7 @@ pub struct Event {
     pub attributes: HashMap<String, json::Value>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema, Clone)]
 pub struct ExportTraceServiceResponse {
     // The details of a partially successful export request.
     //
@@ -81,7 +81,7 @@ pub struct ExportTraceServiceResponse {
     pub partial_success: Option<ExportTracePartialSuccess>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema, Clone)]
 pub struct ExportTracePartialSuccess {
     // The number of rejected spans.
     //
