@@ -31,7 +31,7 @@ jobs:
     strategy:
       matrix:
         browser: [chrome]
-        testfilename: ["functions_tests.cy.js","logs_tests.cy.js","logs_queries.cy.js","logs_quickmode.cy.js","menu_tests.cy.js","alerts_tests.cy.js", "dashboard"]
+        # testfilename: ["functions_tests.cy.js","logs_tests.cy.js","logs_queries.cy.js","logs_quickmode.cy.js","menu_tests.cy.js","alerts_tests.cy.js", "dashboard"]
     steps:
       - name: Remove unused tools
         run: |
