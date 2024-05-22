@@ -202,7 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     filled
                     borderless
                     dense
-                    clearable
                     debounce="1"
                     :placeholder="t('search.searchField')"
                   >
@@ -553,13 +552,14 @@ export default defineComponent({
       const schemaMapping = new Set([]);
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
-        streamResponse.settings.defined_schema_fields.forEach((field) => {
-          streamResponse.schema.push({
-            name: field,
-            delete: false,
-            index_type: [],
+        if (streamResponse.settings.defined_schema_fields?.length)
+          streamResponse.settings.defined_schema_fields.forEach((field) => {
+            streamResponse.schema.push({
+              name: field,
+              delete: false,
+              index_type: [],
+            });
           });
-        });
       }
 
       if (
