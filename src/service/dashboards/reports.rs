@@ -46,47 +46,14 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), anyhow::Error> {
-    if !CONFIG.common.report_server_url.is_empty() {
-        // Check if report username and password are present in the report server
-        let url =
-            url::Url::parse(&format!("{}/healthz", &CONFIG.common.report_server_url)).unwrap();
-        match Client::builder()
-            .build()
-            .unwrap()
-            .get(url)
-            .header("Content-Type", "application/json")
-            // .header(reqwest::header::AUTHORIZATION, creds)
-            .send()
-            .await
-        {
-            Ok(resp) => {
-                if !resp.status().is_success() {
-                    return Err(anyhow::anyhow!(
-                        "Report can not be saved: error contacting report server {:?}",
-                        resp.bytes().await
-                    ));
-                }
-            }
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "Report can not be saved: error contacting report server {e}"
-                ));
-            }
-        }
-    } else {
-        if !CONFIG.common.local_mode {
-            return Err(anyhow::anyhow!(
-                "Report server URL must be specified for cluster mode"
-            ));
-        }
-
+    if CONFIG.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
         if !CONFIG.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
         // Check if Chrome is enabled, otherwise don't save the report
-        if !CONFIG.chrome.chrome_enabled {
+        if !CONFIG.chrome.chrome_enabled || CONFIG.chrome.chrome_path.is_empty() {
             return Err(anyhow::anyhow!("Chrome not enabled"));
         }
 
@@ -323,9 +290,6 @@ impl Report {
             }
             Ok(())
         } else {
-            if !CONFIG.common.local_mode {
-                return Err(anyhow::anyhow!("Report server url not specified"));
-            }
             // Currently only one `ReportDashboard` can be captured and sent
             let dashboard = &self.dashboards[0];
             let report = generate_report(
