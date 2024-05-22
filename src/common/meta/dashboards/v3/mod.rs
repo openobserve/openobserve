@@ -39,6 +39,8 @@ pub struct Dashboard {
     pub tabs: Vec<Tab>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_datetime_duration: Option<DateTimeOptions>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -242,6 +244,19 @@ pub struct Variables {
     pub list: Vec<VariableList>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub show_dynamic_filters: Option<bool>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DateTimeOptions {
+    #[serde(rename = "type")]
+    pub typee: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relative_time_period: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -369,6 +369,7 @@ pub async fn logs_json_handler(
                         &local_trans,
                         value,
                         &stream_vrl_map,
+                        org_id,
                         stream_name,
                         &mut runtime,
                     )

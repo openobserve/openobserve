@@ -164,9 +164,9 @@ const useRoutes = () => {
       name: "viewDashboard",
       component: ViewDashboard,
       props: true,
-      meta: {
-        keepAlive: true,
-      },
+      // meta: {
+        // keepAlive: true,
+      // },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },

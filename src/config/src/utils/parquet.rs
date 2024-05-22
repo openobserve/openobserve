@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -111,6 +111,28 @@ pub fn new_parquet_writer<'a>(
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
 
+pub async fn write_recordbatch_to_parquet(
+    schema: Arc<Schema>,
+    record_batches: &[RecordBatch],
+    bloom_filter_fields: &[String],
+    full_text_search_fields: &[String],
+    metadata: &FileMeta,
+) -> Result<Vec<u8>, anyhow::Error> {
+    let mut buf = Vec::new();
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        full_text_search_fields,
+        metadata,
+    );
+    for batch in record_batches {
+        writer.write(batch).await?;
+    }
+    writer.close().await?;
+    Ok(buf)
+}
+
 // parse file key to get stream_key, date_key, file_name
 pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
@@ -133,6 +155,17 @@ pub async fn read_recordbatch_from_bytes(
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
     let schema_reader = Cursor::new(data.clone());
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    let schema = arrow_reader.schema().clone();
+    let record_reader = arrow_reader.build()?;
+    let batches = record_reader.try_collect().await?;
+    Ok((schema, batches))
+}
+
+pub async fn read_recordbatch_from_file(
+    path: &PathBuf,
+) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+    let file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
     let schema = arrow_reader.schema().clone();
     let record_reader = arrow_reader.build()?;
     let batches = record_reader.try_collect().await?;

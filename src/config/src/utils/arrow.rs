@@ -22,6 +22,9 @@ use super::json::{Map as JsonMap, Value};
 pub fn record_batches_to_json_rows(
     batches: &[&RecordBatch],
 ) -> Result<Vec<JsonMap<String, Value>>, anyhow::Error> {
+    if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+        return Ok(Vec::new());
+    }
     let json_buf = Vec::with_capacity(
         batches
             .iter()

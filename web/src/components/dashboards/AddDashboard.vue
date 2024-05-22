@@ -184,6 +184,12 @@ export default defineComponent({
               list: [],
               showDynamicFilters: true,
             },
+            defaultDatetimeDuration: {
+              startTime: null,
+              endTime: null,
+              relativeTimePeriod: "15m",
+              type: "relative",
+            },
             role: "",
             owner: store.state.userInfo.name,
             created: new Date().toISOString(),

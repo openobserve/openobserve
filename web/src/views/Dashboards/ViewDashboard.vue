@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
+              v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
@@ -180,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
+        v-if="selectedDate"
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
@@ -258,6 +260,36 @@ export default defineComponent({
       data: {},
     });
 
+    // [START] date picker related variables --------
+
+    /**
+     * Retrieves the selected date from the query parameters.
+     */
+    const getSelectedDateFromQueryParams = (params) => ({
+      valueType: params.period
+        ? "relative"
+        : params.from && params.to
+        ? "absolute"
+        : "relative",
+      startTime: params.from ? params.from : null,
+      endTime: params.to ? params.to : null,
+      relativeTimePeriod: params.period ? params.period : "15m",
+    });
+
+    const dateTimePicker = ref(null); // holds a reference to the date time picker
+
+    // holds the date picker v-modal
+    const selectedDate = ref(null);
+
+    // holds the current time for the dashboard
+    const currentTimeObj = ref({});
+
+    // refresh interval v-model
+    const refreshInterval = ref(0);
+
+    // initial timezone, which will come from the route query
+    const initialTimezone = ref(route.query.timezone ?? null);
+
     // dispatch setPrintMode, to set print mode
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
@@ -331,7 +363,7 @@ export default defineComponent({
     });
     // ======= [END] default variable values
 
-    onActivated(async () => {
+    onMounted(async () => {
       await loadDashboard();
     });
 
@@ -361,48 +393,51 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
+
+      // check if route has time realated query params
+      // if not, take dashboard default time settings
+      if (!((route.query.from && route.query.to) || route.query.period)) {
+        // if dashboard has relative time settings
+        if (
+          (currentDashboardData.data?.defaultDatetimeDuration?.type ??
+            "relative") === "relative"
+        ) {
+          selectedDate.value = {
+            valueType: "relative",
+            relativeTimePeriod:
+              currentDashboardData.data?.defaultDatetimeDuration
+                ?.relativeTimePeriod ?? "15m",
+          };
+        } else {
+          // else, dashboard will have absolute time settings
+          selectedDate.value = {
+            valueType: "absolute",
+            startTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.startTime,
+            endTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.endTime,
+          };
+        }
+      } else {
+        // take route time related query params
+        selectedDate.value = getSelectedDateFromQueryParams(route.query);
+      }
     };
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
 
-    // [START] date picker related variables --------
-
-    /**
-     * Retrieves the selected date from the query parameters.
-     */
-    const getSelectedDateFromQueryParams = (params) => ({
-      valueType: params.period
-        ? "relative"
-        : params.from && params.to
-        ? "absolute"
-        : "relative",
-      startTime: params.from ? params.from : null,
-      endTime: params.to ? params.to : null,
-      relativeTimePeriod: params.period ? params.period : null,
-    });
-
-    const dateTimePicker = ref(null); // holds a reference to the date time picker
-
-    // holds the date picker v-modal
-    const selectedDate = ref(getSelectedDateFromQueryParams(route.query));
-
-    // holds the current time for the dashboard
-    const currentTimeObj = ref({});
-
-    // refresh interval v-model
-    const refreshInterval = ref(0);
-
-    // initial timezone, which will come from the route query
-    const initialTimezone = ref(route.query.timezone ?? null);
-
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
-      currentTimeObj.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      if (selectedDate.value && dateTimePicker.value) {
+        const date = dateTimePicker.value?.getConsumableDateTime();
+
+        currentTimeObj.value = {
+          start_time: new Date(date.startTime),
+          end_time: new Date(date.endTime),
+        };
+      }
     });
 
     const getQueryParamsForDuration = (data: any) => {
@@ -467,7 +502,7 @@ export default defineComponent({
     };
 
     // ------- work with query params ----------
-    onActivated(async () => {
+    onMounted(async () => {
       const params = route.query;
 
       if (params.refresh) {
@@ -646,7 +681,7 @@ export default defineComponent({
       document.removeEventListener("fullscreenchange", onFullscreenChange);
     });
 
-    onActivated(() => {
+    onMounted(() => {
       isFullscreen.value = false;
     });
 
