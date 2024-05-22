@@ -391,7 +391,7 @@ clickable v-close-popup>
               @update:model-value="onRefreshIntervalUpdate"
             />
             <q-btn-group
-              class="no-outline q-pa-none no-border"
+              class="no-outline q-pa-none no-border q-mr-xs"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -400,44 +400,39 @@ clickable v-close-popup>
             >
               <q-btn-dropdown
                 data-test="logs-search-bar-region-btn"
-                class="q-mr-xs region-dropdown-btn q-px-xs"
+                class="region-dropdown-btn q-px-xs"
                 :title="t('search.regionTitle')"
                 label="Region"
-              >
-                <q-list class="region-dropdown-list">
-                  <q-item
-                    class="q-pa-sm"
-                    clickable
-                    v-close-popup
-                    v-for="item in Object.keys(store.state.regionInfo)"
-                    :key="'region-key-' + item"
-                  >
-                    <q-item-section
-                      class="full-width"
-                      @click.stop="
-                        handleRegionsSelection(
-                          item,
-                          searchObj.meta.regions.includes(item)
-                        )
-                      "
-                    >
-                      <q-icon
-                        size="xs"
-                        :name="
-                          searchObj.meta.regions.includes(item)
-                            ? 'check_circle'
-                            : 'radio_button_unchecked'
-                        "
-                        class="float-left"
-                      ></q-icon>
-                      <q-item-label>{{ item }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
+                >
+                <q-input
+                  ref="reginFilterRef"
+                  filled
+                  flat
+                  dense
+                  v-model="regionFilter"
+                  :label="t('search.regionFilterMsg')"
+                >
+                  <template v-slot:append>
+                    <q-icon
+                      v-if="regionFilter !== ''"
+                      name="clear"
+                      class="cursor-pointer"
+                      @click="resetRegionFilter"
+                    />
+                  </template>
+                </q-input>
+                <q-tree
+                  class="col-12 col-sm-6"
+                  :nodes="store.state.regionInfo"
+                  node-key="label"
+                  :filter="regionFilter"
+                  :filter-method="regionFilterMethod"
+                  tick-strategy="leaf"
+                  v-model:ticked="searchObj.meta.clusters"
+                />
               </q-btn-dropdown>
             </q-btn-group>
 
-            <!-- <q-separator vertical inset /> -->
             <q-btn
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
@@ -873,7 +868,12 @@ export default defineComponent({
     AutoRefreshInterval,
     ConfirmDialog,
   },
-  emits: ["searchdata", "onChangeInterval", "onChangeTimezone", "handleQuickModeChange"],
+  emits: [
+    "searchdata",
+    "onChangeInterval",
+    "onChangeTimezone",
+    "handleQuickModeChange",
+  ],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -970,6 +970,8 @@ export default defineComponent({
     const $q = useQuasar();
     const store = useStore();
     const rowsPerPage = ref(10);
+    const regionFilter = ref();
+    const regionFilterRef = ref(null);
 
     const {
       searchObj,
@@ -1696,6 +1698,12 @@ export default defineComponent({
               } else {
                 searchObj.meta["regions"] = [];
               }
+
+              if (extractedObj.meta.hasOwnProperty("clusters")) {
+                searchObj.meta["clusters"] = extractedObj.meta.clusters;
+              } else {
+                searchObj.meta["clusters"] = [];
+              }
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
                 searchObj.data.stream.functions;
@@ -2276,7 +2284,16 @@ export default defineComponent({
 
     const handleQuickMode = () => {
       emit("handleQuickModeChange");
-    }
+    };
+
+    const regionFilterMethod = (node, filter) => {
+      const filt = filter.toLowerCase();
+      return node.label && node.label.toLowerCase().indexOf(filt) > -1;
+    };
+
+    const resetRegionFilter = () => {
+      regionFilter.value = "";
+    };
 
     return {
       t,
@@ -2347,6 +2364,10 @@ export default defineComponent({
       config,
       handleRegionsSelection,
       handleQuickMode,
+      regionFilterMethod,
+      regionFilterRef,
+      regionFilter,
+      resetRegionFilter,
     };
   },
   computed: {
