@@ -48,6 +48,31 @@ pub async fn save(
 ) -> Result<(), anyhow::Error> {
     if !CONFIG.common.report_server_url.is_empty() {
         // Check if report username and password are present in the report server
+        let url =
+            url::Url::parse(&format!("{}/healthz", &CONFIG.common.report_server_url)).unwrap();
+        match Client::builder()
+            .build()
+            .unwrap()
+            .get(url)
+            .header("Content-Type", "application/json")
+            // .header(reqwest::header::AUTHORIZATION, creds)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if !resp.status().is_success() {
+                    return Err(anyhow::anyhow!(
+                        "Report can not be saved: error contacting report server {:?}",
+                        resp.bytes().await
+                    ));
+                }
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Report can not be saved: error contacting report server {e}"
+                ));
+            }
+        }
     } else {
         if !CONFIG.common.local_mode {
             return Err(anyhow::anyhow!(
