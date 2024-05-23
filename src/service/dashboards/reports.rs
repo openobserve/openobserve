@@ -128,7 +128,7 @@ pub async fn save(
                     Err(anyhow::anyhow!("Tab not found"))
                 }
             } else {
-                Err(anyhow::anyhow!("Tab not found"))
+                Ok(())
             }
         });
     }
@@ -377,6 +377,10 @@ async fn generate_report(
     }
     // Only one tab is supported for now
     let tab_id = &dashboard.tabs[0];
+    let mut dashb_vars = "".to_string();
+    for variable in dashboard.variables.iter() {
+        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+    }
 
     log::info!("launching browser for dashboard {dashboard_id}");
     let (mut browser, mut handler) =
@@ -430,7 +434,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -474,13 +478,13 @@ async fn generate_report(
             };
 
             let email_dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
             (dashb_url, email_dashb_url)
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
