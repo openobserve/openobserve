@@ -19,9 +19,6 @@ use std::{
     path::Path,
 };
 
-use async_walkdir::WalkDir;
-use futures::StreamExt;
-
 #[inline(always)]
 pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
     let file = File::open(file)?;
@@ -43,30 +40,40 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[inline(always)]
-pub async fn scan_files<P: AsRef<Path>>(
+pub fn scan_files<P: AsRef<Path>>(
     root: P,
     ext: &str,
     limit: Option<usize>,
 ) -> Result<Vec<String>, std::io::Error> {
-    let iter = WalkDir::new(root).filter_map(|entry| async move {
-        let entry = entry.ok()?;
-        let path = entry.path();
+    let limit = limit.unwrap_or_default();
+    let mut files = Vec::with_capacity(std::cmp::max(16, limit));
+    let dir = std::fs::read_dir(root)?;
+    for entry in dir {
+        let path = entry?.path();
         if path.is_file() {
-            let path_ext = path.extension()?.to_str()?;
+            let path_ext = path
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
             if path_ext == ext {
-                Some(path.to_str()?.to_string())
-            } else {
-                None
+                files.push(path.to_str().unwrap().to_string());
+                if limit > 0 && files.len() >= limit {
+                    return Ok(files);
+                }
             }
         } else {
-            None
+            let fl = if limit > 0 { limit - files.len() } else { 0 };
+            let ff = scan_files(path, ext, Some(fl))?;
+            if !ff.is_empty() {
+                files.extend(ff);
+            };
+            if limit > 0 && files.len() >= limit {
+                return Ok(files);
+            }
         }
-    });
-    Ok(if let Some(limit) = limit {
-        iter.take(limit).collect().await
-    } else {
-        iter.collect().await
-    })
+    }
+    Ok(files)
 }
 
 #[cfg(unix)]
@@ -89,14 +96,14 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_file() {
+    async fn test_scan_files() {
         let content = b"Some Text";
         let file_name = "sample.parquet";
 
         put_file_contents(file_name, content).unwrap();
         assert_eq!(get_file_contents(file_name).unwrap(), content);
         assert!(get_file_meta(file_name).unwrap().is_file());
-        assert!(!scan_files(".", "parquet", None).await.unwrap().is_empty());
+        assert!(!scan_files(".", "parquet", None).unwrap().is_empty());
         std::fs::remove_file(file_name).unwrap();
     }
 }

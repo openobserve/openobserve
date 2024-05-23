@@ -75,7 +75,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
 async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::with_capacity(1024);
     let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern, "json", None).await.unwrap_or_default();
+    let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut line_no = 0;
     for file in files {
         line_no += 1;
