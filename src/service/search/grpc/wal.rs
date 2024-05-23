@@ -252,7 +252,12 @@ pub async fn search_parquet(
         let session = config::meta::search::Session {
             id: format!("{trace_id}-wal-{ver}"),
             storage_type: StorageType::Wal,
-            search_type: if !sql.meta.group_by.is_empty() {
+            search_type: if !sql.meta.group_by.is_empty()
+                || sql
+                    .aggs
+                    .iter()
+                    .any(|(_, (_, meta))| !meta.group_by.is_empty())
+            {
                 SearchType::Aggregation
             } else {
                 SearchType::Normal
@@ -459,7 +464,12 @@ pub async fn search_memtable(
         let session = config::meta::search::Session {
             id: format!("{trace_id}-mem-{ver}"),
             storage_type: StorageType::Tmpfs,
-            search_type: if !sql.meta.group_by.is_empty() {
+            search_type: if !sql.meta.group_by.is_empty()
+                || sql
+                    .aggs
+                    .iter()
+                    .any(|(_, (_, meta))| !meta.group_by.is_empty())
+            {
                 SearchType::Aggregation
             } else {
                 SearchType::Normal
