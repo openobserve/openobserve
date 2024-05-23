@@ -62,7 +62,7 @@ pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow:
         .unwrap();
 
     let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern, "json", None).await.unwrap_or_default();
+    let files = scan_files(&pattern, "json", None).unwrap_or_default();
 
     for file in files {
         let local_file = file.to_owned();
