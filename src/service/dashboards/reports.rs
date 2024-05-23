@@ -24,14 +24,15 @@ use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
 };
+use reqwest::Client;
 
 use crate::{
     common::{
         meta::{
             authz::Authz,
             dashboards::reports::{
-                Report, ReportDashboard, ReportDestination, ReportFrequencyType,
-                ReportTimerangeType,
+                HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
+                ReportFrequencyType, ReportTimerangeType,
             },
         },
         utils::auth::{remove_ownership, set_ownership},
@@ -45,18 +46,22 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), anyhow::Error> {
-    // Check if SMTP is enabled, otherwise don't save the report
-    if !CONFIG.smtp.smtp_enabled {
-        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
-    }
+    if CONFIG.common.report_server_url.is_empty() {
+        // Check if SMTP is enabled, otherwise don't save the report
+        if !CONFIG.smtp.smtp_enabled {
+            return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+        }
 
-    // Check if Chrome is enabled, otherwise don't save the report
-    if !CONFIG.chrome.chrome_enabled {
-        return Err(anyhow::anyhow!("Chrome not enabled"));
-    }
+        // Check if Chrome is enabled, otherwise don't save the report
+        if !CONFIG.chrome.chrome_enabled || CONFIG.chrome.chrome_path.is_empty() {
+            return Err(anyhow::anyhow!("Chrome not enabled"));
+        }
 
-    if CONFIG.common.report_user_name.is_empty() || CONFIG.common.report_user_password.is_empty() {
-        return Err(anyhow::anyhow!("Report username and password ENVs not set"));
+        if CONFIG.common.report_user_name.is_empty()
+            || CONFIG.common.report_user_password.is_empty()
+        {
+            return Err(anyhow::anyhow!("Report username and password ENVs not set"));
+        }
     }
 
     if !name.is_empty() {
@@ -235,17 +240,68 @@ impl Report {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
 
-        // Currently only one `ReportDashboard` can be captured and sent
-        let dashboard = &self.dashboards[0];
-        let report = generate_report(
-            dashboard,
-            &self.org_id,
-            &CONFIG.common.report_user_name,
-            &CONFIG.common.report_user_password,
-            &self.timezone,
-        )
-        .await?;
-        self.send_email(&report.0, report.1).await
+        if !CONFIG.common.report_server_url.is_empty() {
+            let mut recepients = vec![];
+            for recepient in &self.destinations {
+                match recepient {
+                    ReportDestination::Email(email) => recepients.push(email.clone()),
+                }
+            }
+
+            let report_data = HttpReportPayload {
+                dashboards: self.dashboards.clone(),
+                email_details: ReportEmailDetails {
+                    title: self.title.clone(),
+                    recepients,
+                    name: self.name.clone(),
+                    message: self.message.clone(),
+                    dashb_url: format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri),
+                },
+            };
+
+            let url = url::Url::parse(&format!(
+                "{}/{}/reports/{}/send",
+                &CONFIG.common.report_server_url, &self.org_id, &self.name
+            ))
+            .unwrap();
+            match Client::builder()
+                .build()
+                .unwrap()
+                .put(url)
+                .query(&[("timezone", &self.timezone)])
+                .header("Content-Type", "application/json")
+                // .header(reqwest::header::AUTHORIZATION, creds)
+                .json(&report_data)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        return Err(anyhow::anyhow!(
+                            "report send error status: {}, err: {:?}",
+                            resp.status(),
+                            resp.bytes().await
+                        ));
+                    }
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("Error contacting report server: {e}"));
+                }
+            }
+            Ok(())
+        } else {
+            // Currently only one `ReportDashboard` can be captured and sent
+            let dashboard = &self.dashboards[0];
+            let report = generate_report(
+                dashboard,
+                &self.org_id,
+                &CONFIG.common.report_user_name,
+                &CONFIG.common.report_user_password,
+                &self.timezone,
+            )
+            .await?;
+            self.send_email(&report.0, report.1).await
+        }
     }
 
     /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
