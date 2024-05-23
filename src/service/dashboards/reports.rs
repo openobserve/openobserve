@@ -128,7 +128,7 @@ pub async fn save(
                     Err(anyhow::anyhow!("Tab not found"))
                 }
             } else {
-                Err(anyhow::anyhow!("Tab not found"))
+                Ok(())
             }
         });
     }
