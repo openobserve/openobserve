@@ -257,7 +257,7 @@ pub async fn search(
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took {} ms",
+        "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {} ms",
         meta.meta.time_range,
         file_list.len(),
         file_list_took,
