@@ -1257,9 +1257,11 @@ const saveReport = async () => {
     .catch((error) => {
       q.notify({
         type: "negative",
-        message: `Error while ${
-          isEditingReport.value ? "updating" : "saving"
-        } report.`,
+        message:
+          error?.response?.data?.message ||
+          `Error while ${
+            isEditingReport.value ? "updating" : "saving"
+          } report.`,
         timeout: 4000,
       });
     })
