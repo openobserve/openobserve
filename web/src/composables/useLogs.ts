@@ -956,7 +956,7 @@ const useLogs = () => {
       let lastPage = 0;
       searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
         (accumulator: number, currentValue: number) =>
-          accumulator + currentValue,
+          accumulator + Math.max(currentValue, 0),
         0
       );
 
