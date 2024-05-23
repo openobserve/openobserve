@@ -148,7 +148,6 @@ export default defineConfig({
         "o2cs-oo-rum": [
           "@openobserve/browser-logs",
           "@openobserve/browser-rum",
-          "@openobserve/rrweb-player",
         ],
         vgl: ["vue3-grid-layout"],
         "o2cs-date-fns": ["date-fns", "date-fns-tz"],

@@ -151,8 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import rrwebPlayer from "@openobserve/rrweb-player";
-import "@openobserve/rrweb-player/dist/style.css";
 import {
   nextTick,
   ref,
@@ -185,7 +183,9 @@ const { t } = useI18n();
 
 const store = useStore();
 
-const player = ref<rrwebPlayer>();
+let rrwebPlayer: any;
+
+const player = ref<any>();
 
 const playerRef = ref<HTMLElement | null>(null);
 
@@ -258,9 +258,18 @@ watch(
   { deep: true, immediate: true }
 );
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
+  await importVideoPlayer();
   initializeWorker();
 });
+
+const importVideoPlayer = async () => {
+  const rrwebPlayerModule: any = await import("@openobserve/rrweb-player");
+
+  await import("@openobserve/rrweb-player/dist/style.css");
+
+  rrwebPlayer = rrwebPlayerModule.default();
+};
 
 onBeforeUnmount(() => {
   if (worker.value) {
@@ -403,7 +412,7 @@ const setupSession = async () => {
     playerState.value.isPlaying = false;
   });
 
-  player.value.addEventListener("error", (error) => {
+  player.value.addEventListener("error", () => {
     console.error("Playback error:");
   });
 
