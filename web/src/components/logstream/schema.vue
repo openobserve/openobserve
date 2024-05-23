@@ -169,6 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :filter="`${filterField}@${activeTab}`"
               :filter-method="filterFieldFn"
               :pagination="{ rowsPerPage }"
+              selection="multiple"
+              v-model:selected="selectedFields"
               class="q-table"
               id="schemaFieldList"
               :rows-per-page-options="[]"
@@ -200,7 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     filled
                     borderless
                     dense
-                    clearable
                     debounce="1"
                     :placeholder="t('search.searchField')"
                   >
@@ -210,23 +211,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-input>
                 </div>
               </template>
-              <template v-slot:body-cell-delete="props">
+              <template v-slot:header-selection="scope">
                 <q-td class="text-center">
                   <q-checkbox
                     v-if="
                       !(
-                        props.row.name ==
-                          store.state.zoConfig.timestamp_column ||
-                        props.row.name == allFieldsName
+                        scope.name == store.state.zoConfig.timestamp_column ||
+                        scope.name == allFieldsName
                       )
                     "
-                    :data-test="`schema-stream-delete-${props.row.name}-field-fts-key-checkbox`"
-                    v-model="selectedFields"
-                    :val="props.row.name"
+                    :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
+                    v-model="scope.selected"
                     size="sm"
                   />
                 </q-td>
               </template>
+
+              <template v-slot:body-selection="scope">
+                <q-td class="text-center">
+                  <q-checkbox
+                    v-if="
+                      !(
+                        scope.row.name ==
+                          store.state.zoConfig.timestamp_column ||
+                        scope.row.name == allFieldsName
+                      )
+                    "
+                    :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                    v-model="scope.selected"
+                    size="sm"
+                  />
+                </q-td>
+              </template>
+
               <template v-slot:body-cell-name="props">
                 <q-td>{{ props.row.name }}</q-td>
               </template>
@@ -450,7 +467,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
-          selectedFields.value
+          selectedFields.value.map((field) => field.name)
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -535,13 +552,14 @@ export default defineComponent({
       const schemaMapping = new Set([]);
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
-        streamResponse.settings.defined_schema_fields.forEach((field) => {
-          streamResponse.schema.push({
-            name: field,
-            delete: false,
-            index_type: [],
+        if (streamResponse.settings.defined_schema_fields?.length)
+          streamResponse.settings.defined_schema_fields.forEach((field) => {
+            streamResponse.schema.push({
+              name: field,
+              delete: false,
+              index_type: [],
+            });
           });
-        });
       }
 
       if (
@@ -648,16 +666,14 @@ export default defineComponent({
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
 
-      settings.defined_schema_fields.push(
-        ...newSchemaFields.value.map((field) => {
-          field.name = field.name
-            .trim()
-            .toLowerCase()
-            .replace(/ /g, "_")
-            .replace(/-/g, "_");
-          return field.name;
-        })
+      const newSchemaFieldsSet = new Set(
+        newSchemaFields.value.map((field) =>
+          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
+        )
       );
+
+      // Push unique and normalized field names to settings.defined_schema_fields
+      settings.defined_schema_fields.push(...newSchemaFieldsSet);
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -827,12 +843,6 @@ export default defineComponent({
 
     const columns = [
       {
-        name: "delete",
-        label: "",
-        align: "center",
-        sortable: false,
-      },
-      {
         name: "name",
         label: t("logStream.propertyName"),
         align: "center",
@@ -879,10 +889,14 @@ export default defineComponent({
     const updateDefinedSchemaFields = () => {
       markFormDirty();
 
+      const selectedFieldsSet = new Set(
+        selectedFields.value.map((field) => field.name)
+      );
+
       if (activeTab.value === "schemaFields") {
         indexData.value.defined_schema_fields =
           indexData.value.defined_schema_fields.filter(
-            (field) => !selectedFields.value.includes(field)
+            (field) => !selectedFieldsSet.has(field)
           );
 
         if (!indexData.value.defined_schema_fields.length) {
@@ -890,13 +904,17 @@ export default defineComponent({
         }
       } else {
         indexData.value.defined_schema_fields = [
-          ...indexData.value.defined_schema_fields,
-          ...selectedFields.value.map((field) => field),
+          ...new Set([
+            ...indexData.value.defined_schema_fields,
+            ...selectedFieldsSet,
+          ]),
         ];
       }
 
       selectedFields.value = [];
     };
+
+    const onSelection = () => {};
 
     return {
       t,
@@ -937,6 +955,7 @@ export default defineComponent({
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,
+      onSelection,
     };
   },
   created() {
@@ -978,6 +997,10 @@ export default defineComponent({
         font-weight: 700;
         height: 35px;
       }
+    }
+
+    .q-table tbody td:after {
+      background: none !important;
     }
 
     tbody tr {
@@ -1098,6 +1121,11 @@ export default defineComponent({
 .indexDetailsContainer {
   .q-table__control {
     width: 100%;
+  }
+
+  th:first-child,
+  td:first-child {
+    padding-left: 8px !important;
   }
 }
 
