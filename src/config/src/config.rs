@@ -732,6 +732,8 @@ pub struct Limit {
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
     pub distinct_values_hourly: bool,
+    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 3)]
+    pub consistent_hash_vnodes: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1004,6 +1006,10 @@ pub fn init() -> Config {
 
     if cfg.limit.sql_max_db_connections == 0 {
         cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
+    }
+
+    if cfg.limit.consistent_hash_vnodes == 0 {
+        cfg.limit.consistent_hash_vnodes = 3;
     }
 
     // check common config
