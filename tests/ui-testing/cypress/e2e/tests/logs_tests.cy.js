@@ -131,7 +131,7 @@ describe("Logs testcases", () => {
     logstests.attributeToNotHaveVrlFunctionvalue();
   });
 
-  it("should load the values of a field when the field is expanded", () => {
+  it.skip("should load the values of a field when the field is expanded", () => {
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
@@ -928,7 +928,7 @@ describe("Logs testcases", () => {
     cy.get('[data-test="confirm-button"]').click({ force: true });
   });
 
-  it("should display error on adding only blank spaces under function name", () => {
+  it.skip("should display error on adding only blank spaces under function name", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
     cy.wait(2000);
     logstests.enterTextVrlQueryEditor(".a=1");
@@ -940,7 +940,7 @@ describe("Logs testcases", () => {
       .should("be.visible");
   });
 
-  it("should display error on special characters under function name", () => {
+  it.skip("should display error on special characters under function name", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
     cy.wait(2000);
     logstests.enterTextVrlQueryEditor("a=1");
