@@ -238,24 +238,12 @@ pub async fn authentication(
                 let auth_header = _req.headers().get("Authorization");
                 if auth_header.is_some() {
                     let auth_header = auth_header.unwrap().to_str().unwrap();
-                    let auth_header = auth_header.split_whitespace().collect::<Vec<&str>>();
-                    if auth_header.len() == 2 {
-                        let auth_header = auth_header[1];
-                        let auth_header = match base64::decode(auth_header) {
-                            Ok(v) => v,
-                            Err(_) => return unauthorized_error(resp),
-                        };
-                        let auth_header = auth_header.split(":").collect::<Vec<&str>>();
-                        if auth_header.len() == 2 {
-                            let name = auth_header[0];
-                            let password = auth_header[1];
-                            SignInUser {
-                                name: name.to_string(),
-                                password: password.to_string(),
-                            }
-                        } else {
-                            return unauthorized_error(resp);
-                        }
+                    if let Some((name, password)) =
+                        o2_enterprise::enterprise::dex::service::auth::get_user_from_token(
+                            auth_header,
+                        )
+                    {
+                        SignInUser { name, password }
                     } else {
                         return unauthorized_error(resp);
                     }
@@ -310,6 +298,74 @@ pub async fn authentication(
         Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
+    }
+}
+
+#[get("/login")]
+pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        let mut resp = SignInResponse::default();
+        let auth_header = _req.headers().get("Authorization");
+        if auth_header.is_some() {
+            let auth_header = auth_header.unwrap().to_str().unwrap();
+            match o2_enterprise::enterprise::dex::service::auth::get_user_from_token(auth_header) {
+                Some((name, password)) => {
+                    match crate::handler::http::auth::validator::validate_user(&name, &password)
+                        .await
+                    {
+                        Ok(v) => {
+                            if v.is_valid {
+                                resp.status = true;
+                            } else {
+                                resp.status = false;
+                                resp.message = "Invalid credentials".to_string();
+                            }
+                        }
+                        Err(_e) => {
+                            resp.status = false;
+                            resp.message = "Invalid credentials".to_string();
+                        }
+                    };
+                    if resp.status {
+                        let access_token = format!(
+                            "Basic {}",
+                            base64::encode(&format!("{}:{}", &name, &password))
+                        );
+                        let tokens = json::to_string(&AuthTokens {
+                            access_token,
+                            refresh_token: "".to_string(),
+                        })
+                        .unwrap();
+                        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+                        auth_cookie.set_expires(
+                            cookie::time::OffsetDateTime::now_utc()
+                                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                        );
+                        auth_cookie.set_http_only(true);
+                        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+                        auth_cookie.set_path("/");
+                        if CONFIG.auth.cookie_same_site_lax {
+                            auth_cookie.set_same_site(cookie::SameSite::Lax);
+                        } else {
+                            auth_cookie.set_same_site(cookie::SameSite::None);
+                        }
+                        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
+                    } else {
+                        Ok(HttpResponse::Unauthorized().json(resp))
+                    }
+                }
+                None => {
+                    resp.status = false;
+                    resp.message = "Invalid credentials".to_string();
+                    Ok(HttpResponse::Unauthorized().json(resp))
+                }
+            }
+        } else {
+            resp.status = false;
+            resp.message = "Invalid credentials".to_string();
+            Ok(HttpResponse::Unauthorized().json(resp))
+        }
     }
 }
 
