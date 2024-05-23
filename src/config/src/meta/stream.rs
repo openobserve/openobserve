@@ -108,6 +108,7 @@ pub struct FileMeta {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub flattened: bool,
 }
 
 impl FileMeta {
@@ -149,6 +150,7 @@ impl TryFrom<&[u8]> for FileMeta {
             records,
             original_size,
             compressed_size,
+            flattened: false,
         })
     }
 }
@@ -339,6 +341,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
+            flattened: false,
         }
     }
 }
@@ -743,6 +746,7 @@ mod tests {
             records: 300,
             original_size: 10,
             compressed_size: 1,
+            flattened: false,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);

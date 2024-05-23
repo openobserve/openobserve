@@ -54,12 +54,14 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
+        flattened: bool,
         created_at: i64,
         files: &[String],
     ) -> Result<()>;
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
+    async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
     async fn query(
         &self,
@@ -69,6 +71,8 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_flattened(&self, flattened: bool, limit: i64)
+    -> Result<Vec<(String, FileMeta)>>;
     async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>>;
     async fn get_min_ts(
         &self,
@@ -149,8 +153,15 @@ pub async fn batch_remove(files: &[String]) -> Result<()> {
 }
 
 #[inline]
-pub async fn batch_add_deleted(org_id: &str, created_at: i64, files: &[String]) -> Result<()> {
-    CLIENT.batch_add_deleted(org_id, created_at, files).await
+pub async fn batch_add_deleted(
+    org_id: &str,
+    flattened: bool,
+    created_at: i64,
+    files: &[String],
+) -> Result<()> {
+    CLIENT
+        .batch_add_deleted(org_id, flattened, created_at, files)
+        .await
 }
 
 #[inline]
@@ -166,6 +177,11 @@ pub async fn get(file: &str) -> Result<FileMeta> {
 #[inline]
 pub async fn contains(file: &str) -> Result<bool> {
     CLIENT.contains(file).await
+}
+
+#[inline]
+pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
+    CLIENT.update_flattened(file, flattened).await
 }
 
 #[inline]
@@ -187,6 +203,11 @@ pub async fn query(
     CLIENT
         .query(org_id, stream_type, stream_name, time_level, time_range)
         .await
+}
+
+#[inline]
+pub async fn query_flattened(flattened: bool, limit: i64) -> Result<Vec<(String, FileMeta)>> {
+    CLIENT.query_flattened(flattened, limit).await
 }
 
 #[inline]
@@ -281,6 +302,7 @@ pub struct FileRecord {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub flattened: bool,
 }
 
 impl From<&FileRecord> for FileMeta {
@@ -291,6 +313,7 @@ impl From<&FileRecord> for FileMeta {
             records: record.records,
             original_size: record.original_size,
             compressed_size: record.compressed_size,
+            flattened: record.flattened,
         }
     }
 }
@@ -325,4 +348,5 @@ pub struct FileDeletedRecord {
     pub stream: String,
     pub date: String,
     pub file: String,
+    pub flattened: bool,
 }

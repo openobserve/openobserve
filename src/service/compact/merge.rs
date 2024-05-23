@@ -670,6 +670,7 @@ pub async fn merge_files(
         records: total_records,
         original_size: new_file_size,
         compressed_size: 0,
+        flattened: false,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
@@ -814,7 +815,9 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
     let mut success = false;
     let created_at = Utc::now().timestamp_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await {
+        if let Err(e) =
+            infra_file_list::batch_add_deleted(org_id, false, created_at, &del_items).await
+        {
             log::error!(
                 "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
                 e

@@ -532,6 +532,7 @@ async fn merge_files(
         records: total_records,
         original_size: new_file_size,
         compressed_size: 0,
+        flattened: false,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!(

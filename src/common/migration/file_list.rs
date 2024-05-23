@@ -108,7 +108,10 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
                     .flatten()
                     .map(|file| file.to_owned())
                     .collect::<Vec<_>>();
-                if let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
+                if let Err(e) = dest
+                    .batch_add_deleted(org_id, false, end_time, &files)
+                    .await
+                {
                     log::error!("load file_list_deleted into db err: {}", e);
                 }
             }
@@ -119,7 +122,10 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
             .query_deleted(org_id, end_time, 1_000_000)
             .await
             .expect("load file_list_deleted failed");
-        if let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
+        if let Err(e) = dest
+            .batch_add_deleted(org_id, false, end_time, &files)
+            .await
+        {
             log::error!("load file_list_deleted into db err: {}", e);
             continue;
         }

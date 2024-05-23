@@ -19,7 +19,7 @@ use config::{
     utils::parquet::parse_file_key_columns,
 };
 use hashbrown::HashMap;
-use sqlx::{Executor, QueryBuilder, Row, Sqlite};
+use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
 
 use crate::{
     db::sqlite::{CLIENT_RO, CLIENT_RW},
@@ -118,6 +118,7 @@ impl super::FileList for SqliteFileList {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
+        flattened: bool,
         created_at: i64,
         files: &[String],
     ) -> Result<()> {
@@ -130,7 +131,7 @@ impl super::FileList for SqliteFileList {
             let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, created_at)",
+                "INSERT INTO file_list_deleted (org, stream, date, file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item: &String| {
                 let (stream_key, date_key, file_name) =
@@ -139,6 +140,7 @@ impl super::FileList for SqliteFileList {
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
+                    .push_bind(flattened)
                     .push_bind(created_at);
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -210,7 +212,7 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -227,10 +229,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
-            "#,
+            r#"SELECT * FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
         )
         .bind(stream_key)
         .bind(date_key)
@@ -243,9 +242,28 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         Ok(!ret.unwrap().is_empty())
     }
 
+    async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+        sqlx::query(
+            r#"UPDATE file_list SET flattened = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
+        )
+        .bind(flattened)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&*client)
+        .await?;
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT_RO.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size FROM file_list;"#)
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list;"#,
+        )
         .fetch_all(&pool)
         .await?;
         Ok(ret
@@ -277,7 +295,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND min_ts <= $2 AND max_ts >= $3;
             "#,
@@ -298,13 +316,42 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    async fn query_flattened(
+        &self,
+        flattened: bool,
+        limit: i64,
+    ) -> Result<Vec<(String, FileMeta)>> {
+        let pool = CLIENT_RO.clone();
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+            r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    WHERE flattened = $1
+    ORDER BY id ASC LIMIT $2;
+            "#,
+        )
+        .bind(flattened)
+        .bind(limit)
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .iter()
+            .map(|r| {
+                (
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    r.into(),
+                )
+            })
+            .collect())
+    }
+
     async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
+            r#"SELECT stream, date, file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -573,7 +620,7 @@ impl SqliteFileList {
         let client = client.lock().await;
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
+INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
         "#).as_str(),
     )
@@ -587,6 +634,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
         .bind(meta.records)
         .bind(meta.original_size)
         .bind(meta.compressed_size)
+        .bind(meta.flattened)
         .execute(&*client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -609,7 +657,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
             let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)").as_str(),
+                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)").as_str(),
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -624,7 +672,8 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
                     .push_bind(item.meta.max_ts)
                     .push_bind(item.meta.records)
                     .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size);
+                    .push_bind(item.meta.compressed_size)
+                    .push_bind(item.meta.flattened);
             });
             let need_single_insert = match query_builder.build().execute(&mut *tx).await {
                 Ok(_) => false,
@@ -748,6 +797,11 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .execute(&*client)
     .await?;
 
+    // create column flattened for old version <= 0.10.5
+    add_column_flattened(&client, "file_list").await?;
+    add_column_flattened(&client, "file_list_history").await?;
+    add_column_flattened(&client, "file_list_deleted").await?;
+
     Ok(())
 }
 
@@ -840,5 +894,20 @@ pub async fn create_table_index() -> Result<()> {
         .execute(&*client)
         .await?;
 
+    Ok(())
+}
+
+async fn add_column_flattened(client: &Pool<Sqlite>, table: &str) -> Result<()> {
+    // Attempt to add the column, ignoring the error if the column already exists
+    let column = "flattened";
+    let check_sql =
+        format!("ALTER TABLE {table} ADD COLUMN {column} BOOLEAN default false not null;");
+    if let Err(e) = sqlx::query(&check_sql).execute(client).await {
+        // Check if the error is about the duplicate column
+        if !e.to_string().contains("duplicate column name") {
+            // If the error is not about the duplicate column, return it
+            return Err(e.into());
+        }
+    }
     Ok(())
 }

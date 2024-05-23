@@ -126,6 +126,7 @@ impl super::FileList for PostgresFileList {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
+        flattened: bool,
         created_at: i64,
         files: &[String],
     ) -> Result<()> {
@@ -137,7 +138,7 @@ impl super::FileList for PostgresFileList {
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, created_at)",
+                "INSERT INTO file_list_deleted (org, stream, date, file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -146,6 +147,7 @@ impl super::FileList for PostgresFileList {
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
+                    .push_bind(flattened)
                     .push_bind(created_at);
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -218,7 +220,7 @@ impl super::FileList for PostgresFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -235,10 +237,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
-            "#,
+            r#"SELECT * FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
         )
         .bind(stream_key)
         .bind(date_key)
@@ -249,6 +248,22 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             return Ok(false);
         }
         Ok(!ret.unwrap().is_empty())
+    }
+
+    async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
+        let pool = CLIENT.clone();
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+        sqlx::query(
+            r#"UPDATE file_list SET flattened = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
+        )
+        .bind(flattened)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&pool)
+        .await?;
+        Ok(())
     }
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
@@ -273,7 +288,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND min_ts <= $2 AND max_ts >= $3;
             "#,
@@ -294,13 +309,42 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    async fn query_flattened(
+        &self,
+        flattened: bool,
+        limit: i64,
+    ) -> Result<Vec<(String, FileMeta)>> {
+        let pool = CLIENT.clone();
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+            r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    WHERE flattened = $1
+    ORDER BY id ASC LIMIT $2;
+            "#,
+        )
+        .bind(flattened)
+        .bind(limit)
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .into_iter()
+            .map(|r| {
+                (
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    FileMeta::from(&r),
+                )
+            })
+            .collect())
+    }
+
     async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
+            r#"SELECT stream, date, file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -565,7 +609,7 @@ impl PostgresFileList {
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
+INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT DO NOTHING;
             "#).as_str(),
@@ -580,6 +624,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
         .bind(meta.records)
         .bind(meta.original_size)
         .bind(meta.compressed_size)
+        .bind(meta.flattened)
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -601,7 +646,7 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)").as_str(),
+                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)").as_str(),
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -616,7 +661,8 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
                     .push_bind(item.meta.max_ts)
                     .push_bind(item.meta.records)
                     .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size);
+                    .push_bind(item.meta.compressed_size)
+                    .push_bind(item.meta.flattened);
             });
             let need_single_insert = match query_builder.build().execute(&mut *tx).await {
                 Ok(_) => false,
@@ -736,6 +782,11 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .execute(&pool)
     .await?;
 
+    // create column flattened for old version <= 0.10.5
+    add_column_flattened("file_list").await?;
+    add_column_flattened("file_list_history").await?;
+    add_column_flattened("file_list_deleted").await?;
+
     Ok(())
 }
 
@@ -820,5 +871,36 @@ pub async fn create_table_index() -> Result<()> {
         log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) succeed");
     }
 
+    Ok(())
+}
+
+async fn add_column_flattened(table: &str) -> Result<()> {
+    let pool = CLIENT.clone();
+    let column = "flattened";
+    let check_sql = format!(
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+    );
+    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
+        .fetch_one(&pool)
+        .await?;
+    if has_column > 0 {
+        return Ok(());
+    }
+
+    let alert_sql = format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} BOOLEAN default false not null;"
+    );
+    let mut tx = pool.begin().await?;
+    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
+        log::error!("[POSTGRES] Error in adding column {column}: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::info!("[POSTGRES] Error in committing transaction: {}", e);
+        return Err(e.into());
+    };
     Ok(())
 }
