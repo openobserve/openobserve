@@ -13,27 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Write,
+    sync::Arc,
+};
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
     utils::{
-        json::{estimate_json_bytes, get_string_value, Map, Value},
+        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Number, Value},
         schema_ext::SchemaExt,
     },
     CONFIG,
 };
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{ingestion::TriggerAlertData, schema::get_invalid_schema_start_dt};
 use crate::{
     common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
-    service::{
-        ingestion::get_wal_time_key,
-        schema::{check_for_schema, SchemaCache},
-    },
+    service::{ingestion::get_wal_time_key, schema::check_for_schema},
 };
 
 pub mod bulk;
@@ -150,101 +151,127 @@ pub fn cast_to_schema_v1(
     value: &mut Map<String, Value>,
     schema_map: &HashMap<&String, &DataType>,
 ) -> Result<(), anyhow::Error> {
-    let mut parse_error = String::new();
-    for (field_name, data_type) in schema_map {
-        let field_name_str = field_name.to_owned().to_owned();
-        // let field_name = field_name_str.to_owned();
-        let Some(val) = value.get(&field_name_str) else {
-            continue;
-        };
+    let mut errors = Vec::new();
+    for (key, val) in value.iter_mut() {
         if val.is_null() {
-            value.insert(field_name_str, Value::Null);
             continue;
         }
+        let Some(data_type) = schema_map.get(key) else {
+            continue;
+        };
         match data_type {
             DataType::Utf8 => {
                 if val.is_string() {
                     continue;
                 }
-                value.insert(field_name_str, Value::String(get_string_value(val)));
+                *val = Value::String(get_string_value(val));
             }
             DataType::Int64 | DataType::Int32 | DataType::Int16 | DataType::Int8 => {
                 if val.is_i64() {
                     continue;
                 }
-                if val.is_boolean() {
-                    value.insert(
-                        field_name_str,
-                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
-                    );
-                    continue;
-                }
-                let val = get_string_value(val);
-                match val.parse::<i64>() {
-                    Ok(val) => {
-                        value.insert(field_name_str, Value::Number(val.into()));
-                    }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
-                };
-            }
-            DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
                 if val.is_u64() {
                     continue;
                 }
-                if val.is_boolean() {
-                    value.insert(
-                        field_name_str,
-                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
-                    );
+                if val.is_f64() {
+                    *val = Value::Number((val.as_f64().unwrap() as i64).into());
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<u64>() {
-                    Ok(val) => {
-                        value.insert(field_name_str, Value::Number(val.into()));
+                if val.is_boolean() {
+                    *val = Value::Number((val.as_bool().unwrap() as i64).into());
+                    continue;
+                }
+                let local_val = get_string_value(val);
+                match local_val.parse::<i64>() {
+                    Ok(v) => {
+                        *val = Value::Number(v.into());
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((key, *data_type)),
+                };
+            }
+            DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
+                if val.is_i64() {
+                    continue;
+                }
+                if val.is_u64() {
+                    continue;
+                }
+                if val.is_f64() {
+                    *val = Value::Number((val.as_f64().unwrap() as u64).into());
+                    continue;
+                }
+                if val.is_boolean() {
+                    *val = Value::Number((val.as_bool().unwrap() as u64).into());
+                    continue;
+                }
+                let local_val = get_string_value(val);
+                match local_val.parse::<u64>() {
+                    Ok(v) => {
+                        *val = Value::Number(v.into());
+                    }
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
             DataType::Float64 | DataType::Float32 | DataType::Float16 => {
                 if val.is_f64() {
                     continue;
                 }
+                if val.is_i64() {
+                    *val = Value::Number(Number::from_f64(val.as_i64().unwrap() as f64).unwrap());
+                    continue;
+                }
+                if val.is_u64() {
+                    *val = Value::Number(Number::from_f64(val.as_u64().unwrap() as f64).unwrap());
+                    continue;
+                }
                 if val.is_boolean() {
-                    value.insert(
-                        field_name_str,
-                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    *val = Value::Number(
+                        Number::from_f64((val.as_bool().unwrap() as i64) as f64).unwrap(),
                     );
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<f64>() {
-                    Ok(val) => {
-                        value.insert(
-                            field_name_str,
-                            Value::Number(serde_json::Number::from_f64(val).unwrap()),
-                        );
+                let local_val = get_string_value(val);
+                match local_val.parse::<f64>() {
+                    Ok(local_val) => {
+                        *val = Value::Number(serde_json::Number::from_f64(local_val).unwrap());
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
             DataType::Boolean => {
                 if val.is_boolean() {
                     continue;
                 }
-                let val = get_string_value(val);
-                match val.parse::<bool>() {
-                    Ok(val) => {
-                        value.insert(field_name_str, Value::Bool(val));
+                if val.is_i64() {
+                    *val = Value::Bool(val.as_i64().unwrap() > 0);
+                    continue;
+                }
+                if val.is_u64() {
+                    *val = Value::Bool(val.as_u64().unwrap() > 0);
+                    continue;
+                }
+                if val.is_f64() {
+                    *val = Value::Bool(val.as_f64().unwrap() > 0.0);
+                    continue;
+                }
+                let local_val: String = get_string_value(val);
+                match local_val.parse::<bool>() {
+                    Ok(local_val) => {
+                        *val = Value::Bool(local_val);
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                    Err(_) => errors.push((key, *data_type)),
                 };
             }
-            _ => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+            _ => errors.push((key, *data_type)),
         };
     }
-    if !parse_error.is_empty() {
-        Err(anyhow::Error::msg(parse_error))
+    if !errors.is_empty() {
+        let error_message = errors
+            .iter()
+            .map(|(field, dt)| format!("Failed to cast Field: {}, DataType: {:?}", field, dt))
+            .collect::<Vec<_>>()
+            .join(", ");
+        Err(anyhow::Error::msg(error_message))
     } else {
         Ok(())
     }
@@ -266,7 +293,7 @@ async fn add_valid_record(
         .unwrap();
 
     // check schema
-    let (schema_evolution, _) = match check_for_schema(
+    let schema_evolution = match check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -390,13 +417,6 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
-fn set_parsing_error_v1(parse_error: &mut String, field_name: &str, field_data_type: &DataType) {
-    parse_error.push_str(&format!(
-        "Failed to cast {} to type {} ",
-        field_name, field_data_type
-    ));
-}
-
 async fn add_record(
     stream_meta: &StreamMeta<'_>,
     write_buf: &mut HashMap<String, SchemaRecords>,
@@ -431,11 +451,6 @@ async fn add_record(
     Ok(())
 }
 
-fn bool_to_serde_json_number(value: bool) -> serde_json::Number {
-    let num = value as i64;
-    serde_json::Number::from(num)
-}
-
 struct StreamMeta<'a> {
     org_id: String,
     stream_name: String,
@@ -444,24 +459,43 @@ struct StreamMeta<'a> {
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
-pub fn refactor_map(original_map: &mut Map<String, Value>, defined_schema_keys: &[String]) {
-    let mut non_schema_map = HashMap::new();
+pub fn refactor_map(
+    original_map: Map<String, Value>,
+    defined_schema_keys: &HashSet<String>,
+) -> Map<String, Value> {
+    let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
+    let mut non_schema_map = Vec::with_capacity(1024); // 1KB
 
-    for (key, value) in original_map.iter() {
-        if !defined_schema_keys.contains(key) {
-            non_schema_map.insert(key.clone(), get_string_value(value));
+    let mut has_elements = false;
+    non_schema_map.write_all(b"{").unwrap();
+    for (key, value) in original_map {
+        if defined_schema_keys.contains(&key) {
+            new_map.insert(key, value);
+        } else {
+            if has_elements {
+                non_schema_map.write_all(b",").unwrap();
+            } else {
+                has_elements = true;
+            }
+            non_schema_map.write_all(b"\"").unwrap();
+            non_schema_map.write_all(key.as_bytes()).unwrap();
+            non_schema_map.write_all(b"\":\"").unwrap();
+            non_schema_map
+                .write_all(pickup_string_value(value).as_bytes())
+                .unwrap();
+            non_schema_map.write_all(b"\"").unwrap();
         }
     }
+    non_schema_map.write_all(b"}").unwrap();
 
-    original_map.retain(|key, _| defined_schema_keys.contains(key));
-
-    if !non_schema_map.is_empty() {
-        let non_schema_json = serde_json::to_string(&non_schema_map).unwrap_or_default();
-        original_map.insert(
+    if has_elements {
+        new_map.insert(
             CONFIG.common.all_fields_name.to_string(),
-            Value::String(non_schema_json),
+            Value::String(String::from_utf8(non_schema_map).unwrap()),
         );
     }
+
+    new_map
 }
 
 #[cfg(test)]

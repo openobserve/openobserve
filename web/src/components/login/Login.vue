@@ -117,8 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform"
-class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -167,7 +166,7 @@ class="q-gutter-md" @submit.prevent="">
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -204,6 +203,12 @@ export default defineComponent({
     const submitting = ref(false);
 
     const loginAsInternalUser = ref(false);
+
+    onBeforeMount(() => {
+      if (router.currentRoute.value.query.login_as_internal_user === "true") {
+        loginAsInternalUser.value = true;
+      }
+    });
 
     const showSSO = computed(() => {
       return store.state.zoConfig.sso_enabled && config.isEnterprise === "true";

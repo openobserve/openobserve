@@ -1,4 +1,4 @@
-name: UI integration tests
+name: Playwright UI Tests
 
 on:
   push:
@@ -17,21 +17,24 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080
-  # these are cypress related env vars
-  CYPRESS_ORGNAME: default
-  CYPRESS_CLOUD_TOKEN: ${{ secrets.CYPRESS_CLOUD_TOKEN }}
+  INGESTION_URL: http://localhost:5080
+  ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: true
+
 
 jobs:
   ui_integration_tests:
-    name: ui_integration_tests
+    name: playwright_ui_integration_tests
     runs-on: 
       labels: ubuntu-latest
     strategy:
       matrix:
         browser: [chrome]
-        testfilename: ["functions_tests.cy.js","logs_tests.cy.js","logs_queries.cy.js","logs_quickmode.cy.js","menu_tests.cy.js","alerts_tests.cy.js", "dashboard"]
+        testfilename: 
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","region.spec.js", "schema.spec.js","dashboardtype.spec.js"]
+       
     steps:
       - name: Remove unused tools
         run: |
@@ -73,12 +76,26 @@ jobs:
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
-      # You can test your matrix by printing the current Python version
-      # - name: Cypress run
-      #   uses: cypress-io/github-action@v6.6.0
-      #   with:
-      #       browser: ${{ matrix.browser }}
-      #       spec: cypress/e2e/tests
-      - name: Cypress run
+
+      - uses: actions/setup-node@v4
+        with:
+            node-version: lts/*
+      - name: Install dependencies and run ui-tests
         run: |
-          cd tests/ui-testing && npm install && npx cypress run --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests/${{ matrix.testfilename }}
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD"=${ZO_ROOT_USER_PASSWORD} >> .env
+          echo "ZO_BASE_URL"=${ZO_BASE_URL} >> .env
+          echo "INGESTION_URL"=${INGESTION_URL} >> .env
+          echo "ORGNAME"=${ORGNAME} >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+            name: playwright-report
+            path: playwright-report/
+            retention-days: 30
+
+
+ 

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,37 +51,11 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
-        let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) =
-            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        match  sqlx::query(
-            r#"
-INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    ON CONFLICT DO NOTHING;
-            "#,
-        )
-        .bind(org_id)
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .bind(false)
-        .bind(meta.min_ts)
-        .bind(meta.max_ts)
-        .bind(meta.records)
-        .bind(meta.original_size)
-        .bind(meta.compressed_size)
-        .execute(&pool)
-        .await {
-            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
-                  Ok(())
-            } else {
-                  Err(Error::Message(e.to_string()))
-            },
-            Err(e) =>  Err(e.into()),
-            Ok(_) => Ok(()),
-        }
+        self.inner_add("file_list", file, meta).await
+    }
+
+    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()> {
+        self.inner_add("file_list_history", file, meta).await
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
@@ -98,67 +72,11 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
-        if files.is_empty() {
-            return Ok(());
-        }
-        let pool = CLIENT.clone();
-        let chunks = files.chunks(100);
-        for files in chunks {
-            let mut tx = pool.begin().await?;
-            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                "INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)",
-            );
-            query_builder.push_values(files, |mut b, item| {
-                let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(&item.key).expect("parse file key failed");
-                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                b.push_bind(org_id)
-                    .push_bind(stream_key)
-                    .push_bind(date_key)
-                    .push_bind(file_name)
-                    .push_bind(false)
-                    .push_bind(item.meta.min_ts)
-                    .push_bind(item.meta.max_ts)
-                    .push_bind(item.meta.records)
-                    .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size);
-            });
-            let need_single_insert = match query_builder.build().execute(&mut *tx).await {
-                Ok(_) => false,
-                Err(sqlx::Error::Database(e)) => {
-                    if e.is_unique_violation() {
-                        true
-                    } else {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
-                        }
-                        return Err(Error::Message(e.to_string()));
-                    }
-                }
-                Err(e) => {
-                    if let Err(e) = tx.rollback().await {
-                        log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
-                    }
-                    return Err(e.into());
-                }
-            };
-            if need_single_insert {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback file_list batch add error: {}", e);
-                    return Err(e.into());
-                }
-                for item in files {
-                    if let Err(e) = self.add(&item.key, &item.meta).await {
-                        log::error!("[POSTGRES] single insert file_list add error: {}", e);
-                        return Err(e);
-                    }
-                }
-            } else if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit file_list batch add error: {}", e);
-                return Err(e.into());
-            }
-        }
-        Ok(())
+        self.inner_batch_add("file_list", files).await
+    }
+
+    async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
+        self.inner_batch_add("file_list_history", files).await
     }
 
     async fn batch_remove(&self, files: &[String]) -> Result<()> {
@@ -639,11 +557,132 @@ UPDATE stream_stats
     }
 }
 
+impl PostgresFileList {
+    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<()> {
+        let pool = CLIENT.clone();
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        match  sqlx::query(
+            format!(r#"
+INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ON CONFLICT DO NOTHING;
+            "#).as_str(),
+        )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(false)
+        .bind(meta.min_ts)
+        .bind(meta.max_ts)
+        .bind(meta.records)
+        .bind(meta.original_size)
+        .bind(meta.compressed_size)
+        .execute(&pool)
+        .await {
+            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
+                  Ok(())
+            } else {
+                  Err(Error::Message(e.to_string()))
+            },
+            Err(e) =>  Err(e.into()),
+            Ok(_) => Ok(()),
+        }
+    }
+
+    async fn inner_batch_add(&self, table: &str, files: &[FileKey]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+        let pool = CLIENT.clone();
+        let chunks = files.chunks(100);
+        for files in chunks {
+            let mut tx = pool.begin().await?;
+            let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)").as_str(),
+            );
+            query_builder.push_values(files, |mut b, item| {
+                let (stream_key, date_key, file_name) =
+                    parse_file_key_columns(&item.key).expect("parse file key failed");
+                let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+                b.push_bind(org_id)
+                    .push_bind(stream_key)
+                    .push_bind(date_key)
+                    .push_bind(file_name)
+                    .push_bind(false)
+                    .push_bind(item.meta.min_ts)
+                    .push_bind(item.meta.max_ts)
+                    .push_bind(item.meta.records)
+                    .push_bind(item.meta.original_size)
+                    .push_bind(item.meta.compressed_size);
+            });
+            let need_single_insert = match query_builder.build().execute(&mut *tx).await {
+                Ok(_) => false,
+                Err(sqlx::Error::Database(e)) => {
+                    if e.is_unique_violation() {
+                        true
+                    } else {
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[POSTGRES] rollback {table} batch add error: {}", e);
+                        }
+                        return Err(Error::Message(e.to_string()));
+                    }
+                }
+                Err(e) => {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!("[POSTGRES] rollback {table} batch add error: {}", e);
+                    }
+                    return Err(e.into());
+                }
+            };
+            if need_single_insert {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback {table} batch add error: {}", e);
+                    return Err(e.into());
+                }
+                for item in files {
+                    if let Err(e) = self.inner_add(table, &item.key, &item.meta).await {
+                        log::error!("[POSTGRES] single insert {table} add error: {}", e);
+                        return Err(e);
+                    }
+                }
+            } else if let Err(e) = tx.commit().await {
+                log::error!("[POSTGRES] commit {table} batch add error: {}", e);
+                return Err(e.into());
+            }
+        }
+        Ok(())
+    }
+}
+
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
+(
+    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    org      VARCHAR(100) not null,
+    stream   VARCHAR(256) not null,
+    date     VARCHAR(16)  not null,
+    file     VARCHAR(256) not null,
+    deleted  BOOLEAN default false not null,
+    min_ts   BIGINT not null,
+    max_ts   BIGINT not null,
+    records  BIGINT not null,
+    original_size   BIGINT not null,
+    compressed_size BIGINT not null
+);
+        "#,
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS file_list_history
 (
     id       BIGINT GENERATED ALWAYS AS IDENTITY,
     org      VARCHAR(100) not null,
@@ -711,10 +750,18 @@ pub async fn create_table_index() -> Result<()> {
             "file_list",
             "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
-        // (
-        //     "file_list",
-        //     "CREATE UNIQUE INDEX IF NOT EXISTS file_list_stream_file_idx on file_list (stream,
-        // date, file);", ),
+        (
+            "file_list_history",
+            "CREATE INDEX IF NOT EXISTS file_list_history_org_idx on file_list_history (org);",
+        ),
+        (
+            "file_list_history",
+            "CREATE INDEX IF NOT EXISTS file_list_history_stream_ts_idx on file_list_history (stream, min_ts, max_ts);",
+        ),
+        (
+            "file_list_history",
+            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_history_stream_file_idx on file_list_history (stream, date, file);",
+        ),
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_created_at_idx on file_list_deleted (org, created_at);",

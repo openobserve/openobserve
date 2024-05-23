@@ -23,6 +23,7 @@ pub mod kv;
 pub mod logs;
 pub mod metrics;
 pub mod organization;
+pub mod pipelines;
 pub mod prom;
 pub mod rum;
 pub mod search;

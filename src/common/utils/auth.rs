@@ -66,6 +66,7 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
     if O2_CONFIG.openfga.enabled {
         use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
@@ -77,6 +78,23 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
         };
 
+        // Default folder is already created in case of new org, this handles the case for old org
+        if obj_type.eq("folders")
+            && authorizer::authz::check_folder_exists(org_id, &obj.obj_id).await
+        {
+            // If the folder tuples are missing, it automatically creates them
+            // So we can return here
+            log::debug!(
+                "folder tuples already exists for org: {org_id}; folder: {}",
+                &obj.obj_id
+            );
+            return;
+        } else if obj.parent_type.eq("folders") {
+            log::debug!("checking parent folder tuples for folder: {}", &obj.parent);
+            // In case of dashboard, we need to check if the tuples for its folder exist
+            // If not, the below function creates the proper tuples for the folder
+            authorizer::authz::check_folder_exists(org_id, &obj.parent).await;
+        }
         authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
     }
 }
@@ -197,7 +215,11 @@ impl FromRequest for AuthExtractor {
                 path_columns[0].to_string()
             }
         } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
-            if method.eq("GET") {
+            if path_columns[1].starts_with("settings") {
+                if method.eq("POST") || method.eq("DELETE") {
+                    method = "PUT".to_string();
+                }
+            } else if method.eq("GET") {
                 method = "LIST".to_string();
             }
             format!(
@@ -206,6 +228,14 @@ impl FromRequest for AuthExtractor {
                     .get(path_columns[1])
                     .map_or(path_columns[1], |model| model.key),
                 path_columns[0]
+            )
+        } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+            format!(
+                "{}:{org_id}/{}",
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
+                path_columns[2]
             )
         } else if url_len == 3 {
             if path_columns[2].starts_with("alerts")
@@ -263,7 +293,15 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if url_len == 4 {
-            if method.eq("PUT") && path_columns[1] != "streams" || method.eq("DELETE") {
+            if method.eq("PUT") && path_columns[1].eq("reports") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            } else if method.eq("PUT") && path_columns[1] != "streams" || method.eq("DELETE") {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -272,6 +310,9 @@ impl FromRequest for AuthExtractor {
                     path_columns[3]
                 )
             } else {
+                if method.eq("POST") && path_columns[3].eq("pipelines") {
+                    method = "PUT".to_string();
+                }
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -322,7 +363,7 @@ impl FromRequest for AuthExtractor {
                     Some(token) => {
                         format!("Bearer {}", *token)
                     }
-                    None => format!("session {}", access_token),
+                    None => access_token,
                 }
             } else {
                 format!("Bearer {}", access_token)
@@ -345,6 +386,9 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/format_query")
                 || path.contains("/prometheus/api/v1/series")
                 || path.contains("/traces/latest")
+                || (method.eq("LIST") && path.contains("pipelines"))
+                || path.contains("clusters")
+                || path.contains("query_manager")
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

@@ -13,14 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{cmp::max, collections::BTreeMap, path::Path, time::Duration};
 
-use chromiumoxide::{
-    browser::BrowserConfig,
-    detection::{default_executable, DetectionOptions},
-    fetcher::{BrowserFetcher, BrowserFetcherOptions},
-    handler::viewport::Viewport,
-};
+use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
@@ -33,7 +28,6 @@ use lettre::{
     AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
-use reqwest::Client;
 use sysinfo::{DiskExt, SystemExt};
 
 use crate::{
@@ -59,7 +53,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
-pub const PARQUET_WRITE_BUFFER_SIZE: usize = 4096;
 
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
@@ -165,7 +158,7 @@ pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::def
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
-        Client::builder()
+        reqwest::Client::builder()
             .connect_timeout(Duration::new(10, 0))
             .build()
             .unwrap(),
@@ -183,7 +176,7 @@ pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
-    if !CONFIG.chrome.chrome_enabled {
+    if !CONFIG.chrome.chrome_enabled || !CONFIG.common.report_server_url.is_empty() {
         None
     } else {
         let mut browser_config = BrowserConfig::builder()
@@ -209,50 +202,7 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
         if !CONFIG.chrome.chrome_path.is_empty() {
             browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
         } else {
-            let mut should_download = false;
-
-            if !CONFIG.chrome.chrome_check_default {
-                should_download = true;
-            } else {
-                // Check if chrome is available on default paths
-                // 1. Check the CHROME env
-                // 2. Check usual chrome file names in user path
-                // 3. (Windows) Registry
-                // 4. (Windows & MacOS) Usual installations paths
-                if let Ok(exec_path) = default_executable(DetectionOptions::default()) {
-                    browser_config = browser_config.chrome_executable(exec_path);
-                } else {
-                    should_download = true;
-                }
-            }
-            if should_download {
-                // Download known good chrome version
-                let download_path = &CONFIG.chrome.chrome_download_path;
-                log::info!("fetching chrome at: {download_path}");
-                tokio::fs::create_dir_all(download_path).await.unwrap();
-                let fetcher = BrowserFetcher::new(
-                    BrowserFetcherOptions::builder()
-                        .with_path(download_path)
-                        .build()
-                        .unwrap(),
-                );
-
-                // Fetches the browser revision, either locally if it was previously
-                // installed or remotely. Returns error when the download/installation
-                // fails. Since it doesn't retry on network errors during download,
-                // if the installation fails, it might leave the cache in a bad state
-                // and it is advised to wipe it.
-                // Note: Does not work on LinuxArm platforms.
-                let info = fetcher
-                    .fetch()
-                    .await
-                    .expect("chrome could not be downloaded");
-                log::info!(
-                    "chrome fetched at path {:#?}",
-                    info.executable_path.as_path()
-                );
-                browser_config = browser_config.chrome_executable(info.executable_path);
-            }
+            panic!("Chrome path must be specified");
         }
         Some(browser_config.build().unwrap())
     }
@@ -329,10 +279,6 @@ pub struct Chrome {
     pub chrome_enabled: bool,
     #[env_config(name = "ZO_CHROME_PATH", default = "")]
     pub chrome_path: String,
-    #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
-    pub chrome_check_default: bool,
-    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
-    pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
     #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
@@ -420,6 +366,8 @@ pub struct Grpc {
         help = "Max grpc message size in MB, default is 16 MB"
     )]
     pub max_message_size: usize,
+    #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
+    pub connect_timeout: u64,
 }
 
 #[derive(EnvConfig)]
@@ -467,6 +415,7 @@ pub struct Common {
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
+    pub instance_name_short: String,
     #[env_config(name = "ZO_WEB_URL", default = "")] // http://localhost:5080
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
@@ -640,10 +589,18 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "")]
+    pub report_server_url: String,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
+    #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
+    pub skip_formatting_bulk_stream_name: bool,
+    #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]
+    pub bulk_api_response_errors_only: bool,
+    #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
+    pub allow_user_defined_schemas: bool,
 }
 
 #[derive(EnvConfig)]
@@ -745,6 +702,8 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
     pub query_optimization_num_fields: usize,
+    #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
+    pub quick_mode_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
@@ -773,6 +732,8 @@ pub struct Limit {
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
     pub distinct_values_hourly: bool,
+    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 3)]
+    pub consistent_hash_vnodes: usize,
 }
 
 #[derive(EnvConfig)]
@@ -795,6 +756,8 @@ pub struct Compact {
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
+    pub data_retention_history: bool,
 }
 
 #[derive(EnvConfig)]
@@ -804,6 +767,9 @@ pub struct MemoryCache {
     // Memory data cache strategy, default is lru, other value is fifo
     #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
+    // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
+    #[env_config(name = "ZO_MEMORY_CACHE_BUCKET_NUM", default = 0)]
+    pub bucket_num: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
     // MB, default is 50% of system memory
@@ -836,6 +802,9 @@ pub struct DiskCache {
     // Disk data cache strategy, default is lru, other value is fifo
     #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
     pub cache_strategy: String,
+    // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
+    #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
+    pub bucket_num: usize,
     // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
@@ -850,6 +819,8 @@ pub struct DiskCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
+    #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
+    pub multi_dir: String,
 }
 
 #[derive(EnvConfig)]
@@ -1018,9 +989,9 @@ pub fn init() -> Config {
     if cfg.limit.query_thread_num == 0 {
         cfg.limit.query_thread_num = cpu_num * 4;
     }
-    // HACK for move_file_thread_num equal to CPU core * 2
+    // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num * 2;
+        cfg.limit.file_move_thread_num = cpu_num;
     }
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
@@ -1035,6 +1006,10 @@ pub fn init() -> Config {
 
     if cfg.limit.sql_max_db_connections == 0 {
         cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
+    }
+
+    if cfg.limit.consistent_hash_vnodes == 0 {
+        cfg.limit.consistent_hash_vnodes = 3;
     }
 
     // check common config
@@ -1095,6 +1070,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
     }
+    cfg.common.instance_name_short = cfg
+        .common
+        .instance_name
+        .split('.')
+        .next()
+        .unwrap()
+        .to_string();
 
     // HACK for tracing, always disable tracing except ingester and querier
     let local_node_role: Vec<cluster::Role> = cfg
@@ -1294,6 +1276,13 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
 
+    if cfg.memory_cache.bucket_num == 0 {
+        cfg.memory_cache.bucket_num = 1;
+    }
+    cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
+    cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
+    cfg.memory_cache.gc_size /= cfg.memory_cache.bucket_num;
+
     // for memtable limit check
     if cfg.limit.mem_table_max_size == 0 {
         cfg.limit.mem_table_max_size = mem_total / 2; // 50%
@@ -1374,6 +1363,28 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.disk_cache.gc_size *= 1024 * 1024;
     }
+
+    if cfg.disk_cache.multi_dir.contains('/') {
+        return Err(anyhow::anyhow!(
+            "ZO_DISK_CACHE_MULTI_DIR only supports a single directory level, can not contains / "
+        ));
+    }
+
+    if cfg.disk_cache.bucket_num == 0 {
+        cfg.disk_cache.bucket_num = 1;
+    }
+    cfg.disk_cache.bucket_num = max(
+        cfg.disk_cache.bucket_num,
+        cfg.disk_cache
+            .multi_dir
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .count(),
+    );
+    cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
+
     Ok(())
 }
 

@@ -29,7 +29,7 @@ use config::{
     CONFIG,
 };
 use hashbrown::HashSet;
-use infra::schema::unwrap_partition_time_level;
+use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
@@ -50,7 +50,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
+        schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -294,13 +294,9 @@ pub async fn metrics_json_handler(
 
                     // udpate schema metadata
                     if !schema_exists.has_metadata {
-                        if let Err(e) = set_schema_metadata(
-                            org_id,
-                            metric_name,
-                            StreamType::Metrics,
-                            &prom_meta,
-                        )
-                        .await
+                        if let Err(e) =
+                            update_setting(org_id, metric_name, StreamType::Metrics, prom_meta)
+                                .await
                         {
                             log::error!(
                                 "Failed to set metadata for metric: {} with error: {}",
@@ -374,6 +370,7 @@ pub async fn metrics_json_handler(
                                 &local_trans,
                                 rec,
                                 &stream_vrl_map,
+                                org_id,
                                 local_metric_name,
                                 &mut runtime,
                             )

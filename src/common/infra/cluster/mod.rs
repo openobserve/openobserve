@@ -36,7 +36,6 @@ use crate::service::db as db_service;
 mod etcd;
 mod nats;
 
-const CONSISTENT_HASH_VNODES: usize = 3;
 const HEALTH_CHECK_FAILED_TIMES: usize = 3;
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -52,7 +51,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         _ => return,
     };
     let mut h = config::utils::hash::gxhash::new();
-    for i in 0..CONSISTENT_HASH_VNODES {
+    for i in 0..CONFIG.limit.consistent_hash_vnodes {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
         nodes.insert(hash, node.uuid.clone());
@@ -66,7 +65,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         _ => return,
     };
     let mut h = config::utils::hash::gxhash::new();
-    for i in 0..CONSISTENT_HASH_VNODES {
+    for i in 0..CONFIG.limit.consistent_hash_vnodes {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);

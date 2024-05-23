@@ -18,9 +18,10 @@ use std::io::Error;
 use actix_web::{delete, get, web, HttpResponse};
 
 #[cfg(feature = "enterprise")]
-#[delete("/query_manager/{trace_id}")]
-pub async fn cancel_query(trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let res = crate::service::search::cancel_query(&trace_id.into_inner()).await;
+#[delete("/{org_id}/query_manager/{trace_id}")]
+pub async fn cancel_query(params: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (_, trace_id) = params.into_inner();
+    let res = crate::service::search::cancel_query(&trace_id).await;
     match res {
         Ok(status) => Ok(HttpResponse::Ok().json(status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
@@ -28,14 +29,14 @@ pub async fn cancel_query(trace_id: web::Path<String>) -> Result<HttpResponse, E
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[delete("/query_manager/{trace_id}")]
-pub async fn cancel_query(_trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
+#[delete("/{org_id}/query_manager/{trace_id}")]
+pub async fn cancel_query(_params: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/query_manager/status")]
-pub async fn query_status() -> Result<HttpResponse, Error> {
+#[get("/{org_id}/query_manager/status")]
+pub async fn query_status(_params: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = crate::service::search::query_status().await;
     match res {
         Ok(query_status) => Ok(HttpResponse::Ok().json(query_status)),
@@ -44,7 +45,7 @@ pub async fn query_status() -> Result<HttpResponse, Error> {
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[get("/query_manager/status")]
-pub async fn query_status() -> Result<HttpResponse, Error> {
+#[get("/{org_id}/query_manager/status")]
+pub async fn query_status(_params: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

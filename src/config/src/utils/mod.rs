@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod arrow;
 pub mod asynchronism;
 pub mod base64;
 pub mod cgroup;
@@ -20,7 +21,6 @@ pub mod file;
 pub mod flatten;
 pub mod hash;
 pub mod json;
-pub mod lru_cache;
 pub mod parquet;
 pub mod rand;
 pub mod record_batch_ext;

@@ -23,7 +23,7 @@ use config::{
 };
 use infra::dist_lock;
 use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::{mpsc, Mutex, Semaphore};
 
 use crate::{
     common::infra::cluster::{get_node_by_uuid, get_node_from_consistent_hash},
@@ -32,7 +32,7 @@ use crate::{
 
 mod file_list;
 pub mod file_list_deleted;
-mod merge;
+pub mod merge;
 pub mod retention;
 pub mod stats;
 
@@ -178,7 +178,9 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 /// 10. update last compacted offset
 /// 11. release cluster lock
 /// 12. compact file list from storage
-pub async fn run_merge() -> Result<(), anyhow::Error> {
+pub async fn run_merge(
+    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
+) -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [
@@ -245,8 +247,10 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 
                 let org_id = org_id.clone();
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let worker_tx = worker_tx.clone();
                 let task = tokio::task::spawn(async move {
-                    if let Err(e) = merge::merge_by_stream(&org_id, stream_type, &stream_name).await
+                    if let Err(e) =
+                        merge::merge_by_stream(worker_tx, &org_id, stream_type, &stream_name).await
                     {
                         log::error!(
                             "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",

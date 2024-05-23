@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{get, HttpResponse};
+use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {o2_enterprise::enterprise::common::infra::config::O2_CONFIG, std::io::ErrorKind};
 
@@ -28,7 +29,7 @@ use {o2_enterprise::enterprise::common::infra::config::O2_CONFIG, std::io::Error
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = HashMap<String, Vec<String>>),
     )
 )]
 #[get("/clusters")]
@@ -38,11 +39,16 @@ pub async fn list_clusters() -> Result<HttpResponse, Error> {
         let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list()
             .await
             .map_err(|e| Error::new(ErrorKind::Other, e))?;
-        clusters.into_iter().map(|c| c.name).collect::<Vec<_>>()
+        let mut regions = HashMap::with_capacity(clusters.len());
+        for c in clusters {
+            let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);
+            region.push(c.name);
+        }
+        regions
     } else {
-        vec![]
+        HashMap::new()
     };
     #[cfg(not(feature = "enterprise"))]
-    let clusters: Vec<String> = vec![];
+    let clusters: HashMap<String, String> = HashMap::new();
     Ok(HttpResponse::Ok().json(clusters))
 }

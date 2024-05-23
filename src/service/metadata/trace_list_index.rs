@@ -164,14 +164,14 @@ impl TraceListIndex {
             .await
             .unwrap();
         if db_schema.fields().is_empty() {
+            let timestamp = chrono::Utc::now().timestamp_micros();
             let schema = self.schema.as_ref().clone();
-            if let Err(e) = db::schema::set(
+            if let Err(e) = db::schema::merge(
                 org_id,
                 STREAM_NAME,
                 StreamType::Metadata,
                 &schema,
-                None,
-                false,
+                Some(timestamp),
             )
             .await
             {
@@ -184,7 +184,6 @@ impl TraceListIndex {
                 full_text_search_keys: vec![],
                 bloom_filter_fields: vec!["trace_id".to_string()],
                 data_retention: 0,
-                routing: None,
                 flatten_level: None,
                 defined_schema_fields: None,
             };

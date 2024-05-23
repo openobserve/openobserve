@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -38,7 +38,9 @@ use vrl::{
 use super::usage::publish_triggers_usage;
 use crate::{
     common::{
-        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS},
+        infra::config::{
+            REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
+        },
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
@@ -46,7 +48,7 @@ use crate::{
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key, format_stream_name},
+    service::{db, format_partition_key},
 };
 
 pub mod grpc;
@@ -85,7 +87,13 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row: &Value) -> Value {
+pub fn apply_vrl_fn(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: &Value,
+    org_id: &str,
+    stream_name: &str,
+) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(row),
@@ -102,12 +110,22 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row:
         Ok(res) => match res.try_into() {
             Ok(val) => val,
             Err(err) => {
-                log::error!("Returning original row , got error from vrl {:?}", err);
+                log::error!(
+                    "{}/{} vrl failed at processing result {:?}. Returning original row.",
+                    org_id,
+                    stream_name,
+                    err,
+                );
                 row.clone()
             }
         },
         Err(err) => {
-            log::error!("Returning original row , got error from vrl {:?}", err);
+            log::error!(
+                "{}/{} vrl runtime failed at getting result {:?}. Returning original row.",
+                org_id,
+                stream_name,
+                err,
+            );
             row.clone()
         }
     }
@@ -126,12 +144,16 @@ pub async fn get_stream_functions<'a>(
         if stream_functions_map.contains_key(&key) {
             return;
         }
-        let mut _local_trans: Vec<StreamTransform> = vec![];
-        (_local_trans, *stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-            &stream.org_id,
-            &stream.stream_type,
-            &stream.stream_name,
-        );
+        //   let mut _local_trans: Vec<StreamTransform> = vec![];
+        // let local_stream_vrl_map;
+        let (_local_trans, local_stream_vrl_map) =
+            crate::service::ingestion::register_stream_functions(
+                &stream.org_id,
+                &stream.stream_type,
+                &stream.stream_name,
+            );
+        stream_vrl_map.extend(local_stream_vrl_map);
+
         stream_functions_map.insert(key, _local_trans);
     }
 }
@@ -335,6 +357,7 @@ pub fn apply_stream_functions(
     local_trans: &[StreamTransform],
     mut value: Value,
     stream_vrl_map: &HashMap<String, VRLResultResolver>,
+    org_id: &str,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value> {
@@ -342,7 +365,7 @@ pub fn apply_stream_functions(
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
-            value = apply_vrl_fn(runtime, vrl_runtime, &value);
+            value = apply_vrl_fn(runtime, vrl_runtime, &value, org_id, stream_name);
         }
     }
     flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)
@@ -373,6 +396,7 @@ pub async fn write_file(
                     data: entry.records,
                     data_size: entry.records_size,
                 },
+                false,
             )
             .await
         {
@@ -488,29 +512,28 @@ pub async fn get_stream_routing(
     stream_params: StreamParams,
     stream_routing_map: &mut HashMap<String, Vec<Routing>>,
 ) {
-    let stream_settings = infra::schema::get_settings(
-        &stream_params.org_id,
-        &stream_params.stream_name,
-        stream_params.stream_type,
-    )
-    .await
-    .unwrap_or_default();
-    let res: Vec<Routing> = stream_settings
-        .routing
-        .unwrap_or_default()
-        .iter()
-        .map(|(k, v)| Routing {
-            destination: format_stream_name(k),
-            routing: v.clone(),
-        })
-        .collect();
+    if let Some(pipeline) = STREAM_PIPELINES.get(&format!(
+        "{}/{}/{}",
+        &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
+    )) {
+        let res: Vec<Routing> = pipeline
+            .routing
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| Routing {
+                destination: k.to_string(),
+                routing: v.clone(),
+            })
+            .collect();
 
-    stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+        stream_routing_map.insert(stream_params.stream_name.to_string(), res);
+    }
 }
 
 pub async fn get_user_defined_schema(
     streams: &[StreamParams],
-    user_defined_schema_map: &mut HashMap<String, Vec<String>>,
+    user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
 ) {
     for stream in streams {
         let stream_settings =
@@ -519,6 +542,10 @@ pub async fn get_user_defined_schema(
                 .unwrap_or_default();
         if let Some(fields) = stream_settings.defined_schema_fields {
             if !fields.is_empty() {
+                let mut fields: HashSet<_> = fields.iter().cloned().collect();
+                if !fields.contains(&CONFIG.common.column_timestamp) {
+                    fields.insert(CONFIG.common.column_timestamp.to_string());
+                }
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }
         }

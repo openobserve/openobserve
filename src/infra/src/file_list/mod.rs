@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,8 +46,10 @@ pub trait FileList: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()>;
+    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<()>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
+    async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_remove(&self, files: &[String]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
@@ -122,6 +124,11 @@ pub async fn add(file: &str, meta: &FileMeta) -> Result<()> {
 }
 
 #[inline]
+pub async fn add_history(file: &str, meta: &FileMeta) -> Result<()> {
+    CLIENT.add_history(file, meta).await
+}
+
+#[inline]
 pub async fn remove(file: &str) -> Result<()> {
     CLIENT.remove(file).await
 }
@@ -129,6 +136,11 @@ pub async fn remove(file: &str) -> Result<()> {
 #[inline]
 pub async fn batch_add(files: &[FileKey]) -> Result<()> {
     CLIENT.batch_add(files).await
+}
+
+#[inline]
+pub async fn batch_add_history(files: &[FileKey]) -> Result<()> {
+    CLIENT.batch_add_history(files).await
 }
 
 #[inline]

@@ -59,16 +59,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage }"
+        v-model:pagination="pagination"
         hide-header
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
         class="field-table full-height"
         id="fieldList"
         :rows-per-page-options="[]"
         :hide-bottom="
+          (!store.state.zoConfig.user_defined_schemas_enabled ||
+            searchObj.data.stream.userDefinedSchema.length == 0) &&
           searchObj.data.stream.selectedStreamFields != undefined &&
-          (searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
-          searchObj.data.stream.selectedStreamFields.length == 0)
+          (searchObj.data.stream.selectedStreamFields.length <=
+            pagination.rowsPerPage ||
+            searchObj.data.stream.selectedStreamFields.length == 0)
         "
       >
         <template #body-cell-name="props">
@@ -421,13 +424,133 @@ style="opacity: 0.7">
             </q-td>
           </q-tr>
         </template>
+        <template v-slot:pagination="scope">
+          <div
+            v-if="
+              store.state.zoConfig.user_defined_schemas_enabled &&
+              searchObj.data.stream.userDefinedSchema.length > 0
+            "
+          >
+            <q-btn-toggle
+              no-caps
+              v-model="searchObj.meta.useUserDefinedSchemas"
+              data-test="logs-page-field-list-user-defined-schema-toggle"
+              class="schema-field-toggle q-mr-xs"
+              toggle-color="primary"
+              bordered
+              size="8px"
+              color="white"
+              text-color="primary"
+              @update:model-value="toggleSchema"
+              :options="userDefinedSchemaBtnGroupOption"
+            >
+              <template v-slot:user_defined_slot>
+                <q-icon name="person"></q-icon>
+                <q-icon name="schema"></q-icon>
+                <q-tooltip
+                  data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  class="text-body2"
+                >
+                  <span class="text-bold" color="white">{{
+                    t("search.userDefinedSchemaLabel")
+                  }}</span>
+                </q-tooltip>
+              </template>
+              <template v-slot:all_fields_slot>
+                <q-icon name="schema"></q-icon>
+                <q-tooltip
+                  data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  class="text-body2"
+                >
+                  <span class="text-bold" color="white">{{
+                    t("search.allFieldsLabel")
+                  }}</span>
+                  <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                  {{ t("search.allFieldsWarningMsg") }}
+                </q-tooltip>
+              </template>
+            </q-btn-toggle>
+          </div>
+          <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
+            <q-tooltip
+              data-test="logs-page-fields-list-pagination-tooltip"
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              class="text-body2"
+            >
+              Total Fields:
+              {{ searchObj.data.stream.selectedStreamFields.length }}
+            </q-tooltip>
+            <q-btn
+              data-test="logs-page-fields-list-pagination-firstpage-button"
+              v-if="scope.pagesNumber > 2"
+              icon="skip_previous"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.firstPage"
+            />
+
+            <q-btn
+              data-test="logs-page-fields-list-pagination-previouspage-button"
+              icon="fast_rewind"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.prevPage"
+            />
+
+            <q-btn
+              round
+              data-test="logs-page-fields-list-pagination-messsage-button"
+              dense
+              flat
+              class="text text-caption text-regular"
+              >{{ scope.pagination.page }}/{{ scope.pagesNumber }}</q-btn
+            >
+
+            <q-btn
+              data-test="logs-page-fields-list-pagination-nextpage-button"
+              icon="fast_forward"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.nextPage"
+            />
+
+            <q-btn
+              data-test="logs-page-fields-list-pagination-lastpage-button"
+              v-if="scope.pagesNumber > 2"
+              icon="skip_next"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.lastPage"
+            />
+          </div>
+        </template>
       </q-table>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch } from "vue";
+import { defineComponent, ref, type Ref, watch, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -472,7 +595,20 @@ export default defineComponent({
       handleQueryData,
       onStreamChange,
       filterHitsColumns,
+      extractFields,
     } = useLogs();
+    const userDefinedSchemaBtnGroupOption = [
+      {
+        label: "",
+        value: "user_defined_schema",
+        slot: "user_defined_slot",
+      },
+      {
+        label: "",
+        value: "all_fields",
+        slot: "all_fields_slot",
+      },
+    ];
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -486,7 +622,6 @@ export default defineComponent({
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
-    const rowsPerPage = ref(250);
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -665,6 +800,12 @@ export default defineComponent({
             query_context: query_context,
             query_fn: query_fn,
             type: searchObj.data.stream.streamType,
+            regions: searchObj.meta.hasOwnProperty("regions")
+              ? searchObj.meta.regions.join(",")
+              : "",
+            clusters: searchObj.meta.hasOwnProperty("clusters")
+              ? searchObj.meta.clusters.join(",")
+              : "",
           })
           .then((res: any) => {
             if (res.data.hits.length) {
@@ -751,6 +892,19 @@ export default defineComponent({
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
     };
 
+    const pagination = ref({
+      page: 1,
+      rowsPerPage: 25,
+    });
+
+    const toggleSchema = async () => {
+      searchObj.loadingStream = true;
+      setTimeout(async () => {
+        await extractFields();
+        searchObj.loadingStream = false;
+      }, 0);
+    }
+
     return {
       t,
       store,
@@ -772,7 +926,16 @@ export default defineComponent({
       handleQueryData,
       onStreamChange,
       addToInterestingFieldList,
-      rowsPerPage,
+      extractFields,
+      userDefinedSchemaBtnGroupOption,
+      pagination,
+      toggleSchema,
+      pagesNumber: computed(() => {
+        return Math.ceil(
+          searchObj.data.stream.selectedStreamFields.length /
+            pagination.value.rowsPerPage
+        );
+      }),
     };
   },
 });
@@ -849,6 +1012,10 @@ $streamSelectorHeight: 44px;
 
   .field-table {
     width: 100%;
+
+    > .q-table__bottom {
+      padding: 0px !important;
+    }
   }
 
   .field_list {
@@ -1055,6 +1222,34 @@ $streamSelectorHeight: 44px;
         }
       }
     }
+  }
+
+  .schema-field-toggle {
+    border: 1px solid light-grey;
+    border-radius: 5px;
+    line-height: 10px;
+  }
+
+  .q-table__bottom {
+    padding: 0px !important;
+  }
+
+  .pagination-field-count {
+    line-height: 32px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+}
+</style>
+
+<style lang="scss">
+.field-table {
+  .q-table__bottom {
+    padding: 5px !important;
+  }
+
+  .schema-field-toggle .q-btn {
+    padding: 5px !important;
   }
 }
 </style>

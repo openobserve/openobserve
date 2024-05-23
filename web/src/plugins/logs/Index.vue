@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
+            @handleQuickModeChange="handleQuickModeChange"
           />
         </template>
         <template v-slot:after>
@@ -99,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       Result not found.
                     </div>
-                    <HTMLRenderer
+                    <SanitizedHtmlRenderer
                       data-test="logs-search-error-message"
                       :htmlContent="searchObj.data.errorMsg"
                     />
@@ -209,15 +210,11 @@ color="primary" size="md" />
 import {
   defineComponent,
   ref,
-  onDeactivated,
   onActivated,
   computed,
-  onMounted,
   nextTick,
   onBeforeMount,
-  onBeforeUnmount,
   watch,
-  onUnmounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -228,15 +225,13 @@ import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
 import useLogs from "@/composables/useLogs";
-import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser/build/mysql";
 
-import { b64DecodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
-import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -244,7 +239,7 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -376,6 +371,7 @@ export default defineComponent({
       getHistogramQueryData,
       fnParsedSQL,
       addOrderByToQuery,
+      getRegionInfo,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -448,9 +444,16 @@ export default defineComponent({
       refreshHistogramChart();
     });
 
-    onBeforeMount(() => {
+    onBeforeMount(async () => {
       searchObj.loading = true;
       searchObj.meta.pageType = "logs";
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled
+      ) {
+        await getRegionInfo();
+      }
+
       resetSearchObj();
       resetStreamData();
       searchObj.organizationIdetifier =
@@ -460,6 +463,7 @@ export default defineComponent({
       if (config.isCloud == "true") {
         MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
       }
+      searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
     });
 
     /**
@@ -471,6 +475,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.type,
       (type, prev) => {
         if (
+          searchObj.shouldIgnoreWatcher == false &&
           router.currentRoute.value.name === "logs" &&
           prev === "stream_explorer" &&
           !type
@@ -714,6 +719,25 @@ export default defineComponent({
       }
     };
 
+    const handleQuickModeChange = () => {
+      if (searchObj.meta.quickMode == true) {
+        let field_list: string = "*";
+        if (searchObj.data.stream.interestingFieldList.length > 0) {
+          field_list = searchObj.data.stream.interestingFieldList.join(",");
+        }
+        if (searchObj.meta.sqlMode == true) {
+          searchObj.data.query = searchObj.data.query.replace(
+            /SELECT\s+(.*?)\s+FROM/i,
+            (match, fields) => {
+              return `SELECT ${field_list} FROM`;
+            }
+          );
+          setQuery(searchObj.meta.quickMode);
+          updateUrlQueryParams();
+        }
+      }
+    };
+
     return {
       t,
       store,
@@ -745,6 +769,7 @@ export default defineComponent({
       resetStreamData,
       getHistogramQueryData,
       setInterestingFieldInSQLQuery,
+      handleQuickModeChange,
     };
   },
   computed: {
@@ -780,9 +805,6 @@ export default defineComponent({
     },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
-    },
-    quickMode() {
-      return this.searchObj.meta.quickMode;
     },
     refreshHistogram() {
       return this.searchObj.meta.histogramDirtyFlag;
@@ -889,25 +911,6 @@ export default defineComponent({
         }
       }
       // this.searchResultRef.reDrawChart();
-    },
-    quickMode(newVal) {
-      if (newVal == true) {
-        let field_list: string = "*";
-        if (this.searchObj.data.stream.interestingFieldList.length > 0) {
-          field_list =
-            this.searchObj.data.stream.interestingFieldList.join(",");
-        }
-        if (this.searchObj.meta.sqlMode == true) {
-          this.searchObj.data.query = this.searchObj.data.query.replace(
-            /SELECT\s+(.*?)\s+FROM/i,
-            (match, fields) => {
-              return `SELECT ${field_list} FROM`;
-            }
-          );
-          this.setQuery(newVal);
-          this.updateUrlQueryParams();
-        }
-      }
     },
     refreshHistogram() {
       if (

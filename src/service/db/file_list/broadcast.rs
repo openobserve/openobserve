@@ -154,6 +154,7 @@ async fn send_to_node(
             .expect("parse internal grpc token faile");
         let channel = match Channel::from_shared(node.grpc_addr.clone())
             .unwrap()
+            .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
             .connect()
             .await
         {

@@ -193,6 +193,7 @@ impl super::Db for MysqlDb {
 
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
+        let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
                 r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#
@@ -318,6 +319,7 @@ impl super::Db for MysqlDb {
 
         // new value
         if let Some((new_key, new_value, new_start_dt)) = new_value {
+            need_watch_dt = new_start_dt.unwrap_or_default();
             let (module, key1, key2) = super::parse_key(&new_key);
             if let Err(e) = sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, ?);"#,
@@ -358,7 +360,7 @@ impl super::Db for MysqlDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(key, Bytes::from(""), true, start_dt)
+                .put(key, Bytes::from(need_watch_dt.to_string()), true, start_dt)
                 .await?;
         }
 
@@ -502,7 +504,8 @@ impl super::Db for MysqlDb {
 
         let (min_dt, max_dt) = start_dt.unwrap();
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, value AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }

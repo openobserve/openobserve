@@ -118,18 +118,9 @@ pub struct Trigger {
 
 /// Initializes the scheduler - creates table and index
 pub async fn init() -> Result<()> {
-    create_table().await?;
-    create_table_index().await?;
+    CLIENT.create_table().await?;
+    CLIENT.create_table_index().await?;
     Ok(())
-}
-
-/// Creates the Scheduled Jobs table
-pub async fn create_table() -> Result<()> {
-    CLIENT.create_table().await
-}
-
-pub async fn create_table_index() -> Result<()> {
-    CLIENT.create_table_index().await
 }
 
 /// Pushes a Trigger job into the queue

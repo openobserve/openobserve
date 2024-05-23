@@ -30,23 +30,20 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::STREAM_SCHEMAS_FIELDS,
+    schema::{get_stream_setting_fts_fields, STREAM_SCHEMAS_FIELDS},
 };
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    common::meta::stream::StreamParams,
-    service::{search::match_source, stream::get_stream_setting_fts_fields},
-};
+use crate::{common::meta::stream::StreamParams, service::search::match_source};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
 ];
 
-static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
+pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
@@ -114,9 +111,13 @@ impl Display for SqlMode {
 impl Sql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
-        let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
         let stream_type = StreamType::from(req.stream_type.as_str());
+
+        let mut req_time_range = (req_query.start_time, req_query.end_time);
+        if req_time_range.1 == 0 {
+            req_time_range.1 = chrono::Utc::now().timestamp_micros();
+        }
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
@@ -1006,6 +1007,7 @@ mod tests {
             query,
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };
@@ -1115,6 +1117,7 @@ mod tests {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
                 clusters: vec![],
                 timeout: 0,
             };
@@ -1237,6 +1240,7 @@ mod tests {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
                 clusters: vec![],
                 timeout: 0,
             };

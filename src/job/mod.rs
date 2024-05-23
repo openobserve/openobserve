@@ -106,9 +106,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        tokio::task::spawn(async move { db::pipelines::watch().await });
+    }
 
     #[cfg(feature = "enterprise")]
-    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
+        || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE)
+    {
         tokio::task::spawn(async move { db::session::watch().await });
     }
 
@@ -144,6 +149,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        db::pipelines::cache().await.expect("syslog cache failed");
+    }
 
     // cache file list
     if !CONFIG.common.meta_store_external {

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -108,13 +108,29 @@ pub fn new_parquet_writer<'a>(
         }
     }
     let writer_props = writer_props.build();
-    AsyncArrowWriter::try_new(
-        buf,
-        schema.clone(),
-        PARQUET_WRITE_BUFFER_SIZE,
-        Some(writer_props),
-    )
-    .unwrap()
+    AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+}
+
+pub async fn write_recordbatch_to_parquet(
+    schema: Arc<Schema>,
+    record_batches: &[RecordBatch],
+    bloom_filter_fields: &[String],
+    full_text_search_fields: &[String],
+    metadata: &FileMeta,
+) -> Result<Vec<u8>, anyhow::Error> {
+    let mut buf = Vec::new();
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        full_text_search_fields,
+        metadata,
+    );
+    for batch in record_batches {
+        writer.write(batch).await?;
+    }
+    writer.close().await?;
+    Ok(buf)
 }
 
 // parse file key to get stream_key, date_key, file_name
@@ -143,6 +159,23 @@ pub async fn read_recordbatch_from_bytes(
     let record_reader = arrow_reader.build()?;
     let batches = record_reader.try_collect().await?;
     Ok((schema, batches))
+}
+
+pub async fn read_recordbatch_from_file(
+    path: &PathBuf,
+) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+    let file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
+    let schema = arrow_reader.schema().clone();
+    let record_reader = arrow_reader.build()?;
+    let batches = record_reader.try_collect().await?;
+    Ok((schema, batches))
+}
+
+pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow::Error> {
+    let mut file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+    Ok(arrow_reader.schema().clone())
 }
 
 pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {

@@ -26,11 +26,11 @@ use datafusion::{
     },
     common::cast::as_generic_string_array,
     error::{DataFusionError, Result},
+    functions::regex::regexpmatch::regexp_match,
     logical_expr::{
         ExprSchemable, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl, Signature,
         Volatility,
     },
-    physical_expr::regex_expressions::regexp_match,
     physical_plan::ColumnarValue,
     prelude::{create_udf, Expr},
     scalar::ScalarValue,
@@ -269,6 +269,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
         &self,
         args: &[Expr],
         schema: &dyn datafusion::common::ExprSchema,
+        _args_types: &[DataType],
     ) -> Result<DataType> {
         let regexp_pattern = match &args[1] {
             Expr::Literal(arg2) => arg2.to_string().replace('"', ""),

@@ -20,7 +20,7 @@ use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
     http::header,
-    web, HttpRequest, HttpResponse,
+    middleware, web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::{from_fn, Next};
@@ -176,9 +176,9 @@ async fn proxy(
     path: web::Path<PathParamProxyURL>,
     req: HttpRequest,
 ) -> actix_web::Result<HttpResponse> {
-    let client = reqwest::Client::new();
+    let client = awc::Client::new();
     let method = req.method().clone();
-    let forwarded_resp = client
+    let mut forwarded_resp = client
         .request(method, &path.target_url)
         .send()
         .await
@@ -187,7 +187,7 @@ async fn proxy(
         })?;
 
     let status = forwarded_resp.status().as_u16();
-    let body = forwarded_resp.bytes().await.map_err(|e| {
+    let body = forwarded_resp.body().await.map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
     })?;
 
@@ -294,6 +294,18 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
 
+    // set server header
+    #[cfg(feature = "enterprise")]
+    let server = format!(
+        "{}-{}",
+        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+            .super_cluster
+            .region,
+        CONFIG.common.instance_name_short
+    );
+    #[cfg(not(feature = "enterprise"))]
+    let server = CONFIG.common.instance_name_short.to_string();
+
     cfg.service(
         web::scope("/api")
             .wrap(from_fn(audit_middleware))
@@ -301,6 +313,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
+            .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
             .service(users::list)
             .service(users::save)
             .service(users::delete)
@@ -446,7 +459,11 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(authz::fga::delete_role)
             .service(authz::fga::delete_group)
             .service(users::list_roles)
-            .service(clusters::list_clusters),
+            .service(clusters::list_clusters)
+            .service(pipelines::save_pipeline)
+            .service(pipelines::list_pipelines)
+            .service(pipelines::delete_pipeline)
+            .service(pipelines::update_pipeline),
     );
 }
 

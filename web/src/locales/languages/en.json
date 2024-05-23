@@ -52,7 +52,9 @@
     "type": "Type",
     "search": "Search",
     "expand": "Expand",
-    "date": "Date"
+    "date": "Date",
+    "description": "Description",
+    "cancelChanges": "Cancel Changes"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -108,7 +110,12 @@
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search Saved View",
     "streamNotExist": "The following [STREAM_NAME] stream(s) not found. Please verify if the streams exist.",
-    "noFieldFound": "No fields found for selected stream"
+    "noFieldFound": "No fields found for selected stream",
+    "regionTitle": "Select Region",
+    "userDefinedSchemaLabel": "User Defined Schema",
+    "allFieldsLabel": "All Fields",
+    "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately.",
+    "regionFilterMsg": "Search Region/Cluster"
   },
   "menu": {
     "home": "Home",
@@ -137,7 +144,8 @@
     "rum": "Real User Monitoring",
     "settings": "Management",
     "iam": "IAM",
-    "report": "Reports"
+    "report": "Reports",
+    "pipeline": "Pipelines"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -375,7 +383,22 @@
     "indexing": "Indexing",
     "createStream": "Create Stream",
     "indexType": "Index Type",
-    "addField": "Add Field"
+    "addField": "Add Field",
+    "addSchemaField": "Add to Defined Schema Fields",
+    "removeSchemaField": "Remove Defined Schema Fields"
+  },
+  "pipeline": {
+    "header": "Pipelines",
+    "create": "Create Pipeline",
+    "SelectParentNode": "Select Parent Node",
+    "SelectChildNode": "Select Child Node",
+    "deleteNode": "Delete",
+    "addPipeline": "Add Pipeline",
+    "deletePipeline": "Delete Pipeline",
+    "search": "Search Pipeline",
+    "routing": "Routing",
+    "nodes": "Nodes",
+    "associateFunction": "Associate Function"
   },
   "function": {
     "header": "Functions",
@@ -410,7 +433,9 @@
     "uploadCSVFile": "Upload CSV File",
     "selectFunction": "Select Function",
     "appendData": "Append data to existing Enrichment Table",
-    "deleteAssociatedFunction": "Delete Associated Function"
+    "deleteAssociatedFunction": "Delete Associated Function",
+    "streamPipeline": "Stream Pipelines",
+    "streamRouting": "Stream Routing"
   },
   "confirmDialog": {
     "cancel": "Cancel",

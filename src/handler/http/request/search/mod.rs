@@ -40,7 +40,10 @@ use crate::{
             http::{get_stream_type_from_request, RequestHeaderExtractor},
         },
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, sql::RE_ONLY_SELECT},
+        usage::report_request_usage_stats,
+    },
 };
 
 pub mod job;
@@ -202,7 +205,6 @@ pub async fn search(
     }
 
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
-
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
             query_fn = Some(format!("{} \n .", vrl_function));
@@ -347,6 +349,7 @@ pub async fn search(
         ("stream_name" = String, Path, description = "stream_name name"),
         ("key" = i64, Query, description = "around key"),
         ("size" = i64, Query, description = "around size"),
+        ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -416,21 +419,26 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
     };
-    let query_fn = query
+    let mut query_fn = query
         .get("query_fn")
         .and_then(|v| base64::decode_url(v).ok());
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
 
     let default_sql = format!("SELECT * FROM \"{}\" ", stream_name);
     let around_sql = match query.get("sql") {
         None => default_sql,
         Some(v) => match base64::decode_url(v) {
             Err(_) => default_sql,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(&org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                if uses_fn { v } else { default_sql }
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                sql
             }
         },
     };
@@ -438,6 +446,21 @@ pub async fn around(
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
+
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
 
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
@@ -490,7 +513,8 @@ pub async fn around(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        clusters: vec![],
+        regions: regions.clone(),
+        clusters: clusters.clone(),
         timeout,
     };
     let user_id = in_req
@@ -568,7 +592,8 @@ pub async fn around(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        clusters: vec![],
+        regions,
+        clusters,
         timeout,
     };
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
@@ -702,6 +727,7 @@ pub async fn around(
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
+        ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -853,7 +879,10 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!("SELECT * FROM \"{stream_name}\"");
+    let default_sql = format!(
+        "SELECT {} FROM \"{stream_name}\"",
+        CONFIG.common.column_timestamp
+    );
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -869,12 +898,12 @@ async fn values_v1(
         None => None,
         Some(v) => match base64::decode_url(v) {
             Err(_) => None,
-            Ok(v) => {
+            Ok(sql) => {
                 uses_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| v.contains(&format!("{}(", fn_name)));
-                Some(v)
+                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+                Some(sql)
             }
         },
     };
@@ -884,6 +913,16 @@ async fn values_v1(
         // We don't need query_context now
         query_context = None;
     }
+
+    // if it is select *, replace to select _timestamp
+    if RE_ONLY_SELECT.is_match(&query_sql) {
+        query_sql = RE_ONLY_SELECT
+            .replace(
+                &query_sql,
+                format!("SELECT {} ", CONFIG.common.column_timestamp).as_str(),
+            )
+            .to_string()
+    };
 
     let size = query
         .get("size")
@@ -900,6 +939,21 @@ async fn values_v1(
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
+
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
 
     let timeout = query
         .get("timeout")
@@ -940,7 +994,8 @@ async fn values_v1(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        clusters: vec![],
+        regions,
+        clusters,
         timeout,
     };
 
@@ -948,7 +1003,7 @@ async fn values_v1(
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let schema = if let Some(schema) = r.get(&key) {
-        schema.clone()
+        schema.schema().clone()
     } else {
         arrow_schema::Schema::empty()
     };
@@ -1129,6 +1184,21 @@ async fn values_v2(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -1168,7 +1238,8 @@ async fn values_v2(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
-        clusters: vec![],
+        regions,
+        clusters,
         timeout,
     };
     let search_fut = SearchService::search(

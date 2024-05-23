@@ -55,6 +55,8 @@ pub struct Request {
     #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
+    pub regions: Vec<String>, // default query all regions, local: only query local region clusters
+    #[serde(default)]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     #[serde(default)]
     pub timeout: i64,
@@ -203,6 +205,8 @@ pub struct Response {
     pub trace_id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub function_error: String,
+    #[serde(default)]
+    pub is_partial: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -240,6 +244,7 @@ impl Response {
             response_type: "".to_string(),
             trace_id: "".to_string(),
             function_error: "".to_string(),
+            is_partial: false,
         }
     }
 
@@ -296,6 +301,10 @@ impl Response {
     pub fn set_trace_id(&mut self, trace_id: String) {
         self.trace_id = trace_id;
     }
+
+    pub fn set_partial(&mut self, is_partial: bool) {
+        self.is_partial = is_partial;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -305,6 +314,10 @@ pub struct SearchPartitionRequest {
     pub sql_mode: String,
     pub start_time: i64,
     pub end_time: i64,
+    #[serde(default)]
+    pub regions: Vec<String>,
+    #[serde(default)]
+    pub clusters: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -541,6 +554,7 @@ mod tests {
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };

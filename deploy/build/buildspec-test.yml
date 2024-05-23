@@ -29,5 +29,5 @@ phases:
       - touch web/dist/index.html
 
       # run tests
-      - cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
+      - cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
       - ./coverage.sh

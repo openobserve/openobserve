@@ -55,6 +55,7 @@ message SearchResponse {
     bytes                      hits = 6;
     repeated SearchAggResponse aggs = 7;
     ScanStats            scan_stats = 8;
+    bool                 is_partial = 9;
 }
 
 message SearchAggRequest {

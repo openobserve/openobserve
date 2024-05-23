@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.10.4"
+version = "0.10.6"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,6 +44,7 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.6"
+actix-http = "3.6"
 actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
@@ -125,7 +126,7 @@ rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
-rust-embed-for-web = "11.1"
+rust-embed-for-web = "11.2.1"
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -204,13 +205,13 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "36"
-datafusion-expr = "36"
-arrow = { version = "50.0.0", features = ["ipc_compression"] }
-arrow-json = "50.0.0"
-arrow-schema = { version = "50.0.0", features = ["serde"] }
-parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.9", features = ["aws", "azure", "gcp"] }
+datafusion = "38"
+datafusion-expr = "38"
+arrow = { version = "51.0.0", features = ["ipc_compression"] }
+arrow-json = "51.0.0"
+arrow-schema = { version = "51.0.0", features = ["serde"] }
+parquet = { version = "51.0.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.9.1", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -221,7 +222,7 @@ futures = "0.3"
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
 gxhash = "~3.0.0"
-hashlink = "0.8.4"
+hashlink = "0.9.1"
 hashbrown = { version = "0.14", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
@@ -247,8 +248,8 @@ rand = "0.8"
 rayon = "1.7.0"
 regex = "1.7"
 regex-syntax = "0.8"
-reqwest = { version = "0.11", default-features = false, features = [
-  "rustls-tls",
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls-native-roots",
   "stream",
 ] }
 segment = "0.2"
@@ -264,7 +265,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.43", features = ["serde", "visitor"] }
+sqlparser = { version = "0.45", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"

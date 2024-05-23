@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use ::datafusion::arrow::{json as arrow_json, record_batch::RecordBatch};
+use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::search,
-    utils::{flatten, json},
+    utils::{arrow::record_batches_to_json_rows, flatten, json},
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
@@ -50,7 +50,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (merge_batches, scan_stats, inverted_index_count, took_wait) =
+    let (merge_batches, scan_stats, inverted_index_count, took_wait, is_partial) =
         super::search(&trace_id, sql.clone(), req).await?;
 
     // final result
@@ -66,14 +66,8 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     if !batches_query.is_empty() {
         let schema = batches_query[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches_query_ref) {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
+        let json_rows = record_batches_to_json_rows(&batches_query_ref)
+            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
@@ -108,6 +102,8 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                                 fields: program.fields.clone(),
                             },
                             &json::Value::Object(hit.clone()),
+                            &sql.org_id,
+                            &sql.stream_name,
                         );
                         (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                     })
@@ -145,14 +141,9 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         }
         let name = name.strip_prefix("agg_").unwrap().to_string();
         let batch_ref: Vec<&RecordBatch> = batch.iter().collect();
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batch_ref) {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
+
+        let json_rows = record_batches_to_json_rows(&batch_ref)
+            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
         let sources: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
         for source in sources {
             result.add_agg(&name, &source);
@@ -185,6 +176,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     } else {
         result.set_total(total);
     }
+    result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);

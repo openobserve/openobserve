@@ -110,6 +110,12 @@ pub struct FileMeta {
     pub compressed_size: i64,
 }
 
+impl FileMeta {
+    pub fn is_empty(&self) -> bool {
+        self.records == 0 && self.original_size == 0
+    }
+}
+
 impl From<&FileMeta> for Vec<u8> {
     fn from(value: &FileMeta) -> Vec<u8> {
         let mut bytes = [0; 40];
@@ -412,8 +418,6 @@ pub struct StreamSettings {
     #[serde(default)]
     pub data_retention: i64,
     #[serde(skip_serializing_if = "Option::None")]
-    pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
-    #[serde(skip_serializing_if = "Option::None")]
     pub flatten_level: Option<i64>,
     #[serde(skip_serializing_if = "Option::None")]
     pub defined_schema_fields: Option<Vec<String>>,
@@ -437,14 +441,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
-        match self.routing.as_ref() {
-            Some(routing) => {
-                state.serialize_field("routing", routing)?;
-            }
-            None => {
-                state.skip_field("routing")?;
-            }
-        }
+
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
                 if !fields.is_empty() {
@@ -533,18 +530,6 @@ impl From<&str> for StreamSettings {
             }
         }
 
-        let mut routing: HashMap<String, Vec<RoutingCondition>> = HashMap::new();
-        let routes = settings.get("routing");
-        if let Some(value) = routes {
-            let v: Vec<_> = value.as_object().unwrap().iter().collect();
-            for item in v {
-                routing.insert(
-                    item.0.to_string(),
-                    json::from_value(item.1.clone()).unwrap(),
-                );
-            }
-        }
-
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
 
         Self {
@@ -553,7 +538,6 @@ impl From<&str> for StreamSettings {
             full_text_search_keys,
             bloom_filter_fields,
             data_retention,
-            routing: Some(routing),
             flatten_level,
             defined_schema_fields,
         }

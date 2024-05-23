@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Result not found.
                 </div>
-                <HTMLRenderer
+                <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
                   :html-content="searchObj.data.errorMsg"
                 />
@@ -193,7 +193,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -201,7 +201,7 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
-    HTMLRenderer,
+    SanitizedHtmlRenderer,
   },
   methods: {
     async setHistogramDate(date: any) {

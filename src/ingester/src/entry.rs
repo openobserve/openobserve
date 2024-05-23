@@ -38,6 +38,15 @@ pub struct Entry {
 }
 
 impl Entry {
+    pub fn new() -> Self {
+        Self {
+            stream: "".into(),
+            schema_key: "".into(),
+            partition_key: "".into(),
+            data: Vec::new(),
+            data_size: 0,
+        }
+    }
     pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
         let mut buf = Vec::with_capacity(4096);
         let stream = self.stream.as_bytes();
@@ -100,6 +109,12 @@ impl Entry {
             self.data_size,
             arrow_size,
         )))
+    }
+}
+
+impl Default for Entry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <DateTimePickerDashboard
+          v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
         />
@@ -173,7 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="layout-panel-container col"
                       style="height: 100%"
                     >
-                      <DashboardQueryBuilder :dashboardData="currentDashboardData.data"/>
+                      <DashboardQueryBuilder
+                        :dashboardData="currentDashboardData.data"
+                      />
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
@@ -322,7 +325,7 @@ import DashboardQueryEditor from "../../../components/dashboards/addPanel/Dashbo
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
-import _ from "lodash-es";
+import { isEqual } from "lodash-es";
 import { provide } from "vue";
 
 const ConfigPanel = defineAsyncComponent(() => {
@@ -376,7 +379,7 @@ export default defineComponent({
       resetAggregationFunction,
     } = useDashboardPanelData();
     const editMode = ref(false);
-    const selectedDate = ref();
+    const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: [],
@@ -394,7 +397,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
-    
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -497,7 +500,22 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
-      // console.timeEnd("AddPanel:loadDashboard:after");
+
+      // get default time for dashboard
+      // if dashboard has relative time settings
+      if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
+        selectedDate.value = {
+          valueType: "relative",
+          relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
+        };
+      } else {
+        // else, dashboard will have absolute time settings
+        selectedDate.value = {
+          valueType: "absolute",
+          startTime: data?.defaultDatetimeDuration?.startTime,
+          endTime: data?.defaultDatetimeDuration?.endTime,
+        };
+      }
     };
 
     const isInitailDashboardPanelData = () => {
@@ -517,7 +535,7 @@ export default defineComponent({
       //check that is it addpanel initial call
       if (isInitailDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata
-      return !_.isEqual(chartData.value, dashboardPanelData.data);
+      return !isEqual(chartData.value, dashboardPanelData.data);
     });
 
     watch(isOutDated, () => {
@@ -597,10 +615,12 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
-      dashboardPanelData.meta.dateTime = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      if (selectedDate.value) {
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        };
+      }
     };
     const goBack = () => {
       return router.push({

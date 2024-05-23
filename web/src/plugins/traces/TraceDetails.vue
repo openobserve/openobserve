@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, type Ref, onMounted, watch } from "vue";
-import { cloneDeep } from "lodash";
+import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
@@ -205,7 +205,7 @@ import {
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import { throttle } from "lodash";
+import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
@@ -491,6 +491,8 @@ export default defineComponent({
         cloneDeep(serviceTree),
         maxDepth
       );
+
+      console.log("service tree", traceServiceMap.value);
     };
 
     // Convert span object to required format

@@ -65,7 +65,7 @@ const enterpriseResolverPlugin = {
 function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
-    enforce: "pre",
+    enforce: "post",
     resolveId(id) {
       if (id === "monaco-editor") {
         return {
@@ -142,11 +142,28 @@ export default defineConfig({
         }),
       ],
       manualChunks: {
-        analytics: ["rudder-sdk-js"],
-        "monaco-editor": ["monaco-editor"],
-        echarts: ["echarts"],
-        "node-sql-parser": ["node-sql-parser/build/mysql"],
-        lodash: ["lodash-es", "lodash/lodash.js", "moment"],
+        "o2cs-analytics": ["rudder-sdk-js"],
+        "o2cs-monaco-editor": ["monaco-editor"],
+        "o2cs-echarts": ["echarts"],
+        lodash: ["lodash-es", "lodash/lodash.js"],
+        "o2cs-moment": ["moment", "moment-timezone"],
+        "o2cs-oo-rum": [
+          "@openobserve/browser-logs",
+          "@openobserve/browser-rum",
+          "@openobserve/rrweb-player",
+        ],
+        "vgl": ["vue3-grid-layout"],
+        "o2cs-nsp": ["node-sql-parser/build/mysql"],
+        "o2cs-date-fns": ["date-fns", "date-fns-tz"],
+        "o2cs-map": ["@joakimono/echarts-extension-leaflet"],
+      },
+      output: {
+        chunkFileNames: ({ name }) => {
+          if (name.startsWith("o2cs-")) {
+            return `assets/vendor/${name}.[hash].js`;
+          }
+          return `assets/${name}.[hash].js`;
+        },
       },
     },
     outDir: path.resolve(__dirname, "dist"),
@@ -162,7 +179,6 @@ export default defineConfig({
     global: true,
     setupFiles: "src/test/unit/helpers/setupTests.ts",
     deps: {
-      // inline: ["monaco-editor", "plotly.js"],
       inline: ["monaco-editor"],
     },
     coverage: {

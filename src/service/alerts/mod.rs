@@ -461,6 +461,7 @@ impl QueryCondition {
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
             clusters: vec![],
             timeout: 0,
         };

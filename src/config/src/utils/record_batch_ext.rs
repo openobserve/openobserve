@@ -47,14 +47,20 @@ pub fn convert_json_to_record_batch(
     data: &[Arc<serde_json::Value>],
 ) -> Result<RecordBatch, ArrowError> {
     // collect all keys from the json data
-    let mut keys = HashSet::new();
+    let mut keys = HashSet::with_capacity(schema.fields().len());
+    let mut max_keys = 0;
     for record in data.iter() {
-        for (k, _) in record.as_object().unwrap() {
+        let record = record.as_object().unwrap();
+        if record.len() > max_keys {
+            max_keys = record.len();
+        }
+        for (k, _) in record {
             keys.insert(k);
         }
     }
 
     // create builders for each key
+    let records_len = data.len();
     let mut builders: FxIndexMap<&String, (&DataType, Box<dyn ArrayBuilder>)> = schema
         .fields()
         .iter()
@@ -62,14 +68,15 @@ pub fn convert_json_to_record_batch(
         .map(|f| {
             (
                 f.name(),
-                (f.data_type(), make_builder(f.data_type(), data.len())),
+                (f.data_type(), make_builder(f.data_type(), records_len)),
             )
         })
         .collect();
 
     // fill builders with data
+    let mut record_keys = HashSet::with_capacity(max_keys);
     for record in data.iter() {
-        let mut record_keys = HashSet::new();
+        record_keys.clear();
         for (k, v) in record.as_object().unwrap() {
             record_keys.insert(k);
             let res = builders.get_mut(k);
@@ -200,9 +207,36 @@ pub fn convert_json_to_record_batch(
         if let Some((_, builder)) = builders.get_mut(field.name()) {
             cols.push(builder.finish());
         } else {
-            cols.push(new_null_array(field.data_type(), data.len()))
+            cols.push(new_null_array(field.data_type(), records_len))
         }
     }
 
     RecordBatch::try_new(schema.clone(), cols)
+}
+
+pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
+    if schema.fields() == batch.schema().fields() {
+        return batch;
+    }
+    let records_len = batch.num_rows();
+    if records_len == 0 {
+        return RecordBatch::new_empty(schema);
+    }
+
+    let batch_schema = batch.schema();
+    let batch_fields = batch_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
+    for field in schema.fields() {
+        if batch_fields.contains(field.name()) {
+            cols.push(batch.column_by_name(field.name()).unwrap().clone());
+        } else {
+            cols.push(new_null_array(field.data_type(), records_len))
+        }
+    }
+    RecordBatch::try_new(schema, cols).unwrap()
 }

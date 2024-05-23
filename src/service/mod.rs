@@ -34,6 +34,7 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod organization;
+pub mod pipelines;
 pub mod promql;
 pub mod schema;
 pub mod search;
@@ -65,35 +66,26 @@ pub fn format_partition_key(input: &str) -> String {
 // format stream name
 pub async fn get_formatted_stream_name(
     params: &mut StreamParams,
-    schema_map: &mut HashMap<String, schema::SchemaCache>,
+    schema_map: &mut HashMap<String, infra::schema::SchemaCache>,
 ) -> String {
     let mut stream_name = params.stream_name.to_string();
 
-    let schema = infra::schema::get(&params.org_id, &stream_name, params.stream_type)
+    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type)
         .await
         .unwrap();
 
-    let schema = if schema.fields().is_empty() {
+    let schema = if schema.fields_map().is_empty() {
         stream_name = RE_CORRECT_STREAM_NAME
             .replace_all(&stream_name, "_")
             .to_string();
-        infra::schema::get(&params.org_id, &stream_name, params.stream_type)
+        infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type)
             .await
             .unwrap()
     } else {
         schema
     };
 
-    let fields_map = schema
-        .fields()
-        .iter()
-        .enumerate()
-        .map(|(i, f)| (f.name().to_owned(), i))
-        .collect();
-    schema_map.insert(
-        stream_name.to_owned(),
-        schema::SchemaCache::new(schema, fields_map),
-    );
+    schema_map.insert(stream_name.to_owned(), schema);
 
     params.stream_name = stream_name.to_owned().into();
 

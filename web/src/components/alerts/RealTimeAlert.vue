@@ -6,7 +6,7 @@
       :fields="conditions"
       @add="addField"
       @remove="removeField"
-      @input:update="(name, field) => emits('input:update', name, field)"
+      @input:update="(name:string, field: any) => emits('input:update', name, field)"
     />
   </div>
 </template>

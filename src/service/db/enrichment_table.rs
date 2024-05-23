@@ -46,6 +46,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         query,
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
         clusters: vec![],
         timeout: 0,
     };

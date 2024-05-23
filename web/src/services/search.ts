@@ -36,6 +36,8 @@ const search = {
     query_context,
     query_fn,
     stream_type,
+    regions,
+    clusters,
   }: {
     org_identifier: string;
     index: string;
@@ -44,10 +46,20 @@ const search = {
     query_context: any;
     query_fn: any;
     stream_type: string;
+    regions: string;
+    clusters: string;
   }) => {
     let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
+    }
+
+    if (regions.trim()!= "") {
+      url = url + `&regions=${regions}`;
+    }
+
+    if (clusters.trim()!= "") {
+      url = url + `&clusters=${clusters}`;
     }
     return http().get(url);
   },
@@ -128,13 +140,17 @@ const search = {
     const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
     return http().post(url, query);
   },
-  get_running_queries: () => {
-    const url = `/api/query_manager/status`;
+  get_running_queries: (org_identifier:string) => {
+    const url = `/api/${org_identifier}/query_manager/status`;
     return http().get(url);
   },
-  delete_running_query: (traceID: string) => {
-    const url = `/api/query_manager/${traceID}`;
+  delete_running_query: (org_identifier:string,traceID: string) => {
+    const url = `/api/${org_identifier}/query_manager/${traceID}`;
     return http().delete(url);
+  },
+  get_regions: () => {
+    const url = `/api/clusters`;
+    return http().get(url);
   },
 };
 

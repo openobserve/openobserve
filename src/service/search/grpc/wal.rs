@@ -76,6 +76,7 @@ pub async fn search_parquet(
     let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let files = get_file_list(
@@ -91,7 +92,7 @@ pub async fn search_parquet(
     }
 
     let mut scan_stats = ScanStats::new();
-    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
+    let mut lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // get file metadata to build file_list
     let files_num = files.len();
@@ -122,6 +123,11 @@ pub async fn search_parquet(
         .await;
     for file in files_metadata {
         if let Some((min_ts, max_ts)) = sql.meta.time_range {
+            if file.meta.is_empty() {
+                wal::release_files(&[file.key.clone()]).await;
+                lock_files.retain(|f| f != &file.key);
+                continue;
+            }
             if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
                 log::debug!(
                     "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{}]",
@@ -130,6 +136,7 @@ pub async fn search_parquet(
                     file.meta.max_ts
                 );
                 wal::release_files(&[file.key.clone()]).await;
+                lock_files.retain(|f| f != &file.key);
                 continue;
             }
         }
@@ -198,8 +205,6 @@ pub async fn search_parquet(
             ) {
                 Some(id) => id,
                 None => {
-                    // release all files
-                    wal::release_files(&lock_files).await;
                     log::error!(
                         "[trace_id {trace_id}] wal->parquet->search: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
                         &file.key,
@@ -257,9 +262,14 @@ pub async fn search_parquet(
 
         // cacluate the diff between latest schema and group schema
         let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_select_start_search_schema(
+                &sql,
+                &schema,
+                &schema_latest_map,
+                &defined_schema_fields,
+            )?
         } else {
-            generate_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_search_schema(&sql, &schema, &schema_latest_map)?
         };
 
         let datafusion_span = info_span!(
@@ -380,10 +390,8 @@ pub async fn search_memtable(
     let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
-    // let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
-    // let partition_time_level =
-    // unwrap_partition_time_level(schema_settings.partition_time_level,
-    // stream_type);
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     let mut scan_stats = ScanStats::new();
 
@@ -461,9 +469,14 @@ pub async fn search_memtable(
 
         // cacluate the diff between latest schema and group schema
         let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_select_start_search_schema(
+                &sql,
+                &schema,
+                &schema_latest_map,
+                &defined_schema_fields,
+            )?
         } else {
-            generate_search_schema(&sql, &schema_latest_map, &schema)?
+            generate_search_schema(&sql, &schema, &schema_latest_map)?
         };
 
         for batch in record_batches.iter_mut() {
@@ -594,9 +607,7 @@ async fn get_file_list_inner(
         "{}/files/{}/{stream_type}/{}/",
         wal_dir, &sql.org_id, &sql.stream_name
     );
-    let files = scan_files(&pattern, file_ext, None)
-        .await
-        .unwrap_or_default();
+    let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
     if files.is_empty() {
         return Ok(vec![]);
     }

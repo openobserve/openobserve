@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,11 +21,11 @@ use std::{
 use actix_web::HttpResponse;
 use config::{
     meta::stream::{FileMeta, StreamType},
-    utils::json,
+    utils::{arrow::record_batches_to_json_rows, json},
     CONFIG, FILE_EXT_JSON,
 };
 use datafusion::{
-    arrow::{datatypes::Schema, json as arrow_json, record_batch::RecordBatch},
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
     datasource::MemTable,
     prelude::SessionContext,
 };
@@ -89,7 +89,7 @@ pub async fn populate_file_meta(
     let df = ctx.sql(sql.as_str()).await?;
     let batches = df.collect().await?;
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches_ref)?;
+    let json_rows = record_batches_to_json_rows(&batches_ref)?;
     let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     if result.is_empty() {
         return Ok(());

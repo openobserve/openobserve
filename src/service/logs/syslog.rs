@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,7 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
+use infra::schema::SchemaCache;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
@@ -43,7 +44,7 @@ use crate::{
         db, get_formatted_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, SchemaCache},
+        schema::get_upto_discard_error,
     },
 };
 
@@ -137,6 +138,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             &local_trans,
             value,
             &stream_vrl_map,
+            org_id,
             stream_name,
             &mut runtime,
         )?;
