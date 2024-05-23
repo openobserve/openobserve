@@ -189,7 +189,7 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->result: total: {}, took: {}, scan_size: {}",
+        "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,

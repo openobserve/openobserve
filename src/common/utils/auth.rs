@@ -467,7 +467,10 @@ impl FromRequest for AuthExtractor {
             }));
         }
         //}
-        log::info!("AuthExtractor::from_request took {:?}", start.elapsed());
+        log::info!(
+            "AuthExtractor::from_request took {:.3} secs",
+            start.elapsed().as_secs_f64()
+        );
         ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
         )))

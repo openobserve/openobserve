@@ -84,9 +84,9 @@ async fn migrate_meta(from: &str, to: &str) -> Result<(), anyhow::Error> {
             }
         }
         println!(
-            "migrated prefix {} from source, took {} secs",
+            "migrated prefix {} from source, took {:.3} secs",
             item,
-            time.elapsed().as_secs()
+            time.elapsed().as_secs_f64()
         );
     }
 
@@ -117,8 +117,8 @@ async fn migrate_scheduler(from: &str, to: &str) -> Result<(), anyhow::Error> {
         dest.push(item.to_owned()).await?;
     }
     println!(
-        "migrated scheduler from source, took {} secs",
-        time.elapsed().as_secs()
+        "migrated scheduler from source, took {:.3} secs",
+        time.elapsed().as_secs_f64()
     );
 
     Ok(())

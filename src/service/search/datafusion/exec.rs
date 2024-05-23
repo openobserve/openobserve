@@ -232,7 +232,7 @@ pub async fn sql(
 
         let q_time = start.elapsed().as_secs_f64();
         log::info!(
-            "[trace_id {trace_id}] Query agg:{name} took {:.3} seconds.",
+            "[trace_id {trace_id}] Query agg:{name} took {:.3} secs",
             q_time - spend_time
         );
         spend_time = q_time;
@@ -242,7 +242,7 @@ pub async fn sql(
     ctx.deregister_table("tbl")?;
     ctx_aggs.deregister_table("tbl")?;
     log::info!(
-        "[trace_id {trace_id}] Query all took {:.3} seconds.",
+        "[trace_id {trace_id}] Query all took {:.3} secs",
         start.elapsed().as_secs_f64()
     );
 
@@ -370,7 +370,7 @@ async fn exec_query(
     if field_fns.is_empty() && sql.query_fn.is_none() {
         let batches = df.clone().collect().await?;
         log::info!(
-            "[trace_id {trace_id}] Query took {:.3} seconds.",
+            "[trace_id {trace_id}] Query took {:.3} secs",
             start.elapsed().as_secs_f64()
         );
         return Ok(batches);
@@ -473,7 +473,7 @@ async fn exec_query(
     };
     let batches = df.clone().collect().await?;
     log::info!(
-        "[trace_id {trace_id}] Query took {:.3} seconds.",
+        "[trace_id {trace_id}] Query took {:.3} secs",
         start.elapsed().as_secs_f64()
     );
     Ok(batches)
@@ -1030,7 +1030,7 @@ pub async fn convert_parquet_file(
     drop(ctx);
 
     log::info!(
-        "convert_parquet_file took {:.3} seconds.",
+        "convert_parquet_file took {:.3} secs",
         start.elapsed().as_secs_f64()
     );
 
@@ -1095,7 +1095,7 @@ pub async fn merge_parquet_files(
     drop(ctx);
 
     log::info!(
-        "merge_parquet_files took {:.3} seconds.",
+        "merge_parquet_files took {:.3} secs",
         start.elapsed().as_secs_f64()
     );
 

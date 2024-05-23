@@ -257,7 +257,7 @@ pub async fn search(
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {}",
+        "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took {} ms",
         meta.meta.time_range,
         file_list.len(),
         file_list_took,
@@ -308,7 +308,7 @@ pub async fn search(
     dist_lock::unlock(&locker).await?;
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
-        "[trace_id {trace_id}] search: wait in queue took: {}",
+        "[trace_id {trace_id}] search: wait in queue took: {} ms",
         took_wait,
     );
 
@@ -520,7 +520,7 @@ pub async fn search(
                 }
 
                 log::info!(
-                    "[trace_id {trace_id}] search->grpc: response node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] search->grpc: response node: {}, is_querier: {}, total: {}, took: {} ms, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     is_querier,
                     response.total,

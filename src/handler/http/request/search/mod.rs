@@ -232,7 +232,7 @@ pub async fn search(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http search API wait in queue took: {}", took_wait);
+    log::info!("http search API wait in queue took: {} ms", took_wait);
 
     let search_fut = SearchService::search(
         &trace_id,
@@ -475,7 +475,10 @@ pub async fn around(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http search around API wait in queue took: {}", took_wait);
+    log::info!(
+        "http search around API wait in queue took: {} ms",
+        took_wait
+    );
 
     let query_context: Option<String> = None;
 
@@ -972,7 +975,10 @@ async fn values_v1(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http search value_v1 API wait in queue took: {}", took_wait);
+    log::info!(
+        "http search value_v1 API wait in queue took: {} ms",
+        took_wait
+    );
 
     // search
     let mut req = config::meta::search::Request {
@@ -1216,7 +1222,10 @@ async fn values_v2(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http search value_v2 API wait in queue took: {}", took_wait);
+    log::info!(
+        "http search value_v2 API wait in queue took: {} ms",
+        took_wait
+    );
 
     // search
     let req = config::meta::search::Request {
