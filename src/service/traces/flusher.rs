@@ -1,5 +1,6 @@
 use std::{
     io::{Error, ErrorKind},
+    sync::Arc,
     time::Duration,
 };
 
@@ -8,6 +9,7 @@ use config::ider;
 use crossbeam_channel::{Receiver as CrossbeamReceiver, Sender as CrossbeamSender};
 use hashbrown::HashMap;
 use infra::errors::BufferWriteError;
+use ingester::Writer;
 use log::{info, warn};
 use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -20,7 +22,7 @@ use tokio::{
 };
 
 use crate::{
-    common::meta::traces::ExportTraceServiceResponse,
+    common::meta::{stream::SchemaRecords, traces::ExportTraceServiceResponse},
     service::traces::{flusher, handle_trace_json_request, handle_trace_request},
 };
 
@@ -131,9 +133,20 @@ pub enum BufferedWriteResult {
 }
 
 type RequestOps = HashMap<String, ExportRequest>;
-type NotifyResult = HashMap<String, Result<ExportTraceServiceResponse, BufferWriteError>>;
+type NotifyResult = HashMap<
+    String,
+    Result<
+        (
+            ExportTraceServiceResponse,
+            Arc<Writer>,
+            std::collections::HashMap<String, SchemaRecords>,
+            String,
+        ),
+        BufferWriteError,
+    >,
+>;
 type IoFlushNotifyResult = Result<NotifyResult, BufferWriteError>;
-pub static RT: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
+pub static SYNC_RT: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
 pub fn run_trace_io_flush(
     io_flush_rx: CrossbeamReceiver<RequestOps>,
@@ -153,7 +166,7 @@ pub fn run_trace_io_flush(
         // write the ops to the segment files, or return on first error
         for (session_id, request) in request {
             let resp = match request {
-                ExportRequest::GrpcExportTraceServiceRequest(r) => RT.block_on(async {
+                ExportRequest::GrpcExportTraceServiceRequest(r) => SYNC_RT.block_on(async {
                     handle_trace_request(
                         r.0.as_str(),
                         r.1,
@@ -166,7 +179,7 @@ pub fn run_trace_io_flush(
                 }),
                 ExportRequest::HttpJsonExportTraceServiceRequest(r) => {
                     let in_stream_name = r.3.unwrap_or("".to_string());
-                    RT.block_on(async {
+                    SYNC_RT.block_on(async {
                         handle_trace_json_request(
                             r.0.as_str(),
                             r.1,
@@ -232,13 +245,22 @@ pub async fn run_trace_op_buffer(
                 }
                 match io_flush_notify_rx.recv().expect("wal io thread is dead") {
                     Ok(mut resp) => {
+                        for (sid, notify) in &resp {
+                            if let Ok((_, w, data_buf, service_name)) = notify {
+                                // let mut m: std::collections::HashMap<String, SchemaRecords> = Default::default();
+                                // m.extend(data_buf.iter().cloned());
+                                // todo move memtable logic from wal writer , memtable refresh
+                                let _ = crate::service::ingestion::write_memtable(w, sid, data_buf.clone(), service_name).await;
+                            }
+                        }
+
                         // notify the watchers of the write response
                         for (sid, response_tx) in notifies {
                             match resp.remove(&sid) {
                                 Some(r) => {
                                     let bwr = match r {
                                         Ok(ets) => {
-                                            BufferedWriteResult::Success(ets)
+                                            BufferedWriteResult::Success(ets.0)
                                         }
                                         Err(e) => {
                                             BufferedWriteResult::Error(e)

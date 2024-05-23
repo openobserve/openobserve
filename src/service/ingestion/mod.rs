@@ -542,6 +542,35 @@ pub async fn get_user_defined_schema(
     }
 }
 
+pub async fn write_memtable(
+    writer: &Arc<ingester::Writer>,
+    sid: &str,
+    buf: HashMap<String, SchemaRecords>,
+    stream_name: &str,
+) -> ingester::errors::Result<()> {
+    for (hour_key, entry) in buf {
+        if let Err(e) = writer
+            .write_memtable(
+                sid,
+                entry.schema,
+                ingester::Entry {
+                    stream: Arc::from(stream_name),
+                    schema_key: Arc::from(entry.schema_key.as_str()),
+                    partition_key: Arc::from(hour_key.as_str()),
+                    data: entry.records,
+                    data_size: entry.records_size,
+                    session_id: Arc::from(sid),
+                },
+                false,
+            )
+            .await
+        {
+            log::error!("ingestion write memtable error: {}", e);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use infra::schema::{unwrap_stream_settings, STREAM_SETTINGS};

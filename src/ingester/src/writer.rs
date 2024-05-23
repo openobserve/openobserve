@@ -172,23 +172,21 @@ impl Writer {
     // check_ttl is used to check if the memtable has expired
     pub async fn write(
         &self,
-        schema: Arc<Schema>,
+        _schema: Arc<Schema>,
         mut entry: Entry,
         check_ttl: bool,
     ) -> Result<()> {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
         }
-        let session_id = entry.session_id.to_string();
         let entry_bytes = if !check_ttl {
             entry.into_bytes()?
         } else {
             Vec::new()
         };
         let mut wal = self.wal.lock().await;
-        let mut mem = self.memtable.write().await;
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
-            || self.check_mem_threshold(mem.size(), entry.data_size)
+            || self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size)
         {
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
@@ -212,34 +210,12 @@ impl Writer {
                 CONFIG.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
-            let old_wal = std::mem::replace(&mut *wal, new_wal);
+            let _ = std::mem::replace(&mut *wal, new_wal);
+            // rotation memtable remove to flusher
 
-            // rotation memtable
-            let new_mem = MemTable::new();
-            let old_mem = std::mem::replace(&mut *mem, new_mem);
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
-
-            let thread_id = self.thread_id;
-            let key = self.key.clone();
-            let path = old_wal.path().clone();
-            let path_str = path.display().to_string();
-            let sid = session_id.clone();
-            tokio::task::spawn(async move {
-                log::info!(
-                    "[INGESTER:WAL] [{sid}] start add to IMMUTABLES, file: {}",
-                    path_str,
-                );
-                IMMUTABLES.write().await.insert(
-                    path,
-                    Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
-                );
-                log::info!(
-                    "[INGESTER:WAL] [{sid}] dones add to IMMUTABLES, file: {}",
-                    path_str
-                );
-            });
         }
 
         if !check_ttl {
@@ -247,12 +223,6 @@ impl Writer {
             let start = std::time::Instant::now();
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             metrics::INGEST_WAL_LOCK_TIME
-                .with_label_values(&[&self.key.org_id])
-                .observe(start.elapsed().as_millis() as f64);
-            // write into memtable
-            let start = std::time::Instant::now();
-            mem.write(schema, entry).await?;
-            metrics::INGEST_MEMTABLE_LOCK_TIME
                 .with_label_values(&[&self.key.org_id])
                 .observe(start.elapsed().as_millis() as f64);
         }
@@ -315,6 +285,47 @@ impl Writer {
         json_size > 0
             && (json_size + data_size > CONFIG.limit.max_file_size_in_memory
                 || arrow_size + data_size > CONFIG.limit.max_file_size_in_memory)
+    }
+
+    pub async fn write_memtable(
+        &self,
+        _sid: &str,
+        schema: Arc<Schema>,
+        entry: Entry,
+        check_ttl: bool,
+    ) -> Result<()> {
+        if entry.data.is_empty() && !check_ttl {
+            return Ok(());
+        }
+
+        if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
+            let mut mem = self.memtable.write().await;
+            let new_mem = MemTable::new();
+            let old_mem = std::mem::replace(&mut *mem, new_mem);
+            drop(mem);
+
+            let thread_id = self.thread_id;
+            let path = self.wal.lock().await.path().clone();
+            let key = self.key.clone();
+            let path_str = path.display().to_string();
+            tokio::task::spawn(async move {
+                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
+                IMMUTABLES.write().await.insert(
+                    path,
+                    Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
+                );
+                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
+            });
+        }
+
+        let start = std::time::Instant::now();
+        let mut mem = self.memtable.write().await;
+        mem.write(schema, entry).await?;
+        drop(mem);
+        metrics::INGEST_MEMTABLE_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(start.elapsed().as_millis() as f64);
+        Ok(())
     }
 }
 

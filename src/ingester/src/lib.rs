@@ -16,7 +16,7 @@
 mod entry;
 pub mod errors;
 mod immutable;
-mod memtable;
+pub mod memtable;
 mod partition;
 mod rwmap;
 mod stream;

@@ -31,6 +31,7 @@ use infra::{
     errors::BufferWriteError,
     schema::{unwrap_partition_time_level, SchemaCache},
 };
+use ingester::Writer;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::ExportTraceServiceRequest,
@@ -61,7 +62,6 @@ use crate::{
 
 pub mod flusher;
 pub mod otlp_http;
-
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
@@ -76,7 +76,15 @@ pub async fn handle_trace_request(
     is_grpc: bool,
     in_stream_name: Option<&str>,
     session_id: &str,
-) -> Result<crate::common::meta::traces::ExportTraceServiceResponse, BufferWriteError> {
+) -> Result<
+    (
+        crate::common::meta::traces::ExportTraceServiceResponse,
+        Arc<Writer>,
+        HashMap<String, SchemaRecords>,
+        String,
+    ),
+    BufferWriteError,
+> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(BufferWriteError::InternalServerError);
@@ -159,7 +167,6 @@ pub async fn handle_trace_request(
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     let mut trace_index = Vec::with_capacity(res_spans.len());
-    log::info!("[{session_id}] Start handle res_spans loop");
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let resource = res_span.resource.unwrap();
@@ -396,7 +403,7 @@ pub async fn handle_trace_request(
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
     let traces_stream_name_with_sid = format!("{traces_stream_name}^{session_id}");
-    let mut req_stats = write_file(&writer, &traces_stream_name_with_sid, data_buf).await;
+    let mut req_stats = write_file(&writer, &traces_stream_name_with_sid, data_buf.clone()).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
@@ -466,13 +473,7 @@ pub async fn handle_trace_request(
         },
     };
 
-    Ok(res)
-    // let mut out = BytesMut::with_capacity(res.encoded_len());
-    // res.encode(&mut out).expect("Out of memory");
-    // return Ok(HttpResponse::Ok()
-    //     .status(http::StatusCode::OK)
-    //     .content_type("application/x-protobuf")
-    //     .body(out));
+    Ok((res, writer, data_buf, service_name))
 }
 
 fn get_span_status(status: Option<Status>) -> String {
@@ -491,7 +492,15 @@ pub async fn handle_trace_json_request(
     thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
-) -> Result<crate::common::meta::traces::ExportTraceServiceResponse, BufferWriteError> {
+) -> Result<
+    (
+        crate::common::meta::traces::ExportTraceServiceResponse,
+        Arc<Writer>,
+        HashMap<String, SchemaRecords>,
+        String,
+    ),
+    BufferWriteError,
+> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(BufferWriteError::InternalServerError);
@@ -841,7 +850,7 @@ pub async fn handle_trace_json_request(
 
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
-    let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
+    let mut req_stats = write_file(&writer, &traces_stream_name, data_buf.clone()).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
@@ -918,5 +927,5 @@ pub async fn handle_trace_json_request(
         crate::common::meta::traces::ExportTraceServiceResponse::default()
     };
 
-    Ok(resp)
+    Ok((resp, writer, data_buf, service_name))
 }
