@@ -263,13 +263,11 @@ pub async fn authentication(
             if v.is_valid {
                 resp.status = true;
             } else {
-                resp.status = false;
-                resp.message = "Invalid credentials".to_string();
+                return unauthorized_error(resp);
             }
         }
         Err(_e) => {
-            resp.status = false;
-            resp.message = "Invalid credentials".to_string();
+            return unauthorized_error(resp);
         }
     };
     if resp.status {
@@ -297,7 +295,7 @@ pub async fn authentication(
         }
         Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
     } else {
-        Ok(HttpResponse::Unauthorized().json(resp))
+        unauthorized_error(resp)
     }
 }
 
@@ -318,13 +316,11 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                             if v.is_valid {
                                 resp.status = true;
                             } else {
-                                resp.status = false;
-                                resp.message = "Invalid credentials".to_string();
+                                return unauthorized_error(resp);
                             }
                         }
                         Err(_e) => {
-                            resp.status = false;
-                            resp.message = "Invalid credentials".to_string();
+                            return unauthorized_error(resp);
                         }
                     };
                     if resp.status {
@@ -352,19 +348,13 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                         }
                         Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
                     } else {
-                        Ok(HttpResponse::Unauthorized().json(resp))
+                        unauthorized_error(resp)
                     }
                 }
-                None => {
-                    resp.status = false;
-                    resp.message = "Invalid credentials".to_string();
-                    Ok(HttpResponse::Unauthorized().json(resp))
-                }
+                None => unauthorized_error(resp),
             }
         } else {
-            resp.status = false;
-            resp.message = "Invalid credentials".to_string();
-            Ok(HttpResponse::Unauthorized().json(resp))
+            unauthorized_error(resp)
         }
     }
 }
