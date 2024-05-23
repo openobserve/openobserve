@@ -32,10 +32,12 @@ pub enum ReportMediaType {
     Pdf, // Supports Pdf only
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema)]
 pub struct ReportDashboardVariable {
-    pub name: String,
+    pub key: String,
     pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
