@@ -1224,6 +1224,14 @@ pub async fn register_table(
         &session.search_type,
         without_optimizer,
     )?;
+
+    let file_sort_order = if CONFIG.common.datafusion_parquet_sort_order {
+        vec![vec![
+            col(CONFIG.common.column_timestamp.to_owned()).sort(true, true),
+        ]]
+    } else {
+        vec![vec![]]
+    };
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
@@ -1235,6 +1243,7 @@ pub async fn register_table(
                     session.search_type != SearchType::Aggregation
                         || !CONFIG.common.datafusion_parquet_stat_disable_for_aggs,
                 )
+                .with_file_sort_order(file_sort_order)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();

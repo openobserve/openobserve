@@ -603,6 +603,8 @@ pub struct Common {
     pub allow_user_defined_schemas: bool,
     #[env_config(name = "ZO_DATAFUSION_PARQUET_STAT_DISABLE_FOR_AGGS", default = false)]
     pub datafusion_parquet_stat_disable_for_aggs: bool,
+    #[env_config(name = "ZO_DATAFUSION_PARQUET_ENABLE_SORT_ORDER", default = false)]
+    pub datafusion_parquet_sort_order: bool,
 }
 
 #[derive(EnvConfig)]
