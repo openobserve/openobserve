@@ -803,6 +803,9 @@ export default defineComponent({
             regions: searchObj.meta.hasOwnProperty("regions")
               ? searchObj.meta.regions.join(",")
               : "",
+            clusters: searchObj.meta.hasOwnProperty("clusters")
+              ? searchObj.meta.clusters.join(",")
+              : "",
           })
           .then((res: any) => {
             if (res.data.hits.length) {
