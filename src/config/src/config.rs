@@ -15,12 +15,7 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, time::Duration};
 
-use chromiumoxide::{
-    browser::BrowserConfig,
-    detection::{default_executable, DetectionOptions},
-    fetcher::{BrowserFetcher, BrowserFetcherOptions},
-    handler::viewport::Viewport,
-};
+use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
@@ -181,7 +176,7 @@ pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
-    if !CONFIG.chrome.chrome_enabled {
+    if !CONFIG.chrome.chrome_enabled || !CONFIG.common.report_server_url.is_empty() {
         None
     } else {
         let mut browser_config = BrowserConfig::builder()
@@ -207,50 +202,7 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
         if !CONFIG.chrome.chrome_path.is_empty() {
             browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
         } else {
-            let mut should_download = false;
-
-            if !CONFIG.chrome.chrome_check_default {
-                should_download = true;
-            } else {
-                // Check if chrome is available on default paths
-                // 1. Check the CHROME env
-                // 2. Check usual chrome file names in user path
-                // 3. (Windows) Registry
-                // 4. (Windows & MacOS) Usual installations paths
-                if let Ok(exec_path) = default_executable(DetectionOptions::default()) {
-                    browser_config = browser_config.chrome_executable(exec_path);
-                } else {
-                    should_download = true;
-                }
-            }
-            if should_download {
-                // Download known good chrome version
-                let download_path = &CONFIG.chrome.chrome_download_path;
-                log::info!("fetching chrome at: {download_path}");
-                tokio::fs::create_dir_all(download_path).await.unwrap();
-                let fetcher = BrowserFetcher::new(
-                    BrowserFetcherOptions::builder()
-                        .with_path(download_path)
-                        .build()
-                        .unwrap(),
-                );
-
-                // Fetches the browser revision, either locally if it was previously
-                // installed or remotely. Returns error when the download/installation
-                // fails. Since it doesn't retry on network errors during download,
-                // if the installation fails, it might leave the cache in a bad state
-                // and it is advised to wipe it.
-                // Note: Does not work on LinuxArm platforms.
-                let info = fetcher
-                    .fetch()
-                    .await
-                    .expect("chrome could not be downloaded");
-                log::info!(
-                    "chrome fetched at path {:#?}",
-                    info.executable_path.as_path()
-                );
-                browser_config = browser_config.chrome_executable(info.executable_path);
-            }
+            panic!("Chrome path must be specified");
         }
         Some(browser_config.build().unwrap())
     }
@@ -327,10 +279,6 @@ pub struct Chrome {
     pub chrome_enabled: bool,
     #[env_config(name = "ZO_CHROME_PATH", default = "")]
     pub chrome_path: String,
-    #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
-    pub chrome_check_default: bool,
-    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
-    pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
     #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
@@ -641,6 +589,8 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "")]
+    pub report_server_url: String,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
