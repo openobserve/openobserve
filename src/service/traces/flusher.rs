@@ -95,11 +95,14 @@ impl WriteBufferFlusher {
                 let resp = response_rx.await.expect("wal op buffer thread is dead");
                 match resp {
                     BufferedWriteResult::Success(_) => Ok(resp),
-                    BufferedWriteResult::Error(e) => Err(Error::new(ErrorKind::Other, e)),
+                    BufferedWriteResult::Error(e) => {
+                        log::error!("flusher inside write resp error {e}");
+                        Err(Error::new(ErrorKind::Other, e))
+                    },
                 }
             }
             Err(e) => {
-                info!("flusher write error : {}", e);
+                log::error!("flusher inside write error {e}");
                 Err(Error::new(ErrorKind::Other, e))
             }
         }
@@ -241,14 +244,13 @@ pub async fn run_trace_op_buffer(
                 }
                 // send ops into IO flush channel and wait for response
                 if let Err(e) = io_flush_tx.send(ops) {
-                    info!("io_flush_tx send e : {}, len: {}", e, io_flush_tx.len());
+                    log::error!("io_flush_tx send e : {}, len: {}", e, io_flush_tx.len());
                 }
+
                 match io_flush_notify_rx.recv().expect("wal io thread is dead") {
                     Ok(mut resp) => {
                         for (sid, notify) in &resp {
                             if let Ok((_, w, data_buf, service_name)) = notify {
-                                // let mut m: std::collections::HashMap<String, SchemaRecords> = Default::default();
-                                // m.extend(data_buf.iter().cloned());
                                 // todo move memtable logic from wal writer , memtable refresh
                                 let _ = crate::service::ingestion::write_memtable(w, sid, data_buf.clone(), service_name).await;
                             }
@@ -263,6 +265,7 @@ pub async fn run_trace_op_buffer(
                                             BufferedWriteResult::Success(ets.0)
                                         }
                                         Err(e) => {
+                                            log::error!("io_flush_notify_rx resp error : {e}");
                                             BufferedWriteResult::Error(e)
                                         }
                                     };

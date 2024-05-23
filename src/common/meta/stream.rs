@@ -86,7 +86,7 @@ pub struct SchemaEvolution {
     pub is_schema_changed: bool,
     pub types_delta: Option<Vec<Field>>,
 }
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SchemaRecords {
     pub schema_key: String,
     pub schema: Arc<Schema>,

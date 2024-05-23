@@ -82,7 +82,7 @@ impl TraceService for TraceServer {
                 }
             },
             Err(e) => {
-                log::info!("flusher write error {}", e);
+                log::error!("flusher write error {}", e);
                 Err(Status::internal(e.to_string()))
             }
         }
