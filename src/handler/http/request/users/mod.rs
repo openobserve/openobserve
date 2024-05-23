@@ -359,6 +359,74 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     }
 }
 
+#[get("/login")]
+pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        let mut resp = SignInResponse::default();
+        let auth_header = _req.headers().get("Authorization");
+        if auth_header.is_some() {
+            let auth_header = auth_header.unwrap().to_str().unwrap();
+            match o2_enterprise::enterprise::dex::service::auth::get_user_from_token(auth_header) {
+                Some((name, password)) => {
+                    match crate::handler::http::auth::validator::validate_user(&name, &password)
+                        .await
+                    {
+                        Ok(v) => {
+                            if v.is_valid {
+                                resp.status = true;
+                            } else {
+                                resp.status = false;
+                                resp.message = "Invalid credentials".to_string();
+                            }
+                        }
+                        Err(_e) => {
+                            resp.status = false;
+                            resp.message = "Invalid credentials".to_string();
+                        }
+                    };
+                    if resp.status {
+                        let access_token = format!(
+                            "Basic {}",
+                            base64::encode(&format!("{}:{}", &name, &password))
+                        );
+                        let tokens = json::to_string(&AuthTokens {
+                            access_token,
+                            refresh_token: "".to_string(),
+                        })
+                        .unwrap();
+                        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+                        auth_cookie.set_expires(
+                            cookie::time::OffsetDateTime::now_utc()
+                                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                        );
+                        auth_cookie.set_http_only(true);
+                        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+                        auth_cookie.set_path("/");
+                        if CONFIG.auth.cookie_same_site_lax {
+                            auth_cookie.set_same_site(cookie::SameSite::Lax);
+                        } else {
+                            auth_cookie.set_same_site(cookie::SameSite::None);
+                        }
+                        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
+                    } else {
+                        Ok(HttpResponse::Unauthorized().json(resp))
+                    }
+                }
+                None => {
+                    resp.status = false;
+                    resp.message = "Invalid credentials".to_string();
+                    Ok(HttpResponse::Unauthorized().json(resp))
+                }
+            }
+        } else {
+            resp.status = false;
+            resp.message = "Invalid credentials".to_string();
+            Ok(HttpResponse::Unauthorized().json(resp))
+        }
+    }
+}
+
 /// ListUsers
 #[utoipa::path(
     context_path = "/api",
