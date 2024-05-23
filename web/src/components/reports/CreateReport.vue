@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="padding-top: 0; width: 320px"
                     >
                       <div class="q-mb-xs text-bold text-grey-8">
-                        {{ t("reports.cronExpression") }}
+                        {{ t("reports.cronExpression") + " *" }}
                         <q-icon
                           :name="outlinedInfo"
                           size="17px"
@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         bg-color="input-bg"
                         type="text"
                         outlined
-                        :rules="[() => (cronError.length ? cronError : true)]"
+                        :rules="[(val: any) => !!val.length ? cronError.length ? cronError : true : 'Field is required!']"
                         dense
                         style="width: 100%"
                       />
@@ -1191,18 +1191,13 @@ const saveReport = async () => {
     email: email.trim(),
   }));
 
-  // This is unitil we support multiple dashboards and tabs
-  if (formData.value.dashboards[0]?.tabs)
-    formData.value.dashboards[0].tabs = [
-      formData.value.dashboards[0].tabs as string,
-    ];
-
   if (frequency.value.type === "custom") {
     formData.value.frequency.type = frequency.value.custom.period;
     formData.value.frequency.interval = Number(frequency.value.custom.interval);
   } else if (frequency.value.type === "cron") {
     formData.value.frequency.type = frequency.value.type;
-    formData.value.frequency.cron = frequency.value.cron + " *";
+    formData.value.frequency.cron =
+      frequency.value.cron.toString().trim() + " *";
   } else {
     formData.value.frequency.type = frequency.value.type;
     formData.value.frequency.interval = 1;
@@ -1231,6 +1226,13 @@ const saveReport = async () => {
   } catch (err) {
     console.log(err);
   }
+
+  // This is unitil we support multiple dashboards and tabs
+  if (formData.value.dashboards[0]?.tabs)
+    formData.value.dashboards[0].tabs = [
+      formData.value.dashboards[0].tabs as string,
+    ];
+
   const reportAction = isEditingReport.value
     ? reports.updateReport
     : reports.createReport;
@@ -1255,9 +1257,11 @@ const saveReport = async () => {
     .catch((error) => {
       q.notify({
         type: "negative",
-        message: `Error while ${
-          isEditingReport.value ? "updating" : "saving"
-        } report.`,
+        message:
+          error?.response?.data?.message ||
+          `Error while ${
+            isEditingReport.value ? "updating" : "saving"
+          } report.`,
         timeout: 4000,
       });
     })
@@ -1281,7 +1285,7 @@ const validateReportData = async () => {
     return;
   }
 
-  if (!formData.value.dashboards[0].tabs.length) {
+  if (!formData.value.dashboards[0].tabs) {
     step.value = 1;
     return;
   }
@@ -1410,7 +1414,10 @@ const setupEditingReport = async (report: any) => {
   // set frequency
   if (report.frequency.type === "cron") {
     frequency.value.type = report.frequency.type;
-    frequency.value.cron = report.frequency.cron;
+    frequency.value.cron =
+      report.frequency.cron.split(" ").length === 7
+        ? report.frequency.cron.split(" ").slice(0, 6).join(" ")
+        : report.frequency.cron;
   } else if (report.frequency.interval > 1) {
     frequency.value.type = "custom";
     frequency.value.custom.period = report.frequency.type;

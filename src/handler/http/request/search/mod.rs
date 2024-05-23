@@ -447,12 +447,20 @@ pub async fn around(
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
 
-    let regions = query.get("regions").map_or("", |v| v.as_str());
-    let regions = regions
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
 
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
@@ -506,7 +514,7 @@ pub async fn around(
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: regions.clone(),
-        clusters: vec![],
+        clusters: clusters.clone(),
         timeout,
     };
     let user_id = in_req
@@ -585,7 +593,7 @@ pub async fn around(
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
-        clusters: vec![],
+        clusters,
         timeout,
     };
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
@@ -932,12 +940,20 @@ async fn values_v1(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
-    let regions = query.get("regions").map_or("", |v| v.as_str());
-    let regions = regions
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
 
     let timeout = query
         .get("timeout")
@@ -979,7 +995,7 @@ async fn values_v1(
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
-        clusters: vec![],
+        clusters,
         timeout,
     };
 
@@ -1168,12 +1184,20 @@ async fn values_v2(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
-    let regions = query.get("regions").map_or("", |v| v.as_str());
-    let regions = regions
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
 
     let timeout = query
         .get("timeout")
@@ -1215,7 +1239,7 @@ async fn values_v2(
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
-        clusters: vec![],
+        clusters,
         timeout,
     };
     let search_fut = SearchService::search(

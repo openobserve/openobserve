@@ -128,9 +128,8 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let files = scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit))
-        .await
-        .unwrap_or_default();
+    let files =
+        scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit)).unwrap_or_default();
     if files.is_empty() {
         return Ok(FxIndexMap::default());
     }

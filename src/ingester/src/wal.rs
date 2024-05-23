@@ -54,7 +54,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let lock_files = scan_files(wal_dir, "lock").await.unwrap_or_default();
+    let lock_files = wal_scan_files(wal_dir, "lock").await.unwrap_or_default();
 
     // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
     for lock_file in lock_files.iter() {
@@ -95,7 +95,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     create_dir_all(&parquet_dir).context(OpenDirSnafu {
         path: parquet_dir.clone(),
     })?;
-    let par_files = scan_files(parquet_dir, "par").await.unwrap_or_default();
+    let par_files = wal_scan_files(parquet_dir, "par").await.unwrap_or_default();
     for par_file in par_files.iter() {
         log::warn!("delete uncompleted par file: {:?}", par_file);
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
@@ -109,7 +109,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let wal_files = scan_files(&wal_dir, "wal").await.unwrap_or_default();
+    let wal_files = wal_scan_files(&wal_dir, "wal").await.unwrap_or_default();
     if wal_files.is_empty() {
         return Ok(());
     }
@@ -212,7 +212,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     Ok(())
 }
 
-async fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<PathBuf>> {
+async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<PathBuf>> {
     Ok(WalkDir::new(root_dir.into())
         .filter_map(|entry| async move {
             let entry = entry.ok()?;

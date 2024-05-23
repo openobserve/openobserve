@@ -166,9 +166,7 @@ impl Metrics for Querier {
         };
 
         let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
-        let files = scan_files(&pattern, "parquet", None)
-            .await
-            .unwrap_or_default();
+        let files = scan_files(&pattern, "parquet", None).unwrap_or_default();
 
         if arrow_files.is_empty() && files.is_empty() {
             return Ok(Response::new(resp));

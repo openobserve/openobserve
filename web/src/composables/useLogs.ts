@@ -121,6 +121,7 @@ const defaultObject = {
     flagWrapContent: false,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
+    clusters: [],
     useUserDefinedSchemas: "user_defined_schema",
     hasUserDefinedSchemas: false,
   },
@@ -519,6 +520,7 @@ const useLogs = () => {
         store.state.zoConfig.super_cluster_enabled
       ) {
         req["regions"] = searchObj.meta.regions;
+        req["clusters"] = searchObj.meta.clusters;
       }
 
       if (searchObj.data.stream.selectedStreamFields.length == 0) {
@@ -825,10 +827,15 @@ const useLogs = () => {
 
       if (
         config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled &&
-        queryReq.query.hasOwnProperty("regions")
+        store.state.zoConfig.super_cluster_enabled
       ) {
+        if(queryReq.query.hasOwnProperty("regions")) {
         partitionQueryReq["regions"] = queryReq.query.regions;
+        }
+
+        if(queryReq.query.hasOwnProperty("clusters")) {
+          partitionQueryReq["clusters"] = queryReq.query.clusters;
+        }
       }
 
       await searchService
@@ -949,7 +956,7 @@ const useLogs = () => {
       let lastPage = 0;
       searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
         (accumulator: number, currentValue: number) =>
-          accumulator + currentValue,
+          accumulator + Math.max(currentValue, 0),
         0
       );
 
@@ -1337,7 +1344,7 @@ const useLogs = () => {
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
           searchObj.data.queryResults.scan_size = res.data.scan_size;
-          searchObj.data.queryResults.took = res.data.took;
+          searchObj.data.queryResults.took += res.data.took;
           for (const [
             index,
             item,
@@ -2054,7 +2061,7 @@ const useLogs = () => {
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
 
-    let totalCount = searchObj.data.queryResults.total;
+    let totalCount = searchObj.data.queryResults.total || 0;
     if (searchObj.meta.resultGrid.showPagination == false) {
       endCount = searchObj.data.queryResults.hits.length;
       totalCount = searchObj.data.queryResults.hits.length;
@@ -2208,6 +2215,9 @@ const useLogs = () => {
           stream_type: searchObj.data.stream.streamType,
           regions: searchObj.meta.hasOwnProperty("regions")
             ? searchObj.meta.regions.join(",")
+            : "",
+          clusters: searchObj.meta.hasOwnProperty("clusters")
+            ? searchObj.meta.clusters.join(",")
             : "",
         })
         .then((res) => {
@@ -2708,7 +2718,21 @@ const useLogs = () => {
 
   const getRegionInfo = () => {
     searchService.get_regions().then((res) => {
-      store.dispatch("setRegionInfo", res.data);
+      const clusterData = [];
+      let regionObj: any = {};
+      const apiData = res.data;
+      for (const region in apiData) {
+        regionObj = {
+          label: region,
+          children: [],
+        };
+        for (const cluster of apiData[region]) {
+          regionObj.children.push({ label: cluster });
+        }
+        clusterData.push(regionObj);
+      }
+
+      store.dispatch("setRegionInfo", clusterData);
     });
   };
 

@@ -32,10 +32,12 @@ pub enum ReportMediaType {
     Pdf, // Supports Pdf only
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema)]
 pub struct ReportDashboardVariable {
-    pub name: String,
+    pub key: String,
     pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
@@ -193,4 +195,19 @@ impl Default for Report {
             last_edited_by: "".to_string(),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReportEmailDetails {
+    pub recepients: Vec<String>,
+    pub title: String,
+    pub name: String,
+    pub message: String,
+    pub dashb_url: String,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone)]
+pub struct HttpReportPayload {
+    pub dashboards: Vec<ReportDashboard>,
+    pub email_details: ReportEmailDetails,
 }
