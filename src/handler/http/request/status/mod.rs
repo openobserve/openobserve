@@ -75,6 +75,7 @@ struct ConfigResponse<'a> {
     instance: String,
     commit_hash: String,
     build_date: String,
+    build_type: String,
     default_fts_keys: Vec<String>,
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
@@ -207,11 +208,18 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_menus = "";
 
+    #[cfg(feature = "enterprise")]
+    let build_type = "enterprise";
+    #[cfg(not(feature = "enterprise"))]
+    let build_type = "opensource";
+
+    
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
         commit_hash: COMMIT_HASH.to_string(),
         build_date: BUILD_DATE.to_string(),
+        build_type: build_type.to_string(),
         telemetry_enabled: CONFIG.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
