@@ -177,6 +177,8 @@ export default defineComponent({
     const d = new Date();
     this.userInfo =
       sessionUserInfo !== null ? JSON.parse(sessionUserInfo) : null;
+    console.log("config.isEnterprise", config.isEnterprise);
+    console.log("this.userInfo", this.userInfo);
     if (
       (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) ||
       config.isEnterprise === "true"
