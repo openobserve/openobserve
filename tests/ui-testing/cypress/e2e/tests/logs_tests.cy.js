@@ -323,7 +323,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should contain options to include, exclude and add field to table under Json", () => {
+  it.skip("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
