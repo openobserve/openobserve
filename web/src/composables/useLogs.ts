@@ -954,9 +954,10 @@ const useLogs = () => {
       let recordSize = 0;
       let from = 0;
       let lastPage = 0;
+      console.log(JSON.stringify(partitionDetail.partitions));
       searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
         (accumulator: number, currentValue: number) =>
-          accumulator + currentValue,
+          accumulator + Math.max(currentValue, 0),
         0
       );
 
@@ -1701,6 +1702,7 @@ const useLogs = () => {
               } milliseconds to complete`
             );
             console.log("=================== End Debug ===================");
+            console.log(searchObj.data.queryResults.partitionDetail);
             dismiss();
             resolve(true);
           })
