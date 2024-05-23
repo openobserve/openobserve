@@ -621,7 +621,7 @@ impl SqliteFileList {
         match  sqlx::query(
             format!(r#"
 INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
         "#).as_str(),
     )
         .bind(org_id)
@@ -724,15 +724,16 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id      INTEGER not null primary key autoincrement,
-    org     VARCHAR not null,
-    stream  VARCHAR not null,
-    date    VARCHAR not null,
-    file    VARCHAR not null,
-    deleted BOOLEAN default false not null,
-    min_ts   BIGINT not null,
-    max_ts   BIGINT not null,
-    records  BIGINT not null,
+    id        INTEGER not null primary key autoincrement,
+    org       VARCHAR not null,
+    stream    VARCHAR not null,
+    date      VARCHAR not null,
+    file      VARCHAR not null,
+    deleted   BOOLEAN default false not null,
+    flattened BOOLEAN default false not null,
+    min_ts    BIGINT not null,
+    max_ts    BIGINT not null,
+    records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
@@ -745,15 +746,16 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
 (
-    id      INTEGER not null primary key autoincrement,
-    org     VARCHAR not null,
-    stream  VARCHAR not null,
-    date    VARCHAR not null,
-    file    VARCHAR not null,
-    deleted BOOLEAN default false not null,
-    min_ts   BIGINT not null,
-    max_ts   BIGINT not null,
-    records  BIGINT not null,
+    id        INTEGER not null primary key autoincrement,
+    org       VARCHAR not null,
+    stream    VARCHAR not null,
+    date      VARCHAR not null,
+    file      VARCHAR not null,
+    deleted   BOOLEAN default false not null,
+    flattened BOOLEAN default false not null,
+    min_ts    BIGINT not null,
+    max_ts    BIGINT not null,
+    records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
@@ -766,11 +768,12 @@ CREATE TABLE IF NOT EXISTS file_list_history
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
-    id        INTEGER not null primary key autoincrement,
-    org       VARCHAR not null,
-    stream    VARCHAR not null,
-    date      VARCHAR not null,
-    file      VARCHAR not null,
+    id         INTEGER not null primary key autoincrement,
+    org        VARCHAR not null,
+    stream     VARCHAR not null,
+    date       VARCHAR not null,
+    file       VARCHAR not null,
+    flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
         "#,

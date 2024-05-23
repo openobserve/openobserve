@@ -610,7 +610,7 @@ impl PostgresFileList {
         match  sqlx::query(
             format!(r#"
 INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT DO NOTHING;
             "#).as_str(),
         )
@@ -709,15 +709,16 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
-    org      VARCHAR(100) not null,
-    stream   VARCHAR(256) not null,
-    date     VARCHAR(16)  not null,
-    file     VARCHAR(256) not null,
-    deleted  BOOLEAN default false not null,
-    min_ts   BIGINT not null,
-    max_ts   BIGINT not null,
-    records  BIGINT not null,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY,
+    org       VARCHAR(100) not null,
+    stream    VARCHAR(256) not null,
+    date      VARCHAR(16)  not null,
+    file      VARCHAR(256) not null,
+    deleted   BOOLEAN default false not null,
+    flattened BOOLEAN default false not null,
+    min_ts    BIGINT not null,
+    max_ts    BIGINT not null,
+    records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
@@ -730,15 +731,16 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
-    org      VARCHAR(100) not null,
-    stream   VARCHAR(256) not null,
-    date     VARCHAR(16)  not null,
-    file     VARCHAR(256) not null,
-    deleted  BOOLEAN default false not null,
-    min_ts   BIGINT not null,
-    max_ts   BIGINT not null,
-    records  BIGINT not null,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY,
+    org       VARCHAR(100) not null,
+    stream    VARCHAR(256) not null,
+    date      VARCHAR(16)  not null,
+    file      VARCHAR(256) not null,
+    deleted   BOOLEAN default false not null,
+    flattened BOOLEAN default false not null,
+    min_ts    BIGINT not null,
+    max_ts    BIGINT not null,
+    records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
@@ -751,11 +753,12 @@ CREATE TABLE IF NOT EXISTS file_list_history
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
-    org      VARCHAR(100) not null,
-    stream   VARCHAR(256) not null,
-    date     VARCHAR(16)  not null,
-    file     VARCHAR(256) not null,
+    id         BIGINT GENERATED ALWAYS AS IDENTITY,
+    org        VARCHAR(100) not null,
+    stream     VARCHAR(256) not null,
+    date       VARCHAR(16)  not null,
+    file       VARCHAR(256) not null,
+    flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
         "#,
