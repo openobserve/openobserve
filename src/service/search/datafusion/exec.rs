@@ -171,7 +171,7 @@ pub async fn sql(
         )
         .await?,
     );
-    let mut spend_time = start.elapsed().as_secs_f64();
+    let mut spend_time = start.elapsed().as_millis();
 
     // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
@@ -230,9 +230,9 @@ pub async fn sql(
         let batches = df.collect().await?;
         result.insert(format!("agg_{name}"), batches);
 
-        let q_time = start.elapsed().as_secs_f64();
+        let q_time = start.elapsed().as_millis();
         log::info!(
-            "[trace_id {trace_id}] Query agg:{name} took {:.3} secs",
+            "[trace_id {trace_id}] Query agg:{name} took {} ms",
             q_time - spend_time
         );
         spend_time = q_time;
@@ -242,8 +242,8 @@ pub async fn sql(
     ctx.deregister_table("tbl")?;
     ctx_aggs.deregister_table("tbl")?;
     log::info!(
-        "[trace_id {trace_id}] Query all took {:.3} secs",
-        start.elapsed().as_secs_f64()
+        "[trace_id {trace_id}] Query all took {} ms",
+        start.elapsed().as_millis()
     );
 
     Ok(result)
@@ -370,8 +370,8 @@ async fn exec_query(
     if field_fns.is_empty() && sql.query_fn.is_none() {
         let batches = df.clone().collect().await?;
         log::info!(
-            "[trace_id {trace_id}] Query took {:.3} secs",
-            start.elapsed().as_secs_f64()
+            "[trace_id {trace_id}] Query took {} ms",
+            start.elapsed().as_millis()
         );
         return Ok(batches);
     }
@@ -473,8 +473,8 @@ async fn exec_query(
     };
     let batches = df.clone().collect().await?;
     log::info!(
-        "[trace_id {trace_id}] Query took {:.3} secs",
-        start.elapsed().as_secs_f64()
+        "[trace_id {trace_id}] Query took {} ms",
+        start.elapsed().as_millis()
     );
     Ok(batches)
 }
@@ -1030,8 +1030,8 @@ pub async fn convert_parquet_file(
     drop(ctx);
 
     log::info!(
-        "convert_parquet_file took {:.3} secs",
-        start.elapsed().as_secs_f64()
+        "convert_parquet_file took {} ms",
+        start.elapsed().as_millis()
     );
 
     Ok(())
@@ -1095,8 +1095,8 @@ pub async fn merge_parquet_files(
     drop(ctx);
 
     log::info!(
-        "merge_parquet_files took {:.3} secs",
-        start.elapsed().as_secs_f64()
+        "merge_parquet_files took {} ms",
+        start.elapsed().as_millis()
     );
 
     Ok((schema, batches))
