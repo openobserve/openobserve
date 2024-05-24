@@ -52,8 +52,9 @@ test.describe("dashboard testcases", () => {
         await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
             force: true,
         });
+        await page.waitForTimeout(3000);
         // get the data from the search variable
-        // await expect.poll(async () => (await search).status()).toBe(200);
+        await expect.poll(async () => (await search).status()).toBe(200);
         // await search.hits.FIXME_should("be.an", "array");
     }
 
