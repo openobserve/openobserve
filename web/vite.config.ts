@@ -149,9 +149,7 @@ export default defineConfig({
           "@openobserve/browser-logs",
           "@openobserve/browser-rum",
         ],
-        vgl: ["vue3-grid-layout"],
         "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-        "o2cs-map": ["@joakimono/echarts-extension-leaflet"],
       },
       output: {
         chunkFileNames: ({ name }) => {
