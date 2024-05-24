@@ -21,10 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-select
       data-test="log-search-index-list-select-stream"
-      v-model="searchObj.data.metrics.selectedMetric"
-      :label="
-        searchObj.data.metrics.selectedMetric ? '' : t('search.selectIndex')
-      "
+      v-model="selectedMetric"
+      :label="selectedMetric ? '' : t('search.selectIndex')"
       :options="streamOptions"
       data-cy="index-dropdown"
       input-debounce="0"
@@ -39,25 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
-      <template
-        v-if="searchObj.data.metrics.selectedMetric?.type"
-        v-slot:prepend
-      >
+      <template v-if="selectedMetric?.type" v-slot:prepend>
         <q-icon
-          :title="searchObj.data.metrics.selectedMetric?.type"
+          :title="selectedMetric?.type"
           size="xs"
-          :name="
-            metricsIconMapping[
-              searchObj.data.metrics.selectedMetric?.type || ''
-            ]
-          "
+          :name="metricsIconMapping[selectedMetric?.type || '']"
         />
       </template>
       <template v-slot:option="scope">
         <q-item
           :class="
             store.state.theme === 'dark' &&
-            searchObj.data.metrics.selectedMetric?.value !== scope.opt.value
+            selectedMetric?.value !== scope.opt.value
               ? 'text-white'
               : ''
           "
@@ -282,7 +273,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch, onMounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  type Ref,
+  watch,
+  onMounted,
+  computed,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -300,15 +298,16 @@ import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "MetricsList",
-  emits: ["update:change-metric", "select-label"],
+  emits: ["update:change-metric", "select-label", "update:modelValue"],
   components: { EqualIcon, NotEqualIcon },
+  props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
     const quasar = useQuasar();
     const { searchObj } = useMetrics();
-    const streamOptions: any = ref(searchObj.data.metrics.metricList);
+    const streamOptions: any = ref(props.metricsList || []);
     const selectedMetricLabels = ref([]);
     const searchMetricLabel = ref("");
     const filteredMetricLabels = ref([]);
@@ -329,20 +328,28 @@ export default defineComponent({
     };
     const { parsePromQlQuery } = usePromqlSuggestions();
     const { getStream } = useStreams();
+
+    const selectedMetric = computed({
+      get() {
+        return props.modelValue;
+      },
+      set(value) {
+        emit("update:modelValue", value);
+      },
+    });
     watch(
-      () => searchObj.data.metrics.metricList,
+      () => props.metricsList,
       () => {
-        streamOptions.value = searchObj.data.metrics.metricList;
+        streamOptions.value = props.metricsList;
       },
       { deep: true }
     );
     onMounted(() => {
-      if (!streamOptions.value.length)
-        streamOptions.value = searchObj.data.metrics.metricList;
+      if (!streamOptions.value.length) streamOptions.value = props.metricsList;
     });
     const filterMetrics = (val: string, update: any) => {
       update(() => {
-        streamOptions.value = searchObj.data.metrics.metricList;
+        streamOptions.value = props.metricsList;
         const needle = val.toLowerCase();
         streamOptions.value = streamOptions.value.filter(
           (v: any) => v.label.toLowerCase().indexOf(needle) > -1
@@ -351,7 +358,7 @@ export default defineComponent({
     };
     const updateMetricLabels = async () => {
       const streamData = await getStream(
-        searchObj.data.metrics.selectedMetric?.value || "",
+        selectedMetric.value?.value || "",
         "metrics",
         true
       );
@@ -362,11 +369,11 @@ export default defineComponent({
         filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
     watch(
-      () => searchObj.data.metrics.selectedMetric,
+      () => selectedMetric.value,
       (metric) => {
         if (metric?.value) updateMetricLabels();
       },
-      { immediate: true }
+      { immediate: true, deep: true }
     );
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
@@ -392,7 +399,7 @@ export default defineComponent({
         stream
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.metrics.selectedMetric?.value,
+            stream_name: selectedMetric.value?.value,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
             fields: [name],
@@ -485,7 +492,7 @@ export default defineComponent({
 
     const onMetricChange = () => {
       updateMetricLabels();
-      emit("update:change-metric", searchObj.data.metrics.selectedMetric);
+      emit("update:change-metric", selectedMetric.value);
     };
     const setSelectedMetricType = (option: any) => {
       searchObj.data.metrics.selectedMetricType = option.type;
@@ -520,6 +527,7 @@ export default defineComponent({
       outlinedAdd,
       addLabelToEditor,
       addValueToEditor,
+      selectedMetric,
     };
   },
 });

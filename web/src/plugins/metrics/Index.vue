@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #before>
           <metric-list
             data-test="logs-search-index-list"
+            v-model="searchObj.data.metrics.selectedMetric"
+            :metrics-list="searchObj.data.metrics.metricList"
             @select-label="addLabelToEditor"
             @update:change-metric="onMetricChange"
           />
@@ -864,8 +866,6 @@ export default defineComponent({
         .join("&");
 
       let shareURL = window.location.origin + window.location.pathname;
-
-      console.log("shareURL", shareURL);
 
       if (queryString != "") {
         shareURL += "?" + queryString;
