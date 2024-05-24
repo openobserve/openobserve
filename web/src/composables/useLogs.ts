@@ -520,7 +520,7 @@ const useLogs = () => {
           histogram:
             "select histogram(" +
             store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
@@ -736,6 +736,12 @@ const useLogs = () => {
           "[INDEX_NAME]",
           searchObj.data.stream.selectedStream.value
         );
+
+        req.aggs.histogram = req.aggs.histogram.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+        
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
         // console.log(unparsedSQL);
@@ -1169,9 +1175,17 @@ const useLogs = () => {
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
 
-        // Removing sql_mode from histogram query, as it is not required
-        delete searchObj.data.histogramQuery.query.sql_mode;
+        searchObj.data.histogramQuery.query.sql = searchObj.data.histogramQuery.aggs.histogram;
+        searchObj.data.histogramQuery.query.sql_mode = "full";
 
+        searchObj.data.histogramQuery.query.start_time = searchObj.data.datetime.startTime;
+        searchObj.data.histogramQuery.query.end_time = searchObj.data.datetime.endTime;
+        delete searchObj.data.histogramQuery.query.quick_mode;
+         delete searchObj.data.histogramQuery.query.from;
+
+        // Removing sql_mode from histogram query, as it is not required
+        //delete searchObj.data.histogramQuery.query.sql_mode;
+        delete searchObj.data.histogramQuery.aggs;
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
         // get the current page detail and set it into query request
@@ -1341,6 +1355,10 @@ const useLogs = () => {
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       queryReq.query.size = 0;
+      delete queryReq.query.from;
+      delete queryReq.query.quick_mode;
+      queryReq.query['sql_mode'] = "full";
+
       queryReq.query.track_total_hits = true;
       searchService
         .search({
@@ -1650,7 +1668,7 @@ const useLogs = () => {
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
-        queryReq.query.track_total_hits = true;
+        //queryReq.query.track_total_hits = true;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -1660,8 +1678,7 @@ const useLogs = () => {
           .then((res) => {
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
-            searchObj.data.queryResults.aggs = res.data.aggs;
-            searchObj.data.queryResults.total = res.data.total;
+            searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took = res.data.took;
             generateHistogramData();
@@ -1692,7 +1709,7 @@ const useLogs = () => {
             // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
             refreshPartitionPagination(regeratePaginationFlag);
 
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
 
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
@@ -2104,6 +2121,7 @@ const useLogs = () => {
 
   function generateHistogramData() {
     try {
+      let num_records:number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
@@ -2112,11 +2130,13 @@ const useLogs = () => {
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
       ) {
-        searchObj.data.queryResults.aggs.histogram.map(
+        searchObj.data.queryResults.aggs.map(
+          
           (bucket: {
             zo_sql_key: string | number | Date;
             zo_sql_num: string;
           }) => {
+            num_records = num_records + parseInt(bucket.zo_sql_num, 10);
             unparsed_x_data.push(bucket.zo_sql_key);
             // const histDate = new Date(bucket.zo_sql_key);
             xData.push(
@@ -2127,6 +2147,7 @@ const useLogs = () => {
           }
         );
       }
+      searchObj.data.queryResults.total = num_records;
 
       const chartParams = {
         title: getHistogramTitle(),
