@@ -306,11 +306,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { ref, type Ref } from "vue";
+import { defineAsyncComponent, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
-import PermissionsJSON from "@/components/iam/roles/PermissionsJSON.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useRouter } from "vue-router";
@@ -337,6 +336,10 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
+
+const PermissionsJSON = defineAsyncComponent(
+  () => import("@/components/iam/roles/PermissionsJSON.vue")
+);
 
 onBeforeMount(() => {
   permissionsState.permissions = [];

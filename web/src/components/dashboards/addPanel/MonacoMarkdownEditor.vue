@@ -33,6 +33,7 @@ import {
   onDeactivated,
   onUnmounted,
   onActivated,
+  watch,
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
@@ -143,6 +144,15 @@ export default defineComponent({
         editorRef,
       };
     });
+
+    watch(
+      () => store.state.theme,
+      () => {
+        monaco.editor.setTheme(
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+        );
+      }
+    );
   },
 });
 </script>

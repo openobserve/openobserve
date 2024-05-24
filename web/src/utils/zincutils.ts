@@ -16,12 +16,23 @@
 import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
-import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
+
+let moment: any;
+let momentInitialized = false;
+
+const importMoment = async () => {
+  if (!momentInitialized) {
+    const momentModule: any = await import("moment-timezone");
+    moment = momentModule.default;
+    momentInitialized = true;
+  }
+  return moment;
+};
 
 const useLocalStorage = (
   key: string,
@@ -585,10 +596,11 @@ export const convertToUtcTimestamp = (
   return utcTimestamp * 1000;
 };
 
-export const localTimeSelectedTimezoneUTCTime = (
+export const localTimeSelectedTimezoneUTCTime = async (
   time: any,
   timezone: string
 ) => {
+  await importMoment();
   // Creating a Date object using the timestamp
   const date = new Date(time);
 

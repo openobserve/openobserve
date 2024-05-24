@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!no_data_ingest"
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
+      :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
-      <q-card class="my-card">
-        <q-card-section align="center" flat
-bordered class="my-card">
+      <div class="my-card card-container">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="row justify-center" v-if="isCloud == 'false'">
@@ -45,11 +45,11 @@ bordered class="my-card">
             <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
             <div class="text-h6">{{ summary.ingested_data }}</div>
           </div>
-        </q-card-section>
+        </div>
 
         <q-separator />
 
-        <q-card-actions align="center">
+        <div align="center" class="q-py-sm">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
@@ -58,19 +58,18 @@ bordered class="my-card">
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
 
-      <q-card align="center" class="my-card">
-        <q-card-section align="center" flat
-bordered class="my-card">
+      <div align="center" class="my-card card-container">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
           <div class="text-h6">{{ summary.query_fns }}</div>
           <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
           <div class="text-h6">{{ summary.ingest_fns }}</div>
-        </q-card-section>
+        </div>
         <q-separator />
-        <q-card-actions align="center">
+        <div align="center" class="q-py-sm">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
@@ -79,19 +78,18 @@ bordered class="my-card">
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
 
-      <q-card class="my-card">
-        <q-card-section align="center" flat
-bordered class="my-card">
+      <div class="my-card card-container">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
           <div class="text-h6">{{ summary.scheduled_alerts }}</div>
           <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
           <div class="text-h6">{{ summary.rt_alerts }}</div>
-        </q-card-section>
+        </div>
         <q-separator />
-        <q-card-actions align="center">
+        <div align="center" class="q-py-sm">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
@@ -100,8 +98,8 @@ bordered class="my-card">
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
     </div>
 
     <div
@@ -109,16 +107,15 @@ bordered class="my-card">
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
     >
-      <q-card class="my-card">
-        <q-card-section align="center" flat
-bordered class="my-card">
+      <div class="my-card card-container">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
-        </q-card-section>
+        </div>
 
         <q-separator />
 
-        <q-card-actions align="center">
+        <div align="center" class="q-py-sm">
           <q-btn
             no-caps
             color="primary"
@@ -126,8 +123,8 @@ bordered class="my-card">
             flat
             >{{ t("home.findIngestion") }}
           </q-btn>
-        </q-card-actions>
-      </q-card>
+        </div>
+      </div>
     </div>
   </q-page>
 </template>
@@ -265,5 +262,21 @@ export default defineComponent({
 
 .my-card {
   background-color: rgba(0, 0, 0, 0.045);
+}
+
+.card-container {
+  border-radius: 6px;
+}
+
+.dark-theme {
+  .card-container {
+    box-shadow: 0 1px 5px #fff3, 0 2px 2px #ffffff24, 0 3px 1px -2px #ffffff1f;
+  }
+}
+
+.light-theme {
+  .card-container {
+    box-shadow: 0 1px 5px #0003, 0 2px 2px #00000024, 0 3px 1px -2px #0000001f;
+  }
 }
 </style>

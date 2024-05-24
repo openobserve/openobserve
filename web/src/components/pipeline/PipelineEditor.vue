@@ -139,8 +139,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, ref, type Ref } from "vue";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import {
+  computed,
+  defineAsyncComponent,
+  onBeforeMount,
+  ref,
+  type Ref,
+} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import StreamRouting from "./StreamRouting.vue";
 import AssociateFunction from "./AssociateFunction.vue";
@@ -157,6 +162,10 @@ const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue")
+);
 
 interface Routing {
   [key: string]: RouteCondition[];

@@ -27,6 +27,7 @@ import {
   onDeactivated,
   onUnmounted,
   type Ref,
+  watch,
 } from "vue";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { useStore } from "vuex";
@@ -267,6 +268,15 @@ export default defineComponent({
 
       //   //   editorObj.dispose();
     });
+
+    watch(
+      () => store.state.theme,
+      () => {
+        monaco.editor.setTheme(
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+        );
+      }
+    );
 
     onActivated(async () => {
       provider.value?.dispose();

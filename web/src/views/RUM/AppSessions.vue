@@ -154,7 +154,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, onMounted, type Ref, onBeforeMount } from "vue";
+import {
+  ref,
+  defineProps,
+  onMounted,
+  type Ref,
+  onBeforeMount,
+  defineAsyncComponent,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/rum/AppTable.vue";
 import {
@@ -169,7 +176,6 @@ import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { date, useQuasar } from "quasar";
 import useSession from "@/composables/useSessionReplay";
-import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
@@ -184,6 +190,10 @@ interface Session {
   initial_view_name: string;
   id: string;
 }
+
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue")
+);
 
 const props = defineProps({
   isSessionReplayEnabled: {

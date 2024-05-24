@@ -153,13 +153,14 @@ import {
   onActivated,
   computed,
   onMounted,
+  onBeforeMount,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import { Parser } from "node-sql-parser/build/mysql";
+
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
-import QueryEditor from "../QueryEditor.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
@@ -167,7 +168,7 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(() => import("../QueryEditor.vue")),
     ConfirmDialog,
     QueryTypeSelector,
   },
@@ -189,11 +190,22 @@ export default defineComponent({
       removeQuery,
     } = useDashboardPanelData();
     const confirmQueryModeChangeDialog = ref(false);
-    const parser = new Parser();
+    let parser: any;
+
     let streamName = "";
     const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
       usePromqlSuggestions();
     const queryEditorRef = ref(null);
+
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
 
     const addTab = () => {
       addQuery();
@@ -408,7 +420,7 @@ export default defineComponent({
       }
 
       // Group By clause
-        if (latitude || longitude) {
+      if (latitude || longitude) {
         const aliases = [latitude?.alias, longitude?.alias]
           .filter(Boolean)
           .join(", ");

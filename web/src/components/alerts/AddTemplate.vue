@@ -170,6 +170,7 @@ import {
   onBeforeMount,
   onActivated,
   defineEmits,
+  watch,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -281,6 +282,15 @@ const setupTemplateData = () => {
     formData.value.body = props.template.body;
   }
 };
+
+watch(
+  () => store.state.theme,
+  () => {
+    monaco.editor.setTheme(
+      store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+    );
+  }
+);
 
 const isTemplateBodyValid = () => {
   try {
