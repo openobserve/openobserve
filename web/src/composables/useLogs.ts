@@ -520,7 +520,7 @@ const useLogs = () => {
           histogram:
             "select histogram(" +
             store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
@@ -723,8 +723,14 @@ const useLogs = () => {
             "[WHERE_CLAUSE]",
             " WHERE " + whereClause
           );
+
+          req.aggs.histogram = req.aggs.histogram.replace(
+            "[WHERE_CLAUSE]",
+            " WHERE " + whereClause
+          );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
+          req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
         }
 
         req.query.sql = req.query.sql.replace(
