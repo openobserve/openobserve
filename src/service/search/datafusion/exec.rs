@@ -1061,7 +1061,7 @@ pub async fn merge_parquet_files(
     let query_sql = if stream_type == StreamType::Index {
         // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} ASC",
             CONFIG.common.column_timestamp
         )
     } else if CONFIG.limit.distinct_values_hourly
@@ -1069,14 +1069,14 @@ pub async fn merge_parquet_files(
         && stream_name == "distinct_values"
     {
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
+            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} ASC",
             CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp
         )
     } else {
         format!(
-            "SELECT * FROM tbl ORDER BY {} DESC",
+            "SELECT * FROM tbl ORDER BY {} ASC",
             CONFIG.common.column_timestamp
         )
     };
@@ -1224,6 +1224,14 @@ pub async fn register_table(
         &session.search_type,
         without_optimizer,
     )?;
+
+    let file_sort_order = if CONFIG.common.datafusion_parquet_sort_order {
+        vec![vec![
+            col(CONFIG.common.column_timestamp.to_owned()).sort(true, true),
+        ]]
+    } else {
+        vec![vec![]]
+    };
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
@@ -1231,12 +1239,21 @@ pub async fn register_table(
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
                 .with_target_partitions(CONFIG.limit.cpu_num)
+                .with_collect_stat(
+                    session.search_type != SearchType::Aggregation
+                        || !CONFIG.common.datafusion_parquet_stat_disable_for_aggs,
+                )
+                .with_file_sort_order(file_sort_order)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
                 .with_target_partitions(CONFIG.limit.cpu_num)
+                .with_collect_stat(
+                    session.search_type != SearchType::Aggregation
+                        || !CONFIG.common.datafusion_parquet_stat_disable_for_aggs,
+                )
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
