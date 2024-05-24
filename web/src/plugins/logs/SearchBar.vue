@@ -476,6 +476,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'empty-query'
                   : ''
               "
+              @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+              @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
             />
           </template>
           <template #after>
@@ -497,6 +499,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : ''
                 "
                 language="ruby"
+                @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+                @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
               />
             </div>
           </template>

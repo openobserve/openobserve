@@ -80,7 +80,7 @@ export default defineComponent({
       default: "sql",
     },
   },
-  emits: ["update-query", "run-query", "update:query"],
+  emits: ["update-query", "run-query", "update:query", "focus", "blur"],
   setup(props, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
@@ -200,11 +200,11 @@ export default defineComponent({
       );
 
       editorObj.onDidFocusEditorWidget(() => {
-        searchObj.meta.queryEditorPlaceholderFlag = false;
+        emit("focus");
       });
 
       editorObj.onDidBlurEditorWidget(() => {
-        searchObj.meta.queryEditorPlaceholderFlag = true;
+        emit("blur");
       });
 
       window.addEventListener("click", () => {
