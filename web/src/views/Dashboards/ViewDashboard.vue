@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               style="padding-top: 5px"
             >
-              {{ getTimeString }} ({{ store.state.timezone }})
+              {{ timeString }} ({{ store.state.timezone }})
             </div>
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
@@ -259,6 +259,7 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importMoment();
+      setTimeString();
     });
 
     // [START] date picker related variables --------
@@ -295,6 +296,8 @@ export default defineComponent({
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
     };
+
+    const timeString = ref("");
 
     const printDashboard = () => {
       // set print mode as true
@@ -368,8 +371,11 @@ export default defineComponent({
       await loadDashboard();
     });
 
-    const getTimeString = computed(() => {
-      return ` ${moment(currentTimeObj.value?.start_time?.getTime() / 1000)
+    const setTimeString = () => {
+      if (!moment()) return;
+      timeString.value = ` ${moment(
+        currentTimeObj.value?.start_time?.getTime() / 1000
+      )
         .tz(store.state.timezone)
         .format("YYYY/MM/DD HH:mm")}
               -
@@ -378,7 +384,7 @@ export default defineComponent({
                  .format("YYYY/MM/DD HH:mm")}
 
                   `;
-    });
+    };
 
     const loadDashboard = async () => {
       currentDashboardData.data = await getDashboard(
@@ -450,6 +456,8 @@ export default defineComponent({
           start_time: new Date(date.startTime),
           end_time: new Date(date.endTime),
         };
+
+        setTimeString();
       }
     });
 
@@ -729,7 +737,7 @@ export default defineComponent({
       onMovePanel,
       printDashboard,
       initialTimezone,
-      getTimeString,
+      timeString,
     };
   },
 });
