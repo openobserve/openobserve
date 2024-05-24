@@ -304,11 +304,11 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         let mut resp = SignInResponse::default();
-        let auth_header = _req.headers().get("Authorization");
-        if auth_header.is_some() {
-            let auth_header = auth_header.unwrap().to_str().unwrap();
-            match o2_enterprise::enterprise::dex::service::auth::get_user_from_token(auth_header) {
-                Some((name, password)) => {
+        if let Some(auth_header) = _req.headers().get("Authorization") {
+            if let Ok(auth_header) = auth_header.to_str() {
+                if let Some((name, password)) =
+                    o2_enterprise::enterprise::dex::service::auth::get_user_from_token(auth_header)
+                {
                     match crate::handler::http::auth::validator::validate_user(&name, &password)
                         .await
                     {
@@ -319,10 +319,11 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                                 return unauthorized_error(resp);
                             }
                         }
-                        Err(_e) => {
+                        Err(_) => {
                             return unauthorized_error(resp);
                         }
                     };
+
                     if resp.status {
                         let access_token = format!(
                             "Basic {}",
@@ -333,6 +334,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                             refresh_token: "".to_string(),
                         })
                         .unwrap();
+
                         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
                         auth_cookie.set_expires(
                             cookie::time::OffsetDateTime::now_utc()
@@ -341,21 +343,31 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                         auth_cookie.set_http_only(true);
                         auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
                         auth_cookie.set_path("/");
+
                         if CONFIG.auth.cookie_same_site_lax {
                             auth_cookie.set_same_site(cookie::SameSite::Lax);
                         } else {
                             auth_cookie.set_same_site(cookie::SameSite::None);
                         }
-                        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
+
+                        return Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp));
                     } else {
-                        unauthorized_error(resp)
+                        return unauthorized_error(resp);
                     }
+                } else {
+                    return unauthorized_error(resp);
                 }
-                None => unauthorized_error(resp),
+            } else {
+                return unauthorized_error(resp);
             }
         } else {
-            unauthorized_error(resp)
+            return unauthorized_error(resp);
         }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
 
