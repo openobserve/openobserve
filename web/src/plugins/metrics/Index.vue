@@ -757,7 +757,7 @@ export default defineComponent({
 
       const query = metric?.value + "{}";
       nextTick(() => {
-        metricsQueryEditorRef.value.setValue(query);
+        metricsQueryEditorRef?.value?.setValue(query);
       });
     };
 
