@@ -157,9 +157,16 @@ pub async fn generate_by_stream(
 }
 
 pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+    log::debug!("[FLATTEN_COMPACTOR] generate flatten file for {}", file.key);
+
     let data = storage::get(&file.key).await?;
-    let (_, batches) = read_recordbatch_from_bytes(&data).await?;
-    let new_batches = generate_vertical_partition_recordbatch(&batches)?;
+    let (_, batches) = read_recordbatch_from_bytes(&data)
+        .await
+        .map_err(|e| anyhow::anyhow!("read_recordbatch_from_bytes error: {}", e))?;
+    let new_batches = generate_vertical_partition_recordbatch(&batches)
+        .map_err(|e| anyhow::anyhow!("generate_vertical_partition_recordbatch error: {}", e))?;
+
     if new_batches.is_empty() {
         storage::del(&[&file.key]).await?;
         return Ok(());
@@ -192,12 +199,17 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
         &full_text_search_fields,
         &file.meta,
     )
-    .await?;
-    // upload file
+    .await
+    .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
+    // upload filee
     storage::put(&new_file, new_data.into()).await?;
     // delete from queue
     PROCESSING_FILES.write().remove(&file.key);
-    log::info!("[FLATTEN_COMPACTOR] generate_file new file {}", new_file);
+    log::info!(
+        "[FLATTEN_COMPACTOR] generated flatten  new file {}, took {} ms",
+        new_file,
+        start.elapsed().as_millis()
+    );
     // update file list
     infra_file_list::update_flattened(&file.key, true).await?;
     Ok(())
@@ -211,12 +223,12 @@ fn generate_vertical_partition_recordbatch(
     }
     let schema = batches.first().unwrap().schema();
     let batches = arrow::compute::concat_batches(&schema, batches)?;
-    if batches.num_rows() == 0 {
+    let records_len = batches.num_rows();
+    if records_len == 0 {
         return Ok(Vec::new());
     }
-    let records_len = batches.num_rows();
     let Ok(all_field_idx) = schema.index_of(&CONFIG.common.all_fields_name) else {
-        return Ok(Vec::new());
+        return Ok(vec![batches]);
     };
 
     let mut builders: FxIndexMap<String, Box<dyn ArrayBuilder>> = Default::default();
@@ -225,13 +237,20 @@ fn generate_vertical_partition_recordbatch(
         .as_any()
         .downcast_ref::<StringArray>()
     else {
-        return Ok(Vec::new());
+        return Ok(vec![batches]);
     };
 
     let mut inserted_fields = HashSet::with_capacity(128);
     for i in 0..records_len {
         inserted_fields.clear();
-        let data: json::Value = json::from_str(all_values.value(i))?;
+        let value = all_values.value(i);
+        let data = if value.is_empty() {
+            json::Value::Object(Default::default())
+        } else {
+            json::from_str(value).map_err(|e| {
+                anyhow::anyhow!("parse all fields value error: {}, value: {}", e, value)
+            })?
+        };
         let items = data.as_object().unwrap();
         for (key, val) in items {
             let builder = builders.entry(key.to_string()).or_insert_with(|| {

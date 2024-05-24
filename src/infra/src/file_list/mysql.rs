@@ -289,7 +289,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     FORCE INDEX (file_list_stream_ts_idx) 
-    WHERE stream = ? AND flattened = ?;
+    WHERE stream = ? AND flattened = ? LIMIT 1000;
                 "#,
             )
             .bind(stream_key)

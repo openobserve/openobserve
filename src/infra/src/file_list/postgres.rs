@@ -293,7 +293,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
-    WHERE stream = $1 AND flattened = $2;
+    WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
             )
             .bind(stream_key)
