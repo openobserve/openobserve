@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before v-if="searchObj.meta.showFields">
             <index-list
               ref="indexListRef"
+              :field-list="searchObj.data.stream.selectedStreamFields"
               data-test="logs-search-index-list"
               :key="searchObj.data.stream.streamLists"
             />
