@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeMount } from "vue";
 import { date as qDate } from "quasar";
 import {
   timestampToTimezoneDate,
@@ -74,7 +74,6 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useTraces from "@/composables/useTraces";
-import moment from "moment";
 
 const props = defineProps({
   item: {
@@ -90,6 +89,17 @@ const props = defineProps({
 const { searchObj } = useTraces();
 
 const store = useStore();
+
+let moment: any;
+
+const importMoment = async () => {
+  const momentModule: any = await import("moment");
+  moment = momentModule.default;
+};
+
+onBeforeMount(async () => {
+  await importMoment();
+});
 
 const getFormattedDate = computed(() => {
   const format = "YYYY-MM-DD HH:mm:ss";

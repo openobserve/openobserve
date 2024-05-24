@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <img
             class="appLogo"
-            loading="eager"
+            loading="lazy"
             :src="
               store?.state?.theme == 'dark'
                 ? getImageURL('images/common/open_observe_logo_2.svg')
@@ -70,12 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
-            loading="eager"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/open_observe_logo_2.svg')
-                : getImageURL('images/common/open_observe_logo.svg')
-            "
+            loading="lazy"
+            :src="getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
@@ -390,9 +386,9 @@ export default defineComponent({
     "q-avatar": QAvatar,
     "q-icon": QIcon,
     "q-select": QSelect,
-    ThemeSwitcher,
     SlackIcon,
     ManagementIcon,
+    ThemeSwitcher,
   },
   methods: {
     navigateToDocs() {

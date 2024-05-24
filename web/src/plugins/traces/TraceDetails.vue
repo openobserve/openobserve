@@ -188,7 +188,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onMounted, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  type Ref,
+  onMounted,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
@@ -204,7 +211,6 @@ import {
   convertTimelineData,
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -224,7 +230,9 @@ export default defineComponent({
     TraceHeader,
     TraceTimelineIcon,
     ServiceMapIcon,
-    ChartRenderer,
+    ChartRenderer: defineAsyncComponent(
+      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+    ),
   },
   emits: ["shareLink"],
   setup(props, { emit }) {

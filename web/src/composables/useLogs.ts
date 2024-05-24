@@ -15,11 +15,10 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref, toRaw, nextTick } from "vue";
+import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
-import { Parser } from "node-sql-parser/build/mysql";
 
 import {
   useLocalLogFilterField,
@@ -221,12 +220,22 @@ const useLogs = () => {
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream } = useStreams();
   const router = useRouter();
-  const parser = new Parser();
+  let parser: any;
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
 
   const { updateFieldKeywords } = useSqlSuggestions();
+
+  onBeforeMount(async () => {
+    await importSqlParser();
+  });
+
+  const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
   const resetSearchObj = () => {

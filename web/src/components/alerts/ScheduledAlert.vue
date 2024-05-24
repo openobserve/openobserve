@@ -552,15 +552,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, type Ref } from "vue";
+import { ref, watch, computed, type Ref, defineAsyncComponent } from "vue";
 import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
-import QueryEditor from "@/components/QueryEditor.vue";
 import {
   outlinedDelete,
   outlinedInfo,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue")
+);
 
 const props = defineProps([
   "columns",

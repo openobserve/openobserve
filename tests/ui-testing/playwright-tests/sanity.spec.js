@@ -199,6 +199,7 @@ test('should create a function and then delete it', async ({ page }) => {
   await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
   await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
   await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
+  await page.waitForTimeout(1000);
   await page.locator('[data-test="logs-search-bar-function-dropdown"] button').filter({ hasText: 'save' }).click();
   await page.locator('[data-test="saved-function-name-input"]').click();
   await page.locator('[data-test="saved-function-name-input"]').fill('e2eautomatefunctions');

@@ -157,17 +157,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  nextTick,
+  defineAsyncComponent,
+  onBeforeUnmount,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
-import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
-import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -179,7 +184,9 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/plugins/traces/QueryEditor.vue")
+    ),
     SyntaxGuide,
     AppTabs,
     ConfirmDialog,
@@ -217,7 +224,7 @@ export default defineComponent({
 
     const showWarningDialog = ref(false);
 
-    const parser = new Parser();
+    let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
 
@@ -229,6 +236,16 @@ export default defineComponent({
       getSuggestions,
       updateFieldKeywords,
     } = useSqlSuggestions();
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
+    onBeforeUnmount(async () => {
+      await importSqlParser();
+    });
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;

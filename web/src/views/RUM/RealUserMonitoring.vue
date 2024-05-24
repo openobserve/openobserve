@@ -87,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import AppTabs from "@/components/common/AppTabs.vue";
 import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -99,6 +98,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 const route = useRoute();
 const router = useRouter();

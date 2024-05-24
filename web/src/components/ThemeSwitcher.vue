@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import {
   outlinedDarkMode,
   outlinedLightMode,
@@ -61,11 +60,7 @@ export default defineComponent({
     });
     watch(
       () => store.state.theme,
-      () => {
-        monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
-        );
-      }
+      () => {}
     );
 
     const setTheme = (theme: any) => {

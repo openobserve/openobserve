@@ -107,13 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted, watch } from "vue";
+import { ref, onActivated, onMounted, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
-import { getImageURL } from "@/utils/zincutils";
-import { AddTemplate } from "./index";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
@@ -121,6 +119,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
+const AddTemplate = defineAsyncComponent(
+  () => import("@/components/alerts/AddTemplate.vue")
+);
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();

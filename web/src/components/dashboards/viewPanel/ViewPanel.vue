@@ -79,7 +79,7 @@
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
               />
-              <div style="flex: 1; overflow: hidden;">
+              <div style="flex: 1; overflow: hidden">
                 <PanelSchemaRenderer
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"
@@ -114,6 +114,7 @@ import {
   reactive,
   onUnmounted,
   onMounted,
+  onBeforeMount,
 } from "vue";
 
 import { useI18n } from "vue-i18n";
@@ -129,7 +130,7 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
-import { Parser } from "node-sql-parser/build/mysql";
+
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 
 export default defineComponent({
@@ -163,6 +164,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+    let parser: any;
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData();
     // default selected date will be absolute time
@@ -196,12 +198,21 @@ export default defineComponent({
     // array of histogram fields
     let histogramFields: any = ref([]);
 
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
     watch(
       () => histogramInterval.value,
       () => {
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
-          const parser = new Parser();
           const ast: any = parser.astify(query?.query);
 
           // Iterate over the columns to check if the column is histogram

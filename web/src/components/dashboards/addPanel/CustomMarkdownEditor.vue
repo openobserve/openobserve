@@ -56,12 +56,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import MonacoMarkdownEditor from "./MonacoMarkdownEditor.vue";
+import { defineAsyncComponent, defineComponent, ref } from "vue";
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 export default defineComponent({
-  components: { MonacoMarkdownEditor, MarkdownRenderer },
+  components: {
+    MonacoMarkdownEditor: defineAsyncComponent(
+      () => import("./MonacoMarkdownEditor.vue")
+    ),
+    MarkdownRenderer,
+  },
   name: "CustomMarkdownEditor",
   props: {
     modelValue: {

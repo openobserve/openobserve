@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref } from "vue";
+import { defineAsyncComponent, defineComponent, nextTick, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -79,7 +79,6 @@ import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceDetails from "./TraceDetails.vue";
 import { convertTraceData } from "@/utils/traces/convertTraceData";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TraceBlock from "./TraceBlock.vue";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -88,7 +87,9 @@ export default defineComponent({
   name: "SearchResult",
   components: {
     TraceDetails,
-    ChartRenderer,
+    ChartRenderer: defineAsyncComponent(
+      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+    ),
     TraceBlock,
   },
   emits: [
