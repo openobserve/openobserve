@@ -1,23 +1,30 @@
 let parser: any;
+let parserInitialized = false;
 
 const importSqlParser = async () => {
-  const useSqlParser: any = await import("@/composables/useParser");
-  const { sqlParser }: any = useSqlParser.default();
-  parser = await sqlParser();
+  if (!parserInitialized) {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+    parserInitialized = true;
+  }
+  return parser;
 };
 
-importSqlParser();
+export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
+  await importSqlParser();
 
-export const addLabelsToSQlQuery = (originalQuery: any, labels: any) => {
   let dummyQuery = "select * from 'default'";
-  labels.forEach((label: any) => {
-    dummyQuery = addLabelToSQlQuery(
+
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i];
+    dummyQuery = await addLabelToSQlQuery(
       dummyQuery,
       label.name,
       label.value,
       label.operator
     );
-  });
+  }
 
   const astOfOriginalQuery: any = parser.astify(originalQuery);
   const astOfDummy: any = parser.astify(dummyQuery);
@@ -54,12 +61,14 @@ export const addLabelsToSQlQuery = (originalQuery: any, labels: any) => {
   }
 };
 
-export const addLabelToSQlQuery = (
+export const addLabelToSQlQuery = async (
   originalQuery: any,
   label: any,
   value: any,
   operator: any
 ) => {
+  await importSqlParser();
+
   const ast: any = parser.astify(originalQuery);
 
   let query = "";
@@ -125,7 +134,9 @@ export const addLabelToSQlQuery = (
   return query;
 };
 
-export const getStreamFromQuery = (query: any) => {
+export const getStreamFromQuery = async (query: any) => {
+  await importSqlParser();
+
   try {
     const ast: any = parser.astify(query);
     return ast?.from[0]?.table || "";

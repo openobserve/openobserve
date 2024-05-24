@@ -227,7 +227,7 @@ export const usePanelDataLoader = (
             // console.log("Calling queryPromises", query1);
 
             const { query: query2, metadata: metadata2 } =
-              applyDynamicVariables(query1, panelSchema.value.queryType);
+              await applyDynamicVariables(query1, panelSchema.value.queryType);
 
             const query = query2;
             const metadata = {
@@ -282,7 +282,7 @@ export const usePanelDataLoader = (
             );
 
             const { query: query2, metadata: metadata2 } =
-              applyDynamicVariables(query1, panelSchema.value.queryType);
+              await applyDynamicVariables(query1, panelSchema.value.queryType);
 
             const query = query2;
 
@@ -455,7 +455,7 @@ export const usePanelDataLoader = (
     }
   };
 
-  const applyDynamicVariables = (query: any, queryType: any) => {
+  const applyDynamicVariables = async (query: any, queryType: any) => {
     const metadata: any[] = [];
     // console.log(
     //   "variablesDataaaa currentAdHocVariablesData",
@@ -494,7 +494,7 @@ export const usePanelDataLoader = (
     }
 
     if (queryType === "sql") {
-      const queryStream = getStreamFromQuery(query);
+      const queryStream = await getStreamFromQuery(query);
 
       const applicableAdHocVariables = adHocVariables;
       // .filter((it: any) => {
@@ -510,7 +510,7 @@ export const usePanelDataLoader = (
         });
       });
       // console.log("Adding labels to SQL query");
-      query = addLabelsToSQlQuery(query, applicableAdHocVariables);
+      query = await addLabelsToSQlQuery(query, applicableAdHocVariables);
     }
 
     return { query, metadata };
