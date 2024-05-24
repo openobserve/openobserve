@@ -1822,7 +1822,7 @@ const useLogs = () => {
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
-            userDefineSchemaSettings = stream.settings.defined_schema_fields || [];
+            userDefineSchemaSettings = stream.settings.defined_schema_fields.slice() || [];
             // check for schema exist in the object or not
             // if not pull the schema from server.
             if (!stream.hasOwnProperty("schema")) {
