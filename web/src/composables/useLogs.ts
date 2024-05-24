@@ -1815,12 +1815,14 @@ const useLogs = () => {
         const timestampField = store.state.zoConfig.timestamp_column;
         const allField = store.state.zoConfig?.all_fields_name;
         const schemaInterestingFields: string[] = [];
+        let userDefineSchemaSettings: any = [];
         const schemaMaps: any = [];
         let fieldObj: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
+            userDefineSchemaSettings = stream.settings.defined_schema_fields || [];
             // check for schema exist in the object or not
             // if not pull the schema from server.
             if (!stream.hasOwnProperty("schema")) {
@@ -1846,17 +1848,17 @@ const useLogs = () => {
 
             if (
               stream.settings.hasOwnProperty("defined_schema_fields") &&
-              stream.settings.defined_schema_fields.length > 0
+              userDefineSchemaSettings.length > 0
             ) {
               searchObj.meta.hasUserDefinedSchemas = true;
               if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
-                stream.settings.defined_schema_fields.push(
+                userDefineSchemaSettings.push(
                   store.state.zoConfig?.timestamp_column
                 );
               }
 
               if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
-                stream.settings.defined_schema_fields.push(
+                userDefineSchemaSettings.push(
                   store.state.zoConfig?.all_fields_name
                 );
               }
@@ -1908,10 +1910,10 @@ const useLogs = () => {
                 store.state.zoConfig.user_defined_schemas_enabled &&
                 searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
                 stream.settings.hasOwnProperty("defined_schema_fields") &&
-                stream.settings.defined_schema_fields.length > 0
+                userDefineSchemaSettings.length > 0
               ) {
                 if (
-                  stream.settings.defined_schema_fields.includes(field.name)
+                  userDefineSchemaSettings.includes(field.name)
                 ) {
                   schemaMaps.push(fieldObj);
                   schemaFields.push(field.name);
@@ -1919,7 +1921,7 @@ const useLogs = () => {
 
                 if (
                   schemaMaps.length ==
-                  stream.settings.defined_schema_fields.length
+                  userDefineSchemaSettings.length
                 ) {
                   break;
                 }
@@ -2001,7 +2003,7 @@ const useLogs = () => {
             ] = searchObj.data.stream.interestingFieldList;
             useLocalInterestingFields(localFields);
             searchObj.data.stream.userDefinedSchema =
-              stream.settings.defined_schema_fields || [];
+            userDefineSchemaSettings || [];
           }
         }
 
