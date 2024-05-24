@@ -25,6 +25,7 @@ use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{metrics, CONFIG};
 use futures::lock::Mutex;
+use log::info;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::RwLock;
@@ -298,6 +299,13 @@ impl Writer {
             return Ok(());
         }
 
+        info!(
+            "memtable_size: {:?}, entry.data_size: {}, CONFIG.limit.max_file_size_in_memory: {}, CONFIG.limit.max_file_size_in_memory: {}",
+            self.memtable.read().await.size(),
+            entry.data_size,
+            CONFIG.limit.max_file_size_in_memory,
+            CONFIG.limit.max_file_size_in_memory
+        );
         if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
             let mut mem = self.memtable.write().await;
             let new_mem = MemTable::new();
