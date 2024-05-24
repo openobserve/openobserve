@@ -27,9 +27,10 @@ let momentInitialized = false;
 const importMoment = async () => {
   if (!momentInitialized) {
     const momentModule: any = await import("moment");
-    moment = momentModule.default();
+    moment = momentModule.default;
     momentInitialized = true;
   }
+
   return moment;
 };
 

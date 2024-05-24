@@ -94,8 +94,7 @@ let moment: any;
 
 const importMoment = async () => {
   const momentModule: any = await import("moment");
-
-  moment = momentModule.default();
+  moment = momentModule.default;
 };
 
 onBeforeMount(async () => {

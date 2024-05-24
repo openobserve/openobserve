@@ -78,18 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               style="padding-top: 5px"
             >
-              {{
-                moment(currentTimeObj?.start_time?.getTime() / 1000)
-                  .tz(store.state.timezone)
-                  .format("YYYY/MM/DD HH:mm")
-              }}
-              -
-              {{
-                moment(currentTimeObj?.end_time?.getTime() / 1000)
-                  .tz(store.state.timezone)
-                  .format("YYYY/MM/DD HH:mm")
-              }}
-              ({{ store.state.timezone }})
+              {{ getTimeString }} ({{ store.state.timezone }})
             </div>
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
@@ -222,6 +211,7 @@ import {
   onMounted,
   onUnmounted,
   onBeforeMount,
+  computed,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -260,12 +250,11 @@ export default defineComponent({
       data: {},
     });
 
-    let moment: any;
+    let moment: any = () => {};
 
     const importMoment = async () => {
       const momentModule: any = await import("moment-timezone");
-
-      moment = momentModule.default();
+      moment = momentModule.default;
     };
 
     onBeforeMount(async () => {
@@ -377,6 +366,18 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
+    });
+
+    const getTimeString = computed(() => {
+      return ` ${moment(currentTimeObj.value?.start_time?.getTime() / 1000)
+        .tz(store.state.timezone)
+        .format("YYYY/MM/DD HH:mm")}
+              -
+               ${moment(currentTimeObj.value?.end_time?.getTime() / 1000)
+                 .tz(store.state.timezone)
+                 .format("YYYY/MM/DD HH:mm")}
+
+                  `;
     });
 
     const loadDashboard = async () => {
@@ -728,7 +729,7 @@ export default defineComponent({
       onMovePanel,
       printDashboard,
       initialTimezone,
-      moment,
+      getTimeString,
     };
   },
 });
