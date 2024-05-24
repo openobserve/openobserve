@@ -3774,9 +3774,9 @@ dependencies = [
 
 [[package]]
 name = "gxhash"
-version = "3.2.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b02704590225530b065536e78ac91f3e2b33ad94e7383313aaade31cfbb4994b"
+checksum = "fcc9a192659d9fd88d8bd8b8ccdec491225e3623083c1251a1a406c47934415c"
 dependencies = [
  "rand",
  "rustc_version",
