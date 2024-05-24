@@ -438,7 +438,7 @@ pub async fn around(
                     .await
                     .iter()
                     .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-                sql
+                if uses_fn { sql } else { default_sql }
             }
         },
     };
