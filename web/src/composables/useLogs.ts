@@ -1807,6 +1807,7 @@ const useLogs = () => {
       const schemaFields: any = [];
       if (searchObj.data.streamResults.list.length > 0) {
         const timestampField = store.state.zoConfig.timestamp_column;
+        const allField = store.state.zoConfig?.all_fields_name;
         const schemaInterestingFields: string[] = [];
         const schemaMaps: any = [];
         let fieldObj: any = {};
@@ -1888,7 +1889,8 @@ const useLogs = () => {
                     ? true
                     : false,
                 isSchemaField: true,
-                showValues: field.name !== timestampField,
+                showValues:
+                  field.name !== timestampField && field.name !== allField,
                 isInterestingField:
                   searchObj.data.stream.interestingFieldList.includes(
                     field.name
