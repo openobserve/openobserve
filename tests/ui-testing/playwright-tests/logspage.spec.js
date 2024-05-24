@@ -564,20 +564,21 @@ test.describe("Logs UI testcases", () => {
     
   });
 
-  test("should not display error if match all case added with limit and search around ", async ({ page }) => {
-    // Type the value of a variable into an input field
+  test("should not display error if match all case added in log query search", async ({ page }) => {
     await page.waitForTimeout(2000);
     await page.locator('[data-cy="date-time-button"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code') limit 5");
-    await page.getByLabel('SQL Mode').click();
+    await page.waitForTimeout(2000);
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000);
     const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
-    
+    await expect(page.locator('[data-test="log-table-column-1-@timestamp"]')).toBeVisible();
   });
 });
