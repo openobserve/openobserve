@@ -741,7 +741,7 @@ const useLogs = () => {
           "[INDEX_NAME]",
           searchObj.data.stream.selectedStream.value
         );
-        
+
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
         // console.log(unparsedSQL);
@@ -844,11 +844,11 @@ const useLogs = () => {
         config.isEnterprise == "true" &&
         store.state.zoConfig.super_cluster_enabled
       ) {
-        if(queryReq.query.hasOwnProperty("regions")) {
-        partitionQueryReq["regions"] = queryReq.query.regions;
+        if (queryReq.query.hasOwnProperty("regions")) {
+          partitionQueryReq["regions"] = queryReq.query.regions;
         }
 
-        if(queryReq.query.hasOwnProperty("clusters")) {
+        if (queryReq.query.hasOwnProperty("clusters")) {
           partitionQueryReq["clusters"] = queryReq.query.clusters;
         }
       }
@@ -1175,13 +1175,16 @@ const useLogs = () => {
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
 
-        searchObj.data.histogramQuery.query.sql = searchObj.data.histogramQuery.aggs.histogram;
+        searchObj.data.histogramQuery.query.sql =
+          searchObj.data.histogramQuery.aggs.histogram;
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
-        searchObj.data.histogramQuery.query.start_time = searchObj.data.datetime.startTime;
-        searchObj.data.histogramQuery.query.end_time = searchObj.data.datetime.endTime;
+        searchObj.data.histogramQuery.query.start_time =
+          searchObj.data.datetime.startTime;
+        searchObj.data.histogramQuery.query.end_time =
+          searchObj.data.datetime.endTime;
         delete searchObj.data.histogramQuery.query.quick_mode;
-         delete searchObj.data.histogramQuery.query.from;
+        delete searchObj.data.histogramQuery.query.from;
 
         // Removing sql_mode from histogram query, as it is not required
         //delete searchObj.data.histogramQuery.query.sql_mode;
@@ -1357,7 +1360,7 @@ const useLogs = () => {
       queryReq.query.size = 0;
       delete queryReq.query.from;
       delete queryReq.query.quick_mode;
-      queryReq.query['sql_mode'] = "full";
+      queryReq.query["sql_mode"] = "full";
 
       queryReq.query.track_total_hits = true;
       searchService
@@ -1680,7 +1683,7 @@ const useLogs = () => {
             searchObj.loading = false;
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
-            searchObj.data.queryResults.took = res.data.took;
+            searchObj.data.queryResults.took += res.data.took;
             generateHistogramData();
 
             for (const [
@@ -1839,6 +1842,17 @@ const useLogs = () => {
               stream.settings.defined_schema_fields.length > 0
             ) {
               searchObj.meta.hasUserDefinedSchemas = true;
+              if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
+                stream.settings.defined_schema_fields.push(
+                  store.state.zoConfig?.timestamp_column
+                );
+              }
+
+              if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
+                stream.settings.defined_schema_fields.push(
+                  store.state.zoConfig?.all_fields_name
+                );
+              }
             } else {
               searchObj.meta.hasUserDefinedSchemas = false;
             }
@@ -2121,7 +2135,7 @@ const useLogs = () => {
 
   function generateHistogramData() {
     try {
-      let num_records:number = 0;
+      let num_records: number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
@@ -2131,7 +2145,6 @@ const useLogs = () => {
         searchObj.data.queryResults.aggs
       ) {
         searchObj.data.queryResults.aggs.map(
-          
           (bucket: {
             zo_sql_key: string | number | Date;
             zo_sql_num: string;
