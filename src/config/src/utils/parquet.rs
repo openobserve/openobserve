@@ -22,7 +22,6 @@ use parquet::{
     arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
-    format::SortingColumn,
 };
 
 use crate::{config::*, ider, meta::stream::FileMeta};
@@ -34,9 +33,6 @@ pub fn new_parquet_writer<'a>(
     full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
-    let sort_column_id = schema
-        .index_of(&CONFIG.common.column_timestamp)
-        .expect("Not found timestamp field");
     let row_group_size = if CONFIG.limit.parquet_max_row_group_size > 0 {
         CONFIG.limit.parquet_max_row_group_size
     } else {
@@ -49,9 +45,6 @@ pub fn new_parquet_writer<'a>(
         .set_compression(Compression::ZSTD(Default::default()))
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
-        .set_sorting_columns(Some(
-            vec![SortingColumn::new(sort_column_id as i32, true, false)],
-        ))
         .set_column_dictionary_enabled(
             CONFIG.common.column_timestamp.as_str().into(),
             false,
