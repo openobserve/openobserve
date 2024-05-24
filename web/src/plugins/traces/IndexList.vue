@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-fields-table"
         v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
-        :rows="searchObj.data.stream.selectedStreamFields"
+        :rows="fieldList"
         row-key="name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-else-if="searchObj.meta.filterType === 'basic'">
                   <advanced-values-filter
+                    v-if="fieldValues[props.row.name]"
                     :key="searchObj.data.stream.selectedStream.value"
                     :row="props.row"
                     v-model:isOpen="fieldValues[props.row.name].isOpen"
@@ -204,6 +205,12 @@ export default defineComponent({
     AdvancedValuesFilter,
   },
   emits: ["update:changeStream"],
+  props: {
+    fieldList: {
+      type: Array,
+      default: () => [],
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -229,10 +236,10 @@ export default defineComponent({
     });
 
     watch(
-      () => searchObj.data.stream.selectedStreamFields,
+      () => props.fieldList,
       () => {
-        if (searchObj.data.stream.selectedStreamFields.length) {
-          searchObj.data.stream.selectedStreamFields.forEach(
+        if (props.fieldList) {
+          (props.fieldList as any).forEach(
             (field: { name: string; showValues: boolean; ftsKey: boolean }) => {
               if (field.showValues && !field.ftsKey) {
                 fieldValues.value[field.name] = {
