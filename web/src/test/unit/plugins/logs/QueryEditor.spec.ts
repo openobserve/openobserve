@@ -18,7 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
-import QueryEditor from "@/plugins/logs/QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 import "plotly.js";

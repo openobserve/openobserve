@@ -53,12 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import MonacoHTMLEditor from "./MonacoHTMLEditor.vue";
+import { defineAsyncComponent, defineComponent, ref } from "vue";
 import HTMLRenderer from "../panels/HTMLRenderer.vue";
 
 export default defineComponent({
-  components: { MonacoHTMLEditor, HTMLRenderer },
+  components: {
+    MonacoHTMLEditor: defineAsyncComponent(
+      () => import("./MonacoHTMLEditor.vue")
+    ),
+    HTMLRenderer,
+  },
   name: "CustomHTMLEditor",
   props: {
     modelValue: {

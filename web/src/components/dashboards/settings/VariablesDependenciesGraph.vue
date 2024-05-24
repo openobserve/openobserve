@@ -22,15 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
-import ChartRenderer from "../panels/ChartRenderer.vue";
+import { defineAsyncComponent, defineComponent } from "vue";
 import { onMounted } from "vue";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { ref } from "vue";
 
 export default defineComponent({
   name: "VariablesDependenciesGraph",
-  components: { ChartRenderer },
+  components: {
+    ChartRenderer: defineAsyncComponent(
+      () => import("../panels/ChartRenderer.vue")
+    ),
+  },
   props: {
     // we have list of variables
     variablesList: {

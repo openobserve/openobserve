@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineAsyncComponent, defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -145,7 +145,6 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../shared/grid/Pagination.vue";
 import jsTransformService from "../../services/jstransform";
-import AddFunction from "./AddFunction.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
@@ -155,7 +154,12 @@ import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
   name: "functionList",
-  components: { QTablePagination, AddFunction, NoData, ConfirmDialog },
+  components: {
+    QTablePagination,
+    AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
+    NoData,
+    ConfirmDialog,
+  },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",

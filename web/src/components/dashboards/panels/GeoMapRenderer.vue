@@ -28,8 +28,10 @@ import {
   watch,
   onUnmounted,
   nextTick,
+  onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+
 import L from "leaflet";
 import "@/utils/dashboard/leaflet-echarts/index";
 

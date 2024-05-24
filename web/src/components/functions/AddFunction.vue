@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import "monaco-editor/esm/vs/editor/editor.all.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -227,6 +227,15 @@ export default defineComponent({
 
       editorobj.setValue(formData.value.function);
     });
+
+    watch(
+      () => store.state.theme,
+      () => {
+        monaco.editor.setTheme(
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+        );
+      }
+    );
 
     const isValidParam = () => {
       const methodPattern = /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/g;

@@ -122,7 +122,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeMount, onMounted, ref, type Ref } from "vue";
+import {
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  ref,
+  type Ref,
+  defineAsyncComponent,
+} from "vue";
 import AppTable from "@/components/rum/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -132,7 +139,6 @@ import useQuery from "@/composables/useQuery";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
 import DateTime from "@/components/DateTime.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
@@ -140,6 +146,9 @@ import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { useQuasar } from "quasar";
 
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue")
+);
 const { t } = useI18n();
 const dateTime = ref({
   startTime: 0,

@@ -25,7 +25,7 @@ import { convertSankeyData } from "./convertSankeyData";
  * @param {any} data - The data to be converted.
  * @return {any} The converted data.
  */
-export const convertPanelData = (
+export const convertPanelData = async (
   panelSchema: any,
   data: any,
   store: any,
@@ -53,20 +53,18 @@ export const convertPanelData = (
         // panelSchema?.customQuery &&
         panelSchema?.queryType == "promql"
       ) {
-
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
-          ...convertPromQLData(
+          ...(await convertPromQLData(
             panelSchema,
             data,
             store,
             chartPanelRef,
             hoveredSeriesState
-          ),
+          )),
         };
       } else {
-
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
@@ -95,10 +93,7 @@ export const convertPanelData = (
     case "sankey": {
       return {
         chartType: panelSchema.type,
-        ...convertSankeyData(
-          panelSchema,
-          data,
-        ),
+        ...convertSankeyData(panelSchema, data),
       };
     }
     default: {

@@ -222,7 +222,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, onActivated, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onBeforeMount,
+  onActivated,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -232,7 +239,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
-import AddAlert from "@/components/alerts/AddAlert.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -252,7 +258,14 @@ import {
 
 export default defineComponent({
   name: "AlertList",
-  components: { QTablePagination, AddAlert, NoData, ConfirmDialog },
+  components: {
+    QTablePagination,
+    AddAlert: defineAsyncComponent(
+      () => import("@/components/alerts/AddAlert.vue")
+    ),
+    NoData,
+    ConfirmDialog,
+  },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
