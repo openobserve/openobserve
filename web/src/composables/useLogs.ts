@@ -747,7 +747,6 @@ const useLogs = () => {
           "[INDEX_NAME]",
           searchObj.data.stream.selectedStream.value
         );
-
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
         // console.log(unparsedSQL);
