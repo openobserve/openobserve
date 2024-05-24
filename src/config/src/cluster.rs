@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -86,6 +86,11 @@ pub fn is_querier(role: &[Role]) -> bool {
 #[inline(always)]
 pub fn is_compactor(role: &[Role]) -> bool {
     role.contains(&Role::Compactor) || role.contains(&Role::All)
+}
+
+#[inline(always)]
+pub fn is_flatten_compactor(role: &[Role]) -> bool {
+    role.contains(&Role::FlattenCompactor) || role.contains(&Role::All)
 }
 
 #[inline(always)]

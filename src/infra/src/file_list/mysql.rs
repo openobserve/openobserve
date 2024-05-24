@@ -271,59 +271,48 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         stream_type: StreamType,
         stream_name: &str,
         _time_level: PartitionTimeLevel,
-        time_range: (i64, i64),
+        time_range: Option<(i64, i64)>,
+        flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>> {
-        let (time_start, time_end) = time_range;
-        if time_start == 0 && time_end == 0 {
-            return Ok(Vec::new());
+        if let Some((start, end)) = time_range {
+            if start == 0 && end == 0 {
+                return Ok(Vec::new());
+            }
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
         let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"
+        let ret = if flattened.is_some() {
+            sqlx::query_as::<_, super::FileRecord>(
+                r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    FORCE INDEX (file_list_stream_ts_idx) 
+    WHERE stream = ? AND flattened = ?;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(flattened.unwrap())
+            .fetch_all(&pool)
+            .await
+        } else {
+            let (time_start, time_end) = time_range.unwrap_or((0, 0));
+            sqlx::query_as::<_, super::FileRecord>(
+                r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     FORCE INDEX (file_list_stream_ts_idx) 
     WHERE stream = ? AND min_ts <= ? AND max_ts >= ?;
-            "#,
-        )
-        .bind(stream_key)
-        .bind(time_end)
-        .bind(time_start)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
-                    FileMeta::from(&r),
-                )
-            })
-            .collect())
-    }
-
-    async fn query_flattened(
-        &self,
-        flattened: bool,
-        limit: i64,
-    ) -> Result<Vec<(String, FileMeta)>> {
-        let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list
-    WHERE flattened = ?
-    ORDER BY id ASC LIMIT ?;
-            "#,
-        )
-        .bind(flattened)
-        .bind(limit)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
+                "#,
+            )
+            .bind(stream_key)
+            .bind(time_end)
+            .bind(time_start)
+            .fetch_all(&pool)
+            .await
+        };
+        Ok(ret?
             .into_iter()
             .map(|r| {
                 (

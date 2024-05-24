@@ -84,7 +84,8 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
                         stream_type,
                         stream_name,
                         PartitionTimeLevel::Unset,
-                        (start_time, end_time),
+                        Some((start_time, end_time)),
+                        None,
                     )
                     .await
                     .expect("load file_list failed");

@@ -67,11 +67,17 @@ impl Filelist for Filelister {
         let stream_type = StreamType::from(req.stream_type.as_str());
         let stream_name = &req.stream_name;
         let time_level = PartitionTimeLevel::from(req.time_level.as_str());
-        let time_range = (req.start_time, req.end_time);
-        let files =
-            infra_file_list::query(org_id, stream_type, stream_name, time_level, time_range)
-                .await
-                .map_err(|e| Status::internal(e.to_string()))?;
+        let time_range = Some((req.start_time, req.end_time));
+        let files = infra_file_list::query(
+            org_id,
+            stream_type,
+            stream_name,
+            time_level,
+            time_range,
+            None,
+        )
+        .await
+        .map_err(|e| Status::internal(e.to_string()))?;
         let items: Vec<FileKey> = files
             .into_iter()
             .map(|(file, meta)| FileKey {

@@ -69,10 +69,9 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
         time_level: PartitionTimeLevel,
-        time_range: (i64, i64),
+        time_range: Option<(i64, i64)>,
+        flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_flattened(&self, flattened: bool, limit: i64)
-    -> Result<Vec<(String, FileMeta)>>;
     async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>>;
     async fn get_min_ts(
         &self,
@@ -195,19 +194,24 @@ pub async fn query(
     stream_type: StreamType,
     stream_name: &str,
     time_level: PartitionTimeLevel,
-    time_range: (i64, i64),
+    time_range: Option<(i64, i64)>,
+    flattened: Option<bool>,
 ) -> Result<Vec<(String, FileMeta)>> {
-    if time_range.0 > time_range.1 || time_range.0 == 0 || time_range.1 == 0 {
-        return Err(Error::Message("[file_list] invalid time range".to_string()));
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
     }
     CLIENT
-        .query(org_id, stream_type, stream_name, time_level, time_range)
+        .query(
+            org_id,
+            stream_type,
+            stream_name,
+            time_level,
+            time_range,
+            flattened,
+        )
         .await
-}
-
-#[inline]
-pub async fn query_flattened(flattened: bool, limit: i64) -> Result<Vec<(String, FileMeta)>> {
-    CLIENT.query_flattened(flattened, limit).await
 }
 
 #[inline]

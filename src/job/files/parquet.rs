@@ -248,11 +248,6 @@ async fn move_files(
         return Ok(());
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] get schema for partition: {}",
-        prefix
-    );
-
     // get latest schema
     let latest_schema = match infra::schema::get(&org_id, &stream_name, stream_type).await {
         Ok(schema) => Arc::new(schema),

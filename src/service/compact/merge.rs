@@ -16,10 +16,7 @@
 use std::{collections::HashMap, io::Write, sync::Arc};
 
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
-use arrow::array::{
-    make_builder, new_null_array, ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder,
-};
-use arrow_schema::{DataType, Field};
+use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
@@ -34,7 +31,7 @@ use config::{
         },
         record_batch_ext::format_recordbatch_by_schema,
     },
-    FxIndexMap, CONFIG, FILE_EXT_PARQUET,
+    CONFIG, FILE_EXT_PARQUET,
 };
 use hashbrown::HashSet;
 use infra::{
@@ -1066,88 +1063,4 @@ pub async fn merge_parquet_files(
     );
 
     Ok((schema, vec![final_record_batch]))
-}
-
-pub fn generate_vertical_partition_recordbatch(
-    batches: &[RecordBatch],
-) -> Result<Vec<RecordBatch>, anyhow::Error> {
-    if batches.is_empty() {
-        return Ok(Vec::new());
-    }
-    let schema = batches.first().unwrap().schema();
-    let batches = arrow::compute::concat_batches(&schema, batches)?;
-    if batches.num_rows() == 0 {
-        return Ok(Vec::new());
-    }
-    let records_len = batches.num_rows();
-    let Ok(all_field_idx) = schema.index_of(&CONFIG.common.all_fields_name) else {
-        return Ok(Vec::new());
-    };
-
-    let mut builders: FxIndexMap<String, Box<dyn ArrayBuilder>> = Default::default();
-    let Some(all_values) = batches
-        .column(all_field_idx)
-        .as_any()
-        .downcast_ref::<StringArray>()
-    else {
-        return Ok(Vec::new());
-    };
-
-    let mut inserted_fields = HashSet::with_capacity(128);
-    for i in 0..records_len {
-        inserted_fields.clear();
-        let data: json::Value = json::from_str(all_values.value(i))?;
-        let items = data.as_object().unwrap();
-        for (key, val) in items {
-            let builder = builders.entry(key.to_string()).or_insert_with(|| {
-                let mut builder = make_builder(&DataType::Utf8, records_len);
-                if i > 0 {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
-                        .unwrap();
-                    for _ in 0..i {
-                        b.append_null();
-                    }
-                }
-                builder
-            });
-            let b = builder
-                .as_any_mut()
-                .downcast_mut::<StringBuilder>()
-                .unwrap();
-            if val.is_null() {
-                b.append_null();
-            } else {
-                b.append_value(json::get_string_value(val));
-            }
-            inserted_fields.insert(key.to_string());
-        }
-        for (key, builder) in builders.iter_mut() {
-            if !inserted_fields.contains(key) {
-                let b = builder
-                    .as_any_mut()
-                    .downcast_mut::<StringBuilder>()
-                    .unwrap();
-                b.append_null();
-            }
-        }
-    }
-
-    let mut fields = schema.fields().iter().cloned().collect::<Vec<_>>();
-    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len() + builders.len());
-    for i in 0..schema.fields().len() {
-        if i == all_field_idx {
-            cols.push(new_null_array(&DataType::Utf8, records_len));
-        } else {
-            cols.push(batches.column(i).clone());
-        }
-    }
-    for (key, builder) in builders.iter_mut() {
-        fields.push(Arc::new(Field::new(key, DataType::Utf8, true)));
-        cols.push(builder.finish());
-    }
-
-    let schema = Arc::new(Schema::new(fields));
-    Ok(vec![RecordBatch::try_new(schema, cols)?])
 }
