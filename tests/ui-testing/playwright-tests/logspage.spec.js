@@ -531,6 +531,7 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(1000);
     await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000);
     const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
@@ -558,13 +559,14 @@ test.describe("Logs UI testcases", () => {
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
     await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
+    await page.waitForTimeout(2000)
     const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
     
   });
 
-  test("should not display error if match all case added in log query search", async ({ page }) => {
+  test("should display results for search around with limit query", async ({ page }) => {
     await page.waitForTimeout(2000);
     await page.locator('[data-cy="date-time-button"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({force: true });
