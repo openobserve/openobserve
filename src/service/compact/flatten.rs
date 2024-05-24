@@ -206,7 +206,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     // delete from queue
     PROCESSING_FILES.write().remove(&file.key);
     log::info!(
-        "[FLATTEN_COMPACTOR] generated flatten  new file {}, took {} ms",
+        "[FLATTEN_COMPACTOR] generated flatten new file {}, took {} ms",
         new_file,
         start.elapsed().as_millis()
     );
