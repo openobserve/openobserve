@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, onBeforeMount, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -32,9 +32,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
-import moment from "moment";
 import { openobserveRum } from "@openobserve/browser-rum";
-import router from "@/test/unit/helpers/router";
 
 export default defineComponent({
   name: "PageLoginCallback",
@@ -44,6 +42,17 @@ export default defineComponent({
     const router = useRouter();
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
+    let moment: any;
+
+    const importMoment = async () => {
+      const momentModule: any = await import("moment");
+
+      moment = momentModule.default();
+    };
+
+    onBeforeMount(async () => {
+      await importMoment();
+    });
 
     /**
      * Get all organizations for the user

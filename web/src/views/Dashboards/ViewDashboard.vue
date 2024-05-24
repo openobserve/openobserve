@@ -221,6 +221,7 @@ import {
   reactive,
   onMounted,
   onUnmounted,
+  onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -234,7 +235,6 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
-import moment from "moment-timezone";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -258,6 +258,18 @@ export default defineComponent({
     const $q = useQuasar();
     const currentDashboardData = reactive({
       data: {},
+    });
+
+    let moment: any;
+
+    const importMoment = async () => {
+      const momentModule: any = await import("moment-timezone");
+
+      moment = momentModule.default();
+    };
+
+    onBeforeMount(async () => {
+      await importMoment();
     });
 
     // [START] date picker related variables --------

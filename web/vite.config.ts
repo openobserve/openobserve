@@ -143,8 +143,6 @@ export default defineConfig({
       ],
       manualChunks: {
         "o2cs-analytics": ["rudder-sdk-js"],
-        lodash: ["lodash-es", "lodash/lodash.js"],
-        "o2cs-moment": ["moment", "moment-timezone"],
         "o2cs-oo-rum": [
           "@openobserve/browser-logs",
           "@openobserve/browser-rum",
