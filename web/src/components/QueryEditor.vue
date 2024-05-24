@@ -234,6 +234,15 @@ export default defineComponent({
       }
     );
 
+    watch(
+      () => store.state.theme,
+      () => {
+        monaco.editor.setTheme(
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+        );
+      }
+    );
+
     // update readonly when prop value changes
     watch(
       () => props.query,
