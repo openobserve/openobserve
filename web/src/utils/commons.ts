@@ -18,14 +18,27 @@
 import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
-import moment from "moment";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 
-export const modifySQLQuery = (
+let moment: any;
+let momentInitialized = false;
+
+const importMoment = async () => {
+  if (!momentInitialized) {
+    const momentModule: any = await import("moment");
+    moment = momentModule.default();
+    momentInitialized = true;
+  }
+  return moment;
+};
+
+export const modifySQLQuery = async (
   currentTimeObj: any,
   querySQL: String,
   timestampColumn: string
 ) => {
+  await importMoment();
+
   const startTime = moment(String(currentTimeObj.start_time)).format(
     "YYYY-MM-DDThh:mm:ssZ"
   );

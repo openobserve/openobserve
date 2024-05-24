@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import moment from "moment";
 import {
   formatDate,
   formatUnitValue,
@@ -21,6 +20,18 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+
+let moment: any;
+let momentInitialized = false;
+
+const importMoment = async () => {
+  if (!momentInitialized) {
+    const momentModule: any = await import("moment");
+    moment = momentModule.default();
+    momentInitialized = true;
+  }
+  return moment;
+};
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -30,7 +41,7 @@ import { calculateGridPositions } from "./calculateGridForSubPlot";
  * @param {any} store - the store object
  * @return {Object} - the option object for rendering the chart
  */
-export const convertPromQLData = (
+export const convertPromQLData = async (
   panelSchema: any,
   searchQueryData: any,
   store: any,
@@ -38,6 +49,8 @@ export const convertPromQLData = (
   hoveredSeriesState: any
 ) => {
   // console.time("convertPromQLData");
+
+  await importMoment();
 
   // if no data than return it
   if (
@@ -185,7 +198,7 @@ export const convertPromQLData = (
           }
         }
 
-        let hoverText: string[] = [];
+        const hoverText: string[] = [];
         name.forEach((it: any) => {
           // if data is not null than show in tooltip
           if (it.data[1] != null) {
