@@ -32,7 +32,11 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 
+import L from "leaflet";
+import "@/utils/dashboard/leaflet-echarts/index";
+
 // import {tileLayer as LtileLayer } from 'leaflet';
+import "leaflet/dist/leaflet.css";
 import * as echarts from "echarts/core";
 
 export default defineComponent({
@@ -50,7 +54,6 @@ export default defineComponent({
     let lmap: any;
     let lmapComponent: any;
     const lmapOptions = { ...props.data.options?.lmap } || {};
-    let L: any;
 
     const store = useStore();
     const windowResizeEventCallback = async () => {
@@ -58,20 +61,6 @@ export default defineComponent({
       await nextTick();
       chart?.resize();
     };
-
-    const importLeaflet = async () => {
-      const leafletModule: any = await import("leaflet");
-
-      await import("leaflet/dist/leaflet.css");
-
-      await import("@/utils/dashboard/leaflet-echarts/index");
-
-      L = leafletModule.default();
-    };
-
-    onBeforeMount(async () => {
-      await importLeaflet();
-    });
 
     onMounted(async () => {
       await nextTick();
