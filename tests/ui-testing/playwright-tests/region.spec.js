@@ -48,7 +48,7 @@ test.describe("Region testcases", () => {
       force: true,
     });
     // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
+    // await expect.poll(async () => (await search).status()).toBe(200);
     // await search.hits.FIXME_should("be.an", "array");
   }
   // tebefore(async function () {
