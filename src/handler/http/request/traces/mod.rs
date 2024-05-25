@@ -83,7 +83,8 @@ async fn handle_req(
     let in_stream_name = req
         .headers()
         .get(&CONFIG.grpc.stream_header_key)
-        .map(|header| header.to_str().unwrap());
+        .map(|header| header.to_str().unwrap())
+        .unwrap_or("default");
     if content_type.eq(CONTENT_TYPE_PROTO) {
         otlp_http::traces_proto(&org_id, **thread_id, body, in_stream_name, flusher).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {

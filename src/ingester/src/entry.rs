@@ -56,7 +56,7 @@ impl Entry {
         let partition_key = self.partition_key.as_bytes();
         let data = serde_json::to_vec(&self.data).context(JSONSerializationSnafu)?;
         let data_size = data.len();
-        self.data_size = data_size; // reset data size
+        // self.data_size = data_size; // reset data size
         buf.write_u16::<BigEndian>(stream.len() as u16)
             .context(WriteDataSnafu)?;
         buf.extend_from_slice(stream);

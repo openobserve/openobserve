@@ -400,6 +400,44 @@ pub async fn write_file(
     req_stats
 }
 
+pub async fn write_wal_file(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    buf: HashMap<String, SchemaRecords>,
+) -> RequestStats {
+    let mut req_stats = RequestStats::default();
+    let (stream_name, seesion_id) =
+        if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
+            (*stream_name, *seesion_id)
+        } else {
+            (stream_name, "")
+        };
+
+    for (hour_key, entry) in buf {
+        if entry.records.is_empty() {
+            continue;
+        }
+        let entry_records = entry.records.len();
+        if let Err(e) = writer
+            .write_wal(ingester::Entry {
+                stream: Arc::from(stream_name),
+                schema_key: Arc::from(entry.schema_key.as_str()),
+                partition_key: Arc::from(hour_key.as_str()),
+                data: entry.records,
+                data_size: entry.records_size,
+                session_id: Arc::from(seesion_id),
+            })
+            .await
+        {
+            log::error!("ingestion write file error: {}", e);
+        }
+
+        req_stats.size += entry.records_size as f64 / SIZE_IN_MB;
+        req_stats.records += entry_records as i64;
+    }
+    req_stats
+}
+
 pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow!("not an ingester"));
@@ -543,11 +581,13 @@ pub async fn get_user_defined_schema(
 }
 
 pub async fn write_memtable(
-    writer: &Arc<ingester::Writer>,
+    org_id: &str,
+    thread_id: usize,
     sid: &str,
     buf: HashMap<String, SchemaRecords>,
     stream_name: &str,
 ) -> ingester::errors::Result<()> {
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
     for (hour_key, entry) in buf {
         if let Err(e) = writer
             .write_memtable(

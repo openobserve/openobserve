@@ -17,60 +17,92 @@ use std::io::Error;
 
 use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
-use config::ider;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTracePartialSuccess, ExportTraceServiceRequest,
 };
 use prost::Message;
-use tonic::Request;
 
 use super::flusher;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::traces::flusher::{ExportRequest, WriteBufferFlusher},
+    service::traces::{
+        flusher::{ExportRequest, WriteBufferFlusher},
+        validator::{validate_json_trace_request, validate_trace_request},
+    },
 };
 
 pub async fn traces_proto(
     org_id: &str,
     thread_id: usize,
     body: web::Bytes,
-    in_stream_name: Option<&str>,
+    in_stream_name: &str,
     flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    let request = tonic::Request::new(request);
 
-    let (mut metadata, extensions, message) = request.into_parts();
-    let session_id = ider::uuid();
-    metadata.insert("session_id", session_id.parse().unwrap());
-    let req = Request::from_parts(metadata, extensions, message);
-    let request = ExportRequest::GrpcExportTraceServiceRequest((
+    // ((org_id, thread_id, stream_name, entry, trigger, distinct_value, trace_index,
+    // partical_success))
+    let (records, trigger, distinct_value, trace_index, partial_success) =
+        match validate_trace_request(org_id, request, Some(in_stream_name)).await {
+            Ok(data) => data,
+            Err(e) => {
+                return Ok(
+                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                        http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                        e.to_string(),
+                    )),
+                );
+            }
+        };
+
+    let entry: flusher::ExportRequestInnerEntry = (
         org_id.to_string(),
         thread_id,
-        req,
-        Some(in_stream_name.unwrap_or("").to_string()),
-    ));
+        in_stream_name.to_string(),
+        records,
+        trigger,
+        distinct_value,
+        trace_index,
+        partial_success,
+        true,
+    );
 
-    hanlde_resp(flusher, request, true).await
+    hanlde_resp(flusher, ExportRequest::TraceEntry(entry), true).await
 }
 
 pub async fn traces_json(
     org_id: &str,
     thread_id: usize,
     body: web::Bytes,
-    in_stream_name: Option<&str>,
+    in_stream_name: &str,
     flusher: web::Data<WriteBufferFlusher>,
 ) -> Result<HttpResponse, Error> {
-    let in_stream_name = in_stream_name.map(|name| name.to_string());
+    let (records, trigger, distinct_value, trace_index, partial_success) =
+        match validate_json_trace_request(org_id, body, Some(in_stream_name)).await {
+            Ok(data) => data,
+            Err(e) => {
+                return Ok(
+                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                        http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                        e.to_string(),
+                    )),
+                );
+            }
+        };
 
-    let request = ExportRequest::HttpJsonExportTraceServiceRequest((
+    let entry: flusher::ExportRequestInnerEntry = (
         org_id.to_string(),
         thread_id,
-        body,
-        in_stream_name,
-    ));
+        in_stream_name.to_string(),
+        records,
+        trigger,
+        distinct_value,
+        trace_index,
+        partial_success,
+        false,
+    );
 
-    hanlde_resp(flusher, request, false).await
+    hanlde_resp(flusher, ExportRequest::TraceEntry(entry), false).await
 }
 
 async fn hanlde_resp(

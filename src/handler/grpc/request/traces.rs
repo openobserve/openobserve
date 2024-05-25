@@ -22,6 +22,7 @@ use tonic::{codegen::*, Response, Status};
 use crate::service::traces::{
     flusher,
     flusher::{ExportRequest, WriteBufferFlusher},
+    validator::validate_trace_request,
 };
 
 pub struct TraceServer {
@@ -46,10 +47,9 @@ impl TraceService for TraceServer {
         // let in_req = request.into_inner();
         let org_id = metadata.get(&CONFIG.grpc.org_header_key);
         if org_id.is_none() {
-            println!("{:?}", org_id);
             return Err(Status::invalid_argument(msg));
         }
-
+        let org_id = org_id.unwrap().to_str().unwrap();
         let thread_id = metadata.get("thread_id");
         let mut in_thread_id: usize = 0;
         if let Some(thread_id) = thread_id {
@@ -57,17 +57,35 @@ impl TraceService for TraceServer {
         };
 
         let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
-        let mut in_stream_name: Option<String> = None;
+        let mut in_stream_name: String = "default".to_string();
         if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap().to_string());
+            in_stream_name = stream_name.to_str().unwrap().to_string();
         };
 
-        let request = ExportRequest::GrpcExportTraceServiceRequest((
-            org_id.unwrap().to_str().unwrap().to_string(),
+        let (records, trigger, distinct_value, trace_index, partial_success) =
+            match validate_trace_request(
+                org_id,
+                request.into_inner(),
+                Some(in_stream_name.as_str()),
+            )
+            .await
+            {
+                Ok(data) => data,
+                Err(e) => return Err(Status::internal(e.to_string())),
+            };
+        let entry: flusher::ExportRequestInnerEntry = (
+            org_id.to_string(),
             in_thread_id,
-            request,
             in_stream_name,
-        ));
+            records,
+            trigger,
+            distinct_value,
+            trace_index,
+            partial_success,
+            true,
+        );
+
+        let request = ExportRequest::TraceEntry(entry);
 
         match self.flusher.write(request).await {
             Ok(resp) => match resp {

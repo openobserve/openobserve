@@ -306,6 +306,7 @@ impl Writer {
             CONFIG.limit.max_file_size_in_memory,
             CONFIG.limit.max_file_size_in_memory
         );
+
         if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
             let mut mem = self.memtable.write().await;
             let new_mem = MemTable::new();
@@ -317,7 +318,7 @@ impl Writer {
             let key = self.key.clone();
             let path_str = path.display().to_string();
             tokio::task::spawn(async move {
-                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
+                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str);
                 IMMUTABLES.write().await.insert(
                     path,
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
@@ -333,6 +334,52 @@ impl Writer {
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(start.elapsed().as_millis() as f64);
+        Ok(())
+    }
+
+    pub async fn write_wal(&self, mut entry: Entry) -> Result<()> {
+        if entry.data.is_empty() {
+            return Ok(());
+        }
+        let entry_bytes = entry.into_bytes()?;
+        let mut wal = self.wal.lock().await;
+        if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
+            // sync wal before rotation
+            wal.sync().context(WalSnafu)?;
+            // rotation wal
+            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
+            let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
+                .join("logs")
+                .join(self.thread_id.to_string());
+            log::info!(
+                "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
+                wal_dir.display().to_string(),
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id
+            );
+            let new_wal = WalWriter::new(
+                wal_dir,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id,
+                CONFIG.limit.max_file_size_on_disk as u64,
+            )
+            .context(WalSnafu)?;
+            let _ = std::mem::replace(&mut *wal, new_wal);
+
+            // update created_at
+            self.created_at
+                .store(Utc::now().timestamp_micros(), Ordering::Release);
+        }
+
+        // write into wal
+        let start = std::time::Instant::now();
+        wal.write(&entry_bytes, false).context(WalSnafu)?;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(start.elapsed().as_millis() as f64);
+
         Ok(())
     }
 }
