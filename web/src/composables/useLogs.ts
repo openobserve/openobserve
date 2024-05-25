@@ -2019,6 +2019,7 @@ const useLogs = () => {
         } milliseconds to complete`
       );
     } catch (e: any) {
+      console.log(e);
       console.log("Error while extracting fields");
     }
   }
@@ -2635,6 +2636,7 @@ const useLogs = () => {
         true
       );
       searchObj.data.stream.selectedStreamFields = streamData.schema;
+      console.log(searchObj.data.stream.selectedStreamFields);
     }
 
     if (
