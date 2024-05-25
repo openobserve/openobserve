@@ -290,7 +290,7 @@ impl Writer {
 
     pub async fn write_memtable(
         &self,
-        _sid: &str,
+        sid: &str,
         schema: Arc<Schema>,
         entry: Entry,
         check_ttl: bool,
@@ -312,18 +312,21 @@ impl Writer {
             let new_mem = MemTable::new();
             let old_mem = std::mem::replace(&mut *mem, new_mem);
             drop(mem);
-
+            // update created_at
+            self.created_at
+                .store(Utc::now().timestamp_micros(), Ordering::Release);
             let thread_id = self.thread_id;
             let path = self.wal.lock().await.path().clone();
             let key = self.key.clone();
             let path_str = path.display().to_string();
+            let sid = sid.to_string();
             tokio::task::spawn(async move {
-                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str);
+                log::info!("[INGESTER:WAL] [{sid}] start add to IMMUTABLES, file: {}", path_str);
                 IMMUTABLES.write().await.insert(
                     path,
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
-                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
+                log::info!("[INGESTER:WAL] [{sid}] dones add to IMMUTABLES, file: {}", path_str);
             });
         }
 
@@ -337,11 +340,12 @@ impl Writer {
         Ok(())
     }
 
-    pub async fn write_wal(&self, mut entry: Entry) -> Result<()> {
+    pub async fn write_wal(&self, mut entry: Entry) -> Result<Option<String>> {
         if entry.data.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
         let entry_bytes = entry.into_bytes()?;
+        let mut path_str: Option<String> = None;
         let mut wal = self.wal.lock().await;
         if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
             // sync wal before rotation
@@ -351,8 +355,9 @@ impl Writer {
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
                 .join("logs")
                 .join(self.thread_id.to_string());
+            let sid = entry.session_id;
             log::info!(
-                "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
+                "[INGESTER:WAL] [{sid}] create file: {}/{}/{}/{}.wal",
                 wal_dir.display().to_string(),
                 &self.key.org_id,
                 &self.key.stream_type,
@@ -366,11 +371,10 @@ impl Writer {
                 CONFIG.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
-            let _ = std::mem::replace(&mut *wal, new_wal);
-
-            // update created_at
-            self.created_at
-                .store(Utc::now().timestamp_micros(), Ordering::Release);
+            let old_wal = std::mem::replace(&mut *wal, new_wal);
+            let path = old_wal.path().clone();
+            path_str = Some(path.display().to_string());
+            info!("[{sid}] old_wal path_str will be record in immutable : {path_str}");
         }
 
         // write into wal
@@ -380,7 +384,7 @@ impl Writer {
             .with_label_values(&[&self.key.org_id])
             .observe(start.elapsed().as_millis() as f64);
 
-        Ok(())
+        Ok(path_str)
     }
 }
 
