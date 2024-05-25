@@ -974,12 +974,38 @@ const useLogs = () => {
       let recordSize = 0;
       let from = 0;
       let lastPage = 0;
-      searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
-        (accumulator: number, currentValue: number) =>
-          accumulator + Math.max(currentValue, 0),
-        0
-      );
 
+      const parsedSQL: any = fnParsedSQL();
+
+      if (
+        (searchObj.data.queryResults.aggs == undefined &&
+          searchObj.data.resultGrid.currentPage == 1 &&
+          searchObj.loadingHistogram == false &&
+          searchObj.meta.showHistogram == true &&
+          (!searchObj.meta.sqlMode ||
+            (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+        (searchObj.loadingHistogram == false &&
+          searchObj.meta.showHistogram == true &&
+          searchObj.meta.sqlMode == false &&
+          searchObj.data.resultGrid.currentPage == 1)
+      ) {
+        console.log(searchObj.data.queryResults)
+        if(searchObj.data.queryResults.hasOwnProperty("aggs") && searchObj.data.queryResults.aggs != null) {
+        searchObj.data.queryResults.total = searchObj.data.queryResults.aggs.reduce(
+            (accumulator: number, currentValue: number) =>
+              accumulator + Math.max(currentValue.zo_sql_num, 0),
+            0
+          );
+          partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
+        }
+      } else {
+        searchObj.data.queryResults.total =
+          partitionDetail.partitionTotal.reduce(
+            (accumulator: number, currentValue: number) =>
+              accumulator + Math.max(currentValue, 0),
+            0
+          );
+      }
       // partitionDetail.partitions.forEach((item: any, index: number) => {
       for (const [index, item] of partitionDetail.partitions.entries()) {
         total = partitionDetail.partitionTotal[index];
@@ -1267,7 +1293,8 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          getHistogramQueryData(searchObj.data.histogramQuery);
+          await getHistogramQueryData(searchObj.data.histogramQuery);
+          refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
             xData: [],
@@ -1683,32 +1710,14 @@ const useLogs = () => {
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
           })
-          .then((res) => {
+          .then(async (res) => {
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
-            generateHistogramData();
+            await generateHistogramData();
 
-            for (const [
-              index,
-              item,
-            ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
-              if (
-                (searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] == -1 ||
-                  searchObj.data.queryResults.partitionDetail.partitionTotal[
-                    index
-                  ] < res.data.total) &&
-                queryReq.query.start_time == item[0]
-              ) {
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] = res.data.total;
-              }
-            }
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
