@@ -268,7 +268,7 @@ const importVideoPlayer = async () => {
 
   await import("@openobserve/rrweb-player/dist/style.css");
 
-  rrwebPlayer = rrwebPlayerModule.default();
+  rrwebPlayer = rrwebPlayerModule.default;
 };
 
 onBeforeUnmount(() => {
