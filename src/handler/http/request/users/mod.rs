@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_web::{
     cookie, delete, get,
-    http::{self, header},
+    http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
 use config::{
@@ -37,7 +37,6 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
-    handler::http::auth::validator::ID_TOKEN_HEADER,
     service::users,
 };
 
@@ -308,6 +307,9 @@ pub async fn authentication(
 pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        use actix_web::http::header;
+        use handler::http::auth::validator::ID_TOKEN_HEADER;
+
         let mut resp = SignInResponse::default();
         if let Some(auth_header) = _req.headers().get("Authorization") {
             if let Ok(auth_header) = auth_header.to_str() {
