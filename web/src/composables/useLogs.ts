@@ -992,8 +992,8 @@ const useLogs = () => {
         console.log(searchObj.data.queryResults)
         if(searchObj.data.queryResults.hasOwnProperty("aggs") && searchObj.data.queryResults.aggs != null) {
         searchObj.data.queryResults.total = searchObj.data.queryResults.aggs.reduce(
-            (accumulator: number, currentValue: number) =>
-              accumulator + Math.max(currentValue.zo_sql_num, 0),
+            (accumulator: number, currentValue: any) =>
+              accumulator + Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
             0
           );
           partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
