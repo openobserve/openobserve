@@ -15,7 +15,11 @@
 
 use std::io::Error;
 
-use actix_web::{cookie, delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{
+    cookie, delete, get,
+    http::{self, header},
+    post, put, web, HttpRequest, HttpResponse,
+};
 use config::{
     utils::{base64, json},
     CONFIG,
@@ -33,6 +37,7 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
+    handler::http::auth::validator::ID_TOKEN_HEADER,
     service::users,
 };
 
@@ -329,6 +334,11 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                             "Basic {}",
                             base64::encode(&format!("{}:{}", &name, &password))
                         );
+
+                        let id_token = config::utils::json::json!({
+                            "email": name,
+                            "name": name,
+                        });
                         let tokens = json::to_string(&AuthTokens {
                             access_token,
                             refresh_token: "".to_string(),
@@ -349,19 +359,28 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                         } else {
                             auth_cookie.set_same_site(cookie::SameSite::None);
                         }
-
-                        return Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp));
+                        let url = format!(
+                            "{}{}/web/cb#id_token={}.{}",
+                            CONFIG.common.web_url,
+                            CONFIG.common.base_uri,
+                            ID_TOKEN_HEADER,
+                            base64::encode(&id_token.to_string())
+                        );
+                        return Ok(HttpResponse::Found()
+                            .append_header((header::LOCATION, url))
+                            .cookie(auth_cookie)
+                            .json(resp));
                     } else {
-                        return unauthorized_error(resp);
+                        unauthorized_error(resp)
                     }
                 } else {
-                    return unauthorized_error(resp);
+                    unauthorized_error(resp)
                 }
             } else {
-                return unauthorized_error(resp);
+                unauthorized_error(resp)
             }
         } else {
-            return unauthorized_error(resp);
+            unauthorized_error(resp)
         }
     }
 
