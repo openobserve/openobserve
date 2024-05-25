@@ -308,7 +308,8 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use actix_web::http::header;
-        use handler::http::auth::validator::ID_TOKEN_HEADER;
+
+        use crate::handler::http::auth::validator::ID_TOKEN_HEADER;
 
         let mut resp = SignInResponse::default();
         if let Some(auth_header) = _req.headers().get("Authorization") {
