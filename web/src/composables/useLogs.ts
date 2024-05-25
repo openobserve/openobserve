@@ -1821,7 +1821,8 @@ const useLogs = () => {
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
-            userDefineSchemaSettings = stream.settings.defined_schema_fields.slice() || [];
+            userDefineSchemaSettings =
+              stream.settings?.defined_schema_fields?.slice() || [];
             // check for schema exist in the object or not
             // if not pull the schema from server.
             if (!stream.hasOwnProperty("schema")) {
@@ -1911,17 +1912,12 @@ const useLogs = () => {
                 stream.settings.hasOwnProperty("defined_schema_fields") &&
                 userDefineSchemaSettings.length > 0
               ) {
-                if (
-                  userDefineSchemaSettings.includes(field.name)
-                ) {
+                if (userDefineSchemaSettings.includes(field.name)) {
                   schemaMaps.push(fieldObj);
                   schemaFields.push(field.name);
                 }
 
-                if (
-                  schemaMaps.length ==
-                  userDefineSchemaSettings.length
-                ) {
+                if (schemaMaps.length == userDefineSchemaSettings.length) {
                   break;
                 }
               } else {
@@ -2002,7 +1998,7 @@ const useLogs = () => {
             ] = searchObj.data.stream.interestingFieldList;
             useLocalInterestingFields(localFields);
             searchObj.data.stream.userDefinedSchema =
-            userDefineSchemaSettings || [];
+              userDefineSchemaSettings || [];
           }
         }
 
@@ -2023,6 +2019,7 @@ const useLogs = () => {
         } milliseconds to complete`
       );
     } catch (e: any) {
+      console.log(e);
       console.log("Error while extracting fields");
     }
   }
@@ -2639,6 +2636,7 @@ const useLogs = () => {
         true
       );
       searchObj.data.stream.selectedStreamFields = streamData.schema;
+      console.log(searchObj.data.stream.selectedStreamFields);
     }
 
     if (
