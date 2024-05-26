@@ -844,6 +844,9 @@ const useLogs = () => {
         end_time: queryReq.query.end_time,
         sql_mode: searchObj.meta.sqlMode ? "full" : "context",
       };
+      if (store.state.zoConfig.sql_base64_enabled) {
+        partitionQueryReq["encoding"] = "base64";
+      }
 
       if (
         config.isEnterprise == "true" &&
