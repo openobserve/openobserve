@@ -72,7 +72,12 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>>;
+    async fn query_deleted(
+        &self,
+        org_id: &str,
+        time_max: i64,
+        limit: i64,
+    ) -> Result<Vec<(String, bool)>>;
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -215,7 +220,7 @@ pub async fn query(
 }
 
 #[inline]
-pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
+pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<(String, bool)>> {
     CLIENT.query_deleted(org_id, time_max, limit).await
 }
 

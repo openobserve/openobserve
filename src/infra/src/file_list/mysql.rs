@@ -323,7 +323,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
+    async fn query_deleted(
+        &self,
+        org_id: &str,
+        time_max: i64,
+        limit: i64,
+    ) -> Result<Vec<(String, bool)>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
@@ -338,7 +343,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .await?;
         Ok(ret
             .iter()
-            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
+            .map(|r| {
+                (
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    r.flattened,
+                )
+            })
             .collect())
     }
 
