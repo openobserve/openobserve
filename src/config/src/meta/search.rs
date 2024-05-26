@@ -315,9 +315,30 @@ pub struct SearchPartitionRequest {
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
+    pub encoding: RequestEncoding,
+    #[serde(default)]
     pub regions: Vec<String>,
     #[serde(default)]
     pub clusters: Vec<String>,
+}
+
+impl SearchPartitionRequest {
+    #[inline]
+    pub fn decode(&mut self) -> Result<(), std::io::Error> {
+        match self.encoding {
+            RequestEncoding::Base64 => {
+                self.sql = match base64::decode_url(&self.sql) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(e);
+                    }
+                };
+            }
+            RequestEncoding::Empty => {}
+        }
+        self.encoding = RequestEncoding::Empty;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
