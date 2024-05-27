@@ -134,7 +134,11 @@ const getDefaultDashboardPanelData: any = () => ({
     dateTime: { start_time: "", end_time: "" },
     filterValue: <any>[],
     stream: {
+      hasUserDefinedSchemas: false,
+      interestingFieldList: [],
+      userDefinedSchema: [],
       selectedStreamFields: [],
+      useUserDefinedSchemas: "user_defined_schema",
       customQueryFields: [],
       functions: [],
       streamResults: <any>[],
