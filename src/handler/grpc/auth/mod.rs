@@ -113,6 +113,7 @@ mod tests {
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
                 is_external: false,
+                password_ext: Some("Complexpass#123".to_string()),
             },
         );
 
@@ -142,6 +143,7 @@ mod tests {
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
                 is_external: false,
+                password_ext: Some("Complexpass#123".to_string()),
             },
         );
 
@@ -169,6 +171,7 @@ mod tests {
                 rum_token: Some("rum_token".to_string()),
                 org: "dummy".to_owned(),
                 is_external: false,
+                password_ext: Some("Complexpass#123".to_string()),
             },
         );
         let mut request = tonic::Request::new(());
