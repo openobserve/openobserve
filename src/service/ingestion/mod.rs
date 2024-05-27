@@ -403,22 +403,17 @@ pub async fn write_file(
 pub async fn write_wal_file(
     writer: &Arc<ingester::Writer>,
     stream_name: &str,
+    seesion_id: &str,
     buf: HashMap<String, SchemaRecords>,
-) -> RequestStats {
+) -> (RequestStats, Vec<Option<(String, String)>>) {
     let mut req_stats = RequestStats::default();
-    let (stream_name, seesion_id) =
-        if let [stream_name, seesion_id] = stream_name.split('^').collect::<Vec<_>>().as_slice() {
-            (*stream_name, *seesion_id)
-        } else {
-            (stream_name, "")
-        };
-
+    let mut dump_sids = vec![];
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
         }
         let entry_records = entry.records.len();
-        if let Err(e) = writer
+        match writer
             .write_wal(ingester::Entry {
                 stream: Arc::from(stream_name),
                 schema_key: Arc::from(entry.schema_key.as_str()),
@@ -429,13 +424,17 @@ pub async fn write_wal_file(
             })
             .await
         {
-            log::error!("ingestion write file error: {}", e);
+            Err(e) => {
+                log::error!("ingestion write file error: {}", e);
+            }
+            Ok(Some(s)) => dump_sids.push(Some(s)),
+            Ok(None) => dump_sids.push(None),
         }
 
         req_stats.size += entry.records_size as f64 / SIZE_IN_MB;
         req_stats.records += entry_records as i64;
     }
-    req_stats
+    (req_stats, dump_sids)
 }
 
 pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
@@ -584,14 +583,15 @@ pub async fn write_memtable(
     org_id: &str,
     thread_id: usize,
     sid: &str,
-    buf: HashMap<String, SchemaRecords>,
     stream_name: &str,
+    buf: HashMap<String, SchemaRecords>,
+    trace_resp: Option<&Vec<Option<(String, String)>>>,
 ) -> ingester::errors::Result<()> {
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
     for (hour_key, entry) in buf {
+        let rotate = trace_resp.and_then(|vec| vec.iter().flatten().find(|(id, _)| id == sid));
         if let Err(e) = writer
             .write_memtable(
-                sid,
                 entry.schema,
                 ingester::Entry {
                     stream: Arc::from(stream_name),
@@ -602,6 +602,7 @@ pub async fn write_memtable(
                     session_id: Arc::from(sid),
                 },
                 false,
+                rotate,
             )
             .await
         {

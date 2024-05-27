@@ -56,13 +56,13 @@ pub async fn handle_trace_request(
     mut partial_success: ExportTracePartialSuccess,
     session_id: &str,
     is_grpc: bool,
-) -> Result<ExportTraceServiceResponse, BufferWriteError> {
+) -> Result<(ExportTraceServiceResponse, Vec<Option<(String, String)>>), BufferWriteError> {
     let start = std::time::Instant::now();
 
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
-    let traces_stream_name_with_sid = format!("{traces_stream_name}^{session_id}");
-    let mut req_stats = write_wal_file(&writer, &traces_stream_name_with_sid, entry).await;
+    let (mut req_stats, dump_sids) =
+        write_wal_file(&writer, traces_stream_name, session_id, entry).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
@@ -132,7 +132,7 @@ pub async fn handle_trace_request(
         },
     };
 
-    Ok(res)
+    Ok((res, dump_sids))
 }
 
 fn get_span_status(status: Option<Status>) -> String {

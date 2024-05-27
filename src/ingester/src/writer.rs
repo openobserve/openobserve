@@ -58,7 +58,9 @@ pub struct Writer {
     key: WriterKey,
     wal: Arc<Mutex<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
-    next_seq: AtomicU64,
+    // next_seq: AtomicU64,
+    wal_next_seq: AtomicU64,
+    memtable_next_seq: AtomicU64,
     created_at: AtomicI64,
 }
 
@@ -139,8 +141,11 @@ pub async fn flush_all() -> Result<()> {
 impl Writer {
     pub(crate) fn new(thread_id: usize, key: WriterKey) -> Self {
         let now = Utc::now().timestamp_micros();
-        let next_seq = AtomicU64::new(now as u64);
-        let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
+        // let next_seq = AtomicU64::new(now as u64);
+        let wal_next_seq = AtomicU64::new(now as u64);
+        let memtable_next_seq = AtomicU64::new(now as u64);
+        let wal_id = wal_next_seq.fetch_add(1, Ordering::SeqCst);
+        memtable_next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
             .join("logs")
             .join(thread_id.to_string());
@@ -165,7 +170,8 @@ impl Writer {
                 .expect("wal file create error"),
             )),
             memtable: Arc::new(RwLock::new(MemTable::new())),
-            next_seq,
+            wal_next_seq,
+            memtable_next_seq,
             created_at: AtomicI64::new(now),
         }
     }
@@ -192,7 +198,7 @@ impl Writer {
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
             // rotation wal
-            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
+            let wal_id = self.wal_next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
                 .join("logs")
                 .join(self.thread_id.to_string());
@@ -290,24 +296,24 @@ impl Writer {
 
     pub async fn write_memtable(
         &self,
-        sid: &str,
         schema: Arc<Schema>,
         entry: Entry,
         check_ttl: bool,
+        rotate_mem: Option<&(String, String)>,
     ) -> Result<()> {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
         }
 
+        let sid = entry.session_id.clone();
         info!(
-            "memtable_size: {:?}, entry.data_size: {}, CONFIG.limit.max_file_size_in_memory: {}, CONFIG.limit.max_file_size_in_memory: {}",
+            "[{sid}]write_memtable memtable_size: {:?}, entry.data_size: {}, CONFIG.limit.max_file_size_in_memory: {}",
             self.memtable.read().await.size(),
             entry.data_size,
             CONFIG.limit.max_file_size_in_memory,
-            CONFIG.limit.max_file_size_in_memory
         );
 
-        if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
+        if rotate_mem.is_some() {
             let mut mem = self.memtable.write().await;
             let new_mem = MemTable::new();
             let old_mem = std::mem::replace(&mut *mem, new_mem);
@@ -316,17 +322,22 @@ impl Writer {
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
             let thread_id = self.thread_id;
-            let path = self.wal.lock().await.path().clone();
             let key = self.key.clone();
+            let path = PathBuf::from(rotate_mem.unwrap().1.as_str());
             let path_str = path.display().to_string();
-            let sid = sid.to_string();
             tokio::task::spawn(async move {
-                log::info!("[INGESTER:WAL] [{sid}] start add to IMMUTABLES, file: {}", path_str);
+                log::info!(
+                    "[INGESTER:WAL] [{sid}] start add to IMMUTABLES, file: {}",
+                    path_str
+                );
                 IMMUTABLES.write().await.insert(
-                    path,
+                    path.clone(),
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
-                log::info!("[INGESTER:WAL] [{sid}] dones add to IMMUTABLES, file: {}", path_str);
+                log::info!(
+                    "[INGESTER:WAL] [{sid}] dones add to IMMUTABLES, file: {}",
+                    path_str
+                );
             });
         }
 
@@ -340,18 +351,27 @@ impl Writer {
         Ok(())
     }
 
-    pub async fn write_wal(&self, mut entry: Entry) -> Result<Option<String>> {
+    pub async fn write_wal(&self, mut entry: Entry) -> Result<Option<(String, String)>> {
         if entry.data.is_empty() {
             return Ok(None);
         }
         let entry_bytes = entry.into_bytes()?;
-        let mut path_str: Option<String> = None;
         let mut wal = self.wal.lock().await;
-        if self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size) {
+        // info!(
+        //     "[{}]write_wal memtable_size: {:?}, entry.data_size: {},
+        // CONFIG.limit.max_file_size_in_memory: {}",     entry.session_id,
+        //     self.memtable.read().await.size(),
+        //     entry.data_size,
+        //     CONFIG.limit.max_file_size_in_memory
+        // );
+        let mut res = None;
+        if self.check_wal_threshold(wal.size(), entry_bytes.len())
+            || self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size)
+        {
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
             // rotation wal
-            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
+            let wal_id = self.wal_next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
                 .join("logs")
                 .join(self.thread_id.to_string());
@@ -372,9 +392,13 @@ impl Writer {
             )
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
-            let path = old_wal.path().clone();
-            path_str = Some(path.display().to_string());
-            info!("[{sid}] old_wal path_str will be record in immutable : {path_str}");
+            let path_str = old_wal.path().clone().display().to_string();
+            log::info!(
+                "[{sid}] old_wal path_str will be record in immutable : {:?}",
+                path_str
+            );
+
+            res = Some((sid.to_string(), path_str));
         }
 
         // write into wal
@@ -384,7 +408,7 @@ impl Writer {
             .with_label_values(&[&self.key.org_id])
             .observe(start.elapsed().as_millis() as f64);
 
-        Ok(path_str)
+        Ok(res)
     }
 }
 

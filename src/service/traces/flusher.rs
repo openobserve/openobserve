@@ -65,7 +65,7 @@ pub type ExportRequestInnerEntry = (
 pub struct TraceServiceResponse {
     // org_id: String,
     // stream_name: String,
-    response: Result<ExportTraceServiceResponse, BufferWriteError>,
+    response: Result<(ExportTraceServiceResponse, Vec<Option<(String, String)>>), BufferWriteError>,
 }
 type NotifyResult = HashMap<String, TraceServiceResponse>;
 type IoFlushNotifyResult = Result<NotifyResult, BufferWriteError>;
@@ -218,7 +218,7 @@ pub async fn run_trace_op_buffer(
             Some(buffered_write) = buffer_rx.recv() => {
                 let session_id = ider::uuid();
                 let _ = ops.insert(session_id.clone(), buffered_write.request);
-                        notifies.push((session_id, buffered_write.response_tx));
+                notifies.push((session_id, buffered_write.response_tx));
             },
             _ = interval.tick() => {
                 if ops.is_empty() {
@@ -234,16 +234,16 @@ pub async fn run_trace_op_buffer(
                         for (sid, export_request) in &ops {
                             let ExportRequest::TraceEntry(er) = export_request;
                             let (org_id, thread_id, stream_name, entry, _, _,_, _, _) = er;
-                            let _ = crate::service::ingestion::write_memtable(org_id, *thread_id, sid, entry.clone(), stream_name).await;
+                            let trace_resp = resp.get(sid).and_then(|tsr| {tsr.response.as_ref().ok().map(|(_, v)| v)});
+                            let _ = crate::service::ingestion::write_memtable(org_id, *thread_id, sid, stream_name, entry.clone(), trace_resp).await;
                         }
-
                         // notify the watchers of the write response
                         for (sid, response_tx) in notifies {
                             match resp.remove(&sid) {
                                 Some(r) => {
                                     let bwr = match r.response {
                                         Ok(ets) => {
-                                            BufferedWriteResult::Success(ets)
+                                            BufferedWriteResult::Success(ets.0)
                                         }
                                         Err(e) => {
                                             log::error!("io_flush_notify_rx resp error : {e}");
