@@ -290,24 +290,6 @@ pub struct TokioConsole {
     pub tokio_console_retention: u64,
 }
 
-// #[derive(EnvConfig)]
-// pub struct Chrome {
-//     #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
-//     pub chrome_enabled: bool,
-//     #[env_config(name = "ZO_CHROME_PATH", default = "")]
-//     pub chrome_path: String,
-//     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
-//     pub chrome_no_sandbox: bool,
-//     #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
-//     pub chrome_with_head: bool,
-//     #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
-//     pub chrome_sleep_secs: u16,
-//     #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
-//     pub chrome_window_width: u32,
-//     #[env_config(name = "ZO_CHROME_WINDOW_HEIGHT", default = 730)]
-//     pub chrome_window_height: u32,
-// }
-
 #[derive(EnvConfig)]
 pub struct Chrome {
     #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
@@ -630,7 +612,7 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
-    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "localhost:5083")]
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "localhost:5082")]
     pub report_server_url: String,
     #[env_config(name = "ZO_REPORT_SERVER_SKIP_TLS_VERIFY", default = false)]
     pub report_server_skip_tls_verify: bool,
