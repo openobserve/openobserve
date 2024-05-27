@@ -21,8 +21,8 @@ use actix_web::{
     post, put, web, HttpRequest, HttpResponse,
 };
 use config::{
-    get_config,
     utils::{base64, json},
+    CONFIG,
 };
 use strum::IntoEnumIterator;
 
@@ -275,7 +275,6 @@ pub async fn authentication(
         }
     };
     if resp.status {
-        let cfg = get_config();
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
@@ -288,12 +287,12 @@ pub async fn authentication(
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
         );
         auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
         auth_cookie.set_path("/");
-        if cfg.auth.cookie_same_site_lax {
+        if CONFIG.auth.cookie_same_site_lax {
             auth_cookie.set_same_site(cookie::SameSite::Lax);
         } else {
             auth_cookie.set_same_site(cookie::SameSite::None);
