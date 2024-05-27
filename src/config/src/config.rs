@@ -628,8 +628,6 @@ pub struct Common {
     pub allow_user_defined_schemas: bool,
     #[env_config(name = "ZO_DATAFUSION_PARQUET_STAT_DISABLE_FOR_AGGS", default = false)]
     pub datafusion_parquet_stat_disable_for_aggs: bool,
-    #[env_config(name = "ZO_DATAFUSION_PARQUET_ENABLE_SORT_ORDER", default = false)]
-    pub datafusion_parquet_sort_order: bool,
 }
 
 #[derive(EnvConfig)]
@@ -763,6 +761,8 @@ pub struct Limit {
     pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 3)]
     pub consistent_hash_vnodes: usize,
+    #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
+    pub datafusion_file_stat_cache_max_entries: usize,
 }
 
 #[derive(EnvConfig)]

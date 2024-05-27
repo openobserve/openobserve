@@ -61,7 +61,10 @@ use crate::{
         infra::{cluster, config::*},
         meta::{functions::ZoFunction, http::HttpResponse as MetaHttpResponse, user::AuthTokens},
     },
-    service::{db, search::datafusion::DEFAULT_FUNCTIONS},
+    service::{
+        db,
+        search::datafusion::{storage::file_statistics_cache, DEFAULT_FUNCTIONS},
+    },
 };
 
 #[derive(Serialize, ToSchema)]
@@ -306,6 +309,10 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert(
         "COMPACT",
         json::json!({"file_list_offset": last_file_list_offset}),
+    );
+    stats.insert(
+        "DATAFUSION",
+        json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
     );
 
     Ok(HttpResponse::Ok().json(stats))
