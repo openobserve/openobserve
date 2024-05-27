@@ -61,18 +61,13 @@ impl std::fmt::Display for Local {
 
 #[async_trait]
 impl ObjectStore for Local {
-    async fn put_opts(
-        &self,
-        location: &Path,
-        bytes: Bytes,
-        _opts: PutOptions,
-    ) -> Result<PutResult> {
+    async fn put_opts(&self, location: &Path, bytes: Bytes, opts: PutOptions) -> Result<PutResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
         match self
             .client
-            .put(&(format_key(&file, self.with_prefix).into()), bytes)
+            .put_opts(&(format_key(&file, self.with_prefix).into()), bytes, opts)
             .await
         {
             Ok(_output) => {
