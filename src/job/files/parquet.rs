@@ -134,7 +134,7 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
     if files.is_empty() {
         return Ok(FxIndexMap::default());
     }
-    log::debug!(
+    log::info!(
         "[INGESTER:JOB] move files get: {}, took: {} ms",
         files.len(),
         start.elapsed().as_millis()
