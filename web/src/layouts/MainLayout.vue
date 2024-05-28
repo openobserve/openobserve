@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :mini="miniMode"
       bordered
       show-if-above
-      @mouseover="miniMode = false"
+      @mouseover="expandMenu"
       @mouseout="miniMode = true"
       mini-to-overlay
     >
@@ -258,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <menu-link
           v-for="nav in linksList"
           :key="nav.title"
+          :link-name="nav.name"
           v-bind="{ ...nav, mini: miniMode }"
         />
       </q-list>
@@ -958,6 +959,32 @@ export default defineComponent({
       }
     };
 
+    const prefetch = () => {
+      const href = "/web/assets/editor.api.v1.js";
+      console.log(document);
+
+      const existingLink = document.querySelector(
+        `link[rel="prefetch"][href="${href}"]`
+      );
+
+      console.log("existingLink", existingLink);
+      if (!existingLink) {
+        // Create a new link element
+        const link = document.createElement("link");
+        link.rel = "prefetch";
+        link.href = href;
+        document.head.appendChild(link);
+        console.log(`Prefetch link for ${href} added.`);
+      } else {
+        console.log(`Prefetch link for ${href} already exists.`);
+      }
+    };
+
+    const expandMenu = () => {
+      miniMode.value = false;
+      prefetch();
+    };
+
     return {
       t,
       router,
@@ -980,6 +1007,8 @@ export default defineComponent({
       getOrganizationSettings,
       resetStreams,
       triggerRefreshToken,
+      prefetch,
+      expandMenu,
     };
   },
   computed: {
