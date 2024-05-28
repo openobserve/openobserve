@@ -41,7 +41,7 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         interval.tick().await;
         let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         if let Err(e) = config::utils::asynchronism::file::clean_empty_dirs(
-            &CONFIG.common.data_wal_dir,
+            &CONFIG.read().await.common.data_wal_dir,
             Some(last_updated),
         )
         .await

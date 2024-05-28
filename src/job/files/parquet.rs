@@ -70,11 +70,12 @@ use crate::{
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    let config = CONFIG.read().await;
     let (tx, rx) =
-        tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(CONFIG.limit.file_move_thread_num);
+        tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(config.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // move files
-    for thread_id in 0..CONFIG.limit.file_move_thread_num {
+    for thread_id in 0..config.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
             loop {
@@ -98,7 +99,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // prepare files
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
+    let mut interval = time::interval(time::Duration::from_secs(config.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {
         if cluster::is_offline() {
@@ -123,14 +124,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
+    let config = CONFIG.read().await;
     let start = std::time::Instant::now();
-    let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
+    let wal_dir = Path::new(&config.common.data_wal_dir)
         .canonicalize()
         .unwrap();
 
     let pattern = wal_dir.join("files/");
     let files =
-        scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit)).unwrap_or_default();
+        scan_files(&pattern, "parquet", Some(config.limit.file_push_limit)).unwrap_or_default();
     if files.is_empty() {
         return Ok(FxIndexMap::default());
     }
@@ -220,7 +222,8 @@ async fn move_files(
 
     // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
 
-    let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
+    let config = CONFIG.read().await;
+    let wal_dir = Path::new(&config.common.data_wal_dir)
         .canonicalize()
         .unwrap();
 
@@ -289,16 +292,16 @@ async fn move_files(
         .sum::<i64>();
     if total_original_size
         < std::cmp::min(
-            CONFIG.limit.max_file_size_on_disk as i64,
-            CONFIG.compact.max_file_size as i64,
+            config.limit.max_file_size_on_disk as i64,
+            config.compact.max_file_size as i64,
         )
-        && (CONFIG.limit.file_move_fields_limit == 0
-            || group_schema_field_num < CONFIG.limit.file_move_fields_limit)
+        && (config.limit.file_move_fields_limit == 0
+            || group_schema_field_num < config.limit.file_move_fields_limit)
     {
         let mut has_expired_files = false;
         // not enough files to upload, check if some files are too old
         let min_ts = Utc::now().timestamp_micros()
-            - Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+            - Duration::try_seconds(config.limit.max_file_retention_time as i64)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
@@ -445,6 +448,7 @@ async fn merge_files(
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
 
+    let config = CONFIG.read().await;
     let mut new_file_size: i64 = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
@@ -454,9 +458,9 @@ async fn merge_files(
 
     for file in files_with_size.iter() {
         if new_file_size > 0
-            && ((new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64)
-                || (CONFIG.limit.file_move_fields_limit > 0
-                    && group_schema_field_num > CONFIG.limit.file_move_fields_limit))
+            && ((new_file_size + file.meta.original_size > config.compact.max_file_size as i64)
+                || (config.limit.file_move_fields_limit > 0
+                    && group_schema_field_num > config.limit.file_move_fields_limit))
         {
             break;
         }
@@ -617,7 +621,7 @@ async fn merge_files(
     let buf = Bytes::from(buf);
     match storage::put(&new_file_key, buf).await {
         Ok(_) => {
-            if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
+            if config.common.inverted_index_enabled && stream_type != StreamType::Index {
                 generate_index_on_ingester(
                     inverted_idx_batches,
                     new_file_key.clone(),
@@ -680,7 +684,7 @@ pub(crate) async fn generate_index_on_ingester(
     let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     for record_val in recs {
         let timestamp: i64 = record_val
-            .get(&CONFIG.common.column_timestamp)
+            .get(&CONFIG.read().await.common.column_timestamp)
             .unwrap()
             .as_i64()
             .unwrap();
@@ -782,6 +786,7 @@ async fn prepare_index_record_batches(
         return Ok(vec![]);
     }
 
+    let config = CONFIG.read().await;
     // filter null columns
     let schema = batches.first().unwrap().schema();
     let batches = batches.iter().collect::<Vec<_>>();
@@ -796,7 +801,7 @@ async fn prepare_index_record_batches(
     }
     let schema = new_batch.schema();
     if schema.fields().is_empty()
-        || (schema.fields().len() == 1 && schema.field(0).name() == &CONFIG.common.column_timestamp)
+        || (schema.fields().len() == 1 && schema.field(0).name() == &config.common.column_timestamp)
     {
         return Ok(vec![]);
     }
@@ -816,7 +821,7 @@ async fn prepare_index_record_batches(
         let index_df = ctx.table("_tbl_raw_data").await?;
 
         let column_name = column.name();
-        let split_chars = &CONFIG.common.inverted_index_split_chars;
+        let split_chars = &config.common.inverted_index_split_chars;
         let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
         let lower_case_expr = lower(concat(vec![col(column_name), lit("")]));
         let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);

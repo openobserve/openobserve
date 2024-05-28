@@ -45,10 +45,11 @@ pub async fn validator(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let config = CONFIG.read().await;
     let path = match req
         .request()
         .path()
-        .strip_prefix(format!("{}{}", CONFIG.common.base_uri, path_prefix).as_str())
+        .strip_prefix(format!("{}{}", config.common.base_uri, path_prefix).as_str())
     {
         Some(path) => path,
         None => req.request().path(),
@@ -244,10 +245,11 @@ pub async fn validator_aws(
     req: ServiceRequest,
     _credentials: Option<BasicAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let config = CONFIG.read().await;
     let path = req
         .request()
         .path()
-        .strip_prefix(format!("{}/aws/", CONFIG.common.base_uri).as_str())
+        .strip_prefix(format!("{}/aws/", config.common.base_uri).as_str())
         .unwrap_or(req.request().path());
 
     match req.headers().get("X-Amz-Firehose-Access-Key") {
@@ -288,10 +290,11 @@ pub async fn validator_gcp(
     req: ServiceRequest,
     _credentials: Option<BasicAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let config = CONFIG.read().await;
     let path = req
         .request()
         .path()
-        .strip_prefix(format!("{}/gcp/", CONFIG.common.base_uri).as_str())
+        .strip_prefix(format!("{}/gcp/", config.common.base_uri).as_str())
         .unwrap_or(req.request().path());
 
     let query =
@@ -332,7 +335,7 @@ pub async fn validator_rum(
     let path = req
         .request()
         .path()
-        .strip_prefix(format!("{}/rum/v1/", CONFIG.common.base_uri).as_str())
+        .strip_prefix(format!("{}/rum/v1/", CONFIG.read().await.common.base_uri).as_str())
         .unwrap_or(req.request().path());
 
     // After this previous path clean we should get only the

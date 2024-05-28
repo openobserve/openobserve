@@ -115,7 +115,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     if app.subcommand().is_none() {
         return Ok(false);
     }
-
+    let config = CONFIG.read().await;
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -142,13 +142,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 "root" => {
                     let _ = users::update_user(
                         meta::organization::DEFAULT_ORG,
-                        CONFIG.auth.root_user_email.as_str(),
+                        config.auth.root_user_email.as_str(),
                         false,
-                        CONFIG.auth.root_user_email.as_str(),
+                        config.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,
                             old_password: None,
-                            new_password: Some(CONFIG.auth.root_user_password.clone()),
+                            new_password: Some(config.auth.root_user_password.clone()),
                             role: Some(meta::user::UserRole::Root),
                             first_name: Some("root".to_owned()),
                             last_name: Some("".to_owned()),

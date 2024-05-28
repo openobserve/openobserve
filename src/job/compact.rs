@@ -35,14 +35,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    if !CONFIG.compact.enabled {
+    let config = CONFIG.read().await;
+    if !config.compact.enabled {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(CONFIG.limit.file_move_thread_num);
+    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(config.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
-    for thread_id in 0..CONFIG.limit.file_move_thread_num {
+    for thread_id in 0..config.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
             loop {
@@ -100,7 +101,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.read().await.compact.interval,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -117,7 +120,9 @@ async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), an
 
 /// Deletion for data retention
 async fn run_retention() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval + 1));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.read().await.compact.interval + 1,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -134,7 +139,9 @@ async fn run_retention() -> Result<(), anyhow::Error> {
 
 /// Delete files based on the file_file_deleted in the database
 async fn run_delay_deletion() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval + 2));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.read().await.compact.interval + 2,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -151,7 +158,7 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
 
 async fn run_sync_to_db() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.compact.sync_to_db_interval,
+        CONFIG.read().await.compact.sync_to_db_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {

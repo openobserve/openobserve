@@ -25,11 +25,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    let config = CONFIG.read().await;
     log::info!(
         "Spawning embedded report server {}",
-        CONFIG.report_server.enable_report_server
+        config.report_server.enable_report_server
     );
-    if CONFIG.report_server.enable_report_server {
+    if config.report_server.enable_report_server {
         tokio::task::spawn(async move {
             if let Err(e) = reportserver::spawn_server().await {
                 log::error!("report server failed to spawn {}", e);
@@ -77,7 +78,7 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 
 async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.scheduler_clean_interval,
+        CONFIG.read().await.limit.scheduler_clean_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
@@ -90,7 +91,7 @@ async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
 
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.scheduler_watch_interval,
+        CONFIG.read().await.limit.scheduler_watch_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {

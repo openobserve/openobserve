@@ -46,7 +46,10 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
             }
         }
         // after the node is online, keepalive
-        let ttl_keep_alive = min(10, (CONFIG.limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = min(
+            10,
+            (CONFIG.read().await.limit.node_heartbeat_ttl / 2) as u64,
+        );
         loop {
             time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -72,8 +75,9 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 
 /// Register to cluster
 async fn register() -> Result<()> {
+    let config = CONFIG.read().await;
     // 1. create a cluster lock for node register
-    let locker = dist_lock::lock("/nodes/register", CONFIG.limit.node_heartbeat_ttl as u64).await?;
+    let locker = dist_lock::lock("/nodes/register", config.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });
@@ -125,11 +129,11 @@ async fn register() -> Result<()> {
     let node = Node {
         id: new_node_id,
         uuid: LOCAL_NODE_UUID.clone(),
-        name: CONFIG.common.instance_name.clone(),
-        http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
-        grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), CONFIG.grpc.port),
+        name: config.common.instance_name.clone(),
+        http_addr: format!("http://{}:{}", get_local_http_ip(), config.http.port),
+        grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), config.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
-        cpu_num: CONFIG.limit.cpu_num as u64,
+        cpu_num: config.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
@@ -172,6 +176,7 @@ pub(crate) async fn set_offline() -> Result<()> {
 
 /// set online to cluster
 pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
+    let config = CONFIG.read().await;
     // set node status to online
     let node = match super::NODES.read().await.get(LOCAL_NODE_UUID.as_str()) {
         Some(node) => {
@@ -182,11 +187,11 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
         None => Node {
             id: unsafe { LOCAL_NODE_ID },
             uuid: LOCAL_NODE_UUID.clone(),
-            name: CONFIG.common.instance_name.clone(),
-            http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
-            grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
+            name: config.common.instance_name.clone(),
+            http_addr: format!("http://{}:{}", get_local_node_ip(), config.http.port),
+            grpc_addr: format!("http://{}:{}", get_local_node_ip(), config.grpc.port),
             role: LOCAL_NODE_ROLE.clone(),
-            cpu_num: CONFIG.limit.cpu_num as u64,
+            cpu_num: config.limit.cpu_num as u64,
             status: status.clone(),
             scheduled: true,
             broadcasted: false,

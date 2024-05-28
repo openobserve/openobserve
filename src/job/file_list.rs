@@ -30,7 +30,8 @@ use crate::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode || CONFIG.common.meta_store_external {
+    let config = CONFIG.read().await;
+    if config.common.local_mode || config.common.meta_store_external {
         return Ok(());
     }
 
@@ -45,7 +46,9 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.read().await.limit.file_push_interval,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -57,11 +60,12 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
 
 // upload compressed file_list to storage & delete moved files from local
 pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow::Error> {
-    let data_dir = Path::new(&CONFIG.common.data_wal_dir)
+    let config = CONFIG.read().await;
+    let data_dir = Path::new(&config.common.data_wal_dir)
         .canonicalize()
         .unwrap();
 
-    let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}file_list/", &config.common.data_wal_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
 
     for file in files {

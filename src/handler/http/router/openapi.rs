@@ -246,8 +246,9 @@ pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        if !CONFIG.common.base_uri.is_empty() {
-            openapi.servers = Some(vec![utoipa::openapi::Server::new(&CONFIG.common.base_uri)]);
+        let config = CONFIG.blocking_read();
+        if !config.common.base_uri.is_empty() {
+            openapi.servers = Some(vec![utoipa::openapi::Server::new(&config.common.base_uri)]);
         }
         let components = openapi.components.as_mut().unwrap();
         components.add_security_scheme(

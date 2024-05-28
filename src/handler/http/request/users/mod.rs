@@ -275,6 +275,7 @@ pub async fn authentication(
         }
     };
     if resp.status {
+        let config = CONFIG.read().await;
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
@@ -287,12 +288,12 @@ pub async fn authentication(
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                + cookie::time::Duration::seconds(config.auth.cookie_max_age),
         );
         auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+        auth_cookie.set_secure(config.auth.cookie_secure_only);
         auth_cookie.set_path("/");
-        if CONFIG.auth.cookie_same_site_lax {
+        if config.auth.cookie_same_site_lax {
             auth_cookie.set_same_site(cookie::SameSite::Lax);
         } else {
             auth_cookie.set_same_site(cookie::SameSite::None);

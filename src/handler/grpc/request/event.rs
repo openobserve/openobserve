@@ -57,11 +57,11 @@ impl Event for Eventer {
             .filter(|v| v.deleted)
             .map(|v| v.key.clone())
             .collect::<Vec<_>>();
-
+        let config = CONFIG.read().await;
         // Warning: external meta store should not accept any file list
         // querier and compactor can accept add new files
         // ingester only accept remove old files
-        if !CONFIG.common.meta_store_external {
+        if !config.common.meta_store_external {
             if is_querier(&LOCAL_NODE_ROLE) || is_compactor(&LOCAL_NODE_ROLE) {
                 if let Err(e) = infra_file_list::batch_add(&put_items).await {
                     // metrics
@@ -89,7 +89,7 @@ impl Event for Eventer {
         }
 
         // cache latest files for querier
-        if CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
+        if config.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
             let mut cached_field_stream = HashSet::new();
             for item in put_items.iter() {
                 let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
@@ -138,7 +138,7 @@ async fn cache_latest_fields(stream: &str, file: &str) -> Result<(), anyhow::Err
     drop(fr);
 
     if field_cache_time
-        + Duration::try_seconds(CONFIG.limit.quick_mode_file_list_interval)
+        + Duration::try_seconds(CONFIG.read().await.limit.quick_mode_file_list_interval)
             .unwrap()
             .num_microseconds()
             .unwrap()

@@ -147,7 +147,7 @@ impl Default for Manager {
 
 impl Manager {
     pub fn new() -> Manager {
-        let size = CONFIG.limit.cpu_num;
+        let size = CONFIG.blocking_read().limit.cpu_num;
         let mut data = Vec::with_capacity(size);
         for _ in 0..size {
             data.push(RwLock::new(HashMap::<String, Arc<RwFile>>::default()));
@@ -178,7 +178,7 @@ impl Manager {
         drop(manager);
 
         // check size & ttl
-        if file.size().await >= (CONFIG.limit.max_file_size_on_disk as i64)
+        if file.size().await >= (CONFIG.read().await.limit.max_file_size_on_disk as i64)
             || file.expired() <= Utc::now().timestamp()
         {
             let mut manager = locker.write().await;
@@ -258,16 +258,16 @@ impl RwFile {
         schema: Option<Schema>,
     ) -> RwFile {
         let use_arrow = schema.is_some();
-
+        let config = CONFIG.read().await;
         let mut dir_path = if use_arrow {
             format!(
                 "{}files/{}/{}/{}/",
-                &CONFIG.common.data_idx_dir, stream.org_id, stream.stream_type, stream.stream_name
+                &config.common.data_idx_dir, stream.org_id, stream.stream_type, stream.stream_name
             )
         } else {
             format!(
                 "{}files/{}/{}/{}/",
-                &CONFIG.common.data_wal_dir, stream.org_id, stream.stream_type, stream.stream_name
+                &config.common.data_wal_dir, stream.org_id, stream.stream_type, stream.stream_name
             )
         };
         // Hack for file_list
@@ -308,7 +308,7 @@ impl RwFile {
 
         let time_now: DateTime<Utc> = Utc::now();
         let level_duration = partition_time_level.unwrap_or_default().duration();
-        let ttl = if !CONFIG.limit.ignore_file_retention_by_stream && level_duration > 0 {
+        let ttl = if !config.limit.ignore_file_retention_by_stream && level_duration > 0 {
             let time_end_day = Utc
                 .with_ymd_and_hms(
                     time_now.year(),
@@ -324,12 +324,12 @@ impl RwFile {
             if expired > time_end_day {
                 // if the file expired time is tomorrow, it should be deleted at 23:59:59 +
                 // 10min
-                time_end_day + CONFIG.limit.max_file_retention_time as i64
+                time_end_day + config.limit.max_file_retention_time as i64
             } else {
                 expired
             }
         } else {
-            time_now.timestamp() + CONFIG.limit.max_file_retention_time as i64
+            time_now.timestamp() + config.limit.max_file_retention_time as i64
         };
 
         RwFile {

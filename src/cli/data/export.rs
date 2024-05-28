@@ -37,6 +37,7 @@ impl Context for Export {
             Err(_) => return Ok(false),
         };
 
+        let conf = config::CONFIG.read().await;
         let table = c.stream_name;
         let query = search::Query {
             sql: format!("select * from {}", table),
@@ -47,7 +48,7 @@ impl Context for Export {
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
-            sort_by: Some(format!("{} ASC", config::CONFIG.common.column_timestamp)),
+            sort_by: Some(format!("{} ASC", conf.common.column_timestamp)),
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,

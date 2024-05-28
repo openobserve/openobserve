@@ -288,7 +288,7 @@ pub async fn otlp_logs_write(
     let user_email = req.headers().get("user_id").unwrap().to_str().unwrap();
     let in_stream_name = req
         .headers()
-        .get(&CONFIG.grpc.stream_header_key)
+        .get(&CONFIG.read().await.grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");

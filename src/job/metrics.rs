@@ -54,21 +54,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
+    let config = CONFIG.read().await;
     metrics::QUERY_MEMORY_CACHE_LIMIT_BYTES
         .with_label_values(&[])
-        .set(CONFIG.memory_cache.max_size as i64);
+        .set(config.memory_cache.max_size as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
         .with_label_values(&[])
-        .set(CONFIG.disk_cache.max_size as i64);
+        .set(config.disk_cache.max_size as i64);
     Ok(())
 }
 
 async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
-    let data_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
+    let config = CONFIG.read().await;
+    let data_dir = match Path::new(&config.common.data_wal_dir).canonicalize() {
         Ok(path) => path,
         Err(_) => return Ok(()),
     };
-    let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}files/", &config.common.data_wal_dir);
     let files = scan_files(pattern, "parquet", None).unwrap_or_default();
     let mut sizes = HashMap::new();
     for file in files {
@@ -110,7 +112,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         .with_label_values(&[])
         .set(stats.keys_count);
 
-    if CONFIG.common.local_mode {
+    if CONFIG.read().await.common.local_mode {
         metrics::META_NUM_NODES.with_label_values(&["all"]).set(1);
     } else {
         metrics::META_NUM_NODES.reset();

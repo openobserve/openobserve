@@ -30,17 +30,18 @@ impl MetricsService for Ingester {
         &self,
         request: tonic::Request<ExportMetricsServiceRequest>,
     ) -> Result<tonic::Response<ExportMetricsServiceResponse>, tonic::Status> {
+        let config = CONFIG.read().await;
         let metadata = request.metadata().clone();
         let msg = format!(
             "Please specify organization id with header key '{}' ",
-            &CONFIG.grpc.org_header_key
+            &config.grpc.org_header_key
         );
-        if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
+        if !metadata.contains_key(&config.grpc.org_header_key) {
             return Err(Status::invalid_argument(msg));
         }
 
         let in_req = request.into_inner();
-        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        let org_id = metadata.get(&config.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(msg));
         }

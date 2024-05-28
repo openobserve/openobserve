@@ -195,6 +195,7 @@ async fn proxy(
 }
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
+    let config = CONFIG.blocking_read();
     let cors = get_cors();
     cfg.service(status::healthz).service(status::schedulez);
     cfg.service(
@@ -219,7 +220,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         SwaggerUi::new("/swagger/{_:.*}")
             .url(
-                format!("{}/api-doc/openapi.json", CONFIG.common.base_uri),
+                format!("{}/api-doc/openapi.json", config.common.base_uri),
                 openapi::ApiDoc::openapi(),
             )
             .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
@@ -227,13 +228,14 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::redirect("/swagger", "/swagger/"));
     cfg.service(web::redirect("/docs", "/swagger/"));
 
-    if CONFIG.common.ui_enabled {
+    if config.common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
         cfg.service(web::redirect("/web", "./web/"));
         cfg.service(
             web::scope("/web")
                 .wrap_fn(|req, srv| {
-                    let prefix = format!("{}/web/", CONFIG.common.base_uri);
+                    let config = CONFIG.blocking_read();
+                    let prefix = format!("{}/web/", config.common.base_uri);
                     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
 
                     srv.call(req).map(move |res| {
@@ -294,7 +296,7 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
 
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-
+    let config = CONFIG.blocking_read();
     // set server header
     #[cfg(feature = "enterprise")]
     let server = format!(
@@ -302,10 +304,10 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         o2_enterprise::enterprise::common::infra::config::O2_CONFIG
             .super_cluster
             .region,
-        CONFIG.common.instance_name_short
+        config.common.instance_name_short
     );
     #[cfg(not(feature = "enterprise"))]
-    let server = CONFIG.common.instance_name_short.to_string();
+    let server = config.common.instance_name_short.to_string();
 
     cfg.service(
         web::scope("/api")

@@ -29,13 +29,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn _usage_report_stats() -> Result<(), anyhow::Error> {
-    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !CONFIG.common.usage_enabled {
+    let config = CONFIG.read().await;
+    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !config.common.usage_enabled {
         return Ok(());
     }
 
     // should run it every 10 minutes
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.calculate_stats_interval,
+        config.limit.calculate_stats_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
@@ -48,14 +49,15 @@ async fn _usage_report_stats() -> Result<(), anyhow::Error> {
 
 // get stats from file_list to update stream_stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
-    if (CONFIG.common.meta_store_external || !is_querier(&super::cluster::LOCAL_NODE_ROLE))
+    let config = CONFIG.read().await;
+    if (config.common.meta_store_external || !is_querier(&super::cluster::LOCAL_NODE_ROLE))
         && !is_compactor(&super::cluster::LOCAL_NODE_ROLE)
     {
         return Ok(());
     }
 
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.calculate_stats_interval,
+        config.limit.calculate_stats_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
@@ -84,7 +86,7 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
 
     // should run it every minute
     let mut interval = time::interval(time::Duration::from_secs(std::cmp::min(
-        CONFIG.limit.calculate_stats_interval,
+        CONFIG.read().await.limit.calculate_stats_interval,
         60,
     )));
     interval.tick().await; // trigger the first run

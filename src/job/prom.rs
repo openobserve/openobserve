@@ -27,12 +27,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    if !CONFIG.common.metrics_dedup_enabled {
+    let config = CONFIG.read().await;
+    if !config.common.metrics_dedup_enabled {
         return Ok(());
     }
 
     let mut interval = time::interval(Duration::from_secs(
-        CONFIG.limit.metrics_leader_push_interval,
+        config.limit.metrics_leader_push_interval,
     ));
     interval.tick().await; // trigger the first run
 

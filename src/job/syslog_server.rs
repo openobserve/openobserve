@@ -38,10 +38,11 @@ pub static BROADCASTER: Lazy<RwLock<broadcast::Sender<bool>>> = Lazy::new(|| {
 });
 
 pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
+    let config = CONFIG.read().await;
     let server_running = *SYSLOG_ENABLED.read();
     let bind_addr = "0.0.0.0";
-    let tcp_addr: SocketAddr = format!("{bind_addr}:{}", CONFIG.tcp.tcp_port).parse()?;
-    let udp_addr: SocketAddr = format!("{bind_addr}:{}", CONFIG.tcp.udp_port).parse()?;
+    let tcp_addr: SocketAddr = format!("{bind_addr}:{}", config.tcp.tcp_port).parse()?;
+    let udp_addr: SocketAddr = format!("{bind_addr}:{}", config.tcp.udp_port).parse()?;
     if (!server_running || is_init) && start_srv {
         log::info!("Starting TCP UDP server");
         let tcp_listener: TcpListener = TcpListener::bind(tcp_addr).await?;

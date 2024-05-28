@@ -216,60 +216,62 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
 
+    let config = CONFIG.read().await;
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
         commit_hash: COMMIT_HASH.to_string(),
         build_date: BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
-        telemetry_enabled: CONFIG.common.telemetry_enabled,
+        telemetry_enabled: config.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect(),
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
-        sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,
-        timestamp_column: CONFIG.common.column_timestamp.clone(),
+        sql_base64_enabled: config.common.ui_sql_base64_enabled,
+        timestamp_column: config.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
-        data_retention_days: CONFIG.compact.data_retention_days,
-        restricted_routes_on_empty_data: CONFIG.common.restricted_routes_on_empty_data,
+        data_retention_days: config.compact.data_retention_days,
+        restricted_routes_on_empty_data: config.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
         super_cluster_enabled,
-        query_on_stream_selection: CONFIG.common.query_on_stream_selection,
-        show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
+        query_on_stream_selection: config.common.query_on_stream_selection,
+        show_stream_stats_doc_num: config.common.show_stream_dates_doc_num,
         custom_logo_text,
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
         custom_hide_menus: custom_hide_menus.to_string(),
         rum: Rum {
-            enabled: CONFIG.rum.enabled,
-            client_token: CONFIG.rum.client_token.to_string(),
-            application_id: CONFIG.rum.application_id.to_string(),
-            site: CONFIG.rum.site.to_string(),
-            service: CONFIG.rum.service.to_string(),
-            env: CONFIG.rum.env.to_string(),
-            version: CONFIG.rum.version.to_string(),
-            organization_identifier: CONFIG.rum.organization_identifier.to_string(),
-            api_version: CONFIG.rum.api_version.to_string(),
-            insecure_http: CONFIG.rum.insecure_http,
+            enabled: config.rum.enabled,
+            client_token: config.rum.client_token.to_string(),
+            application_id: config.rum.application_id.to_string(),
+            site: config.rum.site.to_string(),
+            service: config.rum.service.to_string(),
+            env: config.rum.env.to_string(),
+            version: config.rum.version.to_string(),
+            organization_identifier: config.rum.organization_identifier.to_string(),
+            api_version: config.rum.api_version.to_string(),
+            insecure_http: config.rum.insecure_http,
         },
-        meta_org: CONFIG.common.usage_org.to_string(),
-        quick_mode_enabled: CONFIG.limit.quick_mode_enabled,
-        user_defined_schemas_enabled: CONFIG.common.allow_user_defined_schemas,
-        all_fields_name: CONFIG.common.all_fields_name.to_string(),
+        meta_org: config.common.usage_org.to_string(),
+        quick_mode_enabled: config.limit.quick_mode_enabled,
+        user_defined_schemas_enabled: config.common.allow_user_defined_schemas,
+        all_fields_name: config.common.all_fields_name.to_string(),
     }))
 }
 
 #[get("/status")]
 pub async fn cache_status() -> Result<HttpResponse, Error> {
+    let conf = CONFIG.read().await;
     let mut stats: HashMap<&str, json::Value> = HashMap::default();
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
-    stats.insert("LOCAL_NODE_NAME", json::json!(&CONFIG.common.instance_name));
-    stats.insert("LOCAL_NODE_ROLE", json::json!(&CONFIG.common.node_role));
+    stats.insert("LOCAL_NODE_NAME", json::json!(&conf.common.instance_name));
+    stats.insert("LOCAL_NODE_ROLE", json::json!(&conf.common.node_role));
     let nodes = cluster::get_cached_online_nodes().await;
     stats.insert("NODE_LIST", json::json!(nodes));
 
@@ -548,16 +550,17 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         }
     };
 
+    let config = CONFIG.read().await;
     let tokens = json::to_string(&AuthTokens::default()).unwrap();
     let mut auth_cookie = Cookie::new("auth_tokens", tokens);
     auth_cookie.set_expires(
         cookie::time::OffsetDateTime::now_utc()
-            + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+            + cookie::time::Duration::seconds(config.auth.cookie_max_age),
     );
     auth_cookie.set_http_only(true);
-    auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+    auth_cookie.set_secure(config.auth.cookie_secure_only);
     auth_cookie.set_path("/");
-    if CONFIG.auth.cookie_same_site_lax {
+    if config.auth.cookie_same_site_lax {
         auth_cookie.set_same_site(SameSite::Lax);
     } else {
         auth_cookie.set_same_site(SameSite::None);

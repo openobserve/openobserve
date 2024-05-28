@@ -62,10 +62,11 @@ pub async fn save_enrichment_table(
                 / SIZE_IN_MB
         }
     };
-    if content_length > CONFIG.limit.enrichment_table_limit as f64 {
+    let config = CONFIG.read().await;
+    if content_length > config.limit.enrichment_table_limit as f64 {
         return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
-            CONFIG.limit.enrichment_table_limit
+            config.limit.enrichment_table_limit
         )));
     }
     match content_type {
