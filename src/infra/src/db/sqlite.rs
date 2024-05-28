@@ -45,7 +45,7 @@ static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::Sender<Event>>;
 
 fn connect_rw() -> Pool<Sqlite> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let url = format!("{}{}", config.common.data_db_dir, "metadata.sqlite");
     if !config.common.local_mode && std::path::Path::new(&url).exists() {
         std::fs::remove_file(&url).expect("remove file sqlite failed");
@@ -69,7 +69,7 @@ fn connect_rw() -> Pool<Sqlite> {
 }
 
 fn connect_ro() -> Pool<Sqlite> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
 
     let url = format!("{}{}", config.common.data_db_dir, "metadata.sqlite");
     let db_opts = SqliteConnectOptions::from_str(&url)
@@ -112,7 +112,7 @@ impl SqliteDbChannel {
                         break;
                     }
                 };
-                if CONFIG.read().unwrap().common.print_key_event {
+                if CONFIG.read().await.common.print_key_event {
                     log::info!("[SQLITE] watch event: {:?}", event);
                 }
                 for (prefix, tx) in WATCHERS.read().await.iter() {

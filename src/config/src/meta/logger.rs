@@ -33,7 +33,7 @@ pub struct CustomTimeFormat;
 
 impl FormatTime for CustomTimeFormat {
     fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        let config = CONFIG.read().unwrap();
+        let config = CONFIG.blocking_read();
         if config.log.local_time_format.is_empty() {
             write!(w, "{}", Utc::now().to_rfc3339())
         } else {

@@ -40,7 +40,7 @@ pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
 /// ```
 fn default() -> Box<dyn ObjectStore> {
     if is_local_disk_storage() {
-        std::fs::create_dir_all(&CONFIG.read().unwrap().common.data_stream_dir)
+        std::fs::create_dir_all(&CONFIG.blocking_read().common.data_stream_dir)
             .expect("create stream data dir success");
         Box::<local::Local>::default()
     } else {
@@ -49,14 +49,14 @@ fn default() -> Box<dyn ObjectStore> {
 }
 
 fn local_cache() -> Box<dyn ObjectStore> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
 
     std::fs::create_dir_all(&config.common.data_cache_dir).expect("create cache dir success");
     Box::new(local::Local::new(&config.common.data_cache_dir, true))
 }
 
 fn local_wal() -> Box<dyn ObjectStore> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     std::fs::create_dir_all(&config.common.data_wal_dir).expect("create wal dir success");
     Box::new(local::Local::new(&config.common.data_wal_dir, false))
 }
@@ -95,7 +95,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
         .collect::<Vec<_>>();
     let files_stream = futures::stream::iter(files);
     files_stream
-        .for_each_concurrent(CONFIG.read().unwrap().limit.cpu_num, |file| async move {
+        .for_each_concurrent(CONFIG.read().await.limit.cpu_num, |file| async move {
             match DEFAULT.delete(&(file.as_str().into())).await {
                 Ok(_) => {
                     log::debug!("Deleted object: {}", file);
@@ -118,7 +118,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
 }
 
 pub fn format_key(key: &str, with_prefix: bool) -> String {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     if !is_local_disk_storage()
         && with_prefix
         && !config.s3.bucket_prefix.is_empty()

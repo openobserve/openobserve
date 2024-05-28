@@ -31,32 +31,33 @@ pub async fn get_chrome_launch_options() -> &'static BrowserConfig {
 }
 
 async fn init_chrome_launch_options() -> BrowserConfig {
+    let config = CONFIG.read().await;
     let mut browser_config = BrowserConfig::builder()
         .window_size(
-            CONFIG.chrome.chrome_window_width,
-            CONFIG.chrome.chrome_window_height,
+            config.chrome.chrome_window_width,
+            config.chrome.chrome_window_height,
         )
         .viewport(Viewport {
-            width: CONFIG.chrome.chrome_window_width,
-            height: CONFIG.chrome.chrome_window_height,
+            width: config.chrome.chrome_window_width,
+            height: config.chrome.chrome_window_height,
             device_scale_factor: Some(1.0),
             ..Viewport::default()
         });
 
-    if CONFIG.chrome.chrome_with_head {
+    if config.chrome.chrome_with_head {
         browser_config = browser_config.with_head();
     }
 
-    if CONFIG.chrome.chrome_no_sandbox {
+    if config.chrome.chrome_no_sandbox {
         browser_config = browser_config.no_sandbox();
     }
 
-    if !CONFIG.chrome.chrome_path.is_empty() {
-        browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
+    if !config.chrome.chrome_path.is_empty() {
+        browser_config = browser_config.chrome_executable(config.chrome.chrome_path.as_str());
     } else {
         let mut should_download = false;
 
-        if !CONFIG.chrome.chrome_check_default {
+        if !config.chrome.chrome_check_default {
             should_download = true;
         } else {
             // Check if chrome is available on default paths
@@ -70,14 +71,14 @@ async fn init_chrome_launch_options() -> BrowserConfig {
                 should_download = true;
             }
         }
-        if should_download && !CONFIG.chrome.chrome_auto_download {
+        if should_download && !config.chrome.chrome_auto_download {
             should_download = false;
             log::error!("Chrome binary could not be detected");
         }
 
         if should_download {
             // Download known good chrome version
-            let download_path = &CONFIG.chrome.chrome_download_path;
+            let download_path = &config.chrome.chrome_download_path;
             log::info!("fetching chrome at: {download_path}");
             tokio::fs::create_dir_all(download_path).await.unwrap();
             let fetcher = BrowserFetcher::new(
@@ -111,12 +112,13 @@ async fn init_chrome_launch_options() -> BrowserConfig {
 }
 
 pub static SMTP_CLIENT: Lazy<AsyncSmtpTransport<Tokio1Executor>> = Lazy::new(|| {
-    let tls_parameters = TlsParameters::new(CONFIG.smtp.smtp_host.clone()).unwrap();
+    let config = CONFIG.blocking_read();
+    let tls_parameters = TlsParameters::new(config.smtp.smtp_host.clone()).unwrap();
     let mut transport_builder =
-        AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&CONFIG.smtp.smtp_host)
-            .port(CONFIG.smtp.smtp_port);
+        AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp.smtp_host)
+            .port(config.smtp.smtp_port);
 
-    let option = &CONFIG.smtp.smtp_encryption;
+    let option = &config.smtp.smtp_encryption;
     transport_builder = if option == "starttls" {
         transport_builder.tls(Tls::Required(tls_parameters))
     } else if option == "ssltls" {
@@ -125,10 +127,10 @@ pub static SMTP_CLIENT: Lazy<AsyncSmtpTransport<Tokio1Executor>> = Lazy::new(|| 
         transport_builder
     };
 
-    if !CONFIG.smtp.smtp_username.is_empty() && !CONFIG.smtp.smtp_password.is_empty() {
+    if !config.smtp.smtp_username.is_empty() && !config.smtp.smtp_password.is_empty() {
         transport_builder = transport_builder.credentials(Credentials::new(
-            CONFIG.smtp.smtp_username.clone(),
-            CONFIG.smtp.smtp_password.clone(),
+            config.smtp.smtp_username.clone(),
+            config.smtp.smtp_password.clone(),
         ));
     }
     transport_builder.build()
@@ -378,7 +380,8 @@ pub async fn send_email(
 
 pub async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
-    let timeout = std::time::Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
+    let timeout =
+        std::time::Duration::from_secs(CONFIG.read().await.chrome.chrome_sleep_secs.into());
     loop {
         if page
             .find_element("span#dashboardVariablesAndPanelsDataLoaded")

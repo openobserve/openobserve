@@ -31,7 +31,7 @@ use crate::errors::*;
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
 
 fn connect() -> Pool<MySql> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let db_opts = MySqlConnectOptions::from_str(&config.common.meta_mysql_dsn)
         .expect("mysql connect options create failed")
         .disable_statement_logging();
@@ -166,7 +166,7 @@ impl super::Db for MysqlDb {
         let lock_sql = format!(
             "SELECT GET_LOCK('{}', {})",
             lock_key,
-            CONFIG.read().unwrap().limit.meta_transaction_lock_timeout
+            CONFIG.read().await.limit.meta_transaction_lock_timeout
         );
         let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_key);
         let mut lock_tx = lock_pool.begin().await?;

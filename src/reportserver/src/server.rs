@@ -11,22 +11,23 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
 
     log::info!("starting o2 chrome server");
 
-    if CONFIG.report_server.user_email.is_empty() || CONFIG.report_server.user_password.is_empty() {
+    let config = CONFIG.read().await;
+    if config.report_server.user_email.is_empty() || config.report_server.user_password.is_empty() {
         log::error!("Missing ZO_REPORT_USER_EMAIL or ZO_REPORT_USER_PASSWORD env vars");
         return Err(anyhow::anyhow!(
             "Please set ZO_REPORT_USER_EMAIL and ZO_REPORT_USER_PASSWORD to use report server"
         ));
     }
 
-    let haddr: SocketAddr = if CONFIG.report_server.ipv6_enabled {
-        format!("[::]:{}", CONFIG.report_server.port).parse()?
+    let haddr: SocketAddr = if config.report_server.ipv6_enabled {
+        format!("[::]:{}", config.report_server.port).parse()?
     } else {
-        let ip = if !CONFIG.report_server.addr.is_empty() {
-            CONFIG.report_server.addr.clone()
+        let ip = if !config.report_server.addr.is_empty() {
+            config.report_server.addr.clone()
         } else {
             "0.0.0.0".to_string()
         };
-        format!("{}:{}", ip, CONFIG.report_server.port).parse()?
+        format!("{}:{}", ip, config.report_server.port).parse()?
     };
     log::info!("starting Report server at: {}", haddr);
     let server = HttpServer::new(move || {

@@ -51,7 +51,7 @@ pub async fn save(
                     anyhow::anyhow!("Atleast one alert destination email is required"),
                 ));
             }
-            if !CONFIG.smtp.smtp_enabled {
+            if !CONFIG.read().await.smtp.smtp_enabled {
                 return Err((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     anyhow::anyhow!("SMTP not configured"),

@@ -30,10 +30,11 @@ enum LockerStore {
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
 pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
-    if CONFIG.common.local_mode {
+    let config = CONFIG.read().await;
+    if config.common.local_mode {
         return Ok(None);
     }
-    match CONFIG.common.cluster_coordinator.as_str() {
+    match config.common.cluster_coordinator.as_str() {
         "nats" => {
             let mut lock = nats::Locker::new(key);
             lock.lock(wait_ttl).await?;

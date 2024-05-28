@@ -57,7 +57,7 @@ pub async fn init() -> Result<()> {
 }
 
 async fn default() -> Box<dyn Db> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.read().await;
     if !config.common.local_mode
         && (config.common.meta_store == "sled" || config.common.meta_store == "sqlite")
     {
@@ -74,7 +74,7 @@ async fn default() -> Box<dyn Db> {
 }
 
 async fn init_cluster_coordinator() -> Box<dyn Db> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.read().await;
     if config.common.local_mode {
         match config.common.meta_store.as_str().into() {
             MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
@@ -89,7 +89,7 @@ async fn init_cluster_coordinator() -> Box<dyn Db> {
 }
 
 async fn init_super_cluster() -> Box<dyn Db> {
-    if CONFIG.read().unwrap().common.local_mode {
+    if CONFIG.read().await.common.local_mode {
         panic!("super cluster is not supported in local mode");
     }
     Box::new(nats::NatsDb::super_cluster())
@@ -97,7 +97,7 @@ async fn init_super_cluster() -> Box<dyn Db> {
 
 pub async fn create_table() -> Result<()> {
     // check db dir
-    std::fs::create_dir_all(&CONFIG.read().unwrap().common.data_db_dir)?;
+    std::fs::create_dir_all(&CONFIG.read().await.common.data_db_dir)?;
     // create for meta store
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator.create_table().await?;

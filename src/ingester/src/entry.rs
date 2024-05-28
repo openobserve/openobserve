@@ -132,23 +132,24 @@ impl RecordBatchEntry {
         data_json_size: usize,
         data_arrow_size: usize,
     ) -> Arc<RecordBatchEntry> {
-        let (min_ts, max_ts) = match data.column_by_name(&CONFIG.common.column_timestamp) {
-            None => (0, 0),
-            Some(v) => {
-                let v = v.as_any().downcast_ref::<Int64Array>().unwrap();
-                let mut min_v = v.value(0);
-                let mut max_v = v.value(0);
-                for v in v.values() {
-                    if &min_v > v {
-                        min_v = *v;
+        let (min_ts, max_ts) =
+            match data.column_by_name(&CONFIG.blocking_read().common.column_timestamp) {
+                None => (0, 0),
+                Some(v) => {
+                    let v = v.as_any().downcast_ref::<Int64Array>().unwrap();
+                    let mut min_v = v.value(0);
+                    let mut max_v = v.value(0);
+                    for v in v.values() {
+                        if &min_v > v {
+                            min_v = *v;
+                        }
+                        if &max_v < v {
+                            max_v = *v;
+                        }
                     }
-                    if &max_v < v {
-                        max_v = *v;
-                    }
+                    (min_v, max_v)
                 }
-                (min_v, max_v)
-            }
-        };
+            };
         Arc::new(Self {
             data,
             data_json_size,

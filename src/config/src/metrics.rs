@@ -682,7 +682,7 @@ fn register_metrics(registry: &Registry) {
 }
 
 fn create_const_labels() -> HashMap<String, String> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let mut labels = HashMap::new();
     labels.insert("cluster".to_string(), config.common.cluster_name.clone());
     labels.insert("instance".to_string(), config.common.instance_name.clone());
@@ -695,7 +695,7 @@ pub fn create_prometheus_handler() -> PrometheusMetrics {
     register_metrics(&registry);
 
     PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", CONFIG.read().unwrap().common.base_uri).as_str())
+        .endpoint(format!("{}/metrics", CONFIG.blocking_read().common.base_uri).as_str())
         .const_labels(create_const_labels())
         .registry(registry)
         .build()

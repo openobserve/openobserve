@@ -46,19 +46,20 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), anyhow::Error> {
-    if CONFIG.common.report_server_url.is_empty() {
+    let config = CONFIG.read().await;
+    if config.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
-        if !CONFIG.smtp.smtp_enabled {
+        if !config.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
         // Check if Chrome is enabled, otherwise don't save the report
-        if !CONFIG.chrome.chrome_enabled || CONFIG.chrome.chrome_path.is_empty() {
+        if !config.chrome.chrome_enabled || config.chrome.chrome_path.is_empty() {
             return Err(anyhow::anyhow!("Chrome not enabled"));
         }
 
-        if CONFIG.common.report_user_name.is_empty()
-            || CONFIG.common.report_user_password.is_empty()
+        if config.common.report_user_name.is_empty()
+            || config.common.report_user_password.is_empty()
         {
             return Err(anyhow::anyhow!("Report username and password ENVs not set"));
         }
@@ -240,7 +241,8 @@ impl Report {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
 
-        if !CONFIG.common.report_server_url.is_empty() {
+        let config = CONFIG.read().await;
+        if !config.common.report_server_url.is_empty() {
             let mut recepients = vec![];
             for recepient in &self.destinations {
                 match recepient {
@@ -255,17 +257,17 @@ impl Report {
                     recepients,
                     name: self.name.clone(),
                     message: self.message.clone(),
-                    dashb_url: format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri),
+                    dashb_url: format!("{}{}/web", config.common.web_url, config.common.base_uri),
                 },
             };
 
             let url = url::Url::parse(&format!(
                 "{}/{}/reports/{}/send",
-                &CONFIG.common.report_server_url, &self.org_id, &self.name
+                &config.common.report_server_url, &self.org_id, &self.name
             ))
             .unwrap();
             match Client::builder()
-                .danger_accept_invalid_certs(CONFIG.common.report_server_skip_tls_verify)
+                .danger_accept_invalid_certs(config.common.report_server_skip_tls_verify)
                 .build()
                 .unwrap()
                 .put(url)
@@ -295,8 +297,8 @@ impl Report {
             let report = generate_report(
                 dashboard,
                 &self.org_id,
-                &CONFIG.common.report_user_name,
-                &CONFIG.common.report_user_password,
+                &config.common.report_user_name,
+                &config.common.report_user_password,
                 &self.timezone,
             )
             .await?;
@@ -306,7 +308,8 @@ impl Report {
 
     /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
     async fn send_email(&self, pdf_data: &[u8], dashb_url: String) -> Result<(), anyhow::Error> {
-        if !CONFIG.smtp.smtp_enabled {
+        let config = CONFIG.read().await;
+        if !config.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
@@ -318,15 +321,15 @@ impl Report {
         }
 
         let mut email = Message::builder()
-            .from(CONFIG.smtp.smtp_from_email.parse()?)
+            .from(config.smtp.smtp_from_email.parse()?)
             .subject(format!("Openobserve Report - {}", &self.title));
 
         for recepient in recepients {
             email = email.to(recepient.parse()?);
         }
 
-        if !CONFIG.smtp.smtp_reply_to.is_empty() {
-            email = email.reply_to(CONFIG.smtp.smtp_reply_to.parse()?);
+        if !config.smtp.smtp_reply_to.is_empty() {
+            email = email.reply_to(config.smtp.smtp_reply_to.parse()?);
         }
 
         let email = email
@@ -364,8 +367,9 @@ async fn generate_report(
     user_pass: &str,
     timezone: &str,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
+    let config = CONFIG.read().await;
     // Check if Chrome is enabled, otherwise don't save the report
-    if !CONFIG.chrome.chrome_enabled {
+    if !config.chrome.chrome_enabled {
         return Err(anyhow::anyhow!("Chrome not enabled"));
     }
 
@@ -396,7 +400,7 @@ async fn generate_report(
         }
     });
 
-    let web_url = format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri);
+    let web_url = format!("{}{}/web", config.common.web_url, config.common.base_uri);
     log::debug!("Navigating to web url: {}", &web_url);
     let page = browser
         .new_page(&format!("{web_url}/login?login_as_internal_user=true"))
@@ -548,7 +552,7 @@ async fn generate_report(
 
 async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
-    let timeout = Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
+    let timeout = Duration::from_secs(CONFIG.read().await.chrome.chrome_sleep_secs.into());
     log::info!("waiting for headless data to load");
     loop {
         if page

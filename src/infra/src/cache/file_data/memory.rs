@@ -31,15 +31,17 @@ use super::CacheStrategy;
 use crate::storage;
 
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
-    let mut files = Vec::with_capacity(CONFIG.memory_cache.bucket_num);
-    for _ in 0..CONFIG.memory_cache.bucket_num {
+    let config = CONFIG.blocking_read();
+    let mut files = Vec::with_capacity(config.memory_cache.bucket_num);
+    for _ in 0..config.memory_cache.bucket_num {
         files.push(RwLock::new(FileData::new()));
     }
     files
 });
 static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
-    let mut datas = Vec::with_capacity(CONFIG.memory_cache.bucket_num);
-    for _ in 0..CONFIG.memory_cache.bucket_num {
+    let config = CONFIG.blocking_read();
+    let mut datas = Vec::with_capacity(config.memory_cache.bucket_num);
+    for _ in 0..config.memory_cache.bucket_num {
         datas.push(Default::default());
     }
     datas
@@ -59,9 +61,10 @@ impl Default for FileData {
 
 impl FileData {
     pub fn new() -> FileData {
+        let config = CONFIG.blocking_read();
         FileData::with_capacity_and_cache_strategy(
-            CONFIG.memory_cache.max_size,
-            &CONFIG.memory_cache.cache_strategy,
+            config.memory_cache.max_size,
+            &config.memory_cache.cache_strategy,
         )
     }
 
@@ -97,7 +100,10 @@ impl FileData {
             // cache is full, need release some space
             let need_release_size = min(
                 self.max_size,
-                max(CONFIG.memory_cache.release_size, data_size * 100),
+                max(
+                    CONFIG.read().await.memory_cache.release_size,
+                    data_size * 100,
+                ),
             );
             self.gc(trace_id, need_release_size).await?;
         }
@@ -180,16 +186,18 @@ impl FileData {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    let config = CONFIG.read().await;
+
     for file in FILES.iter() {
         _ = file.read().await.get("", None).await;
     }
 
     tokio::task::spawn(async move {
-        if CONFIG.memory_cache.gc_interval == 0 {
+        if config.memory_cache.gc_interval == 0 {
             return;
         }
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::CONFIG.memory_cache.gc_interval,
+            config.memory_cache.gc_interval,
         ));
         interval.tick().await; // the first tick is immediate
         loop {
@@ -204,7 +212,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
 #[inline]
 pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
-    if !CONFIG.memory_cache.enabled {
+    if !CONFIG.read().await.memory_cache.enabled {
         return None;
     }
     let idx = get_bucket_idx(file);
@@ -214,7 +222,7 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
 
 #[inline]
 pub async fn exist(file: &str) -> bool {
-    if !CONFIG.memory_cache.enabled {
+    if !CONFIG.read().await.memory_cache.enabled {
         return false;
     }
     let idx = get_bucket_idx(file);
@@ -224,7 +232,7 @@ pub async fn exist(file: &str) -> bool {
 
 #[inline]
 pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
-    if !CONFIG.memory_cache.enabled {
+    if !CONFIG.read().await.memory_cache.enabled {
         return Ok(());
     }
     let idx = get_bucket_idx(file);
@@ -236,19 +244,20 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
 }
 
 async fn gc() -> Result<(), anyhow::Error> {
-    if !CONFIG.memory_cache.enabled {
+    let config = CONFIG.read().await;
+    if !config.memory_cache.enabled {
         return Ok(());
     }
 
     for file in FILES.iter() {
         let r = file.read().await;
-        if r.cur_size + CONFIG.memory_cache.release_size < r.max_size {
+        if r.cur_size + config.memory_cache.release_size < r.max_size {
             drop(r);
             continue;
         }
         drop(r);
         let mut w = file.write().await;
-        w.gc("global", CONFIG.memory_cache.gc_size).await?;
+        w.gc("global", config.memory_cache.gc_size).await?;
         drop(w);
     }
 
@@ -305,11 +314,12 @@ pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
 }
 
 fn get_bucket_idx(file: &str) -> usize {
-    if CONFIG.memory_cache.bucket_num <= 1 {
+    let config = CONFIG.blocking_read();
+    if config.memory_cache.bucket_num <= 1 {
         0
     } else {
         let h = gxhash::new().sum32(file);
-        (h as usize) % CONFIG.memory_cache.bucket_num
+        (h as usize) % config.memory_cache.bucket_num
     }
 }
 
@@ -335,8 +345,10 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_get_file() {
         let trace_id = "session_123";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(CONFIG.memory_cache.max_size, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            CONFIG.read().await.memory_cache.max_size,
+            "lru",
+        );
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -396,8 +408,10 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
         let trace_id = "session_123";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(CONFIG.memory_cache.max_size, "fifo");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            CONFIG.read().await.memory_cache.max_size,
+            "fifo",
+        );
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 

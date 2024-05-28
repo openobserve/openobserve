@@ -35,11 +35,12 @@ impl LogsService for LogsServer {
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
         let (metadata, extensions, message) = request.into_parts();
 
+        let config = CONFIG.read().await;
         // basic validation
-        if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
+        if !metadata.contains_key(&config.grpc.org_header_key) {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &CONFIG.grpc.org_header_key
+                &config.grpc.org_header_key
             )));
         }
 

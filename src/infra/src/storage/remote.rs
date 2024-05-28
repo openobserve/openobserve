@@ -227,7 +227,7 @@ impl ObjectStore for Remote {
 }
 
 fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let mut opts = object_store::ClientOptions::default()
         .with_connect_timeout(std::time::Duration::from_secs(config.s3.connect_timeout))
         .with_timeout(std::time::Duration::from_secs(config.s3.request_timeout))
@@ -261,7 +261,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
 }
 
 fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzure> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
@@ -280,7 +280,7 @@ fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzu
 }
 
 fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
@@ -296,7 +296,7 @@ fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStora
 }
 
 fn init_client() -> Box<dyn object_store::ObjectStore> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
 
     if config.common.print_key_config {
         log::info!("s3 init config: {:?}", config.s3);

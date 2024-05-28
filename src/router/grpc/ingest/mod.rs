@@ -37,7 +37,9 @@ pub(crate) async fn get_ingester_channel() -> Result<Channel, tonic::Status> {
     // cache miss, connect to ingester
     let channel = Channel::from_shared(grpc_addr.clone())
         .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+        .connect_timeout(std::time::Duration::from_secs(
+            CONFIG.read().await.grpc.connect_timeout,
+        ))
         .connect()
         .await
         .map_err(|err| {
@@ -56,12 +58,13 @@ pub(crate) async fn get_ingester_channel() -> Result<Channel, tonic::Status> {
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
+    let config = CONFIG.read().await;
     let nodes = cluster::get_cached_online_ingester_nodes().await;
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        if !CONFIG.route.ingester_srv_url.is_empty() {
+        if !config.route.ingester_srv_url.is_empty() {
             Ok(format!(
                 "http://{}:{}",
-                CONFIG.route.ingester_srv_url, CONFIG.grpc.port
+                config.route.ingester_srv_url, config.grpc.port
             ))
         } else {
             Err(tonic::Status::internal(

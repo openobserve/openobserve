@@ -31,7 +31,7 @@ use crate::errors::*;
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
 fn connect() -> Pool<Postgres> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let db_opts = PgConnectOptions::from_str(&config.common.meta_postgres_dsn)
         .expect("postgres connect options create failed")
         .disable_statement_logging();

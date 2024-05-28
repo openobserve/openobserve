@@ -152,7 +152,7 @@ impl Metadata for DistinctValues {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
             Field::new(
-                CONFIG.common.column_timestamp.as_str(),
+                CONFIG.blocking_read().common.column_timestamp.as_str(),
                 DataType::Int64,
                 false,
             ),
@@ -222,7 +222,7 @@ impl Metadata for DistinctValues {
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    CONFIG.common.column_timestamp.clone(),
+                    CONFIG.read().await.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_wal_time_key(

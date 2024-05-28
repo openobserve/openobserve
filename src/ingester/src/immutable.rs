@@ -116,7 +116,9 @@ pub(crate) async fn persist() -> Result<()> {
     drop(r);
 
     let mut tasks = Vec::with_capacity(paths.len());
-    let semaphore = Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let semaphore = Arc::new(Semaphore::new(
+        CONFIG.read().await.limit.file_move_thread_num,
+    ));
     for path in paths {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<Option<(PathBuf, PersistStat)>>> =

@@ -36,7 +36,7 @@ pub fn load_local_node_uuid() -> String {
 
 #[inline(always)]
 pub fn get_local_http_ip() -> String {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     if !config.http.addr.is_empty() {
         config.http.addr.clone()
     } else {
@@ -46,7 +46,7 @@ pub fn get_local_http_ip() -> String {
 
 #[inline(always)]
 pub fn get_local_grpc_ip() -> String {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     if !config.grpc.addr.is_empty() {
         config.grpc.addr.clone()
     } else {
@@ -66,7 +66,7 @@ pub fn get_local_node_ip() -> String {
 
 #[inline(always)]
 pub fn load_local_node_role() -> Vec<Role> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     config
         .common
         .node_role

@@ -43,7 +43,7 @@ impl Local {
 
 impl Default for Local {
     fn default() -> Self {
-        Local::new(&CONFIG.common.data_stream_dir, true)
+        Local::new(&CONFIG.blocking_read().common.data_stream_dir, true)
     }
 }
 

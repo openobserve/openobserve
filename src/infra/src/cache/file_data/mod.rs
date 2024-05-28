@@ -18,6 +18,7 @@ pub mod memory;
 
 use std::collections::VecDeque;
 
+use config::CONFIG;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
@@ -102,9 +103,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
-    if config::CONFIG.memory_cache.enabled {
+    let config = CONFIG.read().await;
+    if config.memory_cache.enabled {
         memory::download(trace_id, file).await
-    } else if config::CONFIG.disk_cache.enabled {
+    } else if config.disk_cache.enabled {
         disk::download(trace_id, file).await
     } else {
         Ok(())

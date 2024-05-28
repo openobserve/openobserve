@@ -78,7 +78,8 @@ impl Partition {
         stream_type: &str,
         stream_name: &str,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
-        let base_path = PathBuf::from(&CONFIG.common.data_wal_dir);
+        let config = CONFIG.read().await;
+        let base_path = PathBuf::from(&config.common.data_wal_dir);
         let mut path = base_path.clone();
         path.push("files");
         path.push(org_id);
@@ -110,7 +111,7 @@ impl Partition {
             };
             // write into parquet buf
             let (bloom_filter_fields, full_text_search_fields) =
-                if self.schema.fields().len() > CONFIG.limit.file_move_fields_limit {
+                if self.schema.fields().len() > config.limit.file_move_fields_limit {
                     let bloom_filter_fields =
                         infra::schema::get_stream_setting_bloom_filter_fields(self.schema.as_ref())
                             .unwrap();

@@ -48,8 +48,9 @@ use crate::{errors::*, immutable, memtable, writer::WriterKey};
 // 4. the process is killed before step 5, so there are some .parquet files and have lock file, the
 //    files actually wrote to disk completely, need to continue step 5
 pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
+    let config = CONFIG.read().await;
     // 1. get all .lock files
-    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
+    let wal_dir = PathBuf::from(&config.common.data_wal_dir).join("logs");
     // create wal dir if not exists
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
@@ -90,7 +91,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     }
 
     // 4. delete all the .par files
-    let parquet_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("files");
+    let parquet_dir = PathBuf::from(&config.common.data_wal_dir).join("files");
     // create wal dir if not exists
     create_dir_all(&parquet_dir).context(OpenDirSnafu {
         path: parquet_dir.clone(),
@@ -105,7 +106,8 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 
 // replay wal files to create immutable
 pub(crate) async fn replay_wal_files() -> Result<()> {
-    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
+    let config = CONFIG.read().await;
+    let wal_dir = PathBuf::from(&config.common.data_wal_dir).join("logs");
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;

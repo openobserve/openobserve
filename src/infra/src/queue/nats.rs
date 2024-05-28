@@ -47,16 +47,14 @@ impl NatsQueue {
 
 impl Default for NatsQueue {
     fn default() -> Self {
-        Self::new(&CONFIG.read().unwrap().nats.prefix)
+        Self::new(&CONFIG.blocking_read().nats.prefix)
     }
 }
 
 #[async_trait]
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
-        let nats = tokio::task::spawn_blocking(|| CONFIG.read().unwrap().nats)
-            .await
-            .unwrap();
+        let config = CONFIG.read().await;
         let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         let topic_name = format!("{}{}", self.prefix, topic);
@@ -64,8 +62,8 @@ impl super::Queue for NatsQueue {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
             retention: jetstream::stream::RetentionPolicy::Limits,
-            max_age: Duration::from_secs(60 * 60 * 24 * max(1, nats.queue_max_age)),
-            num_replicas: nats.replicas,
+            max_age: Duration::from_secs(60 * 60 * 24 * max(1, config.nats.queue_max_age)),
+            num_replicas: config.nats.replicas,
             ..Default::default()
         };
         _ = jetstream.get_or_create_stream(config).await?;

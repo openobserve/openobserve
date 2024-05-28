@@ -30,7 +30,7 @@ pub mod sqlite;
 static CLIENT: Lazy<Box<dyn SchemaHistory>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn SchemaHistory> {
-    match CONFIG.read().unwrap().common.meta_store.as_str().into() {
+    match CONFIG.blocking_read().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteSchemaHistory>::default(),

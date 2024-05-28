@@ -224,7 +224,7 @@ impl StreamStats {
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
         let file_push_interval =
-            Duration::try_seconds(CONFIG.read().unwrap().limit.file_push_interval as _)
+            Duration::try_seconds(CONFIG.blocking_read().limit.file_push_interval as _)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();

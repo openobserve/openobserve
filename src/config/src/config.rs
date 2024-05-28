@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::max,
-    collections::BTreeMap,
-    path::Path,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
@@ -35,6 +29,7 @@ use lettre::{
 };
 use once_cell::sync::Lazy;
 use sysinfo::{DiskExt, SystemExt};
+use tokio::sync::RwLock;
 
 use crate::{
     meta::cluster,
@@ -76,8 +71,7 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             .iter()
             .map(|s| s.to_string()),
         CONFIG
-            .read()
-            .unwrap()
+            .blocking_read()
             .common
             .feature_fulltext_extra_fields
             .split(',')
@@ -98,8 +92,7 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = CONFIG
-        .read()
-        .unwrap()
+        .blocking_read()
         .common
         .feature_quick_mode_fields
         .split(',')
@@ -122,8 +115,7 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
         CONFIG
-            .read()
-            .unwrap()
+            .blocking_read()
             .common
             .feature_distinct_extra_fields
             .split(',')
@@ -147,8 +139,7 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
         CONFIG
-            .read()
-            .unwrap()
+            .blocking_read()
             .common
             .bloom_filter_default_fields
             .split(',')
@@ -176,14 +167,12 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
             .connect_timeout(Duration::new(10, 0))
             .build()
             .unwrap(),
-        CONFIG.read().unwrap().common.telemetry_url.clone(),
+        CONFIG.blocking_read().common.telemetry_url.clone(),
     )
 });
 
-pub fn refresh_config() -> Result<(), anyhow::Error> {
-    let mut config = CONFIG
-        .write()
-        .map_err(|e| anyhow::anyhow!("Failed to lock config to update, please retry: {}", e))?;
+pub async fn refresh_config() -> Result<(), anyhow::Error> {
+    let mut config = CONFIG.write().await;
     *config = init();
     Ok(())
 }
@@ -198,7 +187,7 @@ pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.read().await;
     if !config.chrome.chrome_enabled || !config.common.report_server_url.is_empty() {
         None
     } else {
@@ -232,7 +221,7 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
 }
 
 pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy::new(|| {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     if !config.smtp.smtp_enabled {
         None
     } else {
@@ -261,7 +250,7 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
 });
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     let blocked_streams = config
         .common
         .blocked_streams
@@ -1480,13 +1469,13 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 #[inline]
 pub fn is_local_disk_storage() -> bool {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
     config.common.local_mode && config.common.local_mode_storage.eq("disk")
 }
 
 #[inline]
 pub fn get_cluster_name() -> String {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
 
     if !config.common.cluster_name.is_empty() {
         config.common.cluster_name.to_string()

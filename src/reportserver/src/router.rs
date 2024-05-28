@@ -65,11 +65,13 @@ pub async fn send_report(
         Some(v) => v,
         None => "Europe/London",
     };
+
+    let config = CONFIG.read().await;
     let (pdf_data, email_dashboard_url) = match generate_report(
         &report.dashboards[0],
         &org_id,
-        &CONFIG.report_server.user_email,
-        &CONFIG.report_server.user_password,
+        &config.report_server.user_email,
+        &config.report_server.user_password,
         &report.email_details.dashb_url,
         timezone,
     )
@@ -83,6 +85,7 @@ pub async fn send_report(
         }
     };
 
+    let config = CONFIG.read().await;
     match send_email(
         &pdf_data,
         models::EmailDetails {
@@ -90,8 +93,8 @@ pub async fn send_report(
             ..report.email_details
         },
         models::SmtpConfig {
-            from_email: CONFIG.smtp.smtp_from_email.to_string(),
-            reply_to: CONFIG.smtp.smtp_reply_to.to_string(),
+            from_email: config.smtp.smtp_from_email.to_string(),
+            reply_to: config.smtp.smtp_reply_to.to_string(),
             client: &SMTP_CLIENT,
         },
     )

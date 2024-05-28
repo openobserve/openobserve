@@ -308,7 +308,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
     type Error = anyhow::Error;
 
     fn try_from(selection: Timerange<'a>) -> Result<Self, Self::Error> {
-        let config = CONFIG.read().unwrap();
+        let config = CONFIG.blocking_read();
         let mut fields = Vec::new();
         match selection.0 {
             Some(expr) => parse_expr_for_field(
@@ -545,7 +545,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     if s == field {
         return true;
     }
-    if field == "*" && s != "_all" && s != CONFIG.read().unwrap().common.column_timestamp.clone() {
+    if field == "*" && s != "_all" && s != CONFIG.blocking_read().common.column_timestamp.clone() {
         return true;
     }
 

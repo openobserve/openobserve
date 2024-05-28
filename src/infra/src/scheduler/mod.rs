@@ -28,7 +28,7 @@ static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
 pub const TRIGGERS_KEY: &str = "/triggers/";
 
 pub fn connect() -> Box<dyn Scheduler> {
-    match CONFIG.common.meta_store.as_str().into() {
+    match CONFIG.blocking_read().common.meta_store.as_str().into() {
         MetaStore::MySQL => Box::<mysql::MySqlScheduler>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresScheduler>::default(),
         _ => Box::<sqlite::SqliteScheduler>::default(),

@@ -33,7 +33,7 @@ pub fn new_parquet_writer<'a>(
     full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
-    let config = CONFIG.read().unwrap();
+    let config = CONFIG.blocking_read();
 
     let row_group_size = if config.limit.parquet_max_row_group_size > 0 {
         config.limit.parquet_max_row_group_size

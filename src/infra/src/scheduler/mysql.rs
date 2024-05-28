@@ -284,7 +284,7 @@ FOR UPDATE;
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
-        .bind(CONFIG.limit.scheduler_max_retries)
+        .bind(CONFIG.read().await.limit.scheduler_max_retries)
         .bind(true)
         .bind(false)
         .bind(concurrency)
@@ -397,7 +397,7 @@ WHERE id IN (?);
         let pool = CLIENT.clone();
         sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
             .bind(TriggerStatus::Completed)
-            .bind(CONFIG.limit.scheduler_max_retries)
+            .bind(CONFIG.read().await.limit.scheduler_max_retries)
             .execute(&pool)
             .await?;
         Ok(())

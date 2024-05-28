@@ -41,9 +41,10 @@ pub async fn init() -> errors::Result<()> {
 
     // start a job to dump immutable data to disk
     tokio::task::spawn(async move {
+        let config = config::CONFIG.read().await;
         // immutable persist every 10 (default) seconds
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::CONFIG.limit.mem_persist_interval,
+            config.limit.mem_persist_interval,
         ));
         interval.tick().await; // the first tick is immediate
         loop {
@@ -59,8 +60,9 @@ pub async fn init() -> errors::Result<()> {
 
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
+        let config = config::CONFIG.read().await;
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::CONFIG.limit.max_file_retention_time,
+            config.limit.max_file_retention_time,
         ));
         interval.tick().await; // the first tick is immediate
         loop {

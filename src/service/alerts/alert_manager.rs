@@ -32,14 +32,15 @@ use crate::{
 
 pub async fn run() -> Result<(), anyhow::Error> {
     log::debug!("Pulling jobs from scheduler");
+    let config = CONFIG.read().await;
     // Scheduler pulls only those triggers that match the conditions-
     // - trigger.next_run_at <= now
     // - !(trigger.is_realtime && !trigger.is_silenced)
     // - trigger.status == "Waiting"
     let triggers = db::scheduler::pull(
-        CONFIG.limit.alert_schedule_concurrency,
-        CONFIG.limit.alert_schedule_timeout,
-        CONFIG.limit.report_schedule_timeout,
+        config.limit.alert_schedule_concurrency,
+        config.limit.alert_schedule_timeout,
+        config.limit.report_schedule_timeout,
     )
     .await?;
 
