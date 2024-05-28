@@ -172,6 +172,7 @@ pub async fn search(
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);
     result.set_partial(is_partial);
+    result.set_histogram_interval(sql.histogram_interval);
     result.set_cluster_took(start.elapsed().as_millis() as usize, 0);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
