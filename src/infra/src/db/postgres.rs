@@ -293,9 +293,14 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
+            let start_dt = if need_watch_dt > 0 {
+                Some(need_watch_dt)
+            } else {
+                start_dt
+            };
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(key, Bytes::from(need_watch_dt.to_string()), true, start_dt)
+                .put(key, Bytes::from(""), true, start_dt)
                 .await?;
         }
 

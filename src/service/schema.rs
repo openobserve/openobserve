@@ -23,7 +23,9 @@ use config::{
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
-use infra::schema::{get_settings, unwrap_stream_settings, SchemaCache};
+use infra::schema::{
+    get_settings, unwrap_stream_settings, SchemaCache, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+};
 use serde_json::{Map, Value};
 
 use crate::{
@@ -38,10 +40,6 @@ pub(crate) fn get_upto_discard_error() -> anyhow::Error {
         "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
         CONFIG.limit.ingest_allowed_upto
     )
-}
-
-pub(crate) fn get_invalid_schema_start_dt() -> anyhow::Error {
-    anyhow::anyhow!("Schema evolution can't use the past _timestamp")
 }
 
 pub(crate) fn get_request_columns_limit_error(
@@ -117,12 +115,22 @@ pub async fn check_for_schema(
             });
         }
         if !field_datatype_delta.is_empty() {
-            // check if the min_ts < current_version_created_at, if yes, discard the data
+            // check if the min_ts < current_version_created_at
             let schema_metadata = schema.schema().metadata();
             if let Some(start_dt) = schema_metadata.get("start_dt") {
                 let created_at = start_dt.parse().unwrap_or_default();
                 if record_ts <= created_at {
-                    return Err(get_invalid_schema_start_dt());
+                    // need create a new version with start_dt = now
+                    _ = handle_diff_schema(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        is_new,
+                        &inferred_schema,
+                        chrono::Utc::now().timestamp_micros(),
+                        stream_schema_map,
+                    )
+                    .await?;
                 }
             }
         }
@@ -259,16 +267,26 @@ async fn handle_diff_schema(
     }
 
     // check defined_schema_fields
-    let stream_setting = get_settings(org_id, stream_name, stream_type).await;
+    let stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
     let defined_schema_fields = stream_setting
-        .and_then(|s| s.defined_schema_fields)
+        .defined_schema_fields
+        .clone()
         .unwrap_or_default();
     let final_schema = SchemaCache::new(final_schema);
     let final_schema =
         generate_schema_for_defined_schema_fields(&final_schema, &defined_schema_fields);
 
     // update thread cache
-    stream_schema_map.insert(stream_name.to_string(), final_schema);
+    stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+
+    // update node cache
+    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.insert(cache_key.clone(), final_schema);
+    drop(w);
+    let mut w = STREAM_SETTINGS.write().await;
+    w.insert(cache_key.clone(), stream_setting);
+    drop(w);
 
     Ok(Some(SchemaEvolution {
         schema_compatible: true,
