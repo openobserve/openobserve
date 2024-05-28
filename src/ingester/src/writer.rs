@@ -25,7 +25,6 @@ use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{metrics, CONFIG};
 use futures::lock::Mutex;
-use log::info;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::RwLock;
@@ -58,9 +57,7 @@ pub struct Writer {
     key: WriterKey,
     wal: Arc<Mutex<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
-    // next_seq: AtomicU64,
-    wal_next_seq: AtomicU64,
-    memtable_next_seq: AtomicU64,
+    next_seq: AtomicU64,
     created_at: AtomicI64,
 }
 
@@ -141,11 +138,8 @@ pub async fn flush_all() -> Result<()> {
 impl Writer {
     pub(crate) fn new(thread_id: usize, key: WriterKey) -> Self {
         let now = Utc::now().timestamp_micros();
-        // let next_seq = AtomicU64::new(now as u64);
-        let wal_next_seq = AtomicU64::new(now as u64);
-        let memtable_next_seq = AtomicU64::new(now as u64);
-        let wal_id = wal_next_seq.fetch_add(1, Ordering::SeqCst);
-        memtable_next_seq.fetch_add(1, Ordering::SeqCst);
+        let next_seq = AtomicU64::new(now as u64);
+        let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
             .join("logs")
             .join(thread_id.to_string());
@@ -170,8 +164,7 @@ impl Writer {
                 .expect("wal file create error"),
             )),
             memtable: Arc::new(RwLock::new(MemTable::new())),
-            wal_next_seq,
-            memtable_next_seq,
+            next_seq,
             created_at: AtomicI64::new(now),
         }
     }
@@ -198,7 +191,7 @@ impl Writer {
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
             // rotation wal
-            let wal_id = self.wal_next_seq.fetch_add(1, Ordering::SeqCst);
+            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
                 .join("logs")
                 .join(self.thread_id.to_string());
@@ -306,13 +299,6 @@ impl Writer {
         }
 
         let sid = entry.session_id.clone();
-        info!(
-            "[{sid}]write_memtable memtable_size: {:?}, entry.data_size: {}, CONFIG.limit.max_file_size_in_memory: {}",
-            self.memtable.read().await.size(),
-            entry.data_size,
-            CONFIG.limit.max_file_size_in_memory,
-        );
-
         if rotate_mem.is_some() {
             let mut mem = self.memtable.write().await;
             let new_mem = MemTable::new();
@@ -357,13 +343,6 @@ impl Writer {
         }
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
-        // info!(
-        //     "[{}]write_wal memtable_size: {:?}, entry.data_size: {},
-        // CONFIG.limit.max_file_size_in_memory: {}",     entry.session_id,
-        //     self.memtable.read().await.size(),
-        //     entry.data_size,
-        //     CONFIG.limit.max_file_size_in_memory
-        // );
         let mut res = None;
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size)
@@ -371,7 +350,7 @@ impl Writer {
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
             // rotation wal
-            let wal_id = self.wal_next_seq.fetch_add(1, Ordering::SeqCst);
+            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
                 .join("logs")
                 .join(self.thread_id.to_string());

@@ -88,6 +88,7 @@ pub struct SchemaEvolution {
 }
 #[derive(Debug, Clone)]
 pub struct SchemaRecords {
+    pub record_id: usize,
     pub schema_key: String,
     pub schema: Arc<Schema>,
     pub records: Vec<Arc<json::Value>>,

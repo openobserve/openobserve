@@ -440,6 +440,7 @@ pub async fn metrics_json_handler(
                             Some(&schema_key),
                         );
                         let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                            record_id: 0,
                             schema_key,
                             schema: Arc::new(schema),
                             records: vec![],

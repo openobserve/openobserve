@@ -263,6 +263,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         );
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
         let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            record_id: 0,
             schema_key,
             schema: Arc::new(schema),
             records: vec![],

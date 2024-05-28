@@ -109,6 +109,7 @@ impl Metadata for TraceListIndex {
             let data_size = json::to_vec(&data).unwrap_or_default().len();
 
             let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                record_id: 0,
                 schema_key: schema_key.clone(),
                 schema: self.schema.clone(),
                 records: vec![],

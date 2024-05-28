@@ -403,7 +403,7 @@ pub async fn write_file(
 pub async fn write_wal_file(
     writer: &Arc<ingester::Writer>,
     stream_name: &str,
-    seesion_id: &str,
+    sid: &str,
     buf: HashMap<String, SchemaRecords>,
 ) -> (RequestStats, Vec<Option<(String, String)>>) {
     let mut req_stats = RequestStats::default();
@@ -420,7 +420,7 @@ pub async fn write_wal_file(
                 partition_key: Arc::from(hour_key.as_str()),
                 data: entry.records,
                 data_size: entry.records_size,
-                session_id: Arc::from(seesion_id),
+                session_id: Arc::from(format!("{sid}_{}", entry.record_id)),
             })
             .await
         {
@@ -589,7 +589,8 @@ pub async fn write_memtable(
 ) -> ingester::errors::Result<()> {
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
     for (hour_key, entry) in buf {
-        let rotate = trace_resp.and_then(|vec| vec.iter().flatten().find(|(id, _)| id == sid));
+        let find_id = format!("{sid}_{}", entry.record_id);
+        let rotate = trace_resp.and_then(|vec| vec.iter().flatten().find(|(id, _)| *id == find_id));
         if let Err(e) = writer
             .write_memtable(
                 entry.schema,

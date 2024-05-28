@@ -166,6 +166,7 @@ pub async fn validate_trace_request(
             }
         }
         let inst_resources = res_span.scope_spans;
+        let mut record_id = 1;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
             for span in spans {
@@ -339,11 +340,13 @@ pub async fn validate_trace_request(
                 );
 
                 let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                    record_id,
                     schema_key,
                     schema: Arc::new(rec_schema),
                     records: vec![],
                     records_size: 0,
                 });
+                record_id += 1;
                 // let record_val = record_val.to_owned();
                 let record_val = json::Value::Object(record_val);
                 let record_size = json::estimate_json_bytes(&record_val);
@@ -487,6 +490,8 @@ pub async fn validate_json_trace_request(
                 .as_array()
                 .unwrap()
         };
+
+        let mut record_id = 1;
         for inst_span in inst_resources {
             if inst_span.get("spans").is_some() {
                 let spans = inst_span.get("spans").unwrap().as_array().unwrap();
@@ -674,11 +679,14 @@ pub async fn validate_json_trace_request(
                     );
 
                     let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                        record_id,
                         schema_key,
                         schema: Arc::new(rec_schema),
                         records: vec![],
                         records_size: 0,
                     });
+                    record_id += 1;
+
                     // let record_val = record_val.to_owned();
                     let record_val = json::Value::Object(record_val);
                     let record_size = json::estimate_json_bytes(&record_val);
