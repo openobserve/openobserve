@@ -56,14 +56,15 @@ async fn get_bucket_by_key<'a>(
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
-        num_replicas: CONFIG.nats.replicas,
+        num_replicas: CONFIG.read().unwrap().nats.replicas,
         history: 3,
         ..Default::default()
     };
     if bucket_name == "nodes" || bucket_name == "clusters" {
         // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
-        bucket.max_age = Duration::from_secs(CONFIG.limit.node_heartbeat_ttl as u64);
+        bucket.max_age =
+            Duration::from_secs(CONFIG.read().unwrap().limit.node_heartbeat_ttl as u64);
     }
     let kv = jetstream.create_key_value(bucket).await?;
     Ok((kv, key.trim_start_matches(bucket_name)))
@@ -127,7 +128,7 @@ impl NatsDb {
 
 impl Default for NatsDb {
     fn default() -> Self {
-        Self::new(&CONFIG.nats.prefix)
+        Self::new(&CONFIG.read().unwrap().nats.prefix)
     }
 }
 
@@ -321,13 +322,16 @@ impl super::Db for NatsDb {
         if keys_len == 0 {
             return Ok(HashMap::new());
         }
+        let config = CONFIG.clone().read().unwrap();
+        let cpu_num = config.limit.cpu_num;
+
         let values = futures::stream::iter(keys)
             .map(|key| async move {
                 let encoded_key = key_encode(&key);
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<(String, Option<Bytes>), Error>((key, value))
             })
-            .buffer_unordered(CONFIG.limit.cpu_num)
+            .buffer_unordered(cpu_num.clone())
             .try_collect::<Vec<(String, Option<Bytes>)>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -385,7 +389,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<Option<Bytes>, Error>(value)
             })
-            .buffer_unordered(CONFIG.limit.cpu_num)
+            .buffer_unordered(CONFIG.clone().read().unwrap().limit.cpu_num)
             .try_collect::<Vec<Option<Bytes>>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -530,19 +534,20 @@ pub async fn create_table() -> Result<()> {
 }
 
 pub async fn connect() -> async_nats::Client {
-    if CONFIG.common.print_key_config {
-        log::info!("Nats init config: {:?}", CONFIG.nats);
+    let config = CONFIG.read().unwrap();
+    if config.common.print_key_config {
+        log::info!("Nats init config: {:?}", config.nats);
     }
 
     let mut opts = async_nats::ConnectOptions::new()
-        .connection_timeout(Duration::from_secs(CONFIG.nats.connect_timeout));
-    if !CONFIG.nats.user.is_empty() {
+        .connection_timeout(Duration::from_secs(config.nats.connect_timeout));
+    if !config.nats.user.is_empty() {
         opts = opts.user_and_password(
-            CONFIG.nats.user.to_string(),
-            CONFIG.nats.password.to_string(),
+            config.nats.user.to_string(),
+            config.nats.password.to_string(),
         );
     }
-    let addrs = CONFIG
+    let addrs = config
         .nats
         .addr
         .split(',')
@@ -578,9 +583,10 @@ impl Locker {
 
     /// lock with timeout, 0 means use default timeout, unit: second
     pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
-        let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
+        let config = CONFIG.read().unwrap();
+        let (bucket, new_key) = get_bucket_by_key(&config.nats.prefix, &self.key).await?;
         let timeout = if timeout == 0 {
-            CONFIG.nats.lock_wait_timeout
+            config.nats.lock_wait_timeout
         } else {
             timeout
         };
@@ -636,7 +642,9 @@ impl Locker {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }
-        let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
+
+        let config = CONFIG.read().unwrap();
+        let (bucket, new_key) = get_bucket_by_key(&config.nats.prefix, &self.key).await?;
         let key = key_encode(new_key);
         let ret = bucket.get(&key).await?;
         let Some(ret) = ret else {

@@ -41,14 +41,14 @@ pub async fn init() -> Result<()> {
 }
 
 async fn default() -> Box<dyn Queue> {
-    match CONFIG.common.queue_store.as_str().into() {
+    match CONFIG.read().unwrap().common.queue_store.as_str().into() {
         MetaStore::Nats => Box::<nats::NatsQueue>::default(),
         _ => Box::<nop::NopQueue>::default(),
     }
 }
 
 async fn init_super_cluster() -> Box<dyn Queue> {
-    if CONFIG.common.local_mode {
+    if CONFIG.read().unwrap().common.local_mode {
         panic!("super cluster is not supported in local mode");
     }
     Box::new(nats::NatsQueue::super_cluster())

@@ -45,8 +45,9 @@ static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::Sender<Event>>;
 
 fn connect_rw() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
-    if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
+    let config = CONFIG.read().unwrap();
+    let url = format!("{}{}", config.common.data_db_dir, "metadata.sqlite");
+    if !config.common.local_mode && std::path::Path::new(&url).exists() {
         std::fs::remove_file(&url).expect("remove file sqlite failed");
         _ = std::fs::remove_file(format!("{url}-shm"));
         _ = std::fs::remove_file(format!("{url}-wal"));
@@ -68,7 +69,9 @@ fn connect_rw() -> Pool<Sqlite> {
 }
 
 fn connect_ro() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
+    let config = CONFIG.read().unwrap();
+
+    let url = format!("{}{}", config.common.data_db_dir, "metadata.sqlite");
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
@@ -78,8 +81,8 @@ fn connect_ro() -> Pool<Sqlite> {
         // .disable_statement_logging()
         .read_only(true);
     SqlitePoolOptions::new()
-        .min_connections(CONFIG.limit.sql_min_db_connections)
-        .max_connections(CONFIG.limit.sql_max_db_connections)
+        .min_connections(config.limit.sql_min_db_connections)
+        .max_connections(config.limit.sql_max_db_connections)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
 }
@@ -109,7 +112,7 @@ impl SqliteDbChannel {
                         break;
                     }
                 };
-                if CONFIG.common.print_key_event {
+                if CONFIG.read().unwrap().common.print_key_event {
                     log::info!("[SQLITE] watch event: {:?}", event);
                 }
                 for (prefix, tx) in WATCHERS.read().await.iter() {

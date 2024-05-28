@@ -57,13 +57,14 @@ pub async fn init() -> Result<()> {
 }
 
 async fn default() -> Box<dyn Db> {
-    if !CONFIG.common.local_mode
-        && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
+    let config = CONFIG.read().unwrap();
+    if !config.common.local_mode
+        && (config.common.meta_store == "sled" || config.common.meta_store == "sqlite")
     {
         panic!("cluster mode is not supported for ZO_META_STORE=sqlite");
     }
 
-    match CONFIG.common.meta_store.as_str().into() {
+    match config.common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
         MetaStore::Nats => Box::<nats::NatsDb>::default(),
@@ -73,13 +74,14 @@ async fn default() -> Box<dyn Db> {
 }
 
 async fn init_cluster_coordinator() -> Box<dyn Db> {
-    if CONFIG.common.local_mode {
-        match CONFIG.common.meta_store.as_str().into() {
+    let config = CONFIG.read().unwrap();
+    if config.common.local_mode {
+        match config.common.meta_store.as_str().into() {
             MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
             _ => Box::<sqlite::SqliteDb>::default(),
         }
     } else {
-        match CONFIG.common.cluster_coordinator.as_str().into() {
+        match config.common.cluster_coordinator.as_str().into() {
             MetaStore::Nats => Box::<nats::NatsDb>::default(),
             _ => Box::<etcd::Etcd>::default(),
         }
@@ -87,7 +89,7 @@ async fn init_cluster_coordinator() -> Box<dyn Db> {
 }
 
 async fn init_super_cluster() -> Box<dyn Db> {
-    if CONFIG.common.local_mode {
+    if CONFIG.read().unwrap().common.local_mode {
         panic!("super cluster is not supported in local mode");
     }
     Box::new(nats::NatsDb::super_cluster())
@@ -95,7 +97,7 @@ async fn init_super_cluster() -> Box<dyn Db> {
 
 pub async fn create_table() -> Result<()> {
     // check db dir
-    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    std::fs::create_dir_all(&CONFIG.read().unwrap().common.data_db_dir)?;
     // create for meta store
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator.create_table().await?;

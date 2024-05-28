@@ -47,7 +47,8 @@ pub async fn get_etcd_client() -> &'static etcd_client::Client {
 }
 
 pub async fn init() {
-    if CONFIG.common.local_mode || CONFIG.common.cluster_coordinator.to_lowercase() == "nats" {
+    let config = CONFIG.read().unwrap();
+    if config.common.local_mode || config.common.cluster_coordinator.to_lowercase() == "nats" {
         return;
     }
     // enable keep alive for auth token
@@ -91,7 +92,7 @@ impl Etcd {
 
 impl Default for Etcd {
     fn default() -> Self {
-        Self::new(&CONFIG.etcd.prefix)
+        Self::new(&CONFIG.read().unwrap().etcd.prefix)
     }
 }
 

@@ -167,7 +167,7 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-pub static CONFIG: Lazy<Arc<RwLock<Config>>> = Lazy::new(|| Arc::new(RwLock::new(init())));
+pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| RwLock::new(init()));
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
@@ -260,14 +260,15 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
-pub static BLOCKED_STREAMS: Lazy<Vec<&str>> = Lazy::new(|| {
-    CONFIG
-        .read()
-        .unwrap()
+pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
+    let config = CONFIG.read().unwrap();
+    let blocked_streams = config
         .common
         .blocked_streams
         .split(',')
-        .collect()
+        .map(|x| x.to_string())
+        .collect();
+    blocked_streams
 });
 
 #[derive(EnvConfig)]

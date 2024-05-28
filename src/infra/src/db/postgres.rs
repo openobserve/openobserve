@@ -31,13 +31,14 @@ use crate::errors::*;
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
 fn connect() -> Pool<Postgres> {
-    let db_opts = PgConnectOptions::from_str(&CONFIG.common.meta_postgres_dsn)
+    let config = CONFIG.read().unwrap();
+    let db_opts = PgConnectOptions::from_str(&config.common.meta_postgres_dsn)
         .expect("postgres connect options create failed")
         .disable_statement_logging();
 
     PgPoolOptions::new()
-        .min_connections(CONFIG.limit.sql_min_db_connections)
-        .max_connections(CONFIG.limit.sql_max_db_connections)
+        .min_connections(config.limit.sql_min_db_connections)
+        .max_connections(config.limit.sql_max_db_connections)
         .connect_lazy_with(db_opts)
 }
 
