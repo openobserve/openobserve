@@ -569,8 +569,8 @@ impl Sql {
                     "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))",
                 )
             );
-            if histogram_interval == None {
-            histogram_interval = Some(convert_histogram_interval_to_seconds(&interval));
+            if histogram_interval.is_none() {
+                histogram_interval = Some(convert_histogram_interval_to_seconds(&interval));
             }
         }
 
@@ -906,7 +906,7 @@ fn convert_histogram_interval_to_seconds(interval: &str) -> i64 {
     let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
         return 0;
     };
-    match unit {
+    match unit.to_lowercase().as_str() {
         "second" | "seconds" => num.parse::<i64>().unwrap(),
         "minute" | "minutes" => num.parse::<i64>().unwrap() * 60,
         "hour" | "hours" => num.parse::<i64>().unwrap() * 3600,
