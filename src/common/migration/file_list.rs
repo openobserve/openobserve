@@ -26,7 +26,7 @@ use crate::{
 };
 
 pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error> {
-    if get_file_meta(&CONFIG.common.data_wal_dir).is_err() {
+    if get_file_meta(&CONFIG.read().await.common.data_wal_dir).is_err() {
         // there is no local wal files, no need upgrade
         return Ok(());
     }

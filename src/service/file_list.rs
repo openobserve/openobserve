@@ -49,7 +49,8 @@ pub async fn query(
     time_max: i64,
     is_local: bool,
 ) -> Result<Vec<FileKey>, anyhow::Error> {
-    if is_local || CONFIG.common.local_mode {
+    let conf = CONFIG.read().await;
+    if is_local || conf.common.local_mode {
         return query_inner(
             org_id,
             stream_name,
@@ -72,6 +73,7 @@ pub async fn query(
     let mut tasks = Vec::with_capacity(3);
     // get first three nodes to check file list max id
     for node in nodes.into_iter().take(3) {
+        let conf = CONFIG.read().await;
         let org_id = org_id.to_string();
         let task = tokio::task::spawn(async move {
             let req = cluster_rpc::EmptyRequest::default();
@@ -92,7 +94,7 @@ pub async fn query(
                 .map_err(|_| Error::Message("invalid token".to_string()))?;
             let channel = Channel::from_shared(node.grpc_addr.clone())
                 .unwrap()
-                .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
                 .connect()
                 .await
                 .map_err(|err| {
@@ -108,17 +110,19 @@ pub async fn query(
             let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
                 channel,
                 move |mut req: Request<()>| {
+                    let conf = CONFIG.blocking_read();
+
                     req.metadata_mut().insert("authorization", token.clone());
                     req.metadata_mut()
-                        .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                        .insert(conf.grpc.org_header_key.as_str(), org_id.clone());
                     Ok(req)
                 },
             );
             client = client
                 .send_compressed(CompressionEncoding::Gzip)
                 .accept_compressed(CompressionEncoding::Gzip)
-                .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
+                .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
             let response: cluster_rpc::MaxIdResponse = match client.max_id(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -199,7 +203,7 @@ pub async fn query(
         .map_err(|_| Error::Message("invalid token".to_string()))?;
     let channel = Channel::from_shared(node.grpc_addr.clone())
         .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+        .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
         .connect()
         .await
         .map_err(|err| {
@@ -216,17 +220,20 @@ pub async fn query(
     let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
+            let conf = CONFIG.blocking_read();
             req.metadata_mut().insert("authorization", token.clone());
             req.metadata_mut()
-                .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                .insert(conf.grpc.org_header_key.as_str(), org_id.clone());
             Ok(req)
         },
     );
+
+    let conf = CONFIG.read().await;
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+        .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
     let response: cluster_rpc::FileList = match client.query(request).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
@@ -312,7 +319,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
-    if CONFIG.common.meta_store_external {
+    if CONFIG.read().await.common.meta_store_external {
         delete_parquet_file_db_only(key, file_list_only).await
     } else {
         delete_parquet_file_s3(key, file_list_only).await

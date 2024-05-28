@@ -27,7 +27,9 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     }
 
     // before starting, set current node to lock the job
-    if CONFIG.common.meta_store_external && (node.is_empty() || LOCAL_NODE_UUID.ne(&node)) {
+    if CONFIG.read().await.common.meta_store_external
+        && (node.is_empty() || LOCAL_NODE_UUID.ne(&node))
+    {
         offset = match update_stats_lock_node().await {
             Ok(Some(offset)) => offset,
             Ok(None) => return Ok(None),

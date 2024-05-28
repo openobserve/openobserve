@@ -102,7 +102,7 @@ impl Event for Eventer {
                 if infra::cache::file_data::download("download", &item.key)
                     .await
                     .is_ok()
-                    && CONFIG.limit.quick_mode_file_list_enabled
+                    && CONFIG.read().await.limit.quick_mode_file_list_enabled
                 {
                     let columns = item.key.split('/').collect::<Vec<&str>>();
                     if columns[2] != "logs" {

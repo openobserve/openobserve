@@ -35,7 +35,7 @@ pub struct ZoLogger {
 
 impl log::Log for ZoLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
-        CONFIG.log.events_enabled
+        CONFIG.blocking_read().log.events_enabled
     }
 
     fn log(self: &ZoLogger, record: &Record) {
@@ -59,7 +59,7 @@ impl log::Log for ZoLogger {
             let event = EventBuilderV10::new()
                 .id(ider::generate())
                 .ty("debug_log")
-                .source(CONFIG.common.instance_name.clone())
+                .source(CONFIG.blocking_read().common.instance_name.clone())
                 .data("application/json", payload)
                 .build()
                 .unwrap();
@@ -78,10 +78,11 @@ pub async fn send_logs() {
         let mut logs = LOGS.write().await;
         logs.push(val);
 
-        if logs.len() >= CONFIG.log.events_batch_size {
+        let config = CONFIG.read().await;
+        if logs.len() >= config.log.events_batch_size {
             let old_logs = std::mem::take(&mut *logs);
-            let url = url::Url::parse(&CONFIG.log.events_url).unwrap();
-            let auth = format!("Basic {}", &CONFIG.log.events_auth);
+            let url = url::Url::parse(&config.log.events_url).unwrap();
+            let auth = format!("Basic {}", &config.log.events_auth);
             let cl = Arc::clone(&cl);
             tokio::task::spawn(async move {
                 let _ = cl

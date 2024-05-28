@@ -53,7 +53,7 @@ impl Telemetry {
         data: Option<HashMap<String, json::Value>>,
         send_zo_data: bool,
     ) {
-        if !CONFIG.common.telemetry_enabled {
+        if !CONFIG.read().await.common.telemetry_enabled {
             return;
         }
         log::info!("sending event {}", event);
@@ -109,7 +109,7 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
     );
     data.insert(
         "host_name".to_string(),
-        CONFIG.common.instance_name.clone().into(),
+        CONFIG.blocking_read().common.instance_name.clone().into(),
     );
 
     data.insert("zo_version".to_string(), VERSION.to_owned().into());
@@ -138,6 +138,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     }
     drop(r);
 
+    let conf = CONFIG.read().await;
     data.insert("num_org".to_string(), orgs.len().into());
     data.insert("num_streams".to_string(), num_streams.into());
     data.insert("num_logs_streams".to_string(), logs_streams.into());
@@ -145,12 +146,12 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     data.insert("num_users".to_string(), USERS.len().into());
     data.insert(
         "is_local_mode".to_string(),
-        json::Value::Bool(CONFIG.common.local_mode),
+        json::Value::Bool(conf.common.local_mode),
     );
-    if CONFIG.common.local_mode {
+    if conf.common.local_mode {
         data.insert(
             "local_mode_storage".to_string(),
-            CONFIG.common.local_mode_storage.clone().into(),
+            conf.common.local_mode_storage.clone().into(),
         );
     }
     let db = infra_db::get_db().await;

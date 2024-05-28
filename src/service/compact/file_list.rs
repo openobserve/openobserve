@@ -223,7 +223,9 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     // filter deleted file keys
     let filter_file_keys: Arc<RwLock<HashMap<String, FileKey>>> =
         Arc::new(RwLock::new(HashMap::new()));
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(
+        CONFIG.read().await.limit.file_move_thread_num,
+    ));
     let mut tasks = Vec::new();
     for file in file_list.clone() {
         let filter_file_keys = filter_file_keys.clone();

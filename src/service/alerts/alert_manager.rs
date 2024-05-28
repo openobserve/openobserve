@@ -175,7 +175,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
-                if trigger.retries + 1 >= CONFIG.limit.scheduler_max_retries {
+                if trigger.retries + 1 >= CONFIG.read().await.limit.scheduler_max_retries {
                     // It has been tried the maximum time, just update the
                     // next_run_at to the next expected trigger time
                     log::debug!(
@@ -325,7 +325,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
         Err(e) => {
             log::error!("Error sending report to subscribers: {e}");
-            if trigger.retries + 1 >= CONFIG.limit.scheduler_max_retries && !run_once {
+            if trigger.retries + 1 >= CONFIG.read().await.limit.scheduler_max_retries && !run_once {
                 // It has been tried the maximum time, just update the
                 // next_run_at to the next expected trigger time
                 log::debug!(

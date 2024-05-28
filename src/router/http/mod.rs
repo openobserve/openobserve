@@ -173,7 +173,11 @@ async fn dispatch(
     }
 
     // set body
-    let body = match resp.body().limit(CONFIG.limit.req_payload_limit).await {
+    let body = match resp
+        .body()
+        .limit(CONFIG.read().await.limit.req_payload_limit)
+        .await
+    {
         Ok(b) => b,
         Err(e) => {
             log::error!("{}: {}", new_url.value, e);
@@ -200,12 +204,13 @@ async fn get_url(path: &str) -> URLDetails {
         cluster::get_cached_online_ingester_nodes().await
     };
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        if node_type == Role::Ingester && !CONFIG.route.ingester_srv_url.is_empty() {
+        let conf = CONFIG.read().await;
+        if node_type == Role::Ingester && !conf.route.ingester_srv_url.is_empty() {
             return URLDetails {
                 is_error: false,
                 value: format!(
                     "http://{}:{}{}",
-                    CONFIG.route.ingester_srv_url, CONFIG.http.port, path
+                    conf.route.ingester_srv_url, conf.http.port, path
                 ),
             };
         }

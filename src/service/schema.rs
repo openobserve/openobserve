@@ -38,7 +38,7 @@ use crate::{
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
         "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
-        CONFIG.limit.ingest_allowed_upto
+        CONFIG.blocking_read().limit.ingest_allowed_upto
     )
 }
 
@@ -48,7 +48,7 @@ pub(crate) fn get_request_columns_limit_error(
 ) -> anyhow::Error {
     anyhow::anyhow!(
         "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_cloumns>",
-        CONFIG.limit.req_cols_per_record_limit
+        CONFIG.blocking_read().limit.req_cols_per_record_limit
     )
 }
 
@@ -64,8 +64,9 @@ pub async fn check_for_schema(
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
+    let conf = CONFIG.read().await;
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.schema().fields().is_empty() && CONFIG.common.skip_schema_validation {
+    if !schema.schema().fields().is_empty() && conf.common.skip_schema_validation {
         return Ok(SchemaEvolution {
             schema_compatible: true,
             is_schema_changed: false,
@@ -86,7 +87,7 @@ pub async fn check_for_schema(
         });
     }
 
-    if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
+    if inferred_schema.fields.len() > conf.limit.req_cols_per_record_limit {
         return Err(get_request_columns_limit_error(
             &format!("{}/{}/{}", org_id, stream_type, stream_name),
             inferred_schema.fields.len(),
@@ -214,7 +215,7 @@ async fn handle_diff_schema(
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
     // retry x times for update schema
-    while retries < CONFIG.limit.meta_transaction_retries {
+    while retries < CONFIG.read().await.limit.meta_transaction_retries {
         match db::schema::merge(
             org_id,
             stream_name,
@@ -311,12 +312,13 @@ pub fn generate_schema_for_defined_schema_fields(
         return schema.clone();
     }
 
+    let conf = CONFIG.blocking_read();
     let mut fields: HashSet<_> = fields.iter().collect();
-    if !fields.contains(&CONFIG.common.column_timestamp) {
-        fields.insert(&CONFIG.common.column_timestamp);
+    if !fields.contains(&conf.common.column_timestamp) {
+        fields.insert(&conf.common.column_timestamp);
     }
-    if !fields.contains(&CONFIG.common.all_fields_name) {
-        fields.insert(&CONFIG.common.all_fields_name);
+    if !fields.contains(&conf.common.all_fields_name) {
+        fields.insert(&conf.common.all_fields_name);
     }
     let mut new_fields = Vec::with_capacity(fields.len());
     for field in fields {
@@ -353,7 +355,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {
-                    if !CONFIG.common.widening_schema_evolution {
+                    if !CONFIG.blocking_read().common.widening_schema_evolution {
                         field_datatype_delta.push(existing_field.as_ref().to_owned());
                     } else if infra::schema::is_widening_conversion(
                         existing_field.data_type(),

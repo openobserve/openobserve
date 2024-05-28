@@ -99,7 +99,7 @@ pub struct RumIngestionResponse {
 }
 
 fn default_scrape_interval() -> u32 {
-    CONFIG.common.default_scrape_interval
+    CONFIG.blocking_read().common.default_scrape_interval
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]

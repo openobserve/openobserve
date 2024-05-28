@@ -30,22 +30,23 @@ impl TraceService for TraceServer {
         &self,
         request: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
+        let conf = CONFIG.read().await;
         let metadata = request.metadata().clone();
         let msg = format!(
             "Please specify organization id with header key '{}' ",
-            &CONFIG.grpc.org_header_key
+            &conf.grpc.org_header_key
         );
-        if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
+        if !metadata.contains_key(&conf.grpc.org_header_key) {
             return Err(Status::invalid_argument(msg));
         }
 
         let in_req = request.into_inner();
-        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        let org_id = metadata.get(&conf.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(msg));
         }
 
-        let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
+        let stream_name = metadata.get(&conf.grpc.stream_header_key);
         let mut in_stream_name: Option<&str> = None;
         if let Some(stream_name) = stream_name {
             in_stream_name = Some(stream_name.to_str().unwrap());

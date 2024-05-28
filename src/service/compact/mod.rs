@@ -41,10 +41,11 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
+    let conf = CONFIG.read().await;
     // check data retention
-    if CONFIG.compact.data_retention_days > 0 {
+    if conf.compact.data_retention_days > 0 {
         let now = Utc::now();
-        let date = now - Duration::try_days(CONFIG.compact.data_retention_days).unwrap();
+        let date = now - Duration::try_days(conf.compact.data_retention_days).unwrap();
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
         let orgs = db::schema::list_organizations_from_cache().await;
@@ -181,7 +182,8 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 pub async fn run_merge(
     worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
 ) -> Result<(), anyhow::Error> {
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let conf = CONFIG.read().await;
+    let semaphore = std::sync::Arc::new(Semaphore::new(conf.limit.file_move_thread_num));
     let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [
         StreamType::Logs,
@@ -271,7 +273,7 @@ pub async fn run_merge(
     }
 
     // after compact, compact file list from storage
-    if !CONFIG.common.meta_store_external {
+    if !conf.common.meta_store_external {
         let last_file_list_offset = db::compact::file_list::get_offset().await?;
         if let Err(e) = file_list::run(last_file_list_offset).await {
             log::error!("[COMPACTOR] merge file list error: {}", e);
@@ -286,7 +288,8 @@ pub async fn run_merge(
 /// 2. delete files from storage
 pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let now = Utc::now();
-    let time_max = now - Duration::try_hours(CONFIG.compact.delete_files_delay_hours).unwrap();
+    let conf = CONFIG.read().await;
+    let time_max = now - Duration::try_hours(conf.compact.delete_files_delay_hours).unwrap();
     let time_max = Utc
         .with_ymd_and_hms(
             time_max.year(),

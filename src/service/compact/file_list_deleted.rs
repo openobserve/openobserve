@@ -84,7 +84,7 @@ async fn query_deleted(
     time_max: i64,
     limit: i64,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
-    if CONFIG.common.meta_store_external {
+    if CONFIG.read().await.common.meta_store_external {
         query_deleted_from_table(org_id, time_min, time_max, limit).await
     } else {
         query_deleted_from_s3(org_id, time_min, time_max, limit).await
@@ -160,8 +160,9 @@ pub async fn load_prefix_from_s3(
     }
     log::info!("Load file_list_deleted gets {} files", files_num);
 
-    let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
-    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
+    let conf = CONFIG.read().await;
+    let mut tasks = Vec::with_capacity(conf.limit.query_thread_num + 1);
+    let chunk_size = std::cmp::max(1, files_num / conf.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
         let task: tokio::task::JoinHandle<Result<HashMap<String, Vec<String>>, anyhow::Error>> =

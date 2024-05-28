@@ -26,9 +26,9 @@ use crate::common::{
 };
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
+    let conf = CONFIG.blocking_read();
     let metadata = req.metadata();
-    if !metadata.contains_key(&CONFIG.grpc.org_header_key)
-        && !metadata.contains_key("authorization")
+    if !metadata.contains_key(&conf.grpc.org_header_key) && !metadata.contains_key("authorization")
     {
         return Err(Status::unauthenticated("No valid auth token"));
     }
@@ -43,11 +43,11 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     if token.eq(get_internal_grpc_token().as_str()) {
         Ok(req)
     } else {
-        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        let org_id = metadata.get(&conf.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &CONFIG.grpc.org_header_key
+                &conf.grpc.org_header_key
             )));
         }
 

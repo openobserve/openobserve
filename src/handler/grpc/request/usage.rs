@@ -30,7 +30,7 @@ impl Usage for UsageServerImpl {
         let metadata = request.metadata().clone();
         let req = request.into_inner();
         let report_to_stream = req.stream_name;
-        let report_to_org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        let report_to_org_id = metadata.get(&CONFIG.read().await.grpc.org_header_key);
         let in_data = req.data.unwrap_or_default();
         let resp = crate::service::logs::otlp_grpc::usage_ingest(
             report_to_org_id.unwrap().to_str().unwrap(),
