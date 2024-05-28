@@ -23,7 +23,6 @@ use actix_web::{
 use config::{
     utils::{base64, json, get_config},
 };
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -309,6 +308,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     {
         use actix_web::http::header;
         use chrono::Utc;
+        use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
         use crate::{
             common::meta::user::AuthTokensExt, handler::http::auth::validator::ID_TOKEN_HEADER,
