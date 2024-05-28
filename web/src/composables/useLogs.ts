@@ -1388,6 +1388,7 @@ const useLogs = () => {
 
   const fnParsedSQL = () => {
     try {
+      console.log(searchObj.data);
       const filteredQuery = searchObj.data.query
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
