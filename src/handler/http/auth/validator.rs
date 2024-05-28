@@ -724,7 +724,7 @@ fn get_salt() -> String {
     {
         o2_enterprise::enterprise::common::infra::config::O2_CONFIG
             .common
-            .query_auth_salt
+            .ext_auth_salt
             .clone()
     }
     #[cfg(not(feature = "enterprise"))]
