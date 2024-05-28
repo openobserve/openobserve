@@ -207,6 +207,9 @@ pub struct Response {
     pub function_error: String,
     #[serde(default)]
     pub is_partial: bool,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub histogram_interval: Option<i64>, // seconds, for histogram
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -245,6 +248,7 @@ impl Response {
             trace_id: "".to_string(),
             function_error: "".to_string(),
             is_partial: false,
+            histogram_interval: None,
         }
     }
 
@@ -304,6 +308,10 @@ impl Response {
 
     pub fn set_partial(&mut self, is_partial: bool) {
         self.is_partial = is_partial;
+    }
+
+    pub fn set_histogram_interval(&mut self, val: Option<i64>) {
+        self.histogram_interval = val;
     }
 }
 

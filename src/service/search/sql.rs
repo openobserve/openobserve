@@ -32,6 +32,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_fts_fields, STREAM_SCHEMAS_FIELDS},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
@@ -81,6 +82,7 @@ pub struct Sql {
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
+    pub histogram_interval: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -542,6 +544,7 @@ impl Sql {
         }
 
         // Hack for histogram
+        let mut histogram_interval = None;
         let from_pos = origin_sql.to_lowercase().find(" from ").unwrap();
         let select_str = origin_sql[0..from_pos].to_string();
         for cap in RE_HISTOGRAM.captures_iter(select_str.as_str()) {
@@ -566,6 +569,9 @@ impl Sql {
                     "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))",
                 )
             );
+            if histogram_interval.is_none() {
+                histogram_interval = Some(convert_histogram_interval_to_seconds(&interval)?);
+            }
         }
 
         // pickup where
@@ -705,6 +711,7 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
+            histogram_interval,
         })
     }
 
@@ -893,6 +900,24 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
         }
     }
     "10 second".to_string()
+}
+
+fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
+    let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
+        return Err(Error::Message("Invalid interval format".to_string()));
+    };
+    let seconds = match unit.to_lowercase().as_str() {
+        "second" | "seconds" => num.parse::<i64>(),
+        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+        _ => {
+            return Err(Error::Message(
+                "Unsupported histogram interval unit".to_string(),
+            ));
+        }
+    };
+    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
 }
 
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
