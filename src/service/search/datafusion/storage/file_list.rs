@@ -30,11 +30,12 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data)
 }
 
-pub async fn set(trace_id: &str, files: &[FileKey]) {
+pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
+    let key = format!("{}/schema={}", trace_id, schema_key);
     let mut values = Vec::with_capacity(files.len());
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
-        let file_name = format!("/{}/$$/{}", trace_id, file.key);
+        let file_name = format!("/{}/$$/{}", key, file.key);
         values.push(ObjectMeta {
             location: file_name.into(),
             last_modified: modified,
@@ -43,7 +44,7 @@ pub async fn set(trace_id: &str, files: &[FileKey]) {
             version: None,
         });
     }
-    FILES.write().insert(trace_id.to_string(), values);
+    FILES.write().insert(key, values);
 }
 
 pub fn clear(trace_id: &str) {
