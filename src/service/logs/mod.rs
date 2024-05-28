@@ -390,7 +390,6 @@ async fn add_valid_record(
         let schema = Arc::new(rec_schema.schema().clone().with_metadata(HashMap::new()));
         let schema_key = schema.hash_key();
         SchemaRecords {
-            record_id: 0,
             schema_key,
             schema,
             records: vec![],
@@ -441,7 +440,6 @@ async fn add_record(
         let schema = Arc::new(Schema::empty());
         let schema_key = schema.hash_key();
         SchemaRecords {
-            record_id: 0,
             schema_key,
             schema,
             records: vec![],

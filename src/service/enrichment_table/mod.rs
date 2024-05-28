@@ -210,7 +210,6 @@ pub async fn save_enrichment_data(
     buf.insert(
         hour_key,
         SchemaRecords {
-            record_id: 0,
             schema_key,
             schema: Arc::new(schema),
             records,

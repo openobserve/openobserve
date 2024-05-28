@@ -671,7 +671,6 @@ pub(crate) async fn generate_index_on_ingester(
         );
 
         let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            record_id: 0,
             schema_key: schema_key.to_string(),
             schema: idx_schema.clone(),
             records: vec![],

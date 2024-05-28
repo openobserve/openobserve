@@ -654,7 +654,6 @@ async fn process_record(
                             Arc::new(rec_schema.schema().clone().with_metadata(HashMap::new()));
                         let schema_key = schema.hash_key();
                         crate::common::meta::stream::SchemaRecords {
-                            record_id: 0,
                             schema_key,
                             schema,
                             records: vec![],
