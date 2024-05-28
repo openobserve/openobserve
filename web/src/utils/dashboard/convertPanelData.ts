@@ -98,7 +98,7 @@ export const convertPanelData = async (
     }
     default: {
       console.log("No Chart Type found, skipping");
-      break;
+      return {};
     }
   }
 };
