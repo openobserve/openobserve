@@ -51,13 +51,17 @@
       </div>
       <div class="trace-date-time" style="width: 175px">
         <div class="section-1 flex justify-end items-center">
-          <div style="font-size: 14px">{{ getFormattedDate.day }}</div>
+          <div style="font-size: 14px">
+            {{ formattedDate?.day }}
+          </div>
           <div
             vertical
             style="height: 16px; width: 2px"
             class="q-mx-sm bg-grey-4"
           />
-          <div style="font-size: 14px">{{ getFormattedDate.time }}</div>
+          <div style="font-size: 14px">
+            {{ formattedDate?.time }}
+          </div>
         </div>
       </div>
     </div>
@@ -65,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeMount, onMounted, ref } from "vue";
 import { date as qDate } from "quasar";
 import {
   timestampToTimezoneDate,
@@ -74,7 +78,6 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useTraces from "@/composables/useTraces";
-import moment from "moment";
 
 const props = defineProps({
   item: {
@@ -91,7 +94,25 @@ const { searchObj } = useTraces();
 
 const store = useStore();
 
-const getFormattedDate = computed(() => {
+let moment: any;
+
+const importMoment = async () => {
+  const momentModule: any = await import("moment-timezone");
+  moment = momentModule.default;
+};
+
+onBeforeMount(async () => {
+  await importMoment();
+  getFormattedDate();
+});
+
+const formattedDate = ref({
+  day: "",
+  time: "",
+  diff: "",
+});
+
+const getFormattedDate = () => {
   const format = "YYYY-MM-DD HH:mm:ss";
   const timezone = store.state.timezone;
 
@@ -143,8 +164,8 @@ const getFormattedDate = computed(() => {
     date3.diff = minDiff.toString() + " minutes ago";
   }
 
-  return date3;
-});
+  formattedDate.value = date3;
+};
 
 function formatDateTo12Hour(date: any) {
   let hours = date.getHours();

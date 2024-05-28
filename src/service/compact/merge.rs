@@ -1039,8 +1039,8 @@ pub async fn merge_parquet_files(
                 )
             })?,
         Some(arrow_schema::SortOptions {
-            descending: true,
-            nulls_first: false,
+            descending: false,
+            nulls_first: true,
         }),
         None,
     )?;

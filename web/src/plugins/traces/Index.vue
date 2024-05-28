@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before v-if="searchObj.meta.showFields">
             <index-list
               ref="indexListRef"
+              :field-list="searchObj.data.stream.selectedStreamFields"
               data-test="logs-search-index-list"
               :key="searchObj.data.stream.streamLists"
             />
@@ -163,17 +164,14 @@ import {
   onActivated,
   onBeforeMount,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
-import SearchBar from "./SearchBar.vue";
-import IndexList from "./IndexList.vue";
-import SearchResult from "./SearchResult.vue";
 import useTraces from "@/composables/useTraces";
-import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
@@ -198,9 +196,9 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 export default defineComponent({
   name: "PageSearch",
   components: {
-    SearchBar,
-    IndexList,
-    SearchResult,
+    SearchBar: defineAsyncComponent(() => import("./SearchBar.vue")),
+    IndexList: defineAsyncComponent(() => import("./IndexList.vue")),
+    SearchResult: defineAsyncComponent(() => import("./SearchResult.vue")),
     SanitizedHtmlRenderer,
   },
   methods: {
@@ -266,7 +264,7 @@ export default defineComponent({
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
-    const parser = new Parser();
+    let parser: any;
     const fieldValues = ref({});
     const { showErrorNotification } = useNotifications();
     const serviceColorIndex = ref(0);
@@ -280,6 +278,12 @@ export default defineComponent({
     const selectedStreamName = computed(
       () => searchObj.data.stream.selectedStream.value
     );
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
 
     function getQueryTransform() {
       try {
@@ -1119,7 +1123,8 @@ export default defineComponent({
       // getStreamList();
     }
 
-    onBeforeMount(() => {
+    onBeforeMount(async () => {
+      await importSqlParser();
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
         loadPageData();
@@ -1290,7 +1295,6 @@ export default defineComponent({
 
     const restoreFilters = (query: string) => {
       // const filters = searchObj.data.stream.filters;
-      const parser = new Parser();
 
       const defaultQuery = `SELECT * FROM '${selectedStreamName.value}' WHERE `;
 
@@ -1419,7 +1423,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 140px) !important;
+  height: calc(100vh - 165px) !important;
 }
 </style>
 <style lang="scss">

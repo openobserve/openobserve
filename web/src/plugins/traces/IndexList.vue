@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-fields-table"
         v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
-        :rows="searchObj.data.stream.selectedStreamFields"
+        :rows="fieldList"
         row-key="name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-else-if="searchObj.meta.filterType === 'basic'">
                   <advanced-values-filter
+                    v-if="fieldValues[props.row.name]"
                     :key="searchObj.data.stream.selectedStream.value"
                     :row="props.row"
                     v-model:isOpen="fieldValues[props.row.name].isOpen"
@@ -181,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref, type Ref, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -192,7 +193,7 @@ import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
-import { Parser } from "node-sql-parser/build/mysql";
+
 import streamService from "@/services/stream";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { watch } from "vue";
@@ -204,6 +205,12 @@ export default defineComponent({
     AdvancedValuesFilter,
   },
   emits: ["update:changeStream"],
+  props: {
+    fieldList: {
+      type: Array,
+      default: () => [],
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -216,11 +223,23 @@ export default defineComponent({
 
     const fieldValues = computed(() => searchObj.data.stream.fieldValues);
 
+    let parser: any;
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
+    onBeforeUnmount(async () => {
+      await importSqlParser();
+    });
+
     watch(
-      () => searchObj.data.stream.selectedStreamFields,
+      () => props.fieldList,
       () => {
-        if (searchObj.data.stream.selectedStreamFields.length) {
-          searchObj.data.stream.selectedStreamFields.forEach(
+        if (props.fieldList) {
+          (props.fieldList as any).forEach(
             (field: { name: string; showValues: boolean; ftsKey: boolean }) => {
               if (field.showValues && !field.ftsKey) {
                 fieldValues.value[field.name] = {
@@ -430,8 +449,6 @@ export default defineComponent({
       prevValues: string[]
     ) => {
       try {
-        const parser = new Parser();
-
         const valuesString = values
           .map((value: string) => "'" + value + "'")
           .join(",");
@@ -685,7 +702,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 184px) !important;
+  height: calc(100vh - 209px) !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);

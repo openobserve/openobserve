@@ -277,7 +277,7 @@ export default defineComponent({
         if (!errorDetail.value) {
           try {
             // passing chartpanelref to get width and height of DOM element
-            panelData.value = convertPanelData(
+            panelData.value = await convertPanelData(
               panelSchema.value,
               data.value,
               store,

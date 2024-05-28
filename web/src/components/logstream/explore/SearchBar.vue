@@ -83,7 +83,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
-import QueryEditor from "@/components/QueryEditor.vue";
 import type { IDateTime } from "@/ts/interfaces";
 
 const defaultValue: any = () => {
@@ -111,7 +110,9 @@ export default defineComponent({
   },
   components: {
     DateTime,
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue")
+    ),
   },
   emits: ["searchdata", "update-query", "change:date-time"],
   methods: {

@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #before>
           <metric-list
             data-test="logs-search-index-list"
+            v-model="searchObj.data.metrics.selectedMetric"
+            :metrics-list="searchObj.data.metrics.metricList"
             @select-label="addLabelToEditor"
             @update:change-metric="onMetricChange"
           />
@@ -251,46 +253,46 @@ import {
   onBeforeMount,
   watch,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
-import MetricList from "./MetricList.vue";
 import useMetrics from "@/composables/useMetrics";
-import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import DateTime from "@/components/DateTime.vue";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
-import QueryEditor from "@/components/QueryEditor.vue";
 import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
-import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import useStreams from "@/composables/useStreams";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "AppMetrics",
   components: {
-    MetricList,
-    DateTime,
-    AutoRefreshInterval,
-    QueryEditor,
-    AddToDashboard,
+    MetricList: defineAsyncComponent(() => import("./MetricList.vue")),
+    DateTime: defineAsyncComponent(() => import("@/components/DateTime.vue")),
+    AutoRefreshInterval: defineAsyncComponent(
+      () => import("@/components/AutoRefreshInterval.vue")
+    ),
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue")
+    ),
+    AddToDashboard: defineAsyncComponent(() => import("./AddToDashboard.vue")),
     SyntaxGuideMetrics,
-    PanelSchemaRenderer,
+    PanelSchemaRenderer: defineAsyncComponent(
+      () => import("@/components/dashboards/PanelSchemaRenderer.vue")
+    ),
     SanitizedHtmlRenderer,
   },
   methods: {
@@ -320,7 +322,7 @@ export default defineComponent({
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
-    const parser = new Parser();
+    let parser: any;
     const metricsQueryEditorRef = ref(null);
     const { dashboardPanelData, resetDashboardPanelData } =
       useMetricsExplorer();
@@ -349,6 +351,12 @@ export default defineComponent({
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
 
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
     const updateStreams = () => {
       if (searchObj.data.streamResults?.list?.length) {
         const streamType = "metrics";
@@ -372,6 +380,7 @@ export default defineComponent({
     const showAddToDashboardDialog = ref(false);
 
     onBeforeMount(async () => {
+      await importSqlParser();
       restoreUrlQueryParams();
       verifyOrganizationStatus(store.state.organizations, router);
       await getLogStreams();
@@ -748,7 +757,7 @@ export default defineComponent({
 
       const query = metric?.value + "{}";
       nextTick(() => {
-        metricsQueryEditorRef.value.setValue(query);
+        metricsQueryEditorRef?.value?.setValue(query);
       });
     };
 
@@ -857,8 +866,6 @@ export default defineComponent({
         .join("&");
 
       let shareURL = window.location.origin + window.location.pathname;
-
-      console.log("shareURL", shareURL);
 
       if (queryString != "") {
         shareURL += "?" + queryString;

@@ -1,7 +1,7 @@
-import { Parser } from "node-sql-parser/build/mysql";
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { onBeforeMount } from "vue";
 
 interface BuildQueryPayload {
   from: number;
@@ -63,9 +63,20 @@ const getTimeInterval = (start_time: number, end_time: number) => {
 };
 
 const useQuery = () => {
-  const parser = new Parser();
+  let parser: any;
   const store = useStore();
   const { showErrorNotification } = useNotifications();
+
+  onBeforeMount(async () => {
+    await importSqlParser();
+  });
+
+  const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
+
   const parseQuery = (query: string, sqlMode = false) => {
     const parsedParams = {
       queryFunctions: "",

@@ -438,7 +438,7 @@ pub async fn around(
                     .await
                     .iter()
                     .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-                sql
+                if uses_fn { sql } else { default_sql }
             }
         },
     };
@@ -1416,10 +1416,13 @@ pub async fn search_partition(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
+    let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    if let Err(e) = req.decode() {
+        return Ok(MetaHttpResponse::bad_request(e));
+    }
 
     let search_fut = SearchService::search_partition(&trace_id, &org_id, stream_type, &req);
     let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {

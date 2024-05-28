@@ -123,6 +123,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
+    let start = std::time::Instant::now();
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
@@ -133,7 +134,11 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
     if files.is_empty() {
         return Ok(FxIndexMap::default());
     }
-    log::debug!("[INGESTER:JOB] move files get: {}", files.len());
+    log::debug!(
+        "[INGESTER:JOB] move files get: {}, took: {} ms",
+        files.len(),
+        start.elapsed().as_millis()
+    );
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
@@ -592,7 +597,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {:?}",
+        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,

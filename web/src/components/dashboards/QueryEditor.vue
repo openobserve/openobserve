@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="dashboard-panel-query-editor-div" class="dashboard-query-editor" ref="editorRef" id="editor"></div>
+  <div
+    data-test="dashboard-panel-query-editor-div"
+    class="dashboard-query-editor"
+    ref="editorRef"
+    id="editor"
+  ></div>
 </template>
 
 <script lang="ts">
@@ -260,6 +265,15 @@ export default defineComponent({
       return keywords;
     };
 
+    watch(
+      () => store.state.theme,
+      () => {
+        monaco.editor.setTheme(
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+        );
+      }
+    );
+
     onMounted(async () => {
       //   editorRef.value.addEventListener("keyup", onKeyUp);
 
@@ -414,7 +428,6 @@ export default defineComponent({
               insertText: `str_match(fieldname, '${lastElement}')`,
               range: range,
             });
-
           } else {
             props.suggestions.forEach((suggestion: any) => {
               filteredSuggestions.push({
@@ -512,7 +525,6 @@ export default defineComponent({
 
 <style lang="scss">
 .dashboard-query-editor {
-
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;

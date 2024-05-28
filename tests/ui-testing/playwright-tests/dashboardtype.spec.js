@@ -52,6 +52,7 @@ test.describe("dashboard testcases", () => {
         await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
             force: true,
         });
+        await page.waitForTimeout(3000);
         // get the data from the search variable
         await expect.poll(async () => (await search).status()).toBe(200);
         // await search.hits.FIXME_should("be.an", "array");
@@ -113,7 +114,6 @@ test.describe("dashboard testcases", () => {
         await page.locator('[data-test="index-dropdown-stream"]').fill('e2e');
         await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
         await page.waitForTimeout(3000)
-        await page.locator('[data-test="selected-chart-area-item"] img').click();
         await page.locator('[data-test="selected-chart-area-item"] img').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-x-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]').click();

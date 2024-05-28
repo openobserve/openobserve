@@ -321,7 +321,6 @@ import DashboardQueryBuilder from "../../../components/dashboards/addPanel/Dashb
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
-import DashboardQueryEditor from "../../../components/dashboards/addPanel/DashboardQueryEditor.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
@@ -358,7 +357,9 @@ export default defineComponent({
     ConfigPanel,
     VariablesValueSelector,
     PanelSchemaRenderer,
-    DashboardQueryEditor,
+    DashboardQueryEditor: defineAsyncComponent(
+      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue")
+    ),
     QueryInspector,
     CustomHTMLEditor,
     CustomMarkdownEditor,

@@ -15,11 +15,10 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref, toRaw, nextTick } from "vue";
+import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
-import { Parser } from "node-sql-parser/build/mysql";
 
 import {
   useLocalLogFilterField,
@@ -221,12 +220,22 @@ const useLogs = () => {
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream } = useStreams();
   const router = useRouter();
-  const parser = new Parser();
+  let parser: any;
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
 
   const { updateFieldKeywords } = useSqlSuggestions();
+
+  onBeforeMount(async () => {
+    await importSqlParser();
+  });
+
+  const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
   const resetSearchObj = () => {
@@ -511,7 +520,7 @@ const useLogs = () => {
           histogram:
             "select histogram(" +
             store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
@@ -714,8 +723,14 @@ const useLogs = () => {
             "[WHERE_CLAUSE]",
             " WHERE " + whereClause
           );
+
+          req.aggs.histogram = req.aggs.histogram.replace(
+            "[WHERE_CLAUSE]",
+            " WHERE " + whereClause
+          );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
+          req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
         }
 
         req.query.sql = req.query.sql.replace(
@@ -724,6 +739,11 @@ const useLogs = () => {
         );
 
         req.query.sql = req.query.sql.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+
+        req.aggs.histogram = req.aggs.histogram.replace(
           "[INDEX_NAME]",
           searchObj.data.stream.selectedStream.value
         );
@@ -824,16 +844,19 @@ const useLogs = () => {
         end_time: queryReq.query.end_time,
         sql_mode: searchObj.meta.sqlMode ? "full" : "context",
       };
+      if (store.state.zoConfig.sql_base64_enabled) {
+        partitionQueryReq["encoding"] = "base64";
+      }
 
       if (
         config.isEnterprise == "true" &&
         store.state.zoConfig.super_cluster_enabled
       ) {
-        if(queryReq.query.hasOwnProperty("regions")) {
-        partitionQueryReq["regions"] = queryReq.query.regions;
+        if (queryReq.query.hasOwnProperty("regions")) {
+          partitionQueryReq["regions"] = queryReq.query.regions;
         }
 
-        if(queryReq.query.hasOwnProperty("clusters")) {
+        if (queryReq.query.hasOwnProperty("clusters")) {
           partitionQueryReq["clusters"] = queryReq.query.clusters;
         }
       }
@@ -954,12 +977,38 @@ const useLogs = () => {
       let recordSize = 0;
       let from = 0;
       let lastPage = 0;
-      searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
-        (accumulator: number, currentValue: number) =>
-          accumulator + Math.max(currentValue, 0),
-        0
-      );
 
+      const parsedSQL: any = fnParsedSQL();
+
+      if (
+        (searchObj.data.queryResults.aggs == undefined &&
+          searchObj.data.resultGrid.currentPage == 1 &&
+          searchObj.loadingHistogram == false &&
+          searchObj.meta.showHistogram == true &&
+          (!searchObj.meta.sqlMode ||
+            (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+        (searchObj.loadingHistogram == false &&
+          searchObj.meta.showHistogram == true &&
+          searchObj.meta.sqlMode == false &&
+          searchObj.data.resultGrid.currentPage == 1)
+      ) {
+        console.log(searchObj.data.queryResults)
+        if(searchObj.data.queryResults.hasOwnProperty("aggs") && searchObj.data.queryResults.aggs != null) {
+        searchObj.data.queryResults.total = searchObj.data.queryResults.aggs.reduce(
+            (accumulator: number, currentValue: any) =>
+              accumulator + Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+            0
+          );
+          partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
+        }
+      } else {
+        searchObj.data.queryResults.total =
+          partitionDetail.partitionTotal.reduce(
+            (accumulator: number, currentValue: number) =>
+              accumulator + Math.max(currentValue, 0),
+            0
+          );
+      }
       // partitionDetail.partitions.forEach((item: any, index: number) => {
       for (const [index, item] of partitionDetail.partitions.entries()) {
         total = partitionDetail.partitionTotal[index];
@@ -1160,9 +1209,20 @@ const useLogs = () => {
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
 
-        // Removing sql_mode from histogram query, as it is not required
-        delete searchObj.data.histogramQuery.query.sql_mode;
+        searchObj.data.histogramQuery.query.sql =
+          searchObj.data.histogramQuery.aggs.histogram;
+        searchObj.data.histogramQuery.query.sql_mode = "full";
 
+        searchObj.data.histogramQuery.query.start_time =
+          searchObj.data.datetime.startTime;
+        searchObj.data.histogramQuery.query.end_time =
+          searchObj.data.datetime.endTime;
+        delete searchObj.data.histogramQuery.query.quick_mode;
+        delete searchObj.data.histogramQuery.query.from;
+
+        // Removing sql_mode from histogram query, as it is not required
+        //delete searchObj.data.histogramQuery.query.sql_mode;
+        delete searchObj.data.histogramQuery.aggs;
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
         // get the current page detail and set it into query request
@@ -1236,7 +1296,8 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          getHistogramQueryData(searchObj.data.histogramQuery);
+          await getHistogramQueryData(searchObj.data.histogramQuery);
+          refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
             xData: [],
@@ -1332,6 +1393,10 @@ const useLogs = () => {
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       queryReq.query.size = 0;
+      delete queryReq.query.from;
+      delete queryReq.query.quick_mode;
+      queryReq.query["sql_mode"] = "full";
+
       queryReq.query.track_total_hits = true;
       searchService
         .search({
@@ -1641,40 +1706,21 @@ const useLogs = () => {
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
-        queryReq.query.track_total_hits = true;
+        //queryReq.query.track_total_hits = true;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
           })
-          .then((res) => {
+          .then(async (res) => {
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
-            searchObj.data.queryResults.aggs = res.data.aggs;
-            searchObj.data.queryResults.total = res.data.total;
+            searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
-            searchObj.data.queryResults.took = res.data.took;
-            generateHistogramData();
+            searchObj.data.queryResults.took += res.data.took;
+            await generateHistogramData();
 
-            for (const [
-              index,
-              item,
-            ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
-              if (
-                (searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] == -1 ||
-                  searchObj.data.queryResults.partitionDetail.partitionTotal[
-                    index
-                  ] < res.data.total) &&
-                queryReq.query.start_time == item[0]
-              ) {
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] = res.data.total;
-              }
-            }
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
@@ -1683,7 +1729,7 @@ const useLogs = () => {
             // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
             refreshPartitionPagination(regeratePaginationFlag);
 
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
 
             searchObjDebug["histogramProcessingEndTime"] = performance.now();
@@ -1778,13 +1824,17 @@ const useLogs = () => {
       const schemaFields: any = [];
       if (searchObj.data.streamResults.list.length > 0) {
         const timestampField = store.state.zoConfig.timestamp_column;
+        const allField = store.state.zoConfig?.all_fields_name;
         const schemaInterestingFields: string[] = [];
+        let userDefineSchemaSettings: any = [];
         const schemaMaps: any = [];
         let fieldObj: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
+            userDefineSchemaSettings =
+              stream.settings?.defined_schema_fields?.slice() || [];
             // check for schema exist in the object or not
             // if not pull the schema from server.
             if (!stream.hasOwnProperty("schema")) {
@@ -1810,9 +1860,20 @@ const useLogs = () => {
 
             if (
               stream.settings.hasOwnProperty("defined_schema_fields") &&
-              stream.settings.defined_schema_fields.length > 0
+              userDefineSchemaSettings.length > 0
             ) {
               searchObj.meta.hasUserDefinedSchemas = true;
+              if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
+                userDefineSchemaSettings.push(
+                  store.state.zoConfig?.timestamp_column
+                );
+              }
+
+              if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
+                userDefineSchemaSettings.push(
+                  store.state.zoConfig?.all_fields_name
+                );
+              }
             } else {
               searchObj.meta.hasUserDefinedSchemas = false;
             }
@@ -1848,7 +1909,8 @@ const useLogs = () => {
                     ? true
                     : false,
                 isSchemaField: true,
-                showValues: field.name !== timestampField,
+                showValues:
+                  field.name !== timestampField && field.name !== allField,
                 isInterestingField:
                   searchObj.data.stream.interestingFieldList.includes(
                     field.name
@@ -1860,19 +1922,14 @@ const useLogs = () => {
                 store.state.zoConfig.user_defined_schemas_enabled &&
                 searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
                 stream.settings.hasOwnProperty("defined_schema_fields") &&
-                stream.settings.defined_schema_fields.length > 0
+                userDefineSchemaSettings.length > 0
               ) {
-                if (
-                  stream.settings.defined_schema_fields.includes(field.name)
-                ) {
+                if (userDefineSchemaSettings.includes(field.name)) {
                   schemaMaps.push(fieldObj);
                   schemaFields.push(field.name);
                 }
 
-                if (
-                  schemaMaps.length ==
-                  stream.settings.defined_schema_fields.length
-                ) {
+                if (schemaMaps.length == userDefineSchemaSettings.length) {
                   break;
                 }
               } else {
@@ -1953,7 +2010,7 @@ const useLogs = () => {
             ] = searchObj.data.stream.interestingFieldList;
             useLocalInterestingFields(localFields);
             searchObj.data.stream.userDefinedSchema =
-              stream.settings.defined_schema_fields || [];
+              userDefineSchemaSettings || [];
           }
         }
 
@@ -2095,6 +2152,7 @@ const useLogs = () => {
 
   function generateHistogramData() {
     try {
+      let num_records: number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
@@ -2103,11 +2161,12 @@ const useLogs = () => {
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
       ) {
-        searchObj.data.queryResults.aggs.histogram.map(
+        searchObj.data.queryResults.aggs.map(
           (bucket: {
             zo_sql_key: string | number | Date;
             zo_sql_num: string;
           }) => {
+            num_records = num_records + parseInt(bucket.zo_sql_num, 10);
             unparsed_x_data.push(bucket.zo_sql_key);
             // const histDate = new Date(bucket.zo_sql_key);
             xData.push(
@@ -2118,6 +2177,7 @@ const useLogs = () => {
           }
         );
       }
+      searchObj.data.queryResults.total = num_records;
 
       const chartParams = {
         title: getHistogramTitle(),
