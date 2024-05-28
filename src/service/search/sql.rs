@@ -570,7 +570,7 @@ impl Sql {
                 )
             );
             if histogram_interval.is_none() {
-                histogram_interval = Some(convert_histogram_interval_to_seconds(&interval));
+                histogram_interval = Some(convert_histogram_interval_to_seconds(&interval)?);
             }
         }
 
@@ -902,17 +902,22 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
     "10 second".to_string()
 }
 
-fn convert_histogram_interval_to_seconds(interval: &str) -> i64 {
+fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
     let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
-        return 0;
+        return Err(Error::Message("Invalid interval format".to_string()));
     };
-    match unit.to_lowercase().as_str() {
-        "second" | "seconds" => num.parse::<i64>().unwrap(),
-        "minute" | "minutes" => num.parse::<i64>().unwrap() * 60,
-        "hour" | "hours" => num.parse::<i64>().unwrap() * 3600,
-        "day" | "days" => num.parse::<i64>().unwrap() * 86400,
-        _ => 0,
-    }
+    let seconds = match unit.to_lowercase().as_str() {
+        "second" | "seconds" => num.parse::<i64>(),
+        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+        _ => {
+            return Err(Error::Message(
+                "Unsupported histogram interval unit".to_string(),
+            ));
+        }
+    };
+    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
 }
 
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
