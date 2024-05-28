@@ -314,7 +314,7 @@ def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_ur
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw_indexed_ignore_case()',
+            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw_ignore_case()',
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
