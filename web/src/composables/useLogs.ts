@@ -641,7 +641,6 @@ const useLogs = () => {
         const histogramParsedSQL: any = fnHistogramParsedSQL(req.aggs.histogram);
 
         histogramParsedSQL.where = parsedSQL.where;
-        console.log(histogramParsedSQL)
 
         let histogramQuery = parser.sqlify(histogramParsedSQL)
         histogramQuery = histogramQuery.replace(/`/g, '"');
@@ -1007,7 +1006,6 @@ const useLogs = () => {
           searchObj.meta.sqlMode == false &&
           searchObj.data.resultGrid.currentPage == 1)
       ) {
-        console.log(searchObj.data.queryResults);
         if (
           searchObj.data.queryResults.hasOwnProperty("aggs") &&
           searchObj.data.queryResults.aggs != null
