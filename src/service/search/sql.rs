@@ -696,8 +696,6 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
-        log::warn!("original: {}, rewrite: {}", origin_sql, rewrite_sql);
-
         Ok(Sql {
             origin_sql,
             rewrite_sql,
