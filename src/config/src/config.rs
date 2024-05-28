@@ -626,8 +626,6 @@ pub struct Common {
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
     pub allow_user_defined_schemas: bool,
-    #[env_config(name = "ZO_DATAFUSION_PARQUET_STAT_DISABLE_FOR_AGGS", default = false)]
-    pub datafusion_parquet_stat_disable_for_aggs: bool,
 }
 
 #[derive(EnvConfig)]

@@ -1237,20 +1237,14 @@ pub async fn register_table(
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
                 .with_target_partitions(CONFIG.limit.cpu_num)
-                .with_collect_stat(
-                    session.search_type != SearchType::Aggregation
-                        || !CONFIG.common.datafusion_parquet_stat_disable_for_aggs,
-                )
+                .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
                 .with_target_partitions(CONFIG.limit.cpu_num)
-                .with_collect_stat(
-                    session.search_type != SearchType::Aggregation
-                        || !CONFIG.common.datafusion_parquet_stat_disable_for_aggs,
-                )
+                .with_collect_stat(true)
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
