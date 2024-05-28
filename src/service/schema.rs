@@ -93,6 +93,7 @@ pub async fn check_for_schema(
         ));
     }
 
+    let mut need_insert_new_latest = false;
     let is_new = schema.schema().fields().is_empty();
     if !is_new {
         let (is_schema_changed, field_datatype_delta) =
@@ -120,17 +121,7 @@ pub async fn check_for_schema(
             if let Some(start_dt) = schema_metadata.get("start_dt") {
                 let created_at = start_dt.parse().unwrap_or_default();
                 if record_ts <= created_at {
-                    // need create a new version with start_dt = now
-                    _ = handle_diff_schema(
-                        org_id,
-                        stream_name,
-                        stream_type,
-                        is_new,
-                        &inferred_schema,
-                        chrono::Utc::now().timestamp_micros(),
-                        stream_schema_map,
-                    )
-                    .await?;
+                    need_insert_new_latest = true;
                 }
             }
         }
@@ -152,6 +143,21 @@ pub async fn check_for_schema(
         is_schema_changed: false,
         types_delta: None,
     });
+
+    // if need_insert_new_latest, create a new version with start_dt = now
+    if need_insert_new_latest {
+        _ = handle_diff_schema(
+            org_id,
+            stream_name,
+            stream_type,
+            is_new,
+            &inferred_schema,
+            chrono::Utc::now().timestamp_micros(),
+            stream_schema_map,
+        )
+        .await?;
+    }
+
     Ok(ret)
 }
 
@@ -273,20 +279,20 @@ async fn handle_diff_schema(
         .clone()
         .unwrap_or_default();
     let final_schema = SchemaCache::new(final_schema);
-    let final_schema =
-        generate_schema_for_defined_schema_fields(&final_schema, &defined_schema_fields);
-
-    // update thread cache
-    stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
 
     // update node cache
     let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), final_schema);
+    w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
     drop(w);
+
+    // update thread cache
+    let final_schema =
+        generate_schema_for_defined_schema_fields(&final_schema, &defined_schema_fields);
+    stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Ok(Some(SchemaEvolution {
         schema_compatible: true,
