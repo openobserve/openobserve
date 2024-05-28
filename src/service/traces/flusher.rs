@@ -51,6 +51,7 @@ pub enum BufferedWriteResult {
 }
 
 type RequestOps = HashMap<String, ExportRequest>;
+type TraceServiceResponseInner = (ExportTraceServiceResponse, Vec<Option<(String, String)>>);
 pub type ExportRequestInnerEntry = (
     String,
     usize,
@@ -65,7 +66,7 @@ pub type ExportRequestInnerEntry = (
 pub struct TraceServiceResponse {
     // org_id: String,
     // stream_name: String,
-    response: Result<(ExportTraceServiceResponse, Vec<Option<(String, String)>>), BufferWriteError>,
+    response: Result<TraceServiceResponseInner, BufferWriteError>,
 }
 type NotifyResult = HashMap<String, TraceServiceResponse>;
 type IoFlushNotifyResult = Result<NotifyResult, BufferWriteError>;
