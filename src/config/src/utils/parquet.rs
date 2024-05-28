@@ -33,8 +33,10 @@ pub fn new_parquet_writer<'a>(
     full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
-    let row_group_size = if CONFIG.limit.parquet_max_row_group_size > 0 {
-        CONFIG.limit.parquet_max_row_group_size
+    let config = CONFIG.read().unwrap();
+
+    let row_group_size = if config.limit.parquet_max_row_group_size > 0 {
+        config.limit.parquet_max_row_group_size
     } else {
         PARQUET_MAX_ROW_GROUP_SIZE
     };
@@ -46,11 +48,11 @@ pub fn new_parquet_writer<'a>(
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
         .set_column_dictionary_enabled(
-            CONFIG.common.column_timestamp.as_str().into(),
+            config.common.column_timestamp.as_str().into(),
             false,
         )
         .set_column_encoding(
-            CONFIG.common.column_timestamp.as_str().into(),
+            config.common.column_timestamp.as_str().into(),
             Encoding::DELTA_BINARY_PACKED,
         )
         .set_key_value_metadata(Some(vec![
@@ -70,9 +72,9 @@ pub fn new_parquet_writer<'a>(
     }
     // Bloom filter stored by row_group, so if the num_rows can limit to row_group_size
     let num_rows = min(metadata.records as u64, row_group_size as u64);
-    if CONFIG.common.bloom_filter_enabled {
+    if config.common.bloom_filter_enabled {
         // if bloom_filter_on_all_fields is true, then use all string fields
-        let fields = if CONFIG.common.bloom_filter_on_all_fields {
+        let fields = if config.common.bloom_filter_on_all_fields {
             schema
                 .fields()
                 .iter()
