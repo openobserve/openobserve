@@ -208,6 +208,7 @@ pub struct Response {
     #[serde(default)]
     pub is_partial: bool,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub histogram_interval: Option<i64>, // seconds, for histogram
 }
 
