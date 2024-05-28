@@ -193,6 +193,10 @@ test('should only display 5 result if limit 5 added', async ({ page }) => {
   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click({force: true});
   await page.waitForTimeout(2000)
   await page.getByText('Showing 1 to 5 out of 5').click();
+  await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click();
+  await page.waitForTimeout(2000)
+  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
 });
 
 test('should create a function and then delete it', async ({ page }) => {
@@ -440,6 +444,27 @@ test('should display pagination when only SQL is on clicking and closing the res
   await page.locator('[data-test="close-dialog"]').click();
   await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
 })
+
+test(' should display histogram in sql mode', async ({ page }) => {
+  await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+    position: {
+      x: 182,
+      y: 66
+    }
+  });
+  await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  // await page.getByRole('heading', { name: 'Error while fetching' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
+  await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+    position: {
+      x: 182,
+      y: 66
+    }
+  });
+
+});
 
 
 test('should display results when SQL+histogram is on and then stream is selected', async ({ page }) => {

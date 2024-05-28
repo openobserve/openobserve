@@ -629,8 +629,23 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
+        req.aggs.histogram = req.aggs.histogram.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+
+        req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
+
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
+        const histogramParsedSQL: any = fnHistogramParsedSQL(req.aggs.histogram);
+
+        histogramParsedSQL.where = parsedSQL.where;
+        console.log(histogramParsedSQL)
+
+        let histogramQuery = parser.sqlify(histogramParsedSQL)
+        histogramQuery = histogramQuery.replace(/`/g, '"');
+        req.aggs.histogram = histogramQuery;
 
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
@@ -992,13 +1007,18 @@ const useLogs = () => {
           searchObj.meta.sqlMode == false &&
           searchObj.data.resultGrid.currentPage == 1)
       ) {
-        console.log(searchObj.data.queryResults)
-        if(searchObj.data.queryResults.hasOwnProperty("aggs") && searchObj.data.queryResults.aggs != null) {
-        searchObj.data.queryResults.total = searchObj.data.queryResults.aggs.reduce(
-            (accumulator: number, currentValue: any) =>
-              accumulator + Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-            0
-          );
+        console.log(searchObj.data.queryResults);
+        if (
+          searchObj.data.queryResults.hasOwnProperty("aggs") &&
+          searchObj.data.queryResults.aggs != null
+        ) {
+          searchObj.data.queryResults.total =
+            searchObj.data.queryResults.aggs.reduce(
+              (accumulator: number, currentValue: any) =>
+                accumulator +
+                Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+              0
+            );
           partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
         }
       } else {
@@ -1374,7 +1394,26 @@ const useLogs = () => {
 
   const fnParsedSQL = () => {
     try {
+      console.log(searchObj.data);
       const filteredQuery = searchObj.data.query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      return parser.astify(filteredQuery);
+    } catch (e: any) {
+      return {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+    }
+  };
+
+  const fnHistogramParsedSQL = (query: string) => {
+    try {
+      const filteredQuery = query
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
