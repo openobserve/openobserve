@@ -20,9 +20,9 @@ use actix_web::{
     http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
+use chrono::Utc;
 use config::{
     utils::{base64, json},
-    CONFIG,
 };
 use strum::IntoEnumIterator;
 
