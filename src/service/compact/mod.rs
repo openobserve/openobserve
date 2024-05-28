@@ -195,8 +195,7 @@ pub async fn run_merge(
     ];
     for org_id in orgs {
         // check backlist
-        if !db::file_list::BLOCKED_ORGS.is_empty()
-            && db::file_list::BLOCKED_ORGS.contains(&org_id.as_str())
+        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }

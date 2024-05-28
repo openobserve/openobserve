@@ -79,7 +79,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = if CONFIG.common.meta_store_external {
+                let item_value = if CONFIG.read().await.common.meta_store_external {
                     match db::get(&ev.key).await {
                         Ok(val) => val,
                         Err(e) => {

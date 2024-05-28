@@ -38,8 +38,9 @@ use crate::{
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
+    let conf = CONFIG.read().await;
     let mut orgs = db::schema::list_organizations_from_cache().await;
-    orgs.retain(|org: &String| org != &CONFIG.common.usage_org);
+    orgs.retain(|org: &String| org != &conf.common.usage_org);
 
     for org_id in orgs {
         // get the working node for the organization
@@ -94,8 +95,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             timeout: 0,
         };
         // do search
-        match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req)
-            .await
+        match SearchService::search("", &conf.common.usage_org, StreamType::Logs, None, &req).await
         {
             Ok(res) => {
                 if !res.hits.is_empty() {
@@ -153,7 +153,15 @@ async fn get_last_stats(
         clusters: vec![],
         timeout: 0,
     };
-    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {
+    match SearchService::search(
+        "",
+        &CONFIG.read().await.common.usage_org,
+        StreamType::Logs,
+        None,
+        &req,
+    )
+    .await
+    {
         Ok(res) => Ok(res.hits),
         Err(err) => match &err {
             infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)) => {
@@ -217,7 +225,7 @@ async fn report_stats(
         data: Some(cluster_rpc::UsageData::from(report_data)),
     };
 
-    match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+    match ingestion_service::ingest(&CONFIG.read().await.common.usage_org, req).await {
         Ok(_) => Ok(()),
         Err(err) => Err(err),
     }

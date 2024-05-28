@@ -331,7 +331,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     SchemaCache::new(latest_schema.clone()),
                 );
                 drop(w);
-                if CONFIG.common.schema_cache_compress_enabled {
+                let conf = CONFIG.read().await;
+                if conf.common.schema_cache_compress_enabled {
                     let schema_versions = schema_versions
                         .into_iter()
                         .map(|(start_dt, data)| {
@@ -436,7 +437,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
                     let data_dir = format!(
                         "{}files/{org_id}/{stream_type}/{stream_name}",
-                        CONFIG.common.data_wal_dir
+                        CONFIG.read().await.common.data_wal_dir
                     );
                     let path = std::path::Path::new(&data_dir);
                     if path.exists() {
@@ -492,7 +493,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             SchemaCache::new(latest_schema.clone()),
         );
         drop(w);
-        if CONFIG.common.schema_cache_compress_enabled {
+        if CONFIG.read().await.common.schema_cache_compress_enabled {
             let schema_versions = schema_versions
                 .into_iter()
                 .map(|(start_dt, data)| {
@@ -555,7 +556,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     }
 
     // waiting for querier to be ready
-    let expect_querier_num = CONFIG.limit.starting_expect_querier_num;
+    let expect_querier_num = CONFIG.read().await.limit.starting_expect_querier_num;
     loop {
         let nodes = get_cached_online_querier_nodes().await.unwrap_or_default();
         if nodes.len() >= expect_querier_num {

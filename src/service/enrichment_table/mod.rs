@@ -152,7 +152,7 @@ pub async fn save_enrichment_data(
                     json_record.insert(header.into(), json::Value::String(field.into()));
                 }
                 json_record.insert(
-                    CONFIG.common.column_timestamp.clone(),
+                    CONFIG.read().await.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 

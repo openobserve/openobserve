@@ -68,7 +68,8 @@ pub fn signature_without_labels(
 
 fn get_exclude_labels() -> Vec<&'static str> {
     let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
-    vec.push(&CONFIG.common.column_timestamp);
+    let conf = CONFIG.blocking_read();
+    vec.push(conf.common.column_timestamp.to_string().as_str());
     vec
 }
 

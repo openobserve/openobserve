@@ -67,7 +67,9 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Err(anyhow::anyhow!(
             "Quota exceeded for this organization [{}]",
             org_id
@@ -79,10 +81,11 @@ pub async fn remote_write(
         return Err(anyhow::Error::msg(e.to_string()));
     }
 
+    let conf = CONFIG.read().await;
     // let min_ts = (Utc::now() -
     // Duration::try_hours(CONFIG.limit.ingest_allowed_upto)).unwrap().timestamp_micros();
-    let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
-    let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
+    let dedup_enabled = conf.common.metrics_dedup_enabled;
+    let election_interval = conf.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
     let mut has_entry = false;
     let mut accept_record: bool;
@@ -154,12 +157,12 @@ pub async fn remote_write(
             .labels
             .drain(..)
             .filter(|label| {
-                if label.name == CONFIG.prom.ha_replica_label {
+                if label.name == conf.prom.ha_replica_label {
                     if !has_entry {
                         replica_label = label.value.clone();
                     }
                     false
-                } else if label.name == CONFIG.prom.ha_cluster_label {
+                } else if label.name == conf.prom.ha_cluster_label {
                     if !has_entry && cluster_name.is_empty() {
                         cluster_name = format!("{}/{}", org_id, label.value.clone());
                     }
@@ -322,7 +325,7 @@ pub async fn remote_write(
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             val_map.insert(
-                CONFIG.common.column_timestamp.clone(),
+                conf.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
             let value_str = config::utils::json::to_string(&val_map).unwrap();
@@ -562,12 +565,13 @@ pub(crate) async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
+    let conf = CONFIG.read().await;
     // Comma-separated list of label names
     let label_names = schema
         .fields()
         .iter()
         .map(|f| f.name().as_str())
-        .filter(|&s| s != CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
+        .filter(|&s| s != conf.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
         .collect::<Vec<_>>()
         .join("\", \"");
     if label_names.is_empty() {
@@ -578,7 +582,7 @@ pub(crate) async fn get_series(
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
-            if mat.name == CONFIG.common.column_timestamp
+            if mat.name == conf.common.column_timestamp
                 || mat.name == VALUE_LABEL
                 || schema.field_with_name(&mat.name).is_err()
             {
@@ -652,6 +656,7 @@ pub(crate) async fn get_labels(
         Ok(schemas) => schemas,
     };
     let mut label_names = hashbrown::HashSet::new();
+    let conf = CONFIG.read().await;
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {
@@ -668,7 +673,7 @@ pub(crate) async fn get_labels(
                 .iter()
                 .map(|f| f.name())
                 .filter(|&s| {
-                    s != &CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
+                    s != &conf.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
                 })
                 .cloned();
             label_names.extend(field_names);

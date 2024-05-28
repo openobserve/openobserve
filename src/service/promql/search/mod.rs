@@ -151,6 +151,7 @@ async fn search_in_cluster(
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
+                let conf = CONFIG.read().await;
                 let org_id: MetadataValue<_> = req
                     .org_id
                     .parse()
@@ -170,7 +171,7 @@ async fn search_in_cluster(
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -181,20 +182,23 @@ async fn search_in_cluster(
                         );
                         server_internal_error("connect search node error")
                     })?;
+
+                let conf = CONFIG.clone().blocking_read();
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
+                        channel,
+                        move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
                         req.metadata_mut()
-                            .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                            .insert(conf.grpc.org_header_key.as_str(), org_id.clone());
                         Ok(req)
                     },
                 );
+                let conf = CONFIG.read().await;
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
                 {
                     Ok(res) => res.into_inner(),

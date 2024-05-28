@@ -65,7 +65,7 @@ impl Metadata for TraceListIndex {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
             Field::new(
-                CONFIG.common.column_timestamp.as_str(),
+                CONFIG.blocking_read().common.column_timestamp.as_str(),
                 DataType::Int64,
                 false,
             ),
@@ -240,7 +240,7 @@ mod tests {
         let mut data = json::to_value(item).unwrap();
         let data = data.as_object_mut().unwrap();
         data.insert(
-            CONFIG.common.column_timestamp.clone(),
+            CONFIG.read().await.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
         let hour_key = ingestion::get_wal_time_key(

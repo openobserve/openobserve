@@ -93,12 +93,13 @@ pub async fn sql(
         return Ok(HashMap::new());
     }
 
+    let conf = CONFIG.read().await;
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
     let without_optimizer = select_wildcard
-        && CONFIG.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
+        && conf.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > conf.limit.query_optimization_num_fields;
     let (mut ctx, mut ctx_aggs) = if !file_type.eq(&FileType::ARROW) {
         let ctx = register_table(
             session,
@@ -184,7 +185,7 @@ pub async fn sql(
     };
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
-        if CONFIG.common.print_key_sql {
+        if conf.common.print_key_sql {
             log::info!("[trace_id {trace_id}] Query agg sql: {}", orig_agg_sql.0);
         }
 
@@ -261,11 +262,11 @@ async fn exec_query(
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
-
+    let conf = CONFIG.read().await;
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
     let without_optimizer = select_wildcard
-        && CONFIG.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
+        && conf.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > conf.limit.query_optimization_num_fields;
 
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
@@ -306,9 +307,9 @@ async fn exec_query(
             Some(ts_range) => format!(
                 "{} where {} >= {} AND {} < {}",
                 sql_parts[0],
-                CONFIG.common.column_timestamp,
+                conf.common.column_timestamp,
                 ts_range.0,
-                CONFIG.common.column_timestamp,
+                conf.common.column_timestamp,
                 ts_range.1
             ),
             None => sql_parts[0].to_owned(),
@@ -325,7 +326,7 @@ async fn exec_query(
     }
 
     // Debug SQL
-    if CONFIG.common.print_key_sql {
+    if conf.common.print_key_sql {
         log::info!("[trace_id {trace_id}] Query sql: {}", query);
     }
 
@@ -582,10 +583,11 @@ pub async fn merge(
         );
     }
 
+    let conf = CONFIG.read().await;
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql);
     let without_optimizer = select_wildcard
-        && CONFIG.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
+        && conf.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > conf.limit.query_optimization_num_fields;
 
     // rewrite sql
     let mut query_sql = match merge_rewrite_sql(sql, schema, is_final_phase) {
@@ -618,7 +620,7 @@ pub async fn merge(
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(CONFIG.limit.cpu_num);
+        .with_target_partitions(conf.limit.cpu_num);
     let list_url = format!("tmpfs:///{}/", work_dir.name());
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
@@ -646,7 +648,7 @@ pub async fn merge(
     register_udf(&mut ctx, org_id).await;
 
     // Debug SQL
-    if CONFIG.common.print_key_sql {
+    if conf.common.print_key_sql {
         log::info!("Merge sql: {query_sql}, is_final_phase: {is_final_phase}");
     }
 
@@ -930,11 +932,12 @@ pub async fn convert_parquet_file(
     rules: HashMap<String, DataType>,
     file_type: FileType,
 ) -> Result<()> {
+    let conf = CONFIG.read().await;
     let start = std::time::Instant::now();
 
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.column_timestamp
+        conf.common.column_timestamp
     );
 
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
@@ -949,13 +952,13 @@ pub async fn convert_parquet_file(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
+                .with_target_partitions(conf.limit.cpu_num)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
+                .with_target_partitions(conf.limit.cpu_num)
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
@@ -1045,12 +1048,12 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
-
+    let conf = CONFIG.read().await;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(CONFIG.limit.cpu_num);
+        .with_target_partitions(conf.limit.cpu_num);
     let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
@@ -1062,22 +1065,22 @@ pub async fn merge_parquet_files(
         // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} ASC",
-            CONFIG.common.column_timestamp
+            conf.common.column_timestamp
         )
-    } else if CONFIG.limit.distinct_values_hourly
+    } else if conf.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
         && stream_name == "distinct_values"
     {
         format!(
             "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} ASC",
-            CONFIG.common.column_timestamp,
-            CONFIG.common.column_timestamp,
-            CONFIG.common.column_timestamp
+            conf.common.column_timestamp,
+            conf.common.column_timestamp,
+            conf.common.column_timestamp
         )
     } else {
         format!(
             "SELECT * FROM tbl ORDER BY {} ASC",
-            CONFIG.common.column_timestamp
+            conf.common.column_timestamp
         )
     };
 
@@ -1114,10 +1117,11 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
-    if CONFIG.common.bloom_filter_enabled {
+    let conf = CONFIG.blocking_read();
+    if conf.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
-    if CONFIG.common.bloom_filter_disabled_on_search {
+    if conf.common.bloom_filter_disabled_on_search {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
     Ok(config)
@@ -1138,18 +1142,19 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
 
+    let conf = CONFIG.blocking_read();
     let mut rn_config =
         RuntimeConfig::new().with_object_store_registry(Arc::new(object_store_registry));
-    if CONFIG.limit.datafusion_file_stat_cache_max_entries > 0 {
+    if conf.limit.datafusion_file_stat_cache_max_entries > 0 {
         let cache_config = CacheManagerConfig::default();
         let cache_config = cache_config.with_files_statistics_cache(Some(
             super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
         ));
         rn_config = rn_config.with_cache_manager(cache_config);
     }
-    if CONFIG.memory_cache.datafusion_max_size > 0 {
+    if conf.memory_cache.datafusion_max_size > 0 {
         #[cfg(not(feature = "enterprise"))]
-        let memory_size = CONFIG.memory_cache.datafusion_max_size;
+        let memory_size = conf.memory_cache.datafusion_max_size;
         #[cfg(feature = "enterprise")]
         let mut memory_size = CONFIG.memory_cache.datafusion_max_size;
         #[cfg(feature = "enterprise")]
@@ -1161,10 +1166,10 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
                 log::debug!("group:{} memory pool size: {}", wg, memory_size);
             }
         }
-        let mem_pool = super::MemoryPoolType::from_str(&CONFIG.memory_cache.datafusion_memory_pool)
+        let mem_pool = super::MemoryPoolType::from_str(&conf.memory_cache.datafusion_memory_pool)
             .map_err(|e| {
-                DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
-            })?;
+            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
+        })?;
         match mem_pool {
             super::MemoryPoolType::Greedy => {
                 rn_config = rn_config.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
@@ -1230,20 +1235,21 @@ pub async fn register_table(
         without_optimizer,
     )?;
 
+    let conf = CONFIG.read().await;
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
+                .with_target_partitions(conf.limit.cpu_num)
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
+                .with_target_partitions(conf.limit.cpu_num)
                 .with_collect_stat(true)
         }
         _ => {
@@ -1277,9 +1283,9 @@ pub async fn register_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    if CONFIG.common.feature_query_infer_schema
-        && (CONFIG.limit.query_optimization_num_fields > 0
-            && schema.fields().len() > CONFIG.limit.query_optimization_num_fields)
+    if conf.common.feature_query_infer_schema
+        && (conf.limit.query_optimization_num_fields > 0
+            && schema.fields().len() > conf.limit.query_optimization_num_fields)
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {

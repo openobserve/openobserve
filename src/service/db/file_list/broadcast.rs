@@ -38,7 +38,8 @@ type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
 /// send an event to broadcast, will create a new channel for each nodes
 pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode || items.is_empty() {
+    let conf = CONFIG.read().await;
+    if conf.common.local_mode || items.is_empty() {
         return Ok(());
     }
     let nodes = if let Some(node_uuid) = node_uuid {
@@ -62,7 +63,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
             continue;
         }
         // if meta_store_external is true, only send to querier
-        if CONFIG.common.meta_store_external && !is_querier(&node.role) {
+        if conf.common.meta_store_external && !is_querier(&node.role) {
             continue;
         }
         if !is_querier(&node.role) && !is_compactor(&node.role) && !is_ingester(&node.role) {
@@ -70,7 +71,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         }
         let node_uuid = node.uuid.clone();
         let node_addr = node.grpc_addr.clone();
-        if CONFIG.common.print_key_event {
+        if conf.common.print_key_event {
             items.iter().for_each(|item| {
                 log::info!(
                     "[broadcast] send event to node[{}]: file: {}, deleted: {}",
@@ -148,13 +149,14 @@ async fn send_to_node(
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             tokio::task::yield_now().await;
         }
+        let conf = CONFIG.read().await;
         // connect to the node
         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .expect("parse internal grpc token faile");
         let channel = match Channel::from_shared(node.grpc_addr.clone())
             .unwrap()
-            .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+            .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
             .connect()
             .await
         {
@@ -177,11 +179,13 @@ async fn send_to_node(
                 Ok(req)
             },
         );
+
+        let conf = CONFIG.read().await;
         client = client
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-            .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+            .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
+            .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
         loop {
             let items = match rx.recv().await {
                 Some(v) => v,

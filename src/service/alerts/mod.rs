@@ -921,7 +921,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             process_variable_replace(&mut resp, key, &VarValue::Str(&value));
 
             // calculate start and end time
-            if key == &CONFIG.common.column_timestamp {
+            if key == &CONFIG.blocking_read().common.column_timestamp {
                 let val = value.parse::<i64>().unwrap_or_default();
                 if alert_start_time == 0 || val < alert_start_time {
                     alert_start_time = val;

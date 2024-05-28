@@ -129,9 +129,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
 
+    let conf = CONFIG.read().await;
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
-    value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level).unwrap();
+    value = flatten::flatten_with_level(value, conf.limit.ingest_flatten_level).unwrap();
 
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
@@ -160,7 +161,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     };
 
     // handle timestamp
-    let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
+    let timestamp = match local_val.get(&conf.common.column_timestamp) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
             Err(_) => Utc::now().timestamp_micros(),
@@ -168,14 +169,14 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         None => Utc::now().timestamp_micros(),
     };
     // check ingestion time
-    let earlest_time = Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap();
+    let earlest_time = Utc::now() - Duration::try_hours(conf.limit.ingest_allowed_upto).unwrap();
     if timestamp < earlest_time.timestamp_micros() {
         stream_status.status.failed += 1; // to old data, just discard
         stream_status.status.error = get_upto_discard_error().to_string();
     }
 
     local_val.insert(
-        CONFIG.common.column_timestamp.clone(),
+        conf.common.column_timestamp.clone(),
         json::Value::Number(timestamp.into()),
     );
 

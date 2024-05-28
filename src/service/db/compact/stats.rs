@@ -22,7 +22,7 @@ use crate::service::db;
 static LOCAL_OFFSET: AtomicI64 = AtomicI64::new(0);
 
 pub async fn get_offset() -> (i64, String) {
-    if !CONFIG.common.meta_store_external {
+    if !CONFIG.read().await.common.meta_store_external {
         let offset = LOCAL_OFFSET.load(Ordering::Relaxed);
         return (offset, String::from(""));
     }
@@ -43,7 +43,7 @@ pub async fn get_offset() -> (i64, String) {
 }
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    if !CONFIG.common.meta_store_external {
+    if !CONFIG.read().await.common.meta_store_external {
         LOCAL_OFFSET.store(offset, Ordering::Release);
         return Ok(());
     }

@@ -48,8 +48,9 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
         }
     }
 
+    let conf = CONFIG.read().await;
     // write into local cache for s3
-    if !CONFIG.common.meta_store_external {
+    if !conf.common.meta_store_external {
         let mut write_buf = json::to_vec(&file_data)?;
         write_buf.push(b'\n');
         let file = wal::get_or_create(
@@ -63,7 +64,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     }
 
     // notify other nodes
-    if !CONFIG.common.meta_store_external || CONFIG.memory_cache.cache_latest_files {
+    if !conf.common.meta_store_external || conf.memory_cache.cache_latest_files {
         let mut q = BROADCAST_QUEUE.write().await;
         q.push(file_data);
     }
@@ -74,7 +75,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
 /// need to load wal file_list when the ingester
 async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::with_capacity(1024);
-    let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}file_list/", &CONFIG.read().await.common.data_wal_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut line_no = 0;
     for file in files {

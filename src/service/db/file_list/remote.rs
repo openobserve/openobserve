@@ -53,8 +53,9 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
-    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
+    let conf = CONFIG.read().await;
+    let mut tasks = Vec::with_capacity(conf.limit.query_thread_num + 1);
+    let chunk_size = std::cmp::max(1, files_num / conf.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
         let task: tokio::task::JoinHandle<Result<ProcessStats, anyhow::Error>> =
@@ -181,7 +182,7 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
         if !super::BLOCKED_ORGS.is_empty() {
             let columns = item.key.split('/').collect::<Vec<&str>>();
             let org_id = columns.get(1).unwrap_or(&"");
-            if super::BLOCKED_ORGS.contains(org_id) {
+            if super::BLOCKED_ORGS.contains(&org_id.to_string()) {
                 // log::error!("Load file_list skip blacklist org: {}", org_id);
                 continue;
             }
@@ -195,7 +196,7 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
             continue;
         }
         // check duplicate files
-        if CONFIG.common.feature_filelist_dedup_enabled {
+        if CONFIG.read().await.common.feature_filelist_dedup_enabled {
             if super::DEPULICATE_FILES.contains(&item.key) {
                 continue;
             }

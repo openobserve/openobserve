@@ -25,6 +25,7 @@ pub async fn ingest(
     dest_org_id: &str,
     req: cluster_rpc::UsageRequest,
 ) -> Result<cluster_rpc::UsageResponse, Error> {
+    let conf = CONFIG.read().await;
     let mut nodes = cluster::get_cached_online_ingester_nodes().await.unwrap();
     nodes.sort_by_key(|x| x.id);
 
@@ -52,7 +53,7 @@ pub async fn ingest(
         .map_err(|_| Error::msg("invalid token".to_string()))?;
     let channel = Channel::from_shared(node_addr)
         .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+        .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
         .connect()
         .await
         .map_err(|err| {
@@ -63,12 +64,14 @@ pub async fn ingest(
             );
             Error::msg("connect ingest node error")
         })?;
+    let config = CONFIG.clone();
     let mut client = cluster_rpc::usage_client::UsageClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
+            let conf = config.blocking_read();
             req.metadata_mut().insert("authorization", token.clone());
             req.metadata_mut().insert(
-                CONFIG.grpc.org_header_key.as_str(),
+                conf.grpc.org_header_key.as_str(),
                 dest_org_id.parse().unwrap(),
             );
             Ok(req)
@@ -77,8 +80,8 @@ pub async fn ingest(
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+        .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
     let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
         Ok(res) => res.into_inner(),
         Err(err) => {

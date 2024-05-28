@@ -28,8 +28,14 @@ pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
-pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
-    Lazy::new(|| CONFIG.compact.blocked_orgs.split(',').collect());
+pub static BLOCKED_ORGS: Lazy<Vec<String>> = Lazy::new(|| {
+    let conf = CONFIG.blocking_read();
+    conf.compact
+        .blocked_orgs
+        .split(',')
+        .map(|x| x.to_string())
+        .collect()
+});
 
 pub async fn progress(
     key: &str,
@@ -53,7 +59,7 @@ pub async fn progress(
             );
         }
         // update stream stats realtime
-        if CONFIG.common.local_mode {
+        if CONFIG.read().await.common.local_mode {
             if let Err(e) = cache::stats::incr_stream_stats(key, data.unwrap()) {
                 log::error!(
                     "service:db:file_list: add {}, incr_stream_stats error: {}",

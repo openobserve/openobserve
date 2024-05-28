@@ -228,6 +228,7 @@ async fn get_file_list(
             std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
         > = tokio::task::spawn(
             async move {
+                let conf = CONFIG.read().await;
                 let org_id: MetadataValue<_> = org_id
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid org_id".to_string()))?;
@@ -246,26 +247,28 @@ async fn get_file_list(
                     .map_err(|_| DataFusionError::Execution("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|_| {
                         DataFusionError::Execution("connect search node error".to_string())
                     })?;
+                let conf = CONFIG.read().await;
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
+                        let header_key = conf.grpc.org_header_key.clone();
                         req.metadata_mut().insert("authorization", token.clone());
-                        req.metadata_mut()
-                            .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                        req.metadata_mut().insert(header_key, org_id.clone());
                         Ok(req)
                     },
                 );
+                let conf = CONFIG.read().await;
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
                 let response: cluster_rpc::MetricsWalFileResponse = match client
                     .wal_file(request)
                     .await

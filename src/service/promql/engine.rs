@@ -916,13 +916,14 @@ async fn selector_load_data_from_datafusion(
         }
     };
 
+    let conf = CONFIG.read().await;
     let mut df_group = table.clone().filter(
-        col(&CONFIG.common.column_timestamp)
+        col(&conf.common.column_timestamp)
             .gt(lit(start))
-            .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
+            .and(col(&conf.common.column_timestamp).lt_eq(lit(end))),
     )?;
     for mat in selector.matchers.matchers.iter() {
-        if mat.name == CONFIG.common.column_timestamp
+        if mat.name == conf.common.column_timestamp
             || mat.name == VALUE_LABEL
             || schema.field_with_name(&mat.name).is_err()
         {
@@ -952,7 +953,7 @@ async fn selector_load_data_from_datafusion(
         }
     }
     let batches = df_group
-        .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+        .sort(vec![col(&conf.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
 
@@ -965,7 +966,7 @@ async fn selector_load_data_from_datafusion(
             .downcast_ref::<StringArray>()
             .unwrap();
         let time_values = batch
-            .column_by_name(&CONFIG.common.column_timestamp)
+            .column_by_name(&conf.common.column_timestamp)
             .unwrap()
             .as_any()
             .downcast_ref::<Int64Array>()
@@ -982,7 +983,7 @@ async fn selector_load_data_from_datafusion(
                 let mut labels = Vec::with_capacity(batch.num_columns());
                 for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
                     let name = k.name();
-                    if name == &CONFIG.common.column_timestamp
+                    if name == &conf.common.column_timestamp
                         || name == HASH_LABEL
                         || name == VALUE_LABEL
                     {

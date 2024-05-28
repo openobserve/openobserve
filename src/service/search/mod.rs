@@ -72,8 +72,9 @@ pub async fn search(
     user_id: Option<String>,
     req: &search::Request,
 ) -> Result<search::Response, Error> {
+    let conf = CONFIG.read().await;
     let trace_id = if trace_id.is_empty() {
-        if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+        if conf.common.tracing_enabled || conf.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
@@ -152,6 +153,7 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
+    let conf = CONFIG.read().await;
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
@@ -209,16 +211,16 @@ pub async fn search_partition(
         compressed_size: compressed_size as usize,
         partitions: vec![],
     };
-    let mut total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
-    if total_secs * CONFIG.limit.query_group_base_speed * cpu_cores < resp.original_size {
+    let mut total_secs = resp.original_size / conf.limit.query_group_base_speed / cpu_cores;
+    if total_secs * conf.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
     }
-    let mut part_num = max(1, total_secs / CONFIG.limit.query_partition_by_secs);
-    if part_num * CONFIG.limit.query_partition_by_secs < total_secs {
+    let mut part_num = max(1, total_secs / conf.limit.query_partition_by_secs);
+    if part_num * conf.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
     let mut step = max(
-        Duration::try_seconds(CONFIG.limit.query_partition_min_secs)
+        Duration::try_seconds(conf.limit.query_partition_min_secs)
             .unwrap()
             .num_microseconds()
             .unwrap(),

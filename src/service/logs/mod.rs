@@ -285,9 +285,10 @@ async fn add_valid_record(
     mut record_val: Map<String, Value>,
     need_trigger: bool,
 ) -> Result<Option<TriggerAlertData>> {
+    let conf = CONFIG.read().await;
     let mut trigger: TriggerAlertData = Vec::new();
     let timestamp: i64 = record_val
-        .get(&CONFIG.common.column_timestamp)
+        .get(&conf.common.column_timestamp)
         .unwrap()
         .as_i64()
         .unwrap();
@@ -324,21 +325,20 @@ async fn add_valid_record(
     let valid_record = match schema_evolution.types_delta {
         None => true,
         Some(delta) => {
-            let ret_val = if !CONFIG.common.widening_schema_evolution
-                || !schema_evolution.is_schema_changed
-            {
-                cast_to_type(&mut record_val, delta)
-            } else {
-                let local_delta = delta
-                    .into_iter()
-                    .filter(|x| x.metadata().contains_key("zo_cast"))
-                    .collect::<Vec<_>>();
-                if !local_delta.is_empty() {
-                    cast_to_type(&mut record_val, local_delta)
+            let ret_val =
+                if !conf.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
+                    cast_to_type(&mut record_val, delta)
                 } else {
-                    Ok(())
-                }
-            };
+                    let local_delta = delta
+                        .into_iter()
+                        .filter(|x| x.metadata().contains_key("zo_cast"))
+                        .collect::<Vec<_>>();
+                    if !local_delta.is_empty() {
+                        cast_to_type(&mut record_val, local_delta)
+                    } else {
+                        Ok(())
+                    }
+                };
             match ret_val {
                 Ok(_) => true,
                 Err(e) => {
@@ -407,8 +407,9 @@ async fn add_record(
     write_buf: &mut HashMap<String, SchemaRecords>,
     record_val: Map<String, Value>,
 ) -> Result<()> {
+    let conf = CONFIG.read().await;
     let timestamp: i64 = record_val
-        .get(&CONFIG.common.column_timestamp)
+        .get(&conf.common.column_timestamp)
         .unwrap()
         .as_i64()
         .unwrap();
@@ -475,7 +476,7 @@ pub fn refactor_map(
 
     if has_elements {
         new_map.insert(
-            CONFIG.common.all_fields_name.to_string(),
+            CONFIG.blocking_read().common.all_fields_name.to_string(),
             Value::String(String::from_utf8(non_schema_map).unwrap()),
         );
     }

@@ -368,7 +368,7 @@ pub fn apply_stream_functions(
             value = apply_vrl_fn(runtime, vrl_runtime, &value, org_id, stream_name);
         }
     }
-    flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)
+    flatten::flatten_with_level(value, CONFIG.blocking_read().limit.ingest_flatten_level)
 }
 
 pub fn init_functions_runtime() -> Runtime {
@@ -413,7 +413,9 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow!("not an ingester"));
     }
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Err(anyhow!("Quota exceeded for this organization [{}]", org_id));
     }
 
@@ -542,9 +544,10 @@ pub async fn get_user_defined_schema(
                 .unwrap_or_default();
         if let Some(fields) = stream_settings.defined_schema_fields {
             if !fields.is_empty() {
+                let conf = CONFIG.read().await;
                 let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(&CONFIG.common.column_timestamp) {
-                    fields.insert(CONFIG.common.column_timestamp.to_string());
+                if !fields.contains(&conf.common.column_timestamp) {
+                    fields.insert(conf.common.column_timestamp.to_string());
                 }
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }

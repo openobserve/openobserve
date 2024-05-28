@@ -60,7 +60,7 @@ pub async fn report_request_usage_stats(
         .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
 
-    if !CONFIG.common.usage_enabled {
+    if !CONFIG.read().await.common.usage_enabled {
         return;
     }
 
@@ -135,7 +135,7 @@ pub async fn report_request_usage_stats(
 pub async fn publish_usage(mut usage: Vec<UsageData>) {
     let mut usages = USAGE_DATA.write().await;
     usages.append(&mut usage);
-    if usages.len() < CONFIG.common.usage_batch_size {
+    if usages.len() < CONFIG.read().await.common.usage_batch_size {
         return;
     }
 
@@ -147,13 +147,14 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
-    if !CONFIG.common.usage_enabled {
+    let conf = CONFIG.read().await;
+    if !conf.common.usage_enabled {
         return;
     }
 
     let mut usages = TRIGGERS_USAGE_DATA.write().await;
     usages.push(trigger);
-    if usages.len() < CONFIG.common.usage_batch_size {
+    if usages.len() < conf.common.usage_batch_size {
         return;
     }
 
@@ -176,7 +177,7 @@ pub async fn flush() {
 }
 
 async fn flush_usage() {
-    if !CONFIG.common.usage_enabled {
+    if !CONFIG.read().await.common.usage_enabled {
         return;
     }
 
@@ -193,7 +194,7 @@ async fn flush_usage() {
 }
 
 async fn flush_triggers_usage() {
-    if !CONFIG.common.usage_enabled {
+    if !CONFIG.read().await.common.usage_enabled {
         return;
     }
 
@@ -254,16 +255,16 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
 
     // Push all the search events
     report_data.append(&mut search_events);
-
-    if &CONFIG.common.usage_reporting_mode != "local"
-        && !CONFIG.common.usage_reporting_url.is_empty()
-        && !CONFIG.common.usage_reporting_creds.is_empty()
+    let conf = CONFIG.read().await;
+    if &conf.common.usage_reporting_mode != "local"
+        && !conf.common.usage_reporting_url.is_empty()
+        && !conf.common.usage_reporting_creds.is_empty()
     {
-        let url = url::Url::parse(&CONFIG.common.usage_reporting_url).unwrap();
-        let creds = if CONFIG.common.usage_reporting_creds.starts_with("Basic") {
-            CONFIG.common.usage_reporting_creds.to_string()
+        let url = url::Url::parse(&conf.common.usage_reporting_url).unwrap();
+        let creds = if conf.common.usage_reporting_creds.starts_with("Basic") {
+            conf.common.usage_reporting_creds.to_string()
         } else {
-            format!("Basic {}", &CONFIG.common.usage_reporting_creds)
+            format!("Basic {}", &conf.common.usage_reporting_creds)
         };
         if let Err(e) = Client::builder()
             .build()
@@ -276,7 +277,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             .await
         {
             log::error!("Error in ingesting usage data to external URL {:?}", e);
-            if &CONFIG.common.usage_reporting_mode != "both" {
+            if &conf.common.usage_reporting_mode != "both" {
                 // on error in ingesting usage data, push back the data
                 let mut usages = USAGE_DATA.write().await;
                 let mut curr_usages = curr_usages.clone();
@@ -286,7 +287,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         }
     }
 
-    if &CONFIG.common.usage_reporting_mode != "remote" {
+    if &conf.common.usage_reporting_mode != "remote" {
         let report_data = report_data
             .iter_mut()
             .map(|usage| json::to_value(usage).unwrap())
@@ -296,7 +297,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             stream_name: USAGE_STREAM.to_owned(),
             data: Some(cluster_rpc::UsageData::from(report_data)),
         };
-        if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+        if let Err(e) = ingestion_service::ingest(&conf.common.usage_org, req).await {
             log::error!("Error in ingesting usage data {:?}", e);
             // on error in ingesting usage data, push back the data
             let mut usages = USAGE_DATA.write().await;
@@ -318,7 +319,7 @@ async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
         stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
         data: Some(cluster_rpc::UsageData::from(json_triggers)),
     };
-    if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+    if let Err(e) = ingestion_service::ingest(&CONFIG.read().await.common.usage_org, req).await {
         log::error!("Error in ingesting triggers usage data {:?}", e);
         // on error in ingesting usage data, push back the data
         let mut usages = TRIGGERS_USAGE_DATA.write().await;

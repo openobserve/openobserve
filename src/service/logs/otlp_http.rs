@@ -102,7 +102,9 @@ pub async fn logs_json_handler(
         );
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
@@ -144,7 +146,8 @@ pub async fn logs_json_handler(
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<TriggerAlertData> = None;
 
-    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+    let conf = CONFIG.read().await;
+    let min_ts = (Utc::now() - Duration::try_hours(conf.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
     let partition_det = crate::service::ingestion::get_stream_partition_keys(
@@ -350,9 +353,9 @@ pub async fn logs_json_handler(
                     stream_status.status.error = get_upto_discard_error().to_string();
                     continue;
                 }
-
+                let conf = CONFIG.read().await;
                 local_val.insert(
-                    CONFIG.common.column_timestamp.clone(),
+                    conf.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -362,7 +365,7 @@ pub async fn logs_json_handler(
 
                 // JSON Flattening
                 value =
-                    flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level).unwrap();
+                    flatten::flatten_with_level(value, conf.limit.ingest_flatten_level).unwrap();
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_functions(

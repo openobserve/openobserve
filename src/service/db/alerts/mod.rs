@@ -155,7 +155,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
-                let item_value: Alert = if config::CONFIG.common.meta_store_external {
+                let item_value: Alert = if config::CONFIG.read().await.common.meta_store_external {
                     match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,

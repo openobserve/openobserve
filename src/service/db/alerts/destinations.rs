@@ -91,23 +91,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Destination = if config::CONFIG.common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
+                let item_value: Destination =
+                    if config::CONFIG.read().await.common.meta_store_external {
+                        match db::get(&ev.key).await {
+                            Ok(val) => match json::from_slice(&val) {
+                                Ok(val) => val,
+                                Err(e) => {
+                                    log::error!("Error getting value: {}", e);
+                                    continue;
+                                }
+                            },
                             Err(e) => {
                                 log::error!("Error getting value: {}", e);
                                 continue;
                             }
-                        },
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
                         }
-                    }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
+                    } else {
+                        json::from_slice(&ev.value.unwrap()).unwrap()
+                    };
                 ALERTS_DESTINATIONS.insert(item_key.to_owned(), item_value);
             }
             db::Event::Delete(ev) => {

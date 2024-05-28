@@ -97,7 +97,7 @@ pub async fn search(
     let timeout = if req.timeout > 0 {
         req.timeout as u64
     } else {
-        CONFIG.limit.query_timeout
+        CONFIG.read().await.limit.query_timeout
     };
 
     let mut engine = Query::new(
