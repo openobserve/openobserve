@@ -494,6 +494,7 @@ impl super::Db for NatsDb {
                                     .send(Event::Put(EventData {
                                         key: bucket_prefix.to_string() + &item_key,
                                         value: Some(entry.value),
+                                        start_dt: None,
                                     }))
                                     .await
                                     .unwrap(),
@@ -502,6 +503,7 @@ impl super::Db for NatsDb {
                                     .send(Event::Delete(EventData {
                                         key: bucket_prefix.to_string() + &item_key,
                                         value: None,
+                                        start_dt: None,
                                     }))
                                     .await
                                     .unwrap(),
