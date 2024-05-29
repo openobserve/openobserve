@@ -25,16 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         horizontal
       >
         <template v-slot:before>
-          <search-bar
-            data-test="logs-search-bar"
-            ref="searchBarRef"
-            :fieldValues="fieldValues"
-            :key="searchObj.data.transforms.length || -1"
-            @searchdata="searchData"
-            @onChangeInterval="onChangeInterval"
-            @onChangeTimezone="refreshTimezone"
-            @handleQuickModeChange="handleQuickModeChange"
-          />
+          <Suspense>
+            <search-bar
+              data-test="logs-search-bar"
+              ref="searchBarRef"
+              :fieldValues="fieldValues"
+              :key="searchObj.data.transforms.length || -1"
+              @searchdata="searchData"
+              @onChangeInterval="onChangeInterval"
+              @onChangeTimezone="refreshTimezone"
+              @handleQuickModeChange="handleQuickModeChange"
+            />
+          </Suspense>
         </template>
         <template v-slot:after>
           <div
