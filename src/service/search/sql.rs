@@ -342,7 +342,16 @@ impl Sql {
                 // sql mode full, disallow without limit, default limit 1000
                 meta.limit = CONFIG.limit.query_full_mode_limit;
             }
-            origin_sql = if meta.order_by.is_empty() && !sql_mode.eq(&SqlMode::Full) {
+            origin_sql = if meta.order_by.is_empty()
+                && (!sql_mode.eq(&SqlMode::Full)
+                    || (meta.group_by.is_empty()
+                        && !origin_sql
+                            .to_lowercase()
+                            .split(" from ")
+                            .next()
+                            .unwrap_or_default()
+                            .contains('(')))
+            {
                 let sort_by = if req_query.sort_by.is_empty() {
                     meta.order_by = vec![(CONFIG.common.column_timestamp.to_string(), true)];
                     format!("{} DESC", CONFIG.common.column_timestamp)
@@ -510,8 +519,8 @@ impl Sql {
         for key in [
             "match",
             "match_ignore_case",
-            "str_match",
-            // "str_match_ignore_case", use UDF will get better result
+            // "str_match"             // use UDF will get better result
+            // "str_match_ignore_case" // use UDF will get better result
         ] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{key}\b\(([^\)]*)\)")).unwrap();
             let re_fn = if key == "match" || key == "str_match" {

@@ -465,6 +465,7 @@ impl super::Db for Etcd {
                                     .send(Event::Put(EventData {
                                         key: item_key.to_string(),
                                         value: Some(Bytes::from(kv.value().to_vec())),
+                                        start_dt: None,
                                     }))
                                     .await
                                     .unwrap(),
@@ -472,6 +473,7 @@ impl super::Db for Etcd {
                                     .send(Event::Delete(EventData {
                                         key: item_key.to_string(),
                                         value: None,
+                                        start_dt: None,
                                     }))
                                     .await
                                     .unwrap(),

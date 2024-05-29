@@ -219,6 +219,7 @@ pub enum Event {
 pub struct EventData {
     pub key: String,
     pub value: Option<Bytes>,
+    pub start_dt: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

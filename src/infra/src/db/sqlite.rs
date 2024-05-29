@@ -264,6 +264,7 @@ impl super::Db for SqliteDb {
                 .send(Event::Put(EventData {
                     key: key.to_string(),
                     value: Some(value),
+                    start_dt,
                 }))
                 .await
             {
@@ -405,26 +406,32 @@ impl super::Db for SqliteDb {
 
         // event watch
         if need_watch {
-            if value.is_some() {
-                if let Err(e) = CHANNEL
-                    .watch_tx
-                    .clone()
-                    .send(Event::Put(EventData {
-                        key: key.to_string(),
-                        value: Some(Bytes::from(need_watch_dt.to_string())),
-                    }))
-                    .await
-                {
-                    log::error!("[SQLITE] send event error: {}", e);
-                }
-            }
+            let start_dt = if need_watch_dt > 0 {
+                Some(need_watch_dt)
+            } else {
+                None
+            };
             if new_value.is_some() {
                 if let Err(e) = CHANNEL
                     .watch_tx
                     .clone()
                     .send(Event::Put(EventData {
                         key: key.to_string(),
-                        value: Some(Bytes::from(need_watch_dt.to_string())),
+                        value: Some(Bytes::from("")),
+                        start_dt,
+                    }))
+                    .await
+                {
+                    log::error!("[SQLITE] send event error: {}", e);
+                }
+            } else if value.is_some() {
+                if let Err(e) = CHANNEL
+                    .watch_tx
+                    .clone()
+                    .send(Event::Put(EventData {
+                        key: key.to_string(),
+                        value: Some(Bytes::from("")),
+                        start_dt,
                     }))
                     .await
                 {
@@ -469,6 +476,7 @@ impl super::Db for SqliteDb {
                         .send(Event::Delete(EventData {
                             key: key.to_string(),
                             value: None,
+                            start_dt,
                         }))
                         .await
                     {
