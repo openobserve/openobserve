@@ -30,8 +30,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, AuthTokensExt, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRole,
+                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
+                UserRequest, UserRole,
             },
         },
         utils::auth::UserEmail,
