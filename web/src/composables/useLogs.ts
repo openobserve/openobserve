@@ -638,11 +638,13 @@ const useLogs = () => {
 
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
-        const histogramParsedSQL: any = fnHistogramParsedSQL(req.aggs.histogram);
+        const histogramParsedSQL: any = fnHistogramParsedSQL(
+          req.aggs.histogram
+        );
 
         histogramParsedSQL.where = parsedSQL.where;
 
-        let histogramQuery = parser.sqlify(histogramParsedSQL)
+        let histogramQuery = parser.sqlify(histogramParsedSQL);
         histogramQuery = histogramQuery.replace(/`/g, '"');
         req.aggs.histogram = histogramQuery;
 
@@ -651,17 +653,20 @@ const useLogs = () => {
           return false;
         }
 
-        if (parsedSQL.orderby == null) {
-          // showErrorNotification("Order by clause is required in SQL mode");
-          notificationMsg.value = "Order by clause is required in SQL mode";
-          return false;
-        }
+        // if (
+        //   hasTimeStampColumn(parsedSQL.columns) &&
+        //   parsedSQL.orderby == null
+        // ) {
+        //   // showErrorNotification("Order by clause is required in SQL mode");
+        //   notificationMsg.value = "Order by clause is required in SQL mode";
+        //   return false;
+        // }
 
-        if (!hasTimeStampColumn(parsedSQL.columns)) {
-          // showErrorNotification("Timestamp column is required in SQL mode");
-          notificationMsg.value = "Timestamp column is required in SQL mode";
-          return false;
-        }
+        // if (!hasTimeStampColumn(parsedSQL.columns)) {
+        //   // showErrorNotification("Timestamp column is required in SQL mode");
+        //   notificationMsg.value = "Timestamp column is required in SQL mode";
+        //   return false;
+        // }
 
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
@@ -823,7 +828,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(parsedSQL?.limit);
+    return !parsedSQL?.limit;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1208,8 +1213,10 @@ const useLogs = () => {
               router.currentRoute.value.name == "logs" &&
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
-              const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
-              const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
+              const start_time: number =
+                initialQueryPayload.value?.query?.start_time || 0;
+              const end_time: number =
+                initialQueryPayload.value?.query?.end_time || 0;
               queryReq.query.start_time = start_time;
               queryReq.query.end_time = end_time;
             }
@@ -2099,24 +2106,34 @@ const useLogs = () => {
       }
       searchObj.data.stream.selectedFields = selectedFields;
 
-      searchObj.data.resultGrid.columns.push({
-        name: "@timestamp",
-        field: (row: any) =>
-          timestampToTimezoneDate(
-            row[store.state.zoConfig.timestamp_column] / 1000,
-            store.state.timezone,
-            "yyyy-MM-dd HH:mm:ss.SSS"
-          ),
-        prop: (row: any) =>
-          timestampToTimezoneDate(
-            row[store.state.zoConfig.timestamp_column] / 1000,
-            store.state.timezone,
-            "yyyy-MM-dd HH:mm:ss.SSS"
-          ),
-        label: t("search.timestamp") + ` (${store.state.timezone})`,
-        align: "left",
-        sortable: true,
-      });
+      const parsedSQL: any = fnParsedSQL();
+      if (
+        (searchObj.meta.sqlMode == true &&
+          parsedSQL.hasOwnProperty("columns") &&
+          hasTimeStampColumn(parsedSQL.columns)) ||
+        searchObj.data.stream.selectedFields.includes(
+          store.state.zoConfig.timestamp_column
+        )
+      ) {
+        searchObj.data.resultGrid.columns.push({
+          name: "@timestamp",
+          field: (row: any) =>
+            timestampToTimezoneDate(
+              row[store.state.zoConfig.timestamp_column] / 1000,
+              store.state.timezone,
+              "yyyy-MM-dd HH:mm:ss.SSS"
+            ),
+          prop: (row: any) =>
+            timestampToTimezoneDate(
+              row[store.state.zoConfig.timestamp_column] / 1000,
+              store.state.timezone,
+              "yyyy-MM-dd HH:mm:ss.SSS"
+            ),
+          label: t("search.timestamp") + ` (${store.state.timezone})`,
+          align: "left",
+          sortable: true,
+        });
+      }
       if (searchObj.data.stream.selectedFields.length == 0) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
         if (searchObj.data.stream.selectedFields.length == 0) {
