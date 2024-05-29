@@ -519,8 +519,8 @@ impl Sql {
         for key in [
             "match",
             "match_ignore_case",
-            "str_match",
-            // "str_match_ignore_case", use UDF will get better result
+            // "str_match"             // use UDF will get better result
+            // "str_match_ignore_case" // use UDF will get better result
         ] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{key}\b\(([^\)]*)\)")).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
