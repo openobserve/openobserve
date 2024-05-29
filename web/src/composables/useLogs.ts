@@ -991,9 +991,8 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
 
       if (
-        (searchObj.data.queryResults.aggs == undefined &&
+        (searchObj.data.queryResults.aggs !== undefined &&
           searchObj.data.resultGrid.currentPage == 1 &&
-          searchObj.loadingHistogram == false &&
           searchObj.meta.showHistogram == true &&
           (!searchObj.meta.sqlMode ||
             (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
