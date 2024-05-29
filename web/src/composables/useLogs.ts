@@ -1209,10 +1209,10 @@ const useLogs = () => {
               router.currentRoute.value.name == "logs" &&
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
-              queryReq.query.start_time =
-                parseInt(initialQueryPayload.value?.query?.start_time);
-              queryReq.query.end_time =
-                parseInt(initialQueryPayload.value?.query?.end_time);
+              const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
+              const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
+              queryReq.query.start_time = start_time;
+              queryReq.query.end_time = end_time;
             }
           }
         }
