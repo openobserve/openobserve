@@ -823,11 +823,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(
-      parsedSQL?.groupby ||
-      hasAggregation(parsedSQL?.columns) ||
-      parsedSQL?.limit
-    );
+    return !(parsedSQL?.limit);
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1531,10 +1527,10 @@ const useLogs = () => {
         }
 
         // for group by query no need to get total.
-        if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
-          searchObj.meta.resultGrid.showPagination = false;
-          delete queryReq.query.track_total_hits;
-        }
+        // if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
+        //   searchObj.meta.resultGrid.showPagination = false;
+        //   delete queryReq.query.track_total_hits;
+        // }
       }
 
       searchService
@@ -1742,7 +1738,16 @@ const useLogs = () => {
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
-        //queryReq.query.track_total_hits = true;
+        const parsedSQL: any = fnParsedSQL();
+
+        let hasAggregationFlag = false;
+        if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+          hasAggregationFlag = hasAggregation(parsedSQL?.columns);
+          if (hasAggregationFlag) {
+            queryReq.query.track_total_hits = true;
+          }
+        }
+
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -1755,6 +1760,9 @@ const useLogs = () => {
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
+            if (hasAggregationFlag) {
+              searchObj.data.queryResults.total = res.data.total;
+            }
             await generateHistogramData();
 
             let regeratePaginationFlag = false;
@@ -2192,10 +2200,17 @@ const useLogs = () => {
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
+      let hasAggregationFlag = false;
+
+      const parsedSQL: any = fnParsedSQL();
+      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+      }
 
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
-        searchObj.data.queryResults.aggs
+        searchObj.data.queryResults.aggs &&
+        !hasAggregationFlag
       ) {
         searchObj.data.queryResults.aggs.map(
           (bucket: {
@@ -2212,8 +2227,8 @@ const useLogs = () => {
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }
         );
+        searchObj.data.queryResults.total = num_records;
       }
-      searchObj.data.queryResults.total = num_records;
 
       const chartParams = {
         title: getHistogramTitle(),
