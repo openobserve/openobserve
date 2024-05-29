@@ -459,8 +459,14 @@ pub struct AuthTokens {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct AuthTokensExt {
+<<<<<<< HEAD
     pub auth_ext: String,
     pub refresh_token: String,
     pub request_time: i64,
+=======
+    pub access_token: String,
+    pub refresh_token: String,
+    pub request_time: String,
+>>>>>>> 20fd312f (changes)
     pub expires_in: i64,
 }
