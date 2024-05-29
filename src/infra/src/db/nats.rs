@@ -494,6 +494,7 @@ impl super::Db for NatsDb {
                                     .send(Event::Put(EventData {
                                         key: bucket_prefix.to_string() + &item_key,
                                         value: Some(entry.value),
+                                        start_dt: None,
                                     }))
                                     .await
                                     .unwrap(),
@@ -502,6 +503,7 @@ impl super::Db for NatsDb {
                                     .send(Event::Delete(EventData {
                                         key: bucket_prefix.to_string() + &item_key,
                                         value: None,
+                                        start_dt: None,
                                     }))
                                     .await
                                     .unwrap(),
@@ -614,12 +616,20 @@ impl Locker {
             };
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!(
-                "nats lock for key: {}, error: {}",
-                self.key, err
-            )));
+            if err.contains("key already exists") {
+                Err(Error::Message(format!(
+                    "nats lock for key: {}, accquire timeout in {timeout}s",
+                    self.key
+                )))
+            } else {
+                Err(Error::Message(format!(
+                    "nats lock for key: {}, error: {}",
+                    self.key, err
+                )))
+            }
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     pub(crate) async fn unlock(&self) -> Result<()> {

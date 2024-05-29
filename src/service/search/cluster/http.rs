@@ -176,6 +176,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     } else {
         result.set_total(total);
     }
+    result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);

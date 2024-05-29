@@ -35,6 +35,15 @@ pub async fn init() {
             None
         }
     };
+
+    let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model().await;
+    if let Some(existing_model) = &existing_meta {
+        if meta.version == existing_model.version {
+            log::info!("OFGA model already exists & no changes required");
+            return;
+        }
+    }
+
     // 1. create a cluster lock
     let locker = dist_lock::lock("/ofga/model/", 0)
         .await

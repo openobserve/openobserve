@@ -267,47 +267,34 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let key_cloumns = ev.key.split('/').collect::<Vec<&str>>();
-                let ev_key = if key_cloumns.len() > 5 {
-                    key_cloumns[..5].join("/")
+                let (ev_key, ev_start_dt) = if key_cloumns.len() > 5 {
+                    (
+                        key_cloumns[..5].join("/"),
+                        key_cloumns[5].parse::<i64>().unwrap_or(0),
+                    )
                 } else {
-                    ev.key.to_string()
+                    (ev.key.to_string(), ev.start_dt.unwrap_or_default())
                 };
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let r = STREAM_SCHEMAS_LATEST.read().await;
-                let prev_schema_start_dt = if let Some(schema) = r.get(&item_key.to_owned()) {
-                    schema
-                        .schema()
-                        .metadata()
-                        .get("start_dt")
-                        .unwrap_or(&"0".to_string())
-                        .parse::<i64>()
-                        .unwrap()
+                let r = STREAM_SCHEMAS.read().await;
+                let prev_start_dt = if let Some(schemas) = r.get(&item_key.to_owned()) {
+                    let idx = if schemas.len() >= 2 {
+                        schemas.len() - 2
+                    } else {
+                        0
+                    };
+                    schemas[idx].0
                 } else {
                     0
                 };
                 drop(r);
-
-                let ts_range = match ev.value {
-                    Some(val) => {
-                        let start_dt = match String::from_utf8(val.to_vec()) {
-                            Ok(date_string) => {
-                                if date_string.is_empty() {
-                                    0
-                                } else {
-                                    date_string.parse::<i64>().unwrap_or(0)
-                                }
-                            }
-                            Err(_) => 0,
-                        };
-
-                        if start_dt > 0 {
-                            Some((prev_schema_start_dt, start_dt))
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
+                let ts_range = if ev_start_dt == 0 && prev_start_dt == 0 {
+                    None
+                } else if ev_start_dt == 0 || (prev_start_dt > 0 && ev_start_dt > prev_start_dt) {
+                    Some((prev_start_dt, chrono::Utc::now().timestamp_micros()))
+                } else {
+                    Some((ev_start_dt, chrono::Utc::now().timestamp_micros()))
                 };
 
                 let mut schema_versions =
@@ -355,7 +342,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
                     w.entry(item_key.to_string())
                         .and_modify(|existing_vec| {
-                            let _ = existing_vec.pop();
+                            existing_vec
+                                .retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
                             existing_vec.extend(schema_versions.clone())
                         })
                         .or_insert(schema_versions);
@@ -382,7 +370,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let mut w = STREAM_SCHEMAS.write().await;
                     w.entry(item_key.to_string())
                         .and_modify(|existing_vec| {
-                            let _ = existing_vec.pop();
+                            existing_vec
+                                .retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
                             existing_vec.extend(schema_versions.clone())
                         })
                         .or_insert(schema_versions);

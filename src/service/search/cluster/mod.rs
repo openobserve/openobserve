@@ -574,7 +574,7 @@ pub async fn search(
             }
         }
     }
-    if succeed == 0 {
+    if succeed == 0 || results.iter().map(|(_, v)| v.total).sum::<i64>() == 0 {
         if let Some(err) = last_error {
             return Err(err);
         }

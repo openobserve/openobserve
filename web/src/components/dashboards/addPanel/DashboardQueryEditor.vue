@@ -192,13 +192,14 @@ export default defineComponent({
     const confirmQueryModeChangeDialog = ref(false);
     let parser: any;
 
-    let streamName = "";
     const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
       usePromqlSuggestions();
+
     const queryEditorRef = ref(null);
 
     onBeforeMount(async () => {
       await importSqlParser();
+      updateQueryValue();
     });
 
     const importSqlParser = async () => {
@@ -740,7 +741,7 @@ export default defineComponent({
         ].customQuery,
         dashboardPanelData.meta.stream.selectedStreamFields,
       ],
-      () => {
+      async () => {
         // Only continue if the current mode is "show custom query"
         if (
           dashboardPanelData.data.queries[
@@ -749,7 +750,7 @@ export default defineComponent({
           dashboardPanelData.data.queryType == "sql"
         ) {
           // Call the updateQueryValue function
-          updateQueryValue();
+          if (parser) updateQueryValue();
         } else {
           // auto query mode selected
           // remove the custom fields from the list

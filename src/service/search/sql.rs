@@ -32,6 +32,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{get_stream_setting_fts_fields, STREAM_SCHEMAS_FIELDS},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
@@ -55,13 +56,14 @@ static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwr
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
 static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_indexed\('([^']*)'\)").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_indexed_ignore_case\('([^']*)'\)").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -81,6 +83,7 @@ pub struct Sql {
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
+    pub histogram_interval: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -339,7 +342,16 @@ impl Sql {
                 // sql mode full, disallow without limit, default limit 1000
                 meta.limit = CONFIG.limit.query_full_mode_limit;
             }
-            origin_sql = if meta.order_by.is_empty() && !sql_mode.eq(&SqlMode::Full) {
+            origin_sql = if meta.order_by.is_empty()
+                && (!sql_mode.eq(&SqlMode::Full)
+                    || (meta.group_by.is_empty()
+                        && !origin_sql
+                            .to_lowercase()
+                            .split(" from ")
+                            .next()
+                            .unwrap_or_default()
+                            .contains('(')))
+            {
                 let sort_by = if req_query.sort_by.is_empty() {
                     meta.order_by = vec![(CONFIG.common.column_timestamp.to_string(), true)];
                     format!("{} DESC", CONFIG.common.column_timestamp)
@@ -507,8 +519,8 @@ impl Sql {
         for key in [
             "match",
             "match_ignore_case",
-            "str_match",
-            // "str_match_ignore_case", use UDF will get better result
+            // "str_match"             // use UDF will get better result
+            // "str_match_ignore_case" // use UDF will get better result
         ] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{key}\b\(([^\)]*)\)")).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
@@ -542,6 +554,7 @@ impl Sql {
         }
 
         // Hack for histogram
+        let mut histogram_interval = None;
         let from_pos = origin_sql.to_lowercase().find(" from ").unwrap();
         let select_str = origin_sql[0..from_pos].to_string();
         for cap in RE_HISTOGRAM.captures_iter(select_str.as_str()) {
@@ -566,6 +579,9 @@ impl Sql {
                     "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))",
                 )
             );
+            if histogram_interval.is_none() {
+                histogram_interval = Some(convert_histogram_interval_to_seconds(&interval)?);
+            }
         }
 
         // pickup where
@@ -705,6 +721,7 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
+            histogram_interval,
         })
     }
 
@@ -893,6 +910,24 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
         }
     }
     "10 second".to_string()
+}
+
+fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
+    let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
+        return Err(Error::Message("Invalid interval format".to_string()));
+    };
+    let seconds = match unit.to_lowercase().as_str() {
+        "second" | "seconds" => num.parse::<i64>(),
+        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+        _ => {
+            return Err(Error::Message(
+                "Unsupported histogram interval unit".to_string(),
+            ));
+        }
+    };
+    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
 }
 
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
