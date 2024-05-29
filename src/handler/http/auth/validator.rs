@@ -720,15 +720,7 @@ pub(crate) async fn list_objects_for_user(
 }
 
 fn get_salt() -> String {
-    #[cfg(feature = "enterprise")]
-    {
-        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .common
-            .ext_auth_salt
-            .clone()
-    }
-    #[cfg(not(feature = "enterprise"))]
-    "openobserve".to_string()
+    CONFIG.auth.ext_auth_salt.clone()
 }
 #[cfg(test)]
 mod tests {
