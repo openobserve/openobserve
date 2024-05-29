@@ -17,8 +17,9 @@ use std::collections::HashMap;
 
 use config::{
     cluster::{is_single_node, load_local_node_role},
+    get_config, get_instance_id,
     utils::json,
-    CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT,
+    SIZE_IN_MB, TELEMETRY_CLIENT,
 };
 use hashbrown::HashSet;
 use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS_LATEST};
@@ -53,7 +54,7 @@ impl Telemetry {
         data: Option<HashMap<String, json::Value>>,
         send_zo_data: bool,
     ) {
-        if !CONFIG.read().await.common.telemetry_enabled {
+        if !get_config().common.telemetry_enabled {
             return;
         }
         log::info!("sending event {}", event);
@@ -69,7 +70,7 @@ impl Telemetry {
         self.add_event(Track {
             user: segment::message::User::UserId {
                 user_id: segment::message::User::AnonymousId {
-                    anonymous_id: INSTANCE_ID.get("instance_id").unwrap().to_string(),
+                    anonymous_id: get_instance_id(),
                 }
                 .to_string(),
             },
@@ -80,10 +81,7 @@ impl Telemetry {
         });
 
         let res = TELEMETRY_CLIENT
-            .send(
-                INSTANCE_ID.get("instance_id").unwrap().to_string(),
-                Message::from(self.event.clone()),
-            )
+            .send(get_instance_id(), Message::from(self.event.clone()))
             .await;
 
         if res.is_err() {
@@ -109,7 +107,7 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
     );
     data.insert(
         "host_name".to_string(),
-        CONFIG.blocking_read().common.instance_name.clone().into(),
+        get_config().common.instance_name.clone().into(),
     );
 
     data.insert("zo_version".to_string(), VERSION.to_owned().into());
@@ -138,7 +136,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     }
     drop(r);
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     data.insert("num_org".to_string(), orgs.len().into());
     data.insert("num_streams".to_string(), num_streams.into());
     data.insert("num_logs_streams".to_string(), logs_streams.into());
@@ -146,12 +144,12 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     data.insert("num_users".to_string(), USERS.len().into());
     data.insert(
         "is_local_mode".to_string(),
-        json::Value::Bool(conf.common.local_mode),
+        json::Value::Bool(cfg.common.local_mode),
     );
-    if conf.common.local_mode {
+    if cfg.common.local_mode {
         data.insert(
             "local_mode_storage".to_string(),
-            conf.common.local_mode_storage.clone().into(),
+            cfg.common.local_mode_storage.clone().into(),
         );
     }
     let db = infra_db::get_db().await;

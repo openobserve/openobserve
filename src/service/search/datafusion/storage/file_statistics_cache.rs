@@ -57,8 +57,7 @@ impl FileStatisticsCache {
 impl Default for FileStatisticsCache {
     fn default() -> Self {
         Self::new(
-            config::CONFIG
-                .blocking_read()
+            config::get_config()
                 .limit
                 .datafusion_file_stat_cache_max_entries,
         )

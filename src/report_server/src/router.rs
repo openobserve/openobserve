@@ -1,7 +1,6 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, put, web, HttpRequest, HttpResponse as ActixHttpResponse};
-use config::CONFIG;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -66,12 +65,12 @@ pub async fn send_report(
         None => "Europe/London",
     };
 
-    let config = CONFIG.read().await;
+    let cfg = config::get_config();
     let (pdf_data, email_dashboard_url) = match generate_report(
         &report.dashboards[0],
         &org_id,
-        &config.report_server.user_email,
-        &config.report_server.user_password,
+        &cfg.report_server.user_email,
+        &cfg.report_server.user_password,
         &report.email_details.dashb_url,
         timezone,
     )
@@ -85,7 +84,6 @@ pub async fn send_report(
         }
     };
 
-    let config = CONFIG.read().await;
     match send_email(
         &pdf_data,
         models::EmailDetails {
@@ -93,8 +91,8 @@ pub async fn send_report(
             ..report.email_details
         },
         models::SmtpConfig {
-            from_email: config.smtp.smtp_from_email.to_string(),
-            reply_to: config.smtp.smtp_reply_to.to_string(),
+            from_email: cfg.smtp.smtp_from_email.to_string(),
+            reply_to: cfg.smtp.smtp_reply_to.to_string(),
             client: &SMTP_CLIENT,
         },
     )

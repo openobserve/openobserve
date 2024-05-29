@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,9 @@
 
 use config::{
     cluster::*,
+    get_config,
     meta::cluster::{Node, NodeStatus, Role},
     utils::json,
-    CONFIG,
 };
 use etcd_client::PutOptions;
 use infra::{
@@ -51,7 +51,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
             let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
             let ret = etcd::keepalive_lease_id(
                 lease_id,
-                CONFIG.read().await.limit.node_heartbeat_ttl,
+                get_config().limit.node_heartbeat_ttl,
                 is_offline,
             )
             .await;
@@ -80,9 +80,9 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 
 /// Register to cluster
 async fn register() -> Result<()> {
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     // 1. create a cluster lock for node register
-    let locker = dist_lock::lock("/nodes/register", config.limit.node_heartbeat_ttl as u64).await?;
+    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. watch node list
     tokio::task::spawn(async move { super::watch_node_list().await });
@@ -130,15 +130,15 @@ async fn register() -> Result<()> {
     }
 
     // 4. join the cluster
-    let key = format!("{}nodes/{}", &config.etcd.prefix, *LOCAL_NODE_UUID);
+    let key = format!("{}nodes/{}", &cfg.etcd.prefix, *LOCAL_NODE_UUID);
     let node = Node {
         id: new_node_id,
         uuid: LOCAL_NODE_UUID.clone(),
-        name: config.common.instance_name.clone(),
-        http_addr: format!("http://{}:{}", get_local_http_ip(), config.http.port),
-        grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), config.grpc.port),
+        name: cfg.common.instance_name.clone(),
+        http_addr: format!("http://{}:{}", get_local_http_ip(), cfg.http.port),
+        grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), cfg.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
-        cpu_num: config.limit.cpu_num as u64,
+        cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
@@ -159,10 +159,7 @@ async fn register() -> Result<()> {
 
     // register node to cluster
     let mut client = etcd::get_etcd_client().await.clone();
-    let resp = match client
-        .lease_grant(config.limit.node_heartbeat_ttl, None)
-        .await
-    {
+    let resp = match client.lease_grant(cfg.limit.node_heartbeat_ttl, None).await {
         Ok(v) => v,
         Err(e) => {
             dist_lock::unlock(&locker).await?;
@@ -197,7 +194,7 @@ pub(crate) async fn set_offline(new_lease_id: bool) -> Result<()> {
 
 /// set online to cluster
 pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result<()> {
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     // set node status to online
     let node = match super::NODES.read().await.get(LOCAL_NODE_UUID.as_str()) {
         Some(node) => {
@@ -208,11 +205,11 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
         None => Node {
             id: unsafe { LOCAL_NODE_ID },
             uuid: LOCAL_NODE_UUID.clone(),
-            name: config.common.instance_name.clone(),
-            http_addr: format!("http://{}:{}", get_local_node_ip(), config.http.port),
-            grpc_addr: format!("http://{}:{}", get_local_node_ip(), config.grpc.port),
+            name: cfg.common.instance_name.clone(),
+            http_addr: format!("http://{}:{}", get_local_node_ip(), cfg.http.port),
+            grpc_addr: format!("http://{}:{}", get_local_node_ip(), cfg.grpc.port),
             role: LOCAL_NODE_ROLE.clone(),
-            cpu_num: config.limit.cpu_num as u64,
+            cpu_num: cfg.limit.cpu_num as u64,
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
@@ -228,7 +225,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
         // get new lease id
         let mut client = etcd::get_etcd_client().await.clone();
         let resp = client
-            .lease_grant(config.limit.node_heartbeat_ttl, None)
+            .lease_grant(cfg.limit.node_heartbeat_ttl, None)
             .await?;
         let lease_id = resp.id();
         // update local node key lease id
@@ -237,7 +234,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
         }
     }
 
-    let key = format!("{}nodes/{}", &config.etcd.prefix, *LOCAL_NODE_UUID);
+    let key = format!("{}nodes/{}", &cfg.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
@@ -249,11 +246,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
 
 /// Leave cluster
 pub(crate) async fn leave() -> Result<()> {
-    let key = format!(
-        "{}nodes/{}",
-        &CONFIG.read().await.etcd.prefix,
-        *LOCAL_NODE_UUID
-    );
+    let key = format!("{}nodes/{}", get_config().etcd.prefix, *LOCAL_NODE_UUID);
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.delete(key, None).await {
         return Err(Error::Message(format!("leave node error: {}", e)));
@@ -263,11 +256,7 @@ pub(crate) async fn leave() -> Result<()> {
 }
 
 pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
-    let key = format!(
-        "{}nodes/{}",
-        &CONFIG.read().await.etcd.prefix,
-        *LOCAL_NODE_UUID
-    );
+    let key = format!("{}nodes/{}", get_config().etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let val = json::to_string(&node).unwrap();
     let mut client = etcd::get_etcd_client().await.clone();

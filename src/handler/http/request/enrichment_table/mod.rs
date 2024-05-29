@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
-use config::{CONFIG, SIZE_IN_MB};
+use config::SIZE_IN_MB;
 use hashbrown::HashMap;
 
 use crate::{
@@ -62,11 +62,11 @@ pub async fn save_enrichment_table(
                 / SIZE_IN_MB
         }
     };
-    let config = CONFIG.read().await;
-    if content_length > config.limit.enrichment_table_limit as f64 {
+    let cfg = config::get_config();
+    if content_length > cfg.limit.enrichment_table_limit as f64 {
         return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
-            config.limit.enrichment_table_limit
+            cfg.limit.enrichment_table_limit
         )));
     }
     match content_type {

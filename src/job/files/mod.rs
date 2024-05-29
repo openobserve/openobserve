@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
+use config::{cluster, ider, meta::stream::StreamType, FILE_EXT_PARQUET};
 use tokio::time;
 
 pub mod broadcast;
@@ -41,7 +41,7 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         interval.tick().await;
         let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         if let Err(e) = config::utils::asynchronism::file::clean_empty_dirs(
-            &CONFIG.read().await.common.data_wal_dir,
+            &config::get_config().common.data_wal_dir,
             Some(last_updated),
         )
         .await

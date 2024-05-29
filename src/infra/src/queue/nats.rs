@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{cmp::max, sync::Arc, time::Duration};
 use async_nats::jetstream;
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{get_cluster_name, CONFIG};
+use config::get_cluster_name;
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -47,14 +47,14 @@ impl NatsQueue {
 
 impl Default for NatsQueue {
     fn default() -> Self {
-        Self::new(&CONFIG.blocking_read().nats.prefix)
+        Self::new(&config::get_config().nats.prefix)
     }
 }
 
 #[async_trait]
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
-        let config = CONFIG.read().await;
+        let cfg = config::get_config();
         let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         let topic_name = format!("{}{}", self.prefix, topic);
@@ -62,8 +62,8 @@ impl super::Queue for NatsQueue {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
             retention: jetstream::stream::RetentionPolicy::Limits,
-            max_age: Duration::from_secs(60 * 60 * 24 * max(1, config.nats.queue_max_age)),
-            num_replicas: config.nats.replicas,
+            max_age: Duration::from_secs(60 * 60 * 24 * max(1, cfg.nats.queue_max_age)),
+            num_replicas: cfg.nats.replicas,
             ..Default::default()
         };
         _ = jetstream.get_or_create_stream(config).await?;

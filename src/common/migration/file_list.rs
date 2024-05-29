@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    get_config,
     meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     utils::{file::get_file_meta, time::BASE_TIME},
-    CONFIG,
 };
 use infra::file_list as infra_file_list;
 
@@ -26,7 +26,7 @@ use crate::{
 };
 
 pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error> {
-    if get_file_meta(&CONFIG.read().await.common.data_wal_dir).is_err() {
+    if get_file_meta(&get_config().common.data_wal_dir).is_err() {
         // there is no local wal files, no need upgrade
         return Ok(());
     }

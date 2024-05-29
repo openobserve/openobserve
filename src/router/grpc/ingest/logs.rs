@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::CONFIG;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_client::LogsServiceClient, logs_service_server::LogsService,
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -35,12 +34,12 @@ impl LogsService for LogsServer {
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
         let (metadata, extensions, message) = request.into_parts();
 
-        let config = CONFIG.read().await;
+        let cfg = config::get_config();
         // basic validation
-        if !metadata.contains_key(&config.grpc.org_header_key) {
+        if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &config.grpc.org_header_key
+                &cfg.grpc.org_header_key
             )));
         }
 

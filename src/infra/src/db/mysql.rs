@@ -17,7 +17,6 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::CONFIG;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -31,14 +30,14 @@ use crate::errors::*;
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(connect);
 
 fn connect() -> Pool<MySql> {
-    let config = CONFIG.blocking_read();
-    let db_opts = MySqlConnectOptions::from_str(&config.common.meta_mysql_dsn)
+    let cfg = config::get_config();
+    let db_opts = MySqlConnectOptions::from_str(&cfg.common.meta_mysql_dsn)
         .expect("mysql connect options create failed")
         .disable_statement_logging();
 
     MySqlPoolOptions::new()
-        .min_connections(config.limit.sql_min_db_connections)
-        .max_connections(config.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_min_db_connections)
+        .max_connections(cfg.limit.sql_max_db_connections)
         .connect_lazy_with(db_opts)
 }
 
@@ -166,7 +165,7 @@ impl super::Db for MysqlDb {
         let lock_sql = format!(
             "SELECT GET_LOCK('{}', {})",
             lock_key,
-            CONFIG.read().await.limit.meta_transaction_lock_timeout
+            config::get_config().limit.meta_transaction_lock_timeout
         );
         let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_key);
         let mut lock_tx = lock_pool.begin().await?;

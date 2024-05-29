@@ -15,6 +15,7 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
+use arc_swap::ArcSwap;
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
@@ -29,7 +30,6 @@ use lettre::{
 };
 use once_cell::sync::Lazy;
 use sysinfo::{DiskExt, SystemExt};
-use tokio::sync::RwLock;
 
 use crate::{
     meta::cluster,
@@ -70,8 +70,7 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string()),
-        CONFIG
-            .blocking_read()
+        get_config()
             .common
             .feature_fulltext_extra_fields
             .split(',')
@@ -91,8 +90,7 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 });
 
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = CONFIG
-        .blocking_read()
+    let mut fields = get_config()
         .common
         .feature_quick_mode_fields
         .split(',')
@@ -114,8 +112,7 @@ const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
 pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
-        CONFIG
-            .blocking_read()
+        get_config()
             .common
             .feature_distinct_extra_fields
             .split(',')
@@ -138,8 +135,7 @@ const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
-        CONFIG
-            .blocking_read()
+        get_config()
             .common
             .bloom_filter_default_fields
             .split(',')
@@ -158,8 +154,8 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-pub static CONFIG: Lazy<Arc<RwLock<Config>>> = Lazy::new(|| Arc::new(RwLock::new(init())));
-pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
+static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
@@ -167,14 +163,25 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
             .connect_timeout(Duration::new(10, 0))
             .build()
             .unwrap(),
-        CONFIG.blocking_read().common.telemetry_url.clone(),
+        CONFIG.load().common.telemetry_url.clone(),
     )
 });
 
-pub async fn refresh_config() -> Result<(), anyhow::Error> {
-    let mut config = CONFIG.write().await;
-    *config = init();
+pub fn get_config() -> Arc<Config> {
+    CONFIG.load().clone()
+}
+
+pub fn refresh_config() -> Result<(), anyhow::Error> {
+    CONFIG.store(Arc::new(init()));
     Ok(())
+}
+
+pub fn cache_instance_id(instance_id: &str) {
+    INSTANCE_ID.insert("instance_id".to_owned(), instance_id.to_owned());
+}
+
+pub fn get_instance_id() -> String {
+    INSTANCE_ID.get("instance_id").unwrap().clone()
 }
 
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
@@ -187,32 +194,32 @@ pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
-    let config = CONFIG.read().await;
-    if !config.chrome.chrome_enabled || !config.common.report_server_url.is_empty() {
+    let cfg = get_config();
+    if !cfg.chrome.chrome_enabled || !cfg.common.report_server_url.is_empty() {
         None
     } else {
         let mut browser_config = BrowserConfig::builder()
             .window_size(
-                config.chrome.chrome_window_width,
-                config.chrome.chrome_window_height,
+                cfg.chrome.chrome_window_width,
+                cfg.chrome.chrome_window_height,
             )
             .viewport(Viewport {
-                width: config.chrome.chrome_window_width,
-                height: config.chrome.chrome_window_height,
+                width: cfg.chrome.chrome_window_width,
+                height: cfg.chrome.chrome_window_height,
                 device_scale_factor: Some(1.0),
                 ..Viewport::default()
             });
 
-        if config.chrome.chrome_with_head {
+        if cfg.chrome.chrome_with_head {
             browser_config = browser_config.with_head();
         }
 
-        if config.chrome.chrome_no_sandbox {
+        if cfg.chrome.chrome_no_sandbox {
             browser_config = browser_config.no_sandbox();
         }
 
-        if !config.chrome.chrome_path.is_empty() {
-            browser_config = browser_config.chrome_executable(config.chrome.chrome_path.as_str());
+        if !cfg.chrome.chrome_path.is_empty() {
+            browser_config = browser_config.chrome_executable(cfg.chrome.chrome_path.as_str());
         } else {
             panic!("Chrome path must be specified");
         }
@@ -221,16 +228,16 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
 }
 
 pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy::new(|| {
-    let config = CONFIG.blocking_read();
-    if !config.smtp.smtp_enabled {
+    let cfg = get_config();
+    if !cfg.smtp.smtp_enabled {
         None
     } else {
-        let tls_parameters = TlsParameters::new(config.smtp.smtp_host.clone()).unwrap();
+        let tls_parameters = TlsParameters::new(cfg.smtp.smtp_host.clone()).unwrap();
         let mut transport_builder =
-            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.smtp.smtp_host)
-                .port(config.smtp.smtp_port);
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&cfg.smtp.smtp_host)
+                .port(cfg.smtp.smtp_port);
 
-        let option = &config.smtp.smtp_encryption;
+        let option = &cfg.smtp.smtp_encryption;
         transport_builder = if option == "starttls" {
             transport_builder.tls(Tls::Required(tls_parameters))
         } else if option == "ssltls" {
@@ -239,10 +246,10 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
             transport_builder
         };
 
-        if !config.smtp.smtp_username.is_empty() && !config.smtp.smtp_password.is_empty() {
+        if !cfg.smtp.smtp_username.is_empty() && !cfg.smtp.smtp_password.is_empty() {
             transport_builder = transport_builder.credentials(Credentials::new(
-                config.smtp.smtp_username.clone(),
-                config.smtp.smtp_password.clone(),
+                cfg.smtp.smtp_username.clone(),
+                cfg.smtp.smtp_password.clone(),
             ));
         }
         Some(transport_builder.build())
@@ -250,8 +257,7 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
 });
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let config = CONFIG.blocking_read();
-    let blocked_streams = config
+    let blocked_streams = get_config()
         .common
         .blocked_streams
         .split(',')
@@ -1469,16 +1475,15 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 #[inline]
 pub fn is_local_disk_storage() -> bool {
-    let config = CONFIG.blocking_read();
-    config.common.local_mode && config.common.local_mode_storage.eq("disk")
+    let cfg = get_config();
+    cfg.common.local_mode && cfg.common.local_mode_storage.eq("disk")
 }
 
 #[inline]
 pub fn get_cluster_name() -> String {
-    let config = CONFIG.blocking_read();
-
-    if !config.common.cluster_name.is_empty() {
-        config.common.cluster_name.to_string()
+    let cfg = get_config();
+    if !cfg.common.cluster_name.is_empty() {
+        cfg.common.cluster_name.to_string()
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }

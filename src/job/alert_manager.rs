@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, config::CONFIG};
+use config::{cluster, get_config};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use tokio::time;
@@ -25,14 +25,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     log::info!(
         "Spawning embedded report server {}",
-        config.report_server.enable_report_server
+        cfg.report_server.enable_report_server
     );
-    if config.report_server.enable_report_server {
+    if cfg.report_server.enable_report_server {
         tokio::task::spawn(async move {
-            if let Err(e) = reportserver::spawn_server().await {
+            if let Err(e) = report_server::spawn_server().await {
                 log::error!("report server failed to spawn {}", e);
             }
         });
@@ -78,7 +78,7 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 
 async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.read().await.limit.scheduler_clean_interval,
+        get_config().limit.scheduler_clean_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
@@ -91,7 +91,7 @@ async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
 
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.read().await.limit.scheduler_watch_interval,
+        get_config().limit.scheduler_watch_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {

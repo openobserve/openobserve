@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
 use http_auth_basic::Credentials;
 use tonic::{metadata::MetadataValue, Request, Status};
 
@@ -26,10 +25,9 @@ use crate::common::{
 };
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
-    let conf = CONFIG.blocking_read();
+    let cfg = config::get_config();
     let metadata = req.metadata();
-    if !metadata.contains_key(&conf.grpc.org_header_key) && !metadata.contains_key("authorization")
-    {
+    if !metadata.contains_key(&cfg.grpc.org_header_key) && !metadata.contains_key("authorization") {
         return Err(Status::unauthenticated("No valid auth token"));
     }
 
@@ -43,11 +41,11 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     if token.eq(get_internal_grpc_token().as_str()) {
         Ok(req)
     } else {
-        let org_id = metadata.get(&conf.grpc.org_header_key);
+        let org_id = metadata.get(&cfg.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &conf.grpc.org_header_key
+                &cfg.grpc.org_header_key
             )));
         }
 
@@ -92,14 +90,14 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use config::INSTANCE_ID;
+    use config::cache_instance_id;
 
     use super::*;
     use crate::common::meta::user::User;
 
     #[tokio::test]
     async fn test_check_no_auth() {
-        INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
+        cache_instance_id("instance");
         ROOT_USER.insert(
             "root".to_string(),
             User {
@@ -128,7 +126,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_auth() {
-        INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
+        cache_instance_id("instance");
         ROOT_USER.insert(
             "root".to_string(),
             User {
@@ -155,7 +153,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_err_auth() {
-        INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
+        cache_instance_id("instance");
         ROOT_USER.insert(
             "root".to_string(),
             User {

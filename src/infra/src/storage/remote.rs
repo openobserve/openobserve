@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{metrics, CONFIG};
+use config::{get_config, metrics};
 use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
@@ -227,82 +227,80 @@ impl ObjectStore for Remote {
 }
 
 fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
-    let config = CONFIG.blocking_read();
+    let cfg = get_config();
     let mut opts = object_store::ClientOptions::default()
-        .with_connect_timeout(std::time::Duration::from_secs(config.s3.connect_timeout))
-        .with_timeout(std::time::Duration::from_secs(config.s3.request_timeout))
-        .with_allow_invalid_certificates(config.s3.allow_invalid_certificates)
+        .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
+        .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
+        .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates)
         .with_allow_http(true);
-    if config.s3.feature_http1_only {
+    if cfg.s3.feature_http1_only {
         opts = opts.with_http1_only();
     }
-    if config.s3.feature_http2_only {
+    if cfg.s3.feature_http2_only {
         opts = opts.with_http2_only();
     }
-    let force_hosted_style =
-        config.s3.feature_force_hosted_style || config.s3.feature_force_path_style;
+    let force_hosted_style = cfg.s3.feature_force_hosted_style || cfg.s3.feature_force_path_style;
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
         .with_client_options(opts)
-        .with_bucket_name(&config.s3.bucket_name)
+        .with_bucket_name(&cfg.s3.bucket_name)
         .with_virtual_hosted_style_request(force_hosted_style);
-    if !config.s3.server_url.is_empty() {
-        builder = builder.with_endpoint(&config.s3.server_url);
+    if !cfg.s3.server_url.is_empty() {
+        builder = builder.with_endpoint(&cfg.s3.server_url);
     }
-    if !config.s3.region_name.is_empty() {
-        builder = builder.with_region(&config.s3.region_name);
+    if !cfg.s3.region_name.is_empty() {
+        builder = builder.with_region(&cfg.s3.region_name);
     }
-    if !config.s3.access_key.is_empty() {
-        builder = builder.with_access_key_id(&config.s3.access_key);
+    if !cfg.s3.access_key.is_empty() {
+        builder = builder.with_access_key_id(&cfg.s3.access_key);
     }
-    if !config.s3.secret_key.is_empty() {
-        builder = builder.with_secret_access_key(&config.s3.secret_key);
+    if !cfg.s3.secret_key.is_empty() {
+        builder = builder.with_secret_access_key(&cfg.s3.secret_key);
     }
     builder.build()
 }
 
 fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzure> {
-    let config = CONFIG.blocking_read();
+    let cfg = get_config();
     let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(config.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(config.s3.request_timeout))
-                .with_allow_invalid_certificates(config.s3.allow_invalid_certificates),
+                .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
+                .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
+                .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
-        .with_container_name(&config.s3.bucket_name);
-    if !config.s3.access_key.is_empty() {
-        builder = builder.with_account(&config.s3.access_key);
+        .with_container_name(&cfg.s3.bucket_name);
+    if !cfg.s3.access_key.is_empty() {
+        builder = builder.with_account(&cfg.s3.access_key);
     }
-    if !config.s3.secret_key.is_empty() {
-        builder = builder.with_access_key(&config.s3.secret_key);
+    if !cfg.s3.secret_key.is_empty() {
+        builder = builder.with_access_key(&cfg.s3.secret_key);
     }
     builder.build()
 }
 
 fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
-    let config = CONFIG.blocking_read();
+    let cfg = get_config();
     let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(config.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(config.s3.request_timeout))
-                .with_allow_invalid_certificates(config.s3.allow_invalid_certificates),
+                .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
+                .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
+                .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
-        .with_bucket_name(&config.s3.bucket_name);
-    if !config.s3.access_key.is_empty() {
-        builder = builder.with_service_account_path(&config.s3.access_key);
+        .with_bucket_name(&cfg.s3.bucket_name);
+    if !cfg.s3.access_key.is_empty() {
+        builder = builder.with_service_account_path(&cfg.s3.access_key);
     }
     builder.build()
 }
 
 fn init_client() -> Box<dyn object_store::ObjectStore> {
-    let config = CONFIG.blocking_read();
-
-    if config.common.print_key_config {
-        log::info!("s3 init config: {:?}", config.s3);
+    let cfg = get_config();
+    if cfg.common.print_key_config {
+        log::info!("s3 init config: {:?}", cfg.s3);
     }
 
-    match config.s3.provider.as_str() {
+    match cfg.s3.provider.as_str() {
         "aws" | "s3" => match init_aws_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
@@ -324,7 +322,7 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
         _ => match init_aws_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("{} init config error: {:?}", config.s3.provider, e);
+                panic!("{} init config error: {:?}", cfg.s3.provider, e);
             }
         },
     }

@@ -24,7 +24,7 @@ use std::{
 use async_nats::{jetstream, Client, ServerAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, ider, utils::base64, CONFIG};
+use config::{cluster, get_config, ider, utils::base64};
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use tokio::{
@@ -50,20 +50,21 @@ async fn get_bucket_by_key<'a>(
     prefix: &'a str,
     key: &'a str,
 ) -> Result<(jetstream::kv::Store, &'a str)> {
+    let cfg = get_config();
     let client = get_nats_client().await.clone();
     let jetstream = jetstream::new(client);
     let key = key.trim_start_matches('/');
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
-        num_replicas: CONFIG.read().await.nats.replicas,
+        num_replicas: cfg.nats.replicas,
         history: 3,
         ..Default::default()
     };
     if bucket_name == "nodes" || bucket_name == "clusters" {
         // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
-        bucket.max_age = Duration::from_secs(CONFIG.read().await.limit.node_heartbeat_ttl as u64);
+        bucket.max_age = Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64);
     }
     let kv = jetstream.create_key_value(bucket).await?;
     Ok((kv, key.trim_start_matches(bucket_name)))
@@ -127,7 +128,7 @@ impl NatsDb {
 
 impl Default for NatsDb {
     fn default() -> Self {
-        Self::new(&CONFIG.blocking_read().nats.prefix)
+        Self::new(&get_config().nats.prefix)
     }
 }
 
@@ -321,8 +322,6 @@ impl super::Db for NatsDb {
         if keys_len == 0 {
             return Ok(HashMap::new());
         }
-        let config = CONFIG.read().await;
-        let cpu_num = config.limit.cpu_num;
 
         let values = futures::stream::iter(keys)
             .map(|key| async move {
@@ -330,7 +329,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<(String, Option<Bytes>), Error>((key, value))
             })
-            .buffer_unordered(cpu_num.clone())
+            .buffer_unordered(get_config().limit.cpu_num)
             .try_collect::<Vec<(String, Option<Bytes>)>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -363,8 +362,6 @@ impl super::Db for NatsDb {
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
-        let config = CONFIG.read().await;
-
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
         let bucket = &bucket;
         let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
@@ -390,7 +387,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<Option<Bytes>, Error>(value)
             })
-            .buffer_unordered(config.limit.cpu_num)
+            .buffer_unordered(get_config().limit.cpu_num)
             .try_collect::<Vec<Option<Bytes>>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -434,7 +431,6 @@ impl super::Db for NatsDb {
             return Ok(vec![]);
         }
         keys.sort();
-        let config = CONFIG.read().await;
         let values = futures::stream::iter(keys)
             .map(|key| async move {
                 let start_dt = key
@@ -447,7 +443,7 @@ impl super::Db for NatsDb {
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<Option<(i64, Bytes)>, Error>(value.map(|value| (start_dt, value)))
             })
-            .buffer_unordered(config.limit.cpu_num)
+            .buffer_unordered(get_config().limit.cpu_num)
             .try_collect::<Vec<Option<(i64, Bytes)>>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -536,20 +532,17 @@ pub async fn create_table() -> Result<()> {
 }
 
 pub async fn connect() -> async_nats::Client {
-    let config = CONFIG.read().await;
-    if config.common.print_key_config {
-        log::info!("Nats init config: {:?}", config.nats);
+    let cfg = get_config();
+    if cfg.common.print_key_config {
+        log::info!("Nats init get_config(): {:?}", cfg.nats);
     }
 
     let mut opts = async_nats::ConnectOptions::new()
-        .connection_timeout(Duration::from_secs(config.nats.connect_timeout));
-    if !config.nats.user.is_empty() {
-        opts = opts.user_and_password(
-            config.nats.user.to_string(),
-            config.nats.password.to_string(),
-        );
+        .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout));
+    if !cfg.nats.user.is_empty() {
+        opts = opts.user_and_password(cfg.nats.user.to_string(), cfg.nats.password.to_string());
     }
-    let addrs = config
+    let addrs = cfg
         .nats
         .addr
         .split(',')
@@ -585,10 +578,10 @@ impl Locker {
 
     /// lock with timeout, 0 means use default timeout, unit: second
     pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
-        let config = CONFIG.read().await;
-        let (bucket, new_key) = get_bucket_by_key(&config.nats.prefix, &self.key).await?;
+        let cfg = get_config();
+        let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
         let timeout = if timeout == 0 {
-            config.nats.lock_wait_timeout
+            cfg.nats.lock_wait_timeout
         } else {
             timeout
         };
@@ -645,8 +638,8 @@ impl Locker {
             return Ok(());
         }
 
-        let config = CONFIG.read().await;
-        let (bucket, new_key) = get_bucket_by_key(&config.nats.prefix, &self.key).await?;
+        let cfg = get_config();
+        let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
         let key = key_encode(new_key);
         let ret = bucket.get(&key).await?;
         let Some(ret) = ret else {

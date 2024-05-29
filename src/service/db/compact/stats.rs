@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,14 +15,12 @@
 
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use config::CONFIG;
-
 use crate::service::db;
 
 static LOCAL_OFFSET: AtomicI64 = AtomicI64::new(0);
 
 pub async fn get_offset() -> (i64, String) {
-    if !CONFIG.read().await.common.meta_store_external {
+    if !config::get_config().common.meta_store_external {
         let offset = LOCAL_OFFSET.load(Ordering::Relaxed);
         return (offset, String::from(""));
     }
@@ -43,7 +41,7 @@ pub async fn get_offset() -> (i64, String) {
 }
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
-    if !CONFIG.read().await.common.meta_store_external {
+    if !config::get_config().common.meta_store_external {
         LOCAL_OFFSET.store(offset, Ordering::Release);
         return Ok(());
     }

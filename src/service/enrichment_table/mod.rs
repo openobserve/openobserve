@@ -23,13 +23,12 @@ use actix_web::{
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamType},
         usage::UsageType,
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
-    CONFIG,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::{
@@ -152,7 +151,7 @@ pub async fn save_enrichment_data(
                     json_record.insert(header.into(), json::Value::String(field.into()));
                 }
                 json_record.insert(
-                    CONFIG.read().await.common.column_timestamp.clone(),
+                    get_config().common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,10 +21,7 @@ use std::{
 use arrow::{array::Int64Array, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::{
-    utils::record_batch_ext::{convert_json_to_record_batch, RecordBatchExt},
-    CONFIG,
-};
+use config::utils::record_batch_ext::{convert_json_to_record_batch, RecordBatchExt};
 use snafu::ResultExt;
 
 use crate::errors::*;
@@ -133,7 +130,7 @@ impl RecordBatchEntry {
         data_arrow_size: usize,
     ) -> Arc<RecordBatchEntry> {
         let (min_ts, max_ts) =
-            match data.column_by_name(&CONFIG.blocking_read().common.column_timestamp) {
+            match data.column_by_name(&config::get_config().common.column_timestamp) {
                 None => (0, 0),
                 Some(v) => {
                     let v = v.as_any().downcast_ref::<Int64Array>().unwrap();

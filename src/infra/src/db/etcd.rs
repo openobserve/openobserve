@@ -23,7 +23,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, CONFIG};
+use config::{cluster, get_config};
 use etcd_client::{
     Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
 };
@@ -47,8 +47,8 @@ pub async fn get_etcd_client() -> &'static etcd_client::Client {
 }
 
 pub async fn init() {
-    let config = CONFIG.read().await;
-    if config.common.local_mode || config.common.cluster_coordinator.to_lowercase() == "nats" {
+    let cfg = get_config();
+    if cfg.common.local_mode || cfg.common.cluster_coordinator.to_lowercase() == "nats" {
         return;
     }
     // enable keep alive for auth token
@@ -92,7 +92,7 @@ impl Etcd {
 
 impl Default for Etcd {
     fn default() -> Self {
-        Self::new(&CONFIG.blocking_read().etcd.prefix)
+        Self::new(&get_config().etcd.prefix)
     }
 }
 
@@ -229,21 +229,21 @@ impl super::Db for Etcd {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
-        let config = CONFIG.read().await;
+        let cfg = get_config();
         let mut result = HashMap::default();
         let key = format!("{}{}", self.prefix, prefix);
         let mut client = get_etcd_client().await.clone();
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
-            .with_limit(config.etcd.load_page_size);
+            .with_limit(cfg.etcd.load_page_size);
         let mut resp = client.get(key.clone(), Some(opt.clone())).await?;
         let mut first_call = true;
         let mut have_next = true;
         let mut last_key = String::new();
         loop {
             let kvs_num = resp.kvs().len() as i64;
-            if kvs_num < config.etcd.load_page_size {
+            if kvs_num < cfg.etcd.load_page_size {
                 have_next = false;
             }
             for kv in resp.kvs() {
@@ -274,21 +274,21 @@ impl super::Db for Etcd {
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
-        let config = CONFIG.read().await;
+        let cfg = get_config();
         let mut result = Vec::new();
         let key = format!("{}{}", self.prefix, prefix);
         let mut client = get_etcd_client().await.clone();
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
-            .with_limit(config.etcd.load_page_size);
+            .with_limit(cfg.etcd.load_page_size);
         let mut resp = client.get(key.clone(), Some(opt.clone())).await?;
         let mut first_call = true;
         let mut have_next = true;
         let mut last_key = String::new();
         loop {
             let kvs_num = resp.kvs().len() as i64;
-            if kvs_num < config.etcd.load_page_size {
+            if kvs_num < cfg.etcd.load_page_size {
                 have_next = false;
             }
             for kv in resp.kvs() {
@@ -319,21 +319,21 @@ impl super::Db for Etcd {
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
-        let config = CONFIG.read().await;
+        let cfg = get_config();
         let mut result = Vec::new();
         let key = format!("{}{}", self.prefix, prefix);
         let mut client = get_etcd_client().await.clone();
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
-            .with_limit(config.etcd.load_page_size);
+            .with_limit(cfg.etcd.load_page_size);
         let mut resp = client.get(key.clone(), Some(opt.clone())).await?;
         let mut first_call = true;
         let mut have_next = true;
         let mut last_key = String::new();
         loop {
             let kvs_num = resp.kvs().len() as i64;
-            if kvs_num < config.etcd.load_page_size {
+            if kvs_num < cfg.etcd.load_page_size {
                 have_next = false;
             }
             for kv in resp.kvs() {
@@ -367,7 +367,7 @@ impl super::Db for Etcd {
         prefix: &str,
         start_dt: Option<(i64, i64)>,
     ) -> Result<Vec<(i64, Bytes)>> {
-        let config = CONFIG.read().await;
+        let cfg = get_config();
         if start_dt.is_none() || start_dt == Some((0, 0)) {
             let vals = self.list_values(prefix).await?;
             return Ok(vals.into_iter().map(|v| (0, v)).collect());
@@ -380,14 +380,14 @@ impl super::Db for Etcd {
         let mut opt = GetOptions::new()
             .with_prefix()
             .with_sort(SortTarget::Key, SortOrder::Ascend)
-            .with_limit(config.etcd.load_page_size);
+            .with_limit(cfg.etcd.load_page_size);
         let mut resp = client.get(key.clone(), Some(opt.clone())).await?;
         let mut first_call = true;
         let mut have_next = true;
         let mut last_key = String::new();
         loop {
             let kvs_num = resp.kvs().len() as i64;
-            if kvs_num < config.etcd.load_page_size {
+            if kvs_num < cfg.etcd.load_page_size {
                 have_next = false;
             }
             for kv in resp.kvs() {
@@ -505,30 +505,30 @@ pub async fn create_table() -> Result<()> {
 }
 
 pub async fn connect() -> etcd_client::Client {
-    let config = CONFIG.read().await;
-    if config.common.print_key_config {
-        log::info!("Etcd init config: {:?}", config.etcd);
+    let cfg = get_config();
+    if cfg.common.print_key_config {
+        log::info!("Etcd init cfg: {:?}", cfg.etcd);
     }
 
     let mut opts = etcd_client::ConnectOptions::new()
-        .with_timeout(core::time::Duration::from_secs(config.etcd.command_timeout))
-        .with_connect_timeout(core::time::Duration::from_secs(config.etcd.connect_timeout));
-    if !&config.etcd.user.is_empty() {
-        opts = opts.with_user(&config.etcd.user, &config.etcd.password);
+        .with_timeout(core::time::Duration::from_secs(cfg.etcd.command_timeout))
+        .with_connect_timeout(core::time::Duration::from_secs(cfg.etcd.connect_timeout));
+    if !&cfg.etcd.user.is_empty() {
+        opts = opts.with_user(&cfg.etcd.user, &cfg.etcd.password);
     }
-    if config.etcd.cert_auth {
-        let server_root_ca_cert = tokio::fs::read(&config.etcd.ca_file).await.unwrap();
+    if cfg.etcd.cert_auth {
+        let server_root_ca_cert = tokio::fs::read(&cfg.etcd.ca_file).await.unwrap();
         let server_root_ca_cert = Certificate::from_pem(server_root_ca_cert);
-        let client_cert = tokio::fs::read(&config.etcd.cert_file).await.unwrap();
-        let client_key = tokio::fs::read(&config.etcd.key_file).await.unwrap();
+        let client_cert = tokio::fs::read(&cfg.etcd.cert_file).await.unwrap();
+        let client_key = tokio::fs::read(&cfg.etcd.key_file).await.unwrap();
         let client_identity = Identity::from_pem(client_cert, client_key);
         let tls = TlsOptions::new()
-            .domain_name(&config.etcd.domain_name)
+            .domain_name(&cfg.etcd.domain_name)
             .ca_certificate(server_root_ca_cert)
             .identity(client_identity);
         opts = opts.with_tls(tls);
     }
-    let addrs = config.etcd.addr.split(',').collect::<Vec<&str>>();
+    let addrs = cfg.etcd.addr.split(',').collect::<Vec<&str>>();
     etcd_client::Client::connect(addrs, Some(opts))
         .await
         .expect("Etcd connect failed")
@@ -540,7 +540,7 @@ pub async fn keepalive_connection() -> Result<()> {
             break;
         }
         let mut client = get_etcd_client().await.clone();
-        let key = format!("{}healthz", &CONFIG.read().await.etcd.prefix);
+        let key = format!("{}healthz", get_config().etcd.prefix);
         let key = key.as_str();
         client.put(key, "OK", None).await?;
         let mut interval = time::interval(time::Duration::from_secs(60));
@@ -622,7 +622,7 @@ pub(crate) struct Locker {
 impl Locker {
     pub(crate) fn new(key: &str) -> Self {
         Self {
-            key: format!("{}locker{}", &CONFIG.blocking_read().etcd.prefix, key),
+            key: format!("{}locker{}", get_config().etcd.prefix, key),
             lock_id: "".to_string(),
             state: Arc::new(AtomicU8::new(0)),
         }
@@ -630,15 +630,15 @@ impl Locker {
 
     /// lock with timeout, 0 means use default timeout, unit: second
     pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
-        let config = CONFIG.read().await;
+        let cfg = get_config();
         let mut client = get_etcd_client().await.clone();
         let mut last_err = None;
         let timeout = if timeout == 0 {
-            config.etcd.lock_wait_timeout
+            cfg.etcd.lock_wait_timeout
         } else {
             timeout
         };
-        let mut n = timeout / config.etcd.command_timeout;
+        let mut n = timeout / cfg.etcd.command_timeout;
         if n < 1 {
             n = 1;
         }
@@ -693,7 +693,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_etcd_count() {
-        if CONFIG.read().await.common.local_mode {
+        if get_config().common.local_mode {
             return;
         }
         let client = Etcd::default();

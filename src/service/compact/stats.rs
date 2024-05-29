@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE_UUID, CONFIG};
+use config::cluster::LOCAL_NODE_UUID;
 use infra::{dist_lock, file_list as infra_file_list};
 use tokio::time;
 
@@ -27,7 +27,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     }
 
     // before starting, set current node to lock the job
-    if CONFIG.read().await.common.meta_store_external
+    if config::get_config().common.meta_store_external
         && (node.is_empty() || LOCAL_NODE_UUID.ne(&node))
     {
         offset = match update_stats_lock_node().await {

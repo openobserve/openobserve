@@ -19,6 +19,7 @@ use ::datafusion::arrow::{datatypes::Schema, ipc, record_batch::RecordBatch};
 use async_recursion::async_recursion;
 use config::{
     cluster::{is_ingester, is_querier},
+    get_config,
     meta::{
         cluster::{Node, Role},
         search::{self, ScanStats},
@@ -27,7 +28,7 @@ use config::{
         },
     },
     utils::json,
-    CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
+    DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -37,7 +38,12 @@ use infra::{
 };
 use itertools::Itertools;
 use proto::cluster_rpc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{
+    codec::CompressionEncoding,
+    metadata::{MetadataKey, MetadataValue},
+    transport::Channel,
+    Request,
+};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -67,7 +73,7 @@ pub async fn search(
 )> {
     let start = std::time::Instant::now();
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
 
@@ -121,7 +127,7 @@ pub async fn search(
             .iter()
             .flat_map(|t| {
                 let mut tokenized_search_terms = vec![];
-                t.split(|c| conf.common.inverted_index_split_chars.contains(c))
+                t.split(|c| cfg.common.inverted_index_split_chars.contains(c))
                     .for_each(|s| {
                         let s = s.trim_matches(|c| DEFAULT_INDEX_TRIM_CHARS.contains(c));
                         if !s.is_empty() && s.len() >= INDEX_MIN_CHAR_LEN {
@@ -279,7 +285,7 @@ pub async fn search(
 
     let locker_key = "/search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
-    let locker = if conf.common.local_mode || !conf.common.feature_query_queue_enabled {
+    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
         dist_lock::lock(&locker_key, 0).await?
@@ -319,8 +325,8 @@ pub async fn search(
     let mut partition_files = Vec::new();
     let mut file_num = file_list.len();
     let mut partition_strategy =
-        QueryPartitionStrategy::from(&conf.common.feature_query_partition_strategy);
-    if conf.memory_cache.cache_latest_files {
+        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    if cfg.memory_cache.cache_latest_files {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
     let offset = match partition_strategy {
@@ -452,7 +458,7 @@ pub async fn search(
 
         let task = tokio::task::spawn(
             async move {
-                let conf = config::CONFIG.read().await;
+                let cfg = config::get_config();
                 let org_id: MetadataValue<_> = req
                     .org_id
                     .parse()
@@ -469,12 +475,17 @@ pub async fn search(
 
                 log::info!("[trace_id {trace_id}] search->grpc: request node: {}, is_querier: {}, files: {req_files}", &node_addr, is_querier);
 
+                let org_header_key: MetadataKey<_> = cfg
+                .grpc
+                .org_header_key
+                .parse()
+                .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -484,18 +495,17 @@ pub async fn search(
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
-                        let conf = CONFIG.blocking_read();
                         req.metadata_mut().insert("authorization", token.clone());
                         req.metadata_mut()
-                            .insert(conf.grpc.org_header_key.as_str(), org_id.clone());
+                            .insert(org_header_key.clone(), org_id.clone());
                         Ok(req)
                     },
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response;
                 tokio::select! {
                     result = client.search(request) => {
@@ -753,7 +763,7 @@ pub(crate) async fn get_file_list(
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
-    let is_local = CONFIG.read().await.common.meta_store_external
+    let is_local = get_config().common.meta_store_external
         || infra_cluster::get_cached_online_querier_nodes()
             .await
             .unwrap_or_default()
@@ -867,28 +877,25 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     // handle metrics response
     let mut results_metrics: HashMap<String, json::Value> = HashMap::with_capacity(16);
     let mut results_values: HashMap<String, Vec<[json::Value; 2]>> = HashMap::with_capacity(16);
-    let conf = CONFIG.blocking_read();
+    let cfg = get_config();
     for source in sources {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
-            if *k != conf.common.column_timestamp && k != "value" {
+            if *k != cfg.common.column_timestamp && k != "value" {
                 key.push(format!("{k}_{v}"));
             }
         });
         let key = key.join("_");
         if !results_metrics.contains_key(&key) {
             let mut fields = fields.clone();
-            fields.remove(&conf.common.column_timestamp);
+            fields.remove(&cfg.common.column_timestamp);
             fields.remove("value");
             results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
         let entry = results_values.entry(key).or_default();
         let value = [
-            fields
-                .get(&conf.common.column_timestamp)
-                .unwrap()
-                .to_owned(),
+            fields.get(&cfg.common.column_timestamp).unwrap().to_owned(),
             json::Value::String(fields.get("value").unwrap().to_string()),
         ];
         entry.push(value);

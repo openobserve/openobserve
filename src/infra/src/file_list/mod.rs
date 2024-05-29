@@ -14,12 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::{
-    meta::{
-        meta_store::MetaStore,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    },
-    CONFIG,
+use config::meta::{
+    meta_store::MetaStore,
+    stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
 };
 use once_cell::sync::Lazy;
 
@@ -32,7 +29,7 @@ pub mod sqlite;
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
-    match CONFIG.blocking_read().common.meta_store.as_str().into() {
+    match config::get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),

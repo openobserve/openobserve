@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, CONFIG};
+use config::{get_config, meta::stream::StreamType};
 use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi};
 
 use crate::{common::meta, handler::http::request};
@@ -246,9 +246,9 @@ pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        let config = CONFIG.blocking_read();
-        if !config.common.base_uri.is_empty() {
-            openapi.servers = Some(vec![utoipa::openapi::Server::new(&config.common.base_uri)]);
+        let cfg = get_config();
+        if !cfg.common.base_uri.is_empty() {
+            openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
         }
         let components = openapi.components.as_mut().unwrap();
         components.add_security_scheme(

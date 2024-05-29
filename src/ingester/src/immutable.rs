@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
-use config::{metrics, CONFIG};
+use config::metrics;
 use futures::future::join_all;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
@@ -117,7 +117,7 @@ pub(crate) async fn persist() -> Result<()> {
 
     let mut tasks = Vec::with_capacity(paths.len());
     let semaphore = Arc::new(Semaphore::new(
-        CONFIG.read().await.limit.file_move_thread_num,
+        config::get_config().limit.file_move_thread_num,
     ));
     for path in paths {
         let permit = semaphore.clone().acquire_owned().await.unwrap();

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::{cmp::min, path::Path};
 
-use config::{CONFIG, MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME};
+use config::{MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME};
 use futures::stream::StreamExt;
 use once_cell::sync::Lazy;
 use reqwest::Client;
@@ -33,12 +33,10 @@ use crate::{
 static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    let config = CONFIG.read().await;
-    std::fs::create_dir_all(&config.common.mmdb_data_dir)?;
+    let cfg = config::get_config();
+    std::fs::create_dir_all(&cfg.common.mmdb_data_dir)?;
     // should run it every 24 hours
-    let mut interval = time::interval(time::Duration::from_secs(
-        config.common.mmdb_update_duration,
-    ));
+    let mut interval = time::interval(time::Duration::from_secs(cfg.common.mmdb_update_duration));
 
     loop {
         interval.tick().await;
@@ -47,15 +45,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn run_download_files() {
-    let config = CONFIG.read().await;
+    let cfg = config::get_config();
 
     // send request and await response
     let client = reqwest::Client::new();
-    let city_fname = format!("{}{}", &config.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
-    let asn_fname = format!("{}{}", &config.common.mmdb_data_dir, MMDB_ASN_FILE_NAME);
+    let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    let asn_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_ASN_FILE_NAME);
 
     let download_city_files =
-        is_digest_different(&city_fname, &config.common.mmdb_geolite_citydb_sha256_url)
+        is_digest_different(&city_fname, &cfg.common.mmdb_geolite_citydb_sha256_url)
             .await
             .unwrap_or_else(|e| {
                 log::error!("Error checking digest difference: {e}");
@@ -63,7 +61,7 @@ async fn run_download_files() {
             });
 
     let download_asn_files =
-        is_digest_different(&asn_fname, &config.common.mmdb_geolite_asndb_sha256_url)
+        is_digest_different(&asn_fname, &cfg.common.mmdb_geolite_asndb_sha256_url)
             .await
             .unwrap_or_else(|e| {
                 log::error!("Error checking digest difference: {e}");
@@ -71,14 +69,14 @@ async fn run_download_files() {
             });
 
     if download_city_files {
-        match download_file(&client, &config.common.mmdb_geolite_citydb_url, &city_fname).await {
+        match download_file(&client, &cfg.common.mmdb_geolite_citydb_url, &city_fname).await {
             Ok(()) => {}
             Err(e) => log::error!("failed to download the files {}", e),
         }
     }
 
     if download_asn_files {
-        match download_file(&client, &config.common.mmdb_geolite_asndb_url, &asn_fname).await {
+        match download_file(&client, &cfg.common.mmdb_geolite_asndb_url, &asn_fname).await {
             Ok(()) => {}
             Err(e) => log::error!("failed to download the files {}", e),
         }

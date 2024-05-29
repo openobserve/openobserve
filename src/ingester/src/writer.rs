@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use std::{
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
-use config::{metrics, CONFIG};
+use config::{get_config, metrics};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
@@ -39,9 +39,9 @@ use crate::{
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
-    let config = CONFIG.blocking_read();
-    let writer_num = if config.common.feature_per_thread_lock {
-        config.limit.http_worker_num
+    let cfg = get_config();
+    let writer_num = if cfg.common.feature_per_thread_lock {
+        cfg.limit.http_worker_num
     } else {
         1
     };
@@ -66,7 +66,7 @@ pub fn check_memtable_size() -> Result<()> {
     let total_mem_size = metrics::INGEST_MEMTABLE_ARROW_BYTES
         .with_label_values(&[])
         .get();
-    if total_mem_size >= CONFIG.blocking_read().limit.mem_table_max_size as i64 {
+    if total_mem_size >= get_config().limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
     } else {
         Ok(())
@@ -89,10 +89,10 @@ pub async fn read_from_memtable(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
-    let writer_num = if config.common.feature_per_thread_lock {
-        config.limit.http_worker_num
+    let writer_num = if cfg.common.feature_per_thread_lock {
+        cfg.limit.http_worker_num
     } else {
         1
     };
@@ -139,10 +139,10 @@ pub async fn flush_all() -> Result<()> {
 impl Writer {
     pub(crate) fn new(thread_id: usize, key: WriterKey) -> Self {
         let now = Utc::now().timestamp_micros();
-        let config = CONFIG.blocking_read();
+        let cfg = get_config();
         let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
-        let wal_dir = PathBuf::from(&config.common.data_wal_dir)
+        let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
             .join("logs")
             .join(thread_id.to_string());
         log::info!(
@@ -161,7 +161,7 @@ impl Writer {
                     &key.org_id,
                     &key.stream_type,
                     wal_id,
-                    config.limit.max_file_size_on_disk as u64,
+                    cfg.limit.max_file_size_on_disk as u64,
                 )
                 .expect("wal file create error"),
             )),
@@ -190,12 +190,12 @@ impl Writer {
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size)
         {
-            let config = CONFIG.read().await;
+            let cfg = get_config();
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
-            let wal_dir = PathBuf::from(&config.common.data_wal_dir)
+            let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
                 .join("logs")
                 .join(self.thread_id.to_string());
             log::info!(
@@ -210,7 +210,7 @@ impl Writer {
                 &self.key.org_id,
                 &self.key.stream_type,
                 wal_id,
-                config.limit.max_file_size_on_disk as u64,
+                cfg.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
@@ -289,12 +289,12 @@ impl Writer {
 
     /// Check if the wal file size is over the threshold or the file is too old
     fn check_wal_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
-        let config = CONFIG.blocking_read();
+        let cfg = get_config();
         let (compressed_size, _uncompressed_size) = written_size;
         compressed_size > 0
-            && (compressed_size + data_size > config.limit.max_file_size_on_disk
+            && (compressed_size + data_size > cfg.limit.max_file_size_on_disk
                 || self.created_at.load(Ordering::Relaxed)
-                    + Duration::try_seconds(config.limit.max_file_retention_time as i64)
+                    + Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                         .unwrap()
                         .num_microseconds()
                         .unwrap()
@@ -303,11 +303,11 @@ impl Writer {
 
     /// Check if the memtable size is over the threshold
     fn check_mem_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
-        let config = CONFIG.blocking_read();
+        let cfg = get_config();
         let (json_size, arrow_size) = written_size;
         json_size > 0
-            && (json_size + data_size > config.limit.max_file_size_in_memory
-                || arrow_size + data_size > config.limit.max_file_size_in_memory)
+            && (json_size + data_size > cfg.limit.max_file_size_in_memory
+                || arrow_size + data_size > cfg.limit.max_file_size_in_memory)
     }
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{metrics, CONFIG};
+use config::metrics;
 use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
@@ -43,7 +43,7 @@ impl Local {
 
 impl Default for Local {
     fn default() -> Self {
-        Local::new(&CONFIG.blocking_read().common.data_stream_dir, true)
+        Local::new(&config::get_config().common.data_stream_dir, true)
     }
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
-use config::{ider, utils::json, CONFIG};
+use config::{get_config, ider, utils::json};
 use log::{Metadata, Record};
 use once_cell::sync::Lazy;
 use reqwest::Client;
@@ -35,7 +35,7 @@ pub struct ZoLogger {
 
 impl log::Log for ZoLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
-        CONFIG.blocking_read().log.events_enabled
+        get_config().log.events_enabled
     }
 
     fn log(self: &ZoLogger, record: &Record) {
@@ -59,7 +59,7 @@ impl log::Log for ZoLogger {
             let event = EventBuilderV10::new()
                 .id(ider::generate())
                 .ty("debug_log")
-                .source(CONFIG.blocking_read().common.instance_name.clone())
+                .source(get_config().common.instance_name.clone())
                 .data("application/json", payload)
                 .build()
                 .unwrap();
@@ -78,11 +78,11 @@ pub async fn send_logs() {
         let mut logs = LOGS.write().await;
         logs.push(val);
 
-        let config = CONFIG.read().await;
-        if logs.len() >= config.log.events_batch_size {
+        let cfg = get_config();
+        if logs.len() >= cfg.log.events_batch_size {
             let old_logs = std::mem::take(&mut *logs);
-            let url = url::Url::parse(&config.log.events_url).unwrap();
-            let auth = format!("Basic {}", &config.log.events_auth);
+            let url = url::Url::parse(&cfg.log.events_url).unwrap();
+            let auth = format!("Basic {}", &cfg.log.events_auth);
             let cl = Arc::clone(&cl);
             tokio::task::spawn(async move {
                 let _ = cl

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::config::{meta::cluster::Role, utils::rand::get_rand_element, CONFIG};
+use ::config::{get_config, meta::cluster::Role, utils::rand::get_rand_element};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::infra::cluster;
@@ -175,7 +175,7 @@ async fn dispatch(
     // set body
     let body = match resp
         .body()
-        .limit(CONFIG.read().await.limit.req_payload_limit)
+        .limit(get_config().limit.req_payload_limit)
         .await
     {
         Ok(b) => b,
@@ -204,13 +204,13 @@ async fn get_url(path: &str) -> URLDetails {
         cluster::get_cached_online_ingester_nodes().await
     };
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        let conf = CONFIG.read().await;
-        if node_type == Role::Ingester && !conf.route.ingester_srv_url.is_empty() {
+        let cfg = get_config();
+        if node_type == Role::Ingester && !cfg.route.ingester_srv_url.is_empty() {
             return URLDetails {
                 is_error: false,
                 value: format!(
                     "http://{}:{}{}",
-                    conf.route.ingester_srv_url, conf.http.port, path
+                    cfg.route.ingester_srv_url, cfg.http.port, path
                 ),
             };
         }

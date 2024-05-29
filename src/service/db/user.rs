@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use anyhow::bail;
-use config::{utils::json, CONFIG};
+use config::utils::json;
 
 use crate::{
     common::{
@@ -157,7 +157,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
 
-                let item_value: DBUser = if CONFIG.read().await.common.meta_store_external {
+                let item_value: DBUser = if config::get_config().common.meta_store_external {
                     match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,

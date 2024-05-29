@@ -18,14 +18,14 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use actix_web::{http, web, HttpResponse};
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamPartition, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -108,8 +108,8 @@ pub async fn traces_json(
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
-    let conf = CONFIG.read().await;
-    let min_ts = (Utc::now() - Duration::try_hours(conf.limit.ingest_allowed_upto).unwrap())
+    let cfg = get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
@@ -129,7 +129,7 @@ pub async fn traces_json(
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
-        PartitionTimeLevel::from(conf.limit.traces_file_retention.as_str());
+        PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
     if stream_schema.has_partition_keys {
         let partition_det = crate::service::ingestion::get_stream_partition_keys(
             org_id,
@@ -347,7 +347,7 @@ pub async fn traces_json(
                     };
 
                     record_val.insert(
-                        conf.common.column_timestamp.clone(),
+                        cfg.common.column_timestamp.clone(),
                         json::Value::Number(timestamp.into()),
                     );
 

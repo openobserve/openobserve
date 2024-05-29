@@ -16,13 +16,12 @@
 use std::sync::Arc;
 
 use config::{
-    is_local_disk_storage,
+    get_config, is_local_disk_storage,
     meta::{
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
     utils::schema_ext::SchemaExt,
-    CONFIG,
 };
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
@@ -120,11 +119,11 @@ pub async fn search(
         files.len(),
     );
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
-    if !conf.common.widening_schema_evolution || schema_versions.len() == 1 {
+    if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
@@ -176,7 +175,7 @@ pub async fn search(
         scan_stats.compressed_size
     );
 
-    if conf.common.memory_circuit_breaker_enable {
+    if cfg.common.memory_circuit_breaker_enable {
         super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
     }
 
@@ -413,15 +412,15 @@ async fn cache_parquet_files(
     files: &[FileKey],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>, CachedFiles), Error> {
-    let conf = CONFIG.read().await;
-    let cache_type = if conf.memory_cache.enabled
-        && scan_stats.compressed_size < conf.memory_cache.skip_size as i64
+    let cfg = get_config();
+    let cache_type = if cfg.memory_cache.enabled
+        && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
     {
         // if scan_compressed_size < 80% of total memory cache, use memory cache
         file_data::CacheType::Memory
     } else if !is_local_disk_storage()
-        && conf.disk_cache.enabled
-        && scan_stats.compressed_size < conf.disk_cache.skip_size as i64
+        && cfg.disk_cache.enabled
+        && scan_stats.compressed_size < cfg.disk_cache.skip_size as i64
     {
         // if scan_compressed_size < 80% of total disk cache, use disk cache
         file_data::CacheType::Disk
@@ -434,23 +433,23 @@ async fn cache_parquet_files(
     let mut disk_cached_files = 0;
 
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(conf.limit.query_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     for file in files.iter() {
         let trace_id = trace_id.to_string();
         let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> = tokio::task::spawn(
             async move {
-                let conf = CONFIG.read().await;
+                let cfg = get_config();
                 let ret = match cache_type {
                     file_data::CacheType::Memory => {
                         let mut disk_exists = false;
                         let mem_exists = file_data::memory::exist(&file_name).await;
-                        if !mem_exists && !conf.memory_cache.skip_disk_check {
+                        if !mem_exists && !cfg.memory_cache.skip_disk_check {
                             // when skip_disk_check = false, need to check disk cache
                             disk_exists = file_data::disk::exist(&file_name).await;
                         }
-                        if !mem_exists && (conf.memory_cache.skip_disk_check || !disk_exists) {
+                        if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
                             (
                                 file_data::memory::download(&trace_id, &file_name)
                                     .await

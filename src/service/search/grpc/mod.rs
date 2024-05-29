@@ -18,12 +18,12 @@ use std::{collections::HashSet, sync::Arc};
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         search::ScanStats,
         stream::{FileKey, StreamType},
     },
-    FxIndexSet, CONFIG,
+    FxIndexSet,
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -51,7 +51,7 @@ pub async fn search(
     let timeout = if req.timeout > 0 {
         req.timeout as u64
     } else {
-        CONFIG.read().await.limit.query_timeout
+        get_config().limit.query_timeout
     };
 
     // check if we are allowed to search
@@ -312,7 +312,7 @@ pub async fn search(
 }
 
 fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Result<(), Error> {
-    let conf = CONFIG.blocking_read();
+    let cfg = get_config();
     let scan_size = if scan_stats.compressed_size > 0 {
         scan_stats.compressed_size
     } else {
@@ -320,9 +320,9 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
     };
     if let Some(cur_memory) = memory_stats::memory_stats() {
         // left memory < datafusion * breaker_ratio and scan_size >=  left memory
-        let left_mem = conf.limit.mem_total - cur_memory.physical_mem;
+        let left_mem = cfg.limit.mem_total - cur_memory.physical_mem;
         if (left_mem
-            < (conf.memory_cache.datafusion_max_size * conf.common.memory_circuit_breaker_ratio
+            < (cfg.memory_cache.datafusion_max_size * cfg.common.memory_circuit_breaker_ratio
                 / 100))
             && (scan_size >= left_mem as i64)
         {
@@ -331,7 +331,7 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
                 scan_size,
                 cur_memory.physical_mem,
                 left_mem,
-                conf.memory_cache.datafusion_max_size * conf.common.memory_circuit_breaker_ratio
+                cfg.memory_cache.datafusion_max_size * cfg.common.memory_circuit_breaker_ratio
                     / 100
             );
             log::warn!("[{trace_id}] {}", err);
@@ -379,7 +379,7 @@ fn generate_search_schema(
     }
 
     let mut schema = Schema::new(new_fields);
-    let timestamp = &CONFIG.blocking_read().common.column_timestamp;
+    let timestamp = &get_config().common.column_timestamp;
     if schema.field_with_name(timestamp).is_err() {
         // self add timestamp column if no exist
         let field = Arc::new(Field::new(timestamp, DataType::Int64, false));
@@ -424,14 +424,14 @@ fn generate_select_start_search_schema(
             }
         }
     }
-    let conf = CONFIG.blocking_read();
+    let cfg = get_config();
     let schema = if !defined_schema_fields.is_empty() {
         let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-        if !fields.contains(&conf.common.column_timestamp) {
-            fields.insert(conf.common.column_timestamp.to_string());
+        if !fields.contains(&cfg.common.column_timestamp) {
+            fields.insert(cfg.common.column_timestamp.to_string());
         }
-        if !fields.contains(&conf.common.all_fields_name) {
-            fields.insert(conf.common.all_fields_name.to_string());
+        if !fields.contains(&cfg.common.all_fields_name) {
+            fields.insert(cfg.common.all_fields_name.to_string());
         }
         let new_fields = fields
             .iter()

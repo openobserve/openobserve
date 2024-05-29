@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{is_local_disk_storage, metrics, CONFIG};
+use config::{get_config, is_local_disk_storage, metrics};
 use futures::{StreamExt, TryStreamExt};
 use object_store::ObjectStore;
 use once_cell::sync::Lazy;
@@ -40,7 +40,7 @@ pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
 /// ```
 fn default() -> Box<dyn ObjectStore> {
     if is_local_disk_storage() {
-        std::fs::create_dir_all(&CONFIG.blocking_read().common.data_stream_dir)
+        std::fs::create_dir_all(&get_config().common.data_stream_dir)
             .expect("create stream data dir success");
         Box::<local::Local>::default()
     } else {
@@ -49,16 +49,15 @@ fn default() -> Box<dyn ObjectStore> {
 }
 
 fn local_cache() -> Box<dyn ObjectStore> {
-    let config = CONFIG.blocking_read();
-
-    std::fs::create_dir_all(&config.common.data_cache_dir).expect("create cache dir success");
-    Box::new(local::Local::new(&config.common.data_cache_dir, true))
+    let cfg = get_config();
+    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    Box::new(local::Local::new(&cfg.common.data_cache_dir, true))
 }
 
 fn local_wal() -> Box<dyn ObjectStore> {
-    let config = CONFIG.blocking_read();
-    std::fs::create_dir_all(&config.common.data_wal_dir).expect("create wal dir success");
-    Box::new(local::Local::new(&config.common.data_wal_dir, false))
+    let cfg = get_config();
+    std::fs::create_dir_all(&cfg.common.data_wal_dir).expect("create wal dir success");
+    Box::new(local::Local::new(&cfg.common.data_wal_dir, false))
 }
 
 pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
@@ -95,7 +94,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
         .collect::<Vec<_>>();
     let files_stream = futures::stream::iter(files);
     files_stream
-        .for_each_concurrent(CONFIG.read().await.limit.cpu_num, |file| async move {
+        .for_each_concurrent(get_config().limit.cpu_num, |file| async move {
             match DEFAULT.delete(&(file.as_str().into())).await {
                 Ok(_) => {
                     log::debug!("Deleted object: {}", file);
@@ -118,13 +117,13 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
 }
 
 pub fn format_key(key: &str, with_prefix: bool) -> String {
-    let config = CONFIG.blocking_read();
+    let cfg = get_config();
     if !is_local_disk_storage()
         && with_prefix
-        && !config.s3.bucket_prefix.is_empty()
-        && !key.starts_with(&config.s3.bucket_prefix)
+        && !cfg.s3.bucket_prefix.is_empty()
+        && !key.starts_with(&cfg.s3.bucket_prefix)
     {
-        format!("{}{}", config.s3.bucket_prefix, key)
+        format!("{}{}", cfg.s3.bucket_prefix, key)
     } else {
         key.to_string()
     }

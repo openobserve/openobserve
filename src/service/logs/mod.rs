@@ -22,12 +22,12 @@ use std::{
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
 use config::{
+    get_config,
     meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
     utils::{
         json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Number, Value},
         schema_ext::SchemaExt,
     },
-    CONFIG,
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
@@ -285,10 +285,10 @@ async fn add_valid_record(
     mut record_val: Map<String, Value>,
     need_trigger: bool,
 ) -> Result<Option<TriggerAlertData>> {
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let mut trigger: TriggerAlertData = Vec::new();
     let timestamp: i64 = record_val
-        .get(&conf.common.column_timestamp)
+        .get(&cfg.common.column_timestamp)
         .unwrap()
         .as_i64()
         .unwrap();
@@ -326,7 +326,7 @@ async fn add_valid_record(
         None => true,
         Some(delta) => {
             let ret_val =
-                if !conf.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
+                if !cfg.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
                     cast_to_type(&mut record_val, delta)
                 } else {
                     let local_delta = delta
@@ -407,9 +407,9 @@ async fn add_record(
     write_buf: &mut HashMap<String, SchemaRecords>,
     record_val: Map<String, Value>,
 ) -> Result<()> {
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let timestamp: i64 = record_val
-        .get(&conf.common.column_timestamp)
+        .get(&cfg.common.column_timestamp)
         .unwrap()
         .as_i64()
         .unwrap();
@@ -476,7 +476,7 @@ pub fn refactor_map(
 
     if has_elements {
         new_map.insert(
-            CONFIG.blocking_read().common.all_fields_name.to_string(),
+            get_config().common.all_fields_name.to_string(),
             Value::String(String::from_utf8(non_schema_map).unwrap()),
         );
     }

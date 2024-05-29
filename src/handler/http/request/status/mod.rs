@@ -25,9 +25,10 @@ use actix_web::{
 use arrow_schema::Schema;
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    get_config, get_instance_id,
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
-    CONFIG, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -216,62 +217,62 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let build_type = "opensource";
 
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
-        instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
+        instance: get_instance_id(),
         commit_hash: COMMIT_HASH.to_string(),
         build_date: BUILD_DATE.to_string(),
         build_type: build_type.to_string(),
-        telemetry_enabled: config.common.telemetry_enabled,
+        telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect(),
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
-        sql_base64_enabled: config.common.ui_sql_base64_enabled,
-        timestamp_column: config.common.column_timestamp.clone(),
+        sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
+        timestamp_column: cfg.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
-        data_retention_days: config.compact.data_retention_days,
-        restricted_routes_on_empty_data: config.common.restricted_routes_on_empty_data,
+        data_retention_days: cfg.compact.data_retention_days,
+        restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
         super_cluster_enabled,
-        query_on_stream_selection: config.common.query_on_stream_selection,
-        show_stream_stats_doc_num: config.common.show_stream_dates_doc_num,
+        query_on_stream_selection: cfg.common.query_on_stream_selection,
+        show_stream_stats_doc_num: cfg.common.show_stream_dates_doc_num,
         custom_logo_text,
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
         custom_hide_menus: custom_hide_menus.to_string(),
         rum: Rum {
-            enabled: config.rum.enabled,
-            client_token: config.rum.client_token.to_string(),
-            application_id: config.rum.application_id.to_string(),
-            site: config.rum.site.to_string(),
-            service: config.rum.service.to_string(),
-            env: config.rum.env.to_string(),
-            version: config.rum.version.to_string(),
-            organization_identifier: config.rum.organization_identifier.to_string(),
-            api_version: config.rum.api_version.to_string(),
-            insecure_http: config.rum.insecure_http,
+            enabled: cfg.rum.enabled,
+            client_token: cfg.rum.client_token.to_string(),
+            application_id: cfg.rum.application_id.to_string(),
+            site: cfg.rum.site.to_string(),
+            service: cfg.rum.service.to_string(),
+            env: cfg.rum.env.to_string(),
+            version: cfg.rum.version.to_string(),
+            organization_identifier: cfg.rum.organization_identifier.to_string(),
+            api_version: cfg.rum.api_version.to_string(),
+            insecure_http: cfg.rum.insecure_http,
         },
-        meta_org: config.common.usage_org.to_string(),
-        quick_mode_enabled: config.limit.quick_mode_enabled,
-        user_defined_schemas_enabled: config.common.allow_user_defined_schemas,
-        all_fields_name: config.common.all_fields_name.to_string(),
+        meta_org: cfg.common.usage_org.to_string(),
+        quick_mode_enabled: cfg.limit.quick_mode_enabled,
+        user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
+        all_fields_name: cfg.common.all_fields_name.to_string(),
     }))
 }
 
 #[get("/status")]
 pub async fn cache_status() -> Result<HttpResponse, Error> {
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let mut stats: HashMap<&str, json::Value> = HashMap::default();
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
-    stats.insert("LOCAL_NODE_NAME", json::json!(&conf.common.instance_name));
-    stats.insert("LOCAL_NODE_ROLE", json::json!(&conf.common.node_role));
+    stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
+    stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
     let nodes = cluster::get_cached_online_nodes().await;
     stats.insert("NODE_LIST", json::json!(nodes));
 
@@ -432,9 +433,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
             auth_cookie.set_path("/");
-            if CONFIG.auth.cookie_same_site_lax {
+            if cfg.auth.cookie_same_site_lax {
                 auth_cookie.set_same_site(SameSite::Lax);
             } else {
                 auth_cookie.set_same_site(SameSite::None);
@@ -500,12 +501,12 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
             auth_cookie.set_path("/");
-            if CONFIG.auth.cookie_same_site_lax {
+            if cfg.auth.cookie_same_site_lax {
                 auth_cookie.set_same_site(SameSite::Lax);
             } else {
                 auth_cookie.set_same_site(SameSite::None);
@@ -518,12 +519,12 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
             auth_cookie.set_path("/");
-            if CONFIG.auth.cookie_same_site_lax {
+            if cfg.auth.cookie_same_site_lax {
                 auth_cookie.set_same_site(SameSite::Lax);
             } else {
                 auth_cookie.set_same_site(SameSite::None);
@@ -550,17 +551,17 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         }
     };
 
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     let tokens = json::to_string(&AuthTokens::default()).unwrap();
     let mut auth_cookie = Cookie::new("auth_tokens", tokens);
     auth_cookie.set_expires(
         cookie::time::OffsetDateTime::now_utc()
-            + cookie::time::Duration::seconds(config.auth.cookie_max_age),
+            + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
     );
     auth_cookie.set_http_only(true);
-    auth_cookie.set_secure(config.auth.cookie_secure_only);
+    auth_cookie.set_secure(cfg.auth.cookie_secure_only);
     auth_cookie.set_path("/");
-    if config.auth.cookie_same_site_lax {
+    if cfg.auth.cookie_same_site_lax {
         auth_cookie.set_same_site(SameSite::Lax);
     } else {
         auth_cookie.set_same_site(SameSite::None);

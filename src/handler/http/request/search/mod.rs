@@ -18,14 +18,14 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
 use config::{
-    ider,
+    get_config, ider,
     meta::{
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, json},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use infra::{errors, schema::STREAM_SCHEMAS_LATEST};
 use opentelemetry::{global, trace::TraceContextExt};
@@ -123,14 +123,14 @@ pub async fn search(
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let mut http_span = None;
-    let trace_id = if conf.common.tracing_enabled {
+    let trace_id = if cfg.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
-    } else if conf.common.tracing_search_enabled {
+    } else if cfg.common.tracing_search_enabled {
         let span = tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone());
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
@@ -220,14 +220,14 @@ pub async fn search(
         }
     }
 
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !config.common.feature_query_queue_enabled {
+    if !cfg.common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
@@ -243,7 +243,7 @@ pub async fn search(
         Some(user_id.to_str().unwrap().to_string()),
         &req,
     );
-    let search_res = if !config.common.tracing_enabled && config.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
@@ -390,14 +390,14 @@ pub async fn around(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     let mut http_span = None;
-    let trace_id = if config.common.tracing_enabled {
+    let trace_id = if cfg.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
-    } else if config.common.tracing_search_enabled {
+    } else if cfg.common.tracing_search_enabled {
         let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/_around",
             org_id = org_id.clone(),
@@ -470,7 +470,7 @@ pub async fn around(
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !config.common.feature_query_queue_enabled {
+    if !cfg.common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
@@ -503,7 +503,7 @@ pub async fn around(
             size: around_size / 2,
             start_time: around_start_time,
             end_time: around_key,
-            sort_by: Some(format!("{} DESC", config.common.column_timestamp)),
+            sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
             sql_mode: "".to_string(),
             quick_mode: false,
             query_type: "".to_string(),
@@ -527,7 +527,7 @@ pub async fn around(
         .ok()
         .map(|v| v.to_string());
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-    let search_res = if !config.common.tracing_enabled && config.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.clone().unwrap()).await
     } else {
         search_fut.await
@@ -582,7 +582,7 @@ pub async fn around(
             size: around_size / 2,
             start_time: around_key,
             end_time: around_end_time,
-            sort_by: Some(format!("{} ASC", config.common.column_timestamp)),
+            sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
             sql_mode: "".to_string(),
             quick_mode: false,
             query_type: "".to_string(),
@@ -598,9 +598,8 @@ pub async fn around(
         clusters,
         timeout,
     };
-    let conf = CONFIG.read().await;
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
-    let search_res = if !conf.common.tracing_enabled && conf.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
@@ -773,14 +772,14 @@ pub async fn values(
         None => "",
     };
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let mut http_span = None;
-    let trace_id = if conf.common.tracing_enabled {
+    let trace_id = if cfg.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
-    } else if conf.common.tracing_search_enabled {
+    } else if cfg.common.tracing_search_enabled {
         let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/_values",
             org_id = org_id.clone(),
@@ -884,10 +883,10 @@ async fn values_v1(
         }
     }
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let default_sql = format!(
         "SELECT {} FROM \"{stream_name}\"",
-        conf.common.column_timestamp
+        cfg.common.column_timestamp
     );
     let mut query_sql = match query.get("filter") {
         None => default_sql,
@@ -925,7 +924,7 @@ async fn values_v1(
         query_sql = RE_ONLY_SELECT
             .replace(
                 &query_sql,
-                format!("SELECT {} ", conf.common.column_timestamp).as_str(),
+                format!("SELECT {} ", cfg.common.column_timestamp).as_str(),
             )
             .to_string()
     };
@@ -971,7 +970,7 @@ async fn values_v1(
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !conf.common.feature_query_queue_enabled {
+    if !cfg.common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1034,7 +1033,7 @@ async fn values_v1(
         Some(user_id.to_string()),
         &req,
     );
-    let search_res = if !conf.common.tracing_enabled && conf.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
@@ -1209,14 +1208,14 @@ async fn values_v2(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !conf.common.feature_query_queue_enabled {
+    if !cfg.common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1256,7 +1255,7 @@ async fn values_v2(
         Some(user_id.to_string()),
         &req,
     );
-    let search_res = if !conf.common.tracing_enabled && conf.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
@@ -1400,14 +1399,14 @@ pub async fn search_partition(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     let mut http_span = None;
-    let trace_id = if conf.common.tracing_enabled {
+    let trace_id = if cfg.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
-    } else if conf.common.tracing_search_enabled {
+    } else if cfg.common.tracing_search_enabled {
         let span = tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone());
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
@@ -1432,7 +1431,7 @@ pub async fn search_partition(
     }
 
     let search_fut = SearchService::search_partition(&trace_id, &org_id, stream_type, &req);
-    let search_res = if !conf.common.tracing_enabled && conf.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await

@@ -23,7 +23,6 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
         schema_ext::SchemaExt,
     },
-    CONFIG,
 };
 use infra::errors;
 use opentelemetry::global;
@@ -151,7 +150,7 @@ impl Metrics for Querier {
 
         // get parquet files
         let wal_dir =
-            match std::path::Path::new(&CONFIG.read().await.common.data_wal_dir).canonicalize() {
+            match std::path::Path::new(&config::get_config().common.data_wal_dir).canonicalize() {
                 Ok(path) => {
                     let mut path = path.to_str().unwrap().to_string();
                     // Hack for windows

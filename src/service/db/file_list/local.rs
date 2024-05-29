@@ -21,7 +21,6 @@ use config::{
         asynchronism::file::get_file_contents, file::scan_files, json,
         parquet::parse_file_key_columns,
     },
-    CONFIG,
 };
 use infra::file_list as infra_file_list;
 use once_cell::sync::Lazy;
@@ -48,9 +47,9 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
         }
     }
 
-    let conf = CONFIG.read().await;
+    let cfg = config::get_config();
     // write into local cache for s3
-    if !conf.common.meta_store_external {
+    if !cfg.common.meta_store_external {
         let mut write_buf = json::to_vec(&file_data)?;
         write_buf.push(b'\n');
         let file = wal::get_or_create(
@@ -64,7 +63,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     }
 
     // notify other nodes
-    if !conf.common.meta_store_external || conf.memory_cache.cache_latest_files {
+    if !cfg.common.meta_store_external || cfg.memory_cache.cache_latest_files {
         let mut q = BROADCAST_QUEUE.write().await;
         q.push(file_data);
     }
@@ -75,7 +74,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
 /// need to load wal file_list when the ingester
 async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::with_capacity(1024);
-    let pattern = format!("{}file_list/", &CONFIG.read().await.common.data_wal_dir);
+    let pattern = format!("{}file_list/", &config::get_config().common.data_wal_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut line_no = 0;
     for file in files {

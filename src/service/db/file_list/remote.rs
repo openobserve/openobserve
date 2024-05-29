@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::{meta::stream::FileKey, utils::json, CONFIG};
+use config::{meta::stream::FileKey, utils::json};
 use futures::future::try_join_all;
 use infra::{cache::stats, file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
@@ -53,9 +53,9 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let conf = CONFIG.read().await;
-    let mut tasks = Vec::with_capacity(conf.limit.query_thread_num + 1);
-    let chunk_size = std::cmp::max(1, files_num / conf.limit.query_thread_num);
+    let cfg = config::get_config();
+    let mut tasks = Vec::with_capacity(cfg.limit.query_thread_num + 1);
+    let chunk_size = std::cmp::max(1, files_num / cfg.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
         let task: tokio::task::JoinHandle<Result<ProcessStats, anyhow::Error>> =
@@ -196,7 +196,7 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
             continue;
         }
         // check duplicate files
-        if CONFIG.read().await.common.feature_filelist_dedup_enabled {
+        if config::get_config().common.feature_filelist_dedup_enabled {
             if super::DEPULICATE_FILES.contains(&item.key) {
                 continue;
             }

@@ -24,7 +24,7 @@ use actix_web::{
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::{from_fn, Next};
-use config::CONFIG;
+use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -195,7 +195,6 @@ async fn proxy(
 }
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
-    let config = CONFIG.blocking_read();
     let cors = get_cors();
     cfg.service(status::healthz).service(status::schedulez);
     cfg.service(
@@ -220,7 +219,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         SwaggerUi::new("/swagger/{_:.*}")
             .url(
-                format!("{}/api-doc/openapi.json", config.common.base_uri),
+                format!("{}/api-doc/openapi.json", get_config().common.base_uri),
                 openapi::ApiDoc::openapi(),
             )
             .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
@@ -228,14 +227,14 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::redirect("/swagger", "/swagger/"));
     cfg.service(web::redirect("/docs", "/swagger/"));
 
-    if config.common.ui_enabled {
+    if get_config().common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
         cfg.service(web::redirect("/web", "./web/"));
         cfg.service(
             web::scope("/web")
                 .wrap_fn(|req, srv| {
-                    let config = CONFIG.blocking_read();
-                    let prefix = format!("{}/web/", config.common.base_uri);
+                    let cfg = get_config();
+                    let prefix = format!("{}/web/", cfg.common.base_uri);
                     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
 
                     srv.call(req).map(move |res| {
@@ -296,7 +295,6 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
 
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    let config = CONFIG.blocking_read();
     // set server header
     #[cfg(feature = "enterprise")]
     let server = format!(
@@ -304,10 +302,10 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         o2_enterprise::enterprise::common::infra::config::O2_CONFIG
             .super_cluster
             .region,
-        config.common.instance_name_short
+        get_config().common.instance_name_short
     );
     #[cfg(not(feature = "enterprise"))]
-    let server = config.common.instance_name_short.to_string();
+    let server = get_config().common.instance_name_short.to_string();
 
     cfg.service(
         web::scope("/api")

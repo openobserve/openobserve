@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,13 @@ use std::{cmp::min, ops::Bound, sync::Arc, time::Duration};
 
 use config::{
     cluster::*,
+    get_config, get_instance_id,
     meta::{
         cluster::{Node, NodeStatus, Role},
         meta_store::MetaStore,
     },
     utils::{hash::Sum64, json},
-    RwAHashMap, RwBTreeMap, CONFIG, INSTANCE_ID,
+    RwAHashMap, RwBTreeMap,
 };
 use infra::{
     db::{get_coordinator, Event},
@@ -51,8 +52,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         _ => return,
     };
     let mut h = config::utils::hash::gxhash::new();
-    let config = CONFIG.read().await;
-    for i in 0..config.limit.consistent_hash_vnodes {
+    for i in 0..get_config().limit.consistent_hash_vnodes {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
         nodes.insert(hash, node.uuid.clone());
@@ -66,9 +66,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         _ => return,
     };
     let mut h = config::utils::hash::gxhash::new();
-    let config = CONFIG.read().await;
-
-    for i in 0..config.limit.consistent_hash_vnodes {
+    for i in 0..get_config().limit.consistent_hash_vnodes {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
@@ -97,18 +95,18 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
 
 #[inline]
 pub fn get_internal_grpc_token() -> String {
-    let config = CONFIG.blocking_read();
-    if config.grpc.internal_grpc_token.is_empty() {
-        INSTANCE_ID.get("instance_id").unwrap().to_string()
+    let cfg = get_config();
+    if cfg.grpc.internal_grpc_token.is_empty() {
+        get_instance_id()
     } else {
-        config.grpc.internal_grpc_token.clone()
+        cfg.grpc.internal_grpc_token.clone()
     }
 }
 
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
-    let config = CONFIG.read().await;
-    if config.common.local_mode {
+    let cfg = get_config();
+    if cfg.common.local_mode {
         let roles = load_local_node_role();
         if !is_single_node(&roles) {
             panic!("Local mode only support NODE_ROLE=all");
@@ -121,14 +119,14 @@ pub async fn register_and_keepalive() -> Result<()> {
         return Ok(());
     }
 
-    match config.common.cluster_coordinator.as_str().into() {
+    match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::register_and_keepalive().await?,
         _ => etcd::register_and_keepalive().await?,
     };
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let ttl_keep_alive = min(10, (config.limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
         let client = reqwest::Client::new();
         loop {
             time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
@@ -142,38 +140,36 @@ pub async fn register_and_keepalive() -> Result<()> {
 }
 
 pub async fn set_online(new_lease_id: bool) -> Result<()> {
-    let config = CONFIG.read().await;
-    if config.common.local_mode {
+    let cfg = get_config();
+    if cfg.common.local_mode {
         return Ok(());
     }
 
-    match config.common.cluster_coordinator.as_str().into() {
+    match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::set_online().await,
         _ => etcd::set_online(new_lease_id).await,
     }
 }
 
 pub async fn set_offline(new_lease_id: bool) -> Result<()> {
-    let config = CONFIG.read().await;
-
-    if config.common.local_mode {
+    let cfg = get_config();
+    if cfg.common.local_mode {
         return Ok(());
     }
 
-    match config.common.cluster_coordinator.as_str().into() {
+    match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::set_offline().await,
         _ => etcd::set_offline(new_lease_id).await,
     }
 }
 
 pub async fn update_local_node(node: &Node) -> Result<()> {
-    let config = CONFIG.read().await;
-
-    if config.common.local_mode {
+    let cfg = get_config();
+    if cfg.common.local_mode {
         return Ok(());
     }
 
-    match config.common.cluster_coordinator.as_str().into() {
+    match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::update_local_node(node).await,
         _ => etcd::update_local_node(node).await,
     }
@@ -183,13 +179,12 @@ pub async fn leave() -> Result<()> {
     unsafe {
         LOCAL_NODE_STATUS = NodeStatus::Offline;
     }
-    let config = CONFIG.read().await;
-
-    if config.common.local_mode {
+    let cfg = get_config();
+    if cfg.common.local_mode {
         return Ok(());
     }
 
-    match config.common.cluster_coordinator.as_str().into() {
+    match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::leave().await,
         _ => etcd::leave().await,
     }
@@ -220,7 +215,7 @@ async fn watch_node_list() -> Result<()> {
     log::info!("Start watching node_list");
 
     loop {
-        let config = CONFIG.read().await;
+        let cfg = get_config();
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
@@ -251,7 +246,7 @@ async fn watch_node_list() -> Result<()> {
                     continue;
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
-                if !config.common.meta_store_external && !broadcasted {
+                if !cfg.common.meta_store_external && !broadcasted {
                     // The ingester need broadcast local file list to the new node
                     if is_ingester(&LOCAL_NODE_ROLE)
                         && (item_value.status.eq(&NodeStatus::Prepare)
@@ -310,13 +305,13 @@ async fn watch_node_list() -> Result<()> {
 }
 
 async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
+    let cfg = get_config();
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
-    let config = CONFIG.read().await;
     for node in nodes {
         if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
             continue;
         }
-        let url = format!("{}{}/healthz", node.http_addr, config.common.base_uri);
+        let url = format!("{}{}/healthz", node.http_addr, cfg.common.base_uri);
         let resp = client.get(url).timeout(HEALTH_CHECK_TIMEOUT).send().await;
         if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!("[CLUSTER] node {} health check failed", node.name);
@@ -364,15 +359,15 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
 
 #[inline(always)]
 pub fn load_local_mode_node() -> Node {
-    let config = CONFIG.blocking_read();
+    let cfg = get_config();
     Node {
         id: 1,
         uuid: LOCAL_NODE_UUID.clone(),
-        name: config.common.instance_name.clone(),
-        http_addr: format!("http://127.0.0.1:{}", config.http.port),
-        grpc_addr: format!("http://127.0.0.1:{}", config.grpc.port),
+        name: cfg.common.instance_name.clone(),
+        http_addr: format!("http://127.0.0.1:{}", cfg.http.port),
+        grpc_addr: format!("http://127.0.0.1:{}", cfg.grpc.port),
         role: [Role::All].to_vec(),
-        cpu_num: config.limit.cpu_num as u64,
+        cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,

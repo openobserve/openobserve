@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -25,7 +24,13 @@ pub mod otlp_grpc;
 pub mod otlp_http;
 pub mod prom;
 
-const EXCLUDE_LABELS: [&str; 4] = [VALUE_LABEL, HASH_LABEL, "is_monotonic", "exemplars"];
+const EXCLUDE_LABELS: [&str; 5] = [
+    VALUE_LABEL,
+    HASH_LABEL,
+    "is_monotonic",
+    "exemplars",
+    "_timestamp",
+];
 
 static RE_CORRECT_LABEL_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
@@ -67,9 +72,10 @@ pub fn signature_without_labels(
 }
 
 fn get_exclude_labels() -> Vec<&'static str> {
-    let mut vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
-    let conf = CONFIG.blocking_read();
-    vec.push(conf.common.column_timestamp.to_string().as_str());
+    let vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
+    // TODO: fixed _timestamp
+    // let column_timestamp = config::get_config().common.column_timestamp.as_str();
+    // vec.push(column_timestamp);
     vec
 }
 

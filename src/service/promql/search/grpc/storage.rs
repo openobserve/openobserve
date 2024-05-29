@@ -21,7 +21,6 @@ use config::{
         search::{ScanStats, SearchType, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
-    CONFIG,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -220,15 +219,15 @@ async fn cache_parquet_files(
     files: &[FileKey],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>)> {
-    let conf: tokio::sync::RwLockReadGuard<config::Config> = CONFIG.read().await;
-    let cache_type = if conf.memory_cache.enabled
-        && scan_stats.compressed_size < conf.memory_cache.skip_size as i64
+    let cfg = config::get_config();
+    let cache_type = if cfg.memory_cache.enabled
+        && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
     {
         // if scan_compressed_size < 80% of total memory cache, use memory cache
         file_data::CacheType::Memory
     } else if !is_local_disk_storage()
-        && conf.disk_cache.enabled
-        && scan_stats.compressed_size < conf.disk_cache.skip_size as i64
+        && cfg.disk_cache.enabled
+        && scan_stats.compressed_size < cfg.disk_cache.skip_size as i64
     {
         // if scan_compressed_size < 80% of total disk cache, use disk cache
         file_data::CacheType::Disk
@@ -238,7 +237,7 @@ async fn cache_parquet_files(
     };
 
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(conf.limit.query_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     for file in files.iter() {
         let trace_id = "";
         let file_name = file.key.clone();

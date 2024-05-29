@@ -24,7 +24,7 @@ use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -86,8 +86,8 @@ pub async fn usage_ingest(
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
-    let conf = CONFIG.read().await;
-    let min_ts = (Utc::now() - Duration::try_hours(conf.limit.ingest_allowed_upto).unwrap())
+    let cfg = config::get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -120,7 +120,7 @@ pub async fn usage_ingest(
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.into_iter() {
         // JSON Flattening
-        let mut value = flatten::flatten_with_level(item, conf.limit.ingest_flatten_level)?;
+        let mut value = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
         // get json object
         let mut local_val = match value.take() {
@@ -132,7 +132,7 @@ pub async fn usage_ingest(
         };
 
         // handle timestamp
-        let timestamp = match local_val.get(&conf.common.column_timestamp) {
+        let timestamp = match local_val.get(&cfg.common.column_timestamp) {
             Some(v) => match parse_timestamp_micro_from_value(v) {
                 Ok(t) => t,
                 Err(e) => {
@@ -150,7 +150,7 @@ pub async fn usage_ingest(
             continue;
         }
         local_val.insert(
-            conf.common.column_timestamp.clone(),
+            cfg.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
 
@@ -347,6 +347,7 @@ pub async fn handle_grpc_request(
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
+    let cfg = config::get_config();
     for resource_log in &request.resource_logs {
         for instrumentation_logs in &resource_log.scope_logs {
             for log_record in &instrumentation_logs.log_records {
@@ -377,10 +378,9 @@ pub async fn handle_grpc_request(
                     None => {}
                 }
 
-                let conf = CONFIG.read().await;
                 // check ingestion time
                 let earlest_time =
-                    Utc::now() - Duration::try_hours(conf.limit.ingest_allowed_upto).unwrap();
+                    Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap();
 
                 let ts = if log_record.time_unix_nano != 0 {
                     log_record.time_unix_nano / 1000
@@ -394,7 +394,7 @@ pub async fn handle_grpc_request(
                     continue;
                 }
 
-                rec[conf.common.column_timestamp.clone()] = ts.into();
+                rec[cfg.common.column_timestamp.clone()] = ts.into();
                 rec["severity"] = log_record.severity_text.to_owned().into();
                 // rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body.as_ref());
@@ -431,7 +431,7 @@ pub async fn handle_grpc_request(
                 };
 
                 // flattening
-                rec = flatten::flatten_with_level(rec, conf.limit.ingest_flatten_level)?;
+                rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
                 if !local_trans.is_empty() {
                     rec = crate::service::ingestion::apply_stream_functions(

@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::{
-    meta::{meta_store::MetaStore, stream::StreamType},
-    CONFIG,
-};
+use config::meta::{meta_store::MetaStore, stream::StreamType};
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
 
@@ -30,7 +27,7 @@ pub mod sqlite;
 static CLIENT: Lazy<Box<dyn SchemaHistory>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn SchemaHistory> {
-    match CONFIG.blocking_read().common.meta_store.as_str().into() {
+    match config::get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteSchemaHistory>::default(),

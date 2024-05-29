@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{utils::file::set_permission, CONFIG};
+use config::utils::file::set_permission;
 use infra::file_list as infra_file_list;
 
 use crate::{
@@ -115,7 +115,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     if app.subcommand().is_none() {
         return Ok(false);
     }
-    let config = CONFIG.read().await;
+    let cfg = config::get_config();
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
@@ -142,13 +142,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 "root" => {
                     let _ = users::update_user(
                         meta::organization::DEFAULT_ORG,
-                        config.auth.root_user_email.as_str(),
+                        cfg.auth.root_user_email.as_str(),
                         false,
-                        config.auth.root_user_email.as_str(),
+                        cfg.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,
                             old_password: None,
-                            new_password: Some(config.auth.root_user_password.clone()),
+                            new_password: Some(cfg.auth.root_user_password.clone()),
                             role: Some(meta::user::UserRole::Root),
                             first_name: Some("root".to_owned()),
                             last_name: Some("".to_owned()),

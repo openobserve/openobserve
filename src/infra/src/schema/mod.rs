@@ -17,9 +17,10 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 use config::{
+    get_config,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    RwAHashMap, CONFIG,
+    RwAHashMap,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::{StreamExt, TryStreamExt};
@@ -121,9 +122,9 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
-    if config.common.schema_cache_compress_enabled {
+    if cfg.common.schema_cache_compress_enabled {
         let mut last_schema_index = None;
         let r = STREAM_SCHEMAS_COMPRESSED.read().await;
         if let Some(versions) = r.get(cache_key) {
@@ -155,7 +156,7 @@ pub async fn get_versions(
                     let mut schemas: Vec<Schema> = json::from_slice(&de_bytes)?;
                     Ok::<Option<Schema>, Error>(schemas.pop())
                 })
-                .buffer_unordered(config.limit.cpu_num)
+                .buffer_unordered(cfg.limit.cpu_num)
                 .try_collect::<Vec<Option<Schema>>>()
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -251,14 +252,14 @@ pub fn unwrap_partition_time_level(
     if level != PartitionTimeLevel::Unset {
         level
     } else {
-        let config = CONFIG.blocking_read();
+        let cfg = get_config();
         match stream_type {
-            StreamType::Logs => PartitionTimeLevel::from(config.limit.logs_file_retention.as_str()),
+            StreamType::Logs => PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str()),
             StreamType::Metrics => {
-                PartitionTimeLevel::from(config.limit.metrics_file_retention.as_str())
+                PartitionTimeLevel::from(cfg.limit.metrics_file_retention.as_str())
             }
             StreamType::Traces => {
-                PartitionTimeLevel::from(config.limit.traces_file_retention.as_str())
+                PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str())
             }
             _ => PartitionTimeLevel::default(),
         }
@@ -610,7 +611,7 @@ pub fn get_merge_schema_changes(
             Some(idx) => {
                 let existing_field = &merged_fields[*idx];
                 if existing_field.data_type() != item_data_type {
-                    if !CONFIG.blocking_read().common.widening_schema_evolution {
+                    if !get_config().common.widening_schema_evolution {
                         field_datatype_delta.push(existing_field.as_ref().clone());
                     } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
                         is_schema_changed = true;

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,8 +20,6 @@ use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
 };
-
-use crate::CONFIG;
 
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
@@ -682,11 +680,11 @@ fn register_metrics(registry: &Registry) {
 }
 
 fn create_const_labels() -> HashMap<String, String> {
-    let config = CONFIG.blocking_read();
+    let cfg = crate::config::get_config();
     let mut labels = HashMap::new();
-    labels.insert("cluster".to_string(), config.common.cluster_name.clone());
-    labels.insert("instance".to_string(), config.common.instance_name.clone());
-    labels.insert("role".to_string(), config.common.node_role.clone());
+    labels.insert("cluster".to_string(), cfg.common.cluster_name.clone());
+    labels.insert("instance".to_string(), cfg.common.instance_name.clone());
+    labels.insert("role".to_string(), cfg.common.node_role.clone());
     labels
 }
 
@@ -695,7 +693,7 @@ pub fn create_prometheus_handler() -> PrometheusMetrics {
     register_metrics(&registry);
 
     PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", CONFIG.blocking_read().common.base_uri).as_str())
+        .endpoint(format!("{}/metrics", crate::config::get_config().common.base_uri).as_str())
         .const_labels(create_const_labels())
         .registry(registry)
         .build()

@@ -19,14 +19,13 @@ use actix_web::{http, HttpResponse};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         stream::{PartitioningDetails, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    CONFIG,
 };
 use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
@@ -100,6 +99,7 @@ pub async fn handle_grpc_request(
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
+    let cfg = get_config();
     for resource_metric in &request.resource_metrics {
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
@@ -216,7 +216,6 @@ pub async fn handle_grpc_request(
                         );
                     }
                 }
-                let conf = CONFIG.read().await;
                 for mut rec in records {
                     // flattening
                     rec = flatten::flatten(rec)?;
@@ -291,7 +290,7 @@ pub async fn handle_grpc_request(
                         rec.as_object_mut().unwrap();
 
                     let timestamp = val_map
-                        .get(&conf.common.column_timestamp)
+                        .get(&cfg.common.column_timestamp)
                         .unwrap()
                         .as_i64()
                         .unwrap_or(Utc::now().timestamp_micros());
@@ -604,8 +603,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
     rec[VALUE_LABEL] = get_metric_val(&data_point.value);
-    rec[&CONFIG.blocking_read().common.column_timestamp] =
-        (data_point.time_unix_nano / 1000).into();
+    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -625,8 +623,7 @@ fn process_hist_data_point(
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[&CONFIG.blocking_read().common.column_timestamp] =
-        (data_point.time_unix_nano / 1000).into();
+    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -675,8 +672,7 @@ fn process_exp_hist_data_point(
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[&CONFIG.blocking_read().common.column_timestamp] =
-        (data_point.time_unix_nano / 1000).into();
+    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -741,8 +737,7 @@ fn process_summary_data_point(
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[&CONFIG.blocking_read().common.column_timestamp] =
-        (data_point.time_unix_nano / 1000).into();
+    rec[&get_config().common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
         DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -780,7 +775,7 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
             exemplar_rec[attr.key.as_str()] = get_val(&attr.value.as_ref());
         }
         exemplar_rec[VALUE_LABEL] = get_exemplar_val(&exemplar.value);
-        exemplar_rec[&CONFIG.blocking_read().common.column_timestamp] =
+        exemplar_rec[&get_config().common.column_timestamp] =
             (exemplar.time_unix_nano / 1000).into();
 
         match TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap_or_default()) {

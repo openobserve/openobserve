@@ -17,11 +17,12 @@ use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
 use config::{
+    get_config,
     meta::{
         search::{ScanStats, SearchType, Session as SearchSession, StorageType},
         stream::StreamType,
     },
-    CONFIG, FILE_EXT_PARQUET,
+    FILE_EXT_PARQUET,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -33,7 +34,12 @@ use datafusion::{
 use futures::future::try_join_all;
 use infra::cache::tmpfs;
 use proto::cluster_rpc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{
+    codec::CompressionEncoding,
+    metadata::{MetadataKey, MetadataValue},
+    transport::Channel,
+    Request,
+};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -228,7 +234,7 @@ async fn get_file_list(
             std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
         > = tokio::task::spawn(
             async move {
-                let conf = CONFIG.read().await;
+                let cfg = get_config();
                 let org_id: MetadataValue<_> = org_id
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid org_id".to_string()))?;
@@ -242,33 +248,36 @@ async fn get_file_list(
                     )
                 });
 
+                let org_header_key: MetadataKey<_> =
+                    cfg.grpc.org_header_key.parse().map_err(|_| {
+                        DataFusionError::Execution("invalid org_header_key".to_string())
+                    })?;
                 let token: MetadataValue<_> = get_internal_grpc_token()
                     .parse()
                     .map_err(|_| DataFusionError::Execution("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(conf.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|_| {
                         DataFusionError::Execution("connect search node error".to_string())
                     })?;
-                let conf = CONFIG.read().await;
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
-                        let header_key = conf.grpc.org_header_key.clone();
                         req.metadata_mut().insert("authorization", token.clone());
-                        req.metadata_mut().insert(header_key, org_id.clone());
+                        req.metadata_mut()
+                            .insert(org_header_key.clone(), org_id.clone());
                         Ok(req)
                     },
                 );
-                let conf = CONFIG.read().await;
+                let cfg = get_config();
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(conf.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(conf.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response: cluster_rpc::MetricsWalFileResponse = match client
                     .wal_file(request)
                     .await

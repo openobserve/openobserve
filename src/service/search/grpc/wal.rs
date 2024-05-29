@@ -17,6 +17,7 @@ use std::{path::Path, sync::Arc};
 
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
+    get_config,
     meta::{
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
@@ -25,7 +26,6 @@ use config::{
         file::scan_files,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
-    CONFIG,
 };
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
@@ -93,13 +93,13 @@ pub async fn search_parquet(
 
     let mut scan_stats = ScanStats::new();
     let mut lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
-    let conf = CONFIG.read().await;
+    let cfg = get_config();
     // get file metadata to build file_list
     let files_num = files.len();
     let mut new_files = Vec::with_capacity(files_num);
     let files_metadata = futures::stream::iter(files)
         .map(|file| async move {
-            let conf = CONFIG.read().await;
+            let cfg = get_config();
             let r = WAL_PARQUET_METADATA.read().await;
             if let Some(meta) = r.get(file.key.as_str()) {
                 let mut file = file;
@@ -107,7 +107,7 @@ pub async fn search_parquet(
                 return file;
             }
             drop(r);
-            let source_file = conf.common.data_wal_dir.to_string() + file.key.as_str();
+            let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();
@@ -119,7 +119,7 @@ pub async fn search_parquet(
                 .insert(file.key.clone(), file.meta.clone());
             file
         })
-        .buffer_unordered(conf.limit.cpu_num)
+        .buffer_unordered(cfg.limit.cpu_num)
         .collect::<Vec<FileKey>>()
         .await;
     for file in files_metadata {
@@ -177,7 +177,7 @@ pub async fn search_parquet(
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
-    if !conf.common.widening_schema_evolution || schema_versions.len() == 1 {
+    if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
@@ -229,7 +229,7 @@ pub async fn search_parquet(
         scan_stats.compressed_size
     );
 
-    if conf.common.memory_circuit_breaker_enable {
+    if cfg.common.memory_circuit_breaker_enable {
         if let Err(e) = super::check_memory_circuit_breaker(trace_id, &scan_stats) {
             // release all files
             wal::release_files(&lock_files).await;
@@ -440,9 +440,9 @@ pub async fn search_memtable(
         scan_stats.files,
         scan_stats.original_size
     );
-    let conf = CONFIG.read().await;
 
-    if conf.common.memory_circuit_breaker_enable {
+    let cfg = get_config();
+    if cfg.common.memory_circuit_breaker_enable {
         super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
     }
 
@@ -685,7 +685,7 @@ async fn get_file_list(
         stream_type,
         _partition_time_level,
         partition_keys,
-        &CONFIG.read().await.common.data_wal_dir,
+        &get_config().common.data_wal_dir,
         "parquet",
     )
     .await
@@ -706,7 +706,7 @@ async fn get_file_list_arrow(
         stream_type,
         _partition_time_level,
         partition_keys,
-        &CONFIG.read().await.common.data_idx_dir,
+        &get_config().common.data_idx_dir,
         "arrow",
     )
     .await

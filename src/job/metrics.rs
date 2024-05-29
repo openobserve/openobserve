@@ -16,11 +16,10 @@
 use std::path::Path;
 
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{cluster::Role, stream::StreamType},
     metrics,
     utils::file::scan_files,
-    CONFIG,
 };
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
@@ -54,23 +53,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
-    let config = CONFIG.read().await;
+    let cfg = get_config();
     metrics::QUERY_MEMORY_CACHE_LIMIT_BYTES
         .with_label_values(&[])
-        .set(config.memory_cache.max_size as i64);
+        .set(cfg.memory_cache.max_size as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
         .with_label_values(&[])
-        .set(config.disk_cache.max_size as i64);
+        .set(cfg.disk_cache.max_size as i64);
     Ok(())
 }
 
 async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
-    let config = CONFIG.read().await;
-    let data_dir = match Path::new(&config.common.data_wal_dir).canonicalize() {
+    let cfg = get_config();
+    let data_dir = match Path::new(&cfg.common.data_wal_dir).canonicalize() {
         Ok(path) => path,
         Err(_) => return Ok(()),
     };
-    let pattern = format!("{}files/", &config.common.data_wal_dir);
+    let pattern = format!("{}files/", &cfg.common.data_wal_dir);
     let files = scan_files(pattern, "parquet", None).unwrap_or_default();
     let mut sizes = HashMap::new();
     for file in files {
@@ -112,7 +111,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         .with_label_values(&[])
         .set(stats.keys_count);
 
-    if CONFIG.read().await.common.local_mode {
+    if get_config().common.local_mode {
         metrics::META_NUM_NODES.with_label_values(&["all"]).set(1);
     } else {
         metrics::META_NUM_NODES.reset();

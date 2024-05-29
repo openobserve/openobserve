@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{utils::hash::Sum32, CONFIG};
+use config::utils::hash::Sum32;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -31,14 +31,14 @@ use crate::errors::*;
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
 fn connect() -> Pool<Postgres> {
-    let config = CONFIG.blocking_read();
-    let db_opts = PgConnectOptions::from_str(&config.common.meta_postgres_dsn)
+    let cfg = config::get_config();
+    let db_opts = PgConnectOptions::from_str(&cfg.common.meta_postgres_dsn)
         .expect("postgres connect options create failed")
         .disable_statement_logging();
 
     PgPoolOptions::new()
-        .min_connections(config.limit.sql_min_db_connections)
-        .max_connections(config.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_min_db_connections)
+        .max_connections(cfg.limit.sql_max_db_connections)
         .connect_lazy_with(db_opts)
 }
 

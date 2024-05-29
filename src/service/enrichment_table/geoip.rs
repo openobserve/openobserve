@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@
 
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
-use config::{CONFIG, MMDB_CITY_FILE_NAME};
+use config::{get_config, MMDB_CITY_FILE_NAME};
 use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
@@ -94,7 +94,7 @@ impl Default for GeoipConfig {
         GeoipConfig {
             path: format!(
                 "{}{}",
-                &CONFIG.blocking_read().common.mmdb_data_dir,
+                &get_config().common.mmdb_data_dir,
                 MMDB_CITY_FILE_NAME
             ),
             locale: default_locale(),
@@ -105,7 +105,7 @@ impl Default for GeoipConfig {
 impl GeoipConfig {
     pub fn new(name: &str) -> self::GeoipConfig {
         GeoipConfig {
-            path: format!("{}{}", &CONFIG.blocking_read().common.mmdb_data_dir, name),
+            path: format!("{}{}", &get_config().common.mmdb_data_dir, name),
             locale: default_locale(),
         }
     }

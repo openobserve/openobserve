@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,17 +27,15 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
-use crate::CONFIG;
-
 pub struct CustomTimeFormat;
 
 impl FormatTime for CustomTimeFormat {
     fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        let config = CONFIG.blocking_read();
-        if config.log.local_time_format.is_empty() {
+        let cfg = crate::get_config();
+        if cfg.log.local_time_format.is_empty() {
             write!(w, "{}", Utc::now().to_rfc3339())
         } else {
-            write!(w, "{}", Local::now().format(&config.log.local_time_format))
+            write!(w, "{}", Local::now().format(&cfg.log.local_time_format))
         }
     }
 }

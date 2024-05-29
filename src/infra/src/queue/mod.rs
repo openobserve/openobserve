@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{meta::meta_store::MetaStore, CONFIG};
+use config::meta::meta_store::MetaStore;
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::errors::{Error, Result};
@@ -41,14 +41,14 @@ pub async fn init() -> Result<()> {
 }
 
 async fn default() -> Box<dyn Queue> {
-    match CONFIG.read().await.common.queue_store.as_str().into() {
+    match config::get_config().common.queue_store.as_str().into() {
         MetaStore::Nats => Box::<nats::NatsQueue>::default(),
         _ => Box::<nop::NopQueue>::default(),
     }
 }
 
 async fn init_super_cluster() -> Box<dyn Queue> {
-    if CONFIG.read().await.common.local_mode {
+    if config::get_config().common.local_mode {
         panic!("super cluster is not supported in local mode");
     }
     Box::new(nats::NatsQueue::super_cluster())

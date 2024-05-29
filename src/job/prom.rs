@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, CONFIG};
+use config::cluster;
 use hashbrown::HashMap;
 use tokio::time::{self, Duration};
 
@@ -27,14 +27,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    let config = CONFIG.read().await;
-    if !config.common.metrics_dedup_enabled {
+    let cfg = config::get_config();
+    if !cfg.common.metrics_dedup_enabled {
         return Ok(());
     }
 
-    let mut interval = time::interval(Duration::from_secs(
-        config.limit.metrics_leader_push_interval,
-    ));
+    let mut interval = time::interval(Duration::from_secs(cfg.limit.metrics_leader_push_interval));
     interval.tick().await; // trigger the first run
 
     let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new(); // maintain the last state

@@ -24,12 +24,11 @@ use utoipa::ToSchema;
 
 use super::usage::Stats;
 use crate::{
+    get_config,
     utils::{
         hash::{gxhash, Sum64},
-        json,
-        json::{Map, Value},
+        json::{self, Map, Value},
     },
-    CONFIG,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -223,11 +222,10 @@ impl StreamStats {
 
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval =
-            Duration::try_seconds(CONFIG.blocking_read().limit.file_push_interval as _)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+        let file_push_interval = Duration::try_seconds(get_config().limit.file_push_interval as _)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
         (self.doc_time_min, self.doc_time_max + file_push_interval)
     }
 
