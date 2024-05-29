@@ -194,8 +194,9 @@ test('should only display 5 result if limit 5 added', async ({ page }) => {
   await page.waitForTimeout(2000)
   await page.getByText('Showing 1 to 5 out of 5').click();
   await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click();
+  await page.waitForTimeout(200)
   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  await page.waitForTimeout(2000)
+  await page.waitForTimeout(500)
   await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
 });
 
