@@ -73,9 +73,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let (tx, rx) =
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(CONFIG.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
+
+    let (watch_tx, watch_rx) = tokio::sync::watch::channel(0usize);
+
+    let (files_tx, files_rx) = tokio::sync::mpsc::channel::<Vec<String>>(1);
+
+    let active_moves = Arc::new(Mutex::new(0));
+
     // move files
     for thread_id in 0..CONFIG.limit.file_move_thread_num {
         let rx = rx.clone();
+        let watch_tx = watch_tx.clone();
+        let active_moves = active_moves.clone();
         tokio::spawn(async move {
             loop {
                 let ret = rx.lock().await.recv().await;
@@ -85,12 +94,22 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((prefix, files)) => {
+                        let mut active_moves_inc = active_moves.lock().await;
+                        *active_moves_inc += 1;
+                        drop(active_moves_inc);
+
                         if let Err(e) = move_files(thread_id, &prefix, files).await {
                             log::error!(
                                 "[INGESTER:JOB] Error moving parquet files to remote: {}",
                                 e
                             );
                         }
+                        let mut active_moves_dec = active_moves.lock().await;
+                        *active_moves_dec -= 1;
+                        if *active_moves_dec == 0 {
+                            let _ = watch_tx.send(0); // Notify that all files are moved
+                        }
+                        drop(active_moves_dec);
                     }
                 }
             }
@@ -105,7 +124,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             break;
         }
         interval.tick().await;
-        match prepare_files().await {
+        match prepare_files(watch_rx.clone()).await {
             Err(e) => {
                 log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
             }
@@ -113,6 +132,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 for (prefix, files) in files.into_iter() {
                     if let Err(e) = tx.send((prefix, files)).await {
                         log::error!("[INGESTER:JOB] Error sending parquet files to move: {}", e);
+                    } else {
+                        let mut active_moves_inc = active_moves.lock().await;
+                        *active_moves_inc += 1;
+                        drop(active_moves_inc);
                     }
                 }
             }
@@ -122,13 +145,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
+async fn prepare_files(
+    mut watch_rx: tokio::sync::watch::Receiver<usize>,
+) -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
     let start = std::time::Instant::now();
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
 
     let pattern = wal_dir.join("files/");
+    // Wait until all files are moved
+    loop {
+        if *watch_rx.borrow() == 0 {
+            break;
+        }
+        watch_rx.changed().await.unwrap();
+    }
+
     let files =
         scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit)).unwrap_or_default();
     if files.is_empty() {

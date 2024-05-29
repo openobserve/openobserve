@@ -2309,6 +2309,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "utoipa",
+ "walkdir",
 ]
 
 [[package]]
@@ -5357,6 +5358,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "version-compare",
  "vrl",
+ "walkdir",
  "zstd",
 ]
 

@@ -19,6 +19,9 @@ use std::{
     path::Path,
 };
 
+use tokio::sync::mpsc::Sender;
+use walkdir::WalkDir;
+
 #[inline(always)]
 pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
     let file = File::open(file)?;
@@ -74,6 +77,55 @@ pub fn scan_files<P: AsRef<Path>>(
         }
     }
     Ok(files)
+}
+
+#[inline(always)]
+pub async fn scan_files_for_move<P: AsRef<Path>>(
+    root: P,
+    ext: &str,
+    limit: Option<usize>,
+    tx: Sender<Vec<String>>,
+) -> Result<(), std::io::Error> {
+    let limit = limit.unwrap_or_default();
+    let mut iter = WalkDir::new(&root)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_file() {
+                let path_ext = path.extension()?.to_str()?;
+                if path_ext == ext {
+                    Some(path.to_str()?.to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .peekable();
+
+    loop {
+        let mut files: Vec<String> = Vec::new();
+
+        while let Some(_) = iter.peek() {
+            if files.len() == limit {
+                break;
+            }
+            if let Some(file) = iter.next() {
+                files.push(file);
+            }
+        }
+
+        if files.is_empty() {
+            break;
+        }
+
+        tx.send(files).await.unwrap();
+    }
+
+    Ok(())
 }
 
 #[cfg(unix)]

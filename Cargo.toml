@@ -162,6 +162,7 @@ ingester.workspace = true
 reportserver.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
+walkdir.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -173,7 +174,14 @@ float-cmp = "0.9"
 async-walkdir = "1.0.0"
 
 [workspace]
-members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto", "src/reportserver"]
+members = [
+  "src/config",
+  "src/infra",
+  "src/ingester",
+  "src/wal",
+  "src/proto",
+  "src/reportserver",
+]
 resolver = "2"
 
 [workspace.package]
@@ -286,3 +294,4 @@ utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 async-walkdir = "1.0.0"
 zstd = "0.13"
+walkdir = "2"
