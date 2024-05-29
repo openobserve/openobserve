@@ -161,7 +161,7 @@ async fn search_in_cluster(
                     .parse()
                     .map_err(|_| Error::Message(format!("invalid org_id: {}", req.org_id)))?;
                 let mut request = tonic::Request::new(req);
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(

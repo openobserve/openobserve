@@ -270,6 +270,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
         let task = tokio::task::spawn(
             async move {
+                let cfg = get_config();
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
@@ -284,7 +285,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -299,16 +300,14 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     channel,
                     move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
-                        //  req.metadata_mut()
-                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
                         Ok(req)
                     },
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -417,9 +416,10 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
         let trace_id = trace_id.to_string();
         let task = tokio::task::spawn(
             async move {
+                let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -433,7 +433,7 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -448,16 +448,14 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     channel,
                     move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
-                        //  req.metadata_mut()
-                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
                         Ok(req)
                     },
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response = match client.cancel_query(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {

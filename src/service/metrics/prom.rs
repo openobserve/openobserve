@@ -83,7 +83,7 @@ pub async fn remote_write(
 
     let cfg = get_config();
     // let min_ts = (Utc::now() -
-    // Duration::try_hours(CONFIG.limit.ingest_allowed_upto)).unwrap().timestamp_micros();
+    // Duration::try_hours(cfg.limit.ingest_allowed_upto)).unwrap().timestamp_micros();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
     let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;

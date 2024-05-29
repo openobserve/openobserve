@@ -1155,7 +1155,7 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
         #[cfg(not(feature = "enterprise"))]
         let memory_size = cfg.memory_cache.datafusion_max_size;
         #[cfg(feature = "enterprise")]
-        let mut memory_size = CONFIG.memory_cache.datafusion_max_size;
+        let mut memory_size = cfg.memory_cache.datafusion_max_size;
         #[cfg(feature = "enterprise")]
         if let Some(wg) = _work_group {
             use o2_enterprise::enterprise::search::WorkGroup;

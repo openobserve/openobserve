@@ -312,6 +312,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 
         use crate::handler::http::auth::validator::ID_TOKEN_HEADER;
 
+        let cfg = get_config();
         let mut resp = SignInResponse::default();
         if let Some(auth_header) = _req.headers().get("Authorization") {
             if let Ok(auth_header) = auth_header.to_str() {

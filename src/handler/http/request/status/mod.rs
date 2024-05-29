@@ -427,10 +427,11 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             })
             .unwrap();
 
+            let cfg = get_config();
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -465,6 +466,7 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
+    let cfg = get_config();
     let token = if let Some(cookie) = req.cookie("auth_tokens") {
         let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
 

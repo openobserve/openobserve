@@ -464,7 +464,7 @@ pub async fn search(
                     .parse()
                     .map_err(|_| Error::Message("invalid org_id".to_string()))?;
                 let mut request = tonic::Request::new(req);
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(

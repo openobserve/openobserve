@@ -42,7 +42,7 @@ pub async fn token_validator(
     let path = match req
         .request()
         .path()
-        .strip_prefix(format!("{}/api/", config::get_config.common.base_uri).as_str())
+        .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
     {
         Some(path) => path,
         None => req.request().path(),

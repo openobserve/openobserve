@@ -344,5 +344,5 @@ pub async fn flush_audit() {
 async fn publish_audit(
     req: cluster_rpc::UsageRequest,
 ) -> Result<cluster_rpc::UsageResponse, anyhow::Error> {
-    ingestion_service::ingest(&CONFIG.common.usage_org, req).await
+    ingestion_service::ingest(&get_config().common.usage_org, req).await
 }

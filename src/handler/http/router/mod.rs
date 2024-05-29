@@ -84,7 +84,7 @@ async fn audit_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     let method = req.method().to_string();
-    let prefix = format!("{}/api/", CONFIG.common.base_uri);
+    let prefix = format!("{}/api/", get_config().common.base_uri);
     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
