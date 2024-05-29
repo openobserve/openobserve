@@ -1210,9 +1210,9 @@ const useLogs = () => {
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
               queryReq.query.start_time =
-                initialQueryPayload.value?.query?.start_time;
+                parseInt(initialQueryPayload.value?.query?.start_time);
               queryReq.query.end_time =
-                initialQueryPayload.value?.query?.end_time;
+                parseInt(initialQueryPayload.value?.query?.end_time);
             }
           }
         }
