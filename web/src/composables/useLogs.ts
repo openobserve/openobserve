@@ -629,8 +629,22 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
+        req.aggs.histogram = req.aggs.histogram.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+
+        req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
+
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
+        const histogramParsedSQL: any = fnHistogramParsedSQL(req.aggs.histogram);
+
+        histogramParsedSQL.where = parsedSQL.where;
+
+        let histogramQuery = parser.sqlify(histogramParsedSQL)
+        histogramQuery = histogramQuery.replace(/`/g, '"');
+        req.aggs.histogram = histogramQuery;
 
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
@@ -809,11 +823,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(
-      parsedSQL?.groupby ||
-      hasAggregation(parsedSQL?.columns) ||
-      parsedSQL?.limit
-    );
+    return !(parsedSQL?.limit);
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -981,9 +991,8 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
 
       if (
-        (searchObj.data.queryResults.aggs == undefined &&
+        (searchObj.data.queryResults.aggs !== undefined &&
           searchObj.data.resultGrid.currentPage == 1 &&
-          searchObj.loadingHistogram == false &&
           searchObj.meta.showHistogram == true &&
           (!searchObj.meta.sqlMode ||
             (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
@@ -992,13 +1001,17 @@ const useLogs = () => {
           searchObj.meta.sqlMode == false &&
           searchObj.data.resultGrid.currentPage == 1)
       ) {
-        console.log(searchObj.data.queryResults)
-        if(searchObj.data.queryResults.hasOwnProperty("aggs") && searchObj.data.queryResults.aggs != null) {
-        searchObj.data.queryResults.total = searchObj.data.queryResults.aggs.reduce(
-            (accumulator: number, currentValue: any) =>
-              accumulator + Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-            0
-          );
+        if (
+          searchObj.data.queryResults.hasOwnProperty("aggs") &&
+          searchObj.data.queryResults.aggs != null
+        ) {
+          searchObj.data.queryResults.total =
+            searchObj.data.queryResults.aggs.reduce(
+              (accumulator: number, currentValue: any) =>
+                accumulator +
+                Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+              0
+            );
           partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
         }
       } else {
@@ -1195,10 +1208,10 @@ const useLogs = () => {
               router.currentRoute.value.name == "logs" &&
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
-              queryReq.query.start_time =
-                initialQueryPayload.value?.query?.start_time;
-              queryReq.query.end_time =
-                initialQueryPayload.value?.query?.end_time;
+              const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
+              const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
+              queryReq.query.start_time = start_time;
+              queryReq.query.end_time = end_time;
             }
           }
         }
@@ -1390,6 +1403,24 @@ const useLogs = () => {
     }
   };
 
+  const fnHistogramParsedSQL = (query: string) => {
+    try {
+      const filteredQuery = query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      return parser.astify(filteredQuery);
+    } catch (e: any) {
+      return {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+    }
+  };
+
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       queryReq.query.size = 0;
@@ -1495,10 +1526,10 @@ const useLogs = () => {
         }
 
         // for group by query no need to get total.
-        if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
-          searchObj.meta.resultGrid.showPagination = false;
-          delete queryReq.query.track_total_hits;
-        }
+        // if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
+        //   searchObj.meta.resultGrid.showPagination = false;
+        //   delete queryReq.query.track_total_hits;
+        // }
       }
 
       searchService
@@ -1706,7 +1737,16 @@ const useLogs = () => {
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
-        //queryReq.query.track_total_hits = true;
+        const parsedSQL: any = fnParsedSQL();
+
+        let hasAggregationFlag = false;
+        if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+          hasAggregationFlag = hasAggregation(parsedSQL?.columns);
+          if (hasAggregationFlag) {
+            queryReq.query.track_total_hits = true;
+          }
+        }
+
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -1719,6 +1759,9 @@ const useLogs = () => {
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
+            if (hasAggregationFlag) {
+              searchObj.data.queryResults.total = res.data.total;
+            }
             await generateHistogramData();
 
             let regeratePaginationFlag = false;
@@ -2156,10 +2199,17 @@ const useLogs = () => {
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
+      let hasAggregationFlag = false;
+
+      const parsedSQL: any = fnParsedSQL();
+      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+      }
 
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
-        searchObj.data.queryResults.aggs
+        searchObj.data.queryResults.aggs &&
+        !hasAggregationFlag
       ) {
         searchObj.data.queryResults.aggs.map(
           (bucket: {
@@ -2176,8 +2226,8 @@ const useLogs = () => {
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }
         );
+        searchObj.data.queryResults.total = num_records;
       }
-      searchObj.data.queryResults.total = num_records;
 
       const chartParams = {
         title: getHistogramTitle(),
