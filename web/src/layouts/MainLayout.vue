@@ -439,6 +439,8 @@ export default defineComponent({
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
 
+    const isMonacoEditorLoaded = ref(false);
+
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
     )
@@ -961,28 +963,23 @@ export default defineComponent({
 
     const prefetch = () => {
       const href = "/web/assets/editor.api.v1.js";
-      console.log(document);
-
       const existingLink = document.querySelector(
         `link[rel="prefetch"][href="${href}"]`
       );
 
-      console.log("existingLink", existingLink);
       if (!existingLink) {
         // Create a new link element
+        isMonacoEditorLoaded.value = true;
         const link = document.createElement("link");
         link.rel = "prefetch";
         link.href = href;
         document.head.appendChild(link);
-        console.log(`Prefetch link for ${href} added.`);
-      } else {
-        console.log(`Prefetch link for ${href} already exists.`);
       }
     };
 
     const expandMenu = () => {
       miniMode.value = false;
-      prefetch();
+      if (!isMonacoEditorLoaded.value) prefetch();
     };
 
     return {
