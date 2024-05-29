@@ -26,7 +26,10 @@ use crate::{
     common::{
         meta::{
             ingestion::INGESTION_EP,
-            user::{AuthTokensExt, DBUser, TokenValidationResponse, UserRole},
+            user::{
+                AuthTokensExt, DBUser, TokenValidationResponse, TokenValidationResponseBuilder,
+                UserRole,
+            },
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
@@ -226,7 +229,8 @@ pub async fn validate_credentials_ext(
     auth_token: AuthTokensExt,
 ) -> Result<TokenValidationResponse, Error> {
     let user;
-    let password_ext_salt = config::CONFIG.auth.ext_auth_salt.as_str();
+    let config = get_config();
+    let password_ext_salt = config.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
         if v.is_empty() {
@@ -272,15 +276,7 @@ pub async fn validate_credentials_ext(
     };
 
     if user.is_none() {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
+        return Ok(TokenValidationResponse::default());
     }
     let user = user.unwrap();
 
@@ -295,16 +291,10 @@ pub async fn validate_credentials_ext(
         ),
         password_ext_salt,
     );
+    println!("In password is {}", in_password);
+    println!("Hashed password is {}", hashed_pass);
     if !hashed_pass.eq(&in_password) {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
+        return Ok(TokenValidationResponse::default());
     }
     if !path.contains("/user")
         || (path.contains("/user")
@@ -353,21 +343,28 @@ async fn validate_user_from_db(
                     user.password_ext = Some(password_ext);
                     let _ = db::user::set(&user).await;
                 }
-                Ok(TokenValidationResponse {
-                    is_valid: true,
-                    user_email: user.email,
-                    is_internal_user: !user.is_external,
-                    user_role: None,
-                    user_name: user.first_name.to_owned(),
-                    family_name: user.last_name,
-                    given_name: user.first_name,
-                })
+                let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
+                Ok(resp)
+                // Ok(TokenValidationResponse {
+                //     is_valid: true,
+                //     user_email: user.email,
+                //     is_internal_user: !user.is_external,
+                //     user_role: None,
+                //     user_name: user.first_name.to_owned(),
+                //     family_name: user.last_name,
+                //     given_name: user.first_name,
+                // })
             } else if user.password_ext.is_some() && req_time.is_some() {
+                log::info!("Validating user for query params");
                 let hashed_pass = get_hash(
                     &format!(
                         "{}{}",
                         get_hash(
-                            &format!("{}{}", user.password_ext.unwrap(), req_time.unwrap()),
+                            &format!(
+                                "{}{}",
+                                user.password_ext.as_ref().unwrap(),
+                                req_time.unwrap()
+                            ),
                             password_ext_salt
                         ),
                         exp_in
@@ -375,15 +372,17 @@ async fn validate_user_from_db(
                     password_ext_salt,
                 );
                 if hashed_pass.eq(&user_password) {
-                    return Ok(TokenValidationResponse {
-                        is_valid: true,
-                        user_email: user.email,
-                        is_internal_user: !user.is_external,
-                        user_role: None,
-                        user_name: user.first_name.to_owned(),
-                        family_name: user.last_name,
-                        given_name: user.first_name,
-                    });
+                    let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
+                    return Ok(resp);
+                    // return Ok(TokenValidationResponse {
+                    //     is_valid: true,
+                    //     user_email: user.email,
+                    //     is_internal_user: !user.is_external,
+                    //     user_role: None,
+                    //     user_name: user.first_name.to_owned(),
+                    //     family_name: user.last_name,
+                    //     given_name: user.first_name,
+                    // });
                 } else {
                     Err(ErrorForbidden("Not allowed"))
                 }
@@ -400,7 +399,8 @@ pub async fn validate_user(
     user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    validate_user_from_db(db_user, user_password, None, 0, &get_salt()).await
+    let config = get_config();
+    validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
 }
 
 pub async fn validate_user_for_query_params(
@@ -409,9 +409,17 @@ pub async fn validate_user_for_query_params(
     req_time: Option<&String>,
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
+    log::info!("Validating user for query params");
     let db_user = db::user::get_db_user(user_id).await;
-
-    validate_user_from_db(db_user, user_password, req_time, exp_in, &get_salt()).await
+    let config = get_config();
+    validate_user_from_db(
+        db_user,
+        user_password,
+        req_time,
+        exp_in,
+        &config.auth.ext_auth_salt,
+    )
+    .await
 }
 
 pub async fn validator_aws(
@@ -729,15 +737,65 @@ pub(crate) async fn list_objects_for_user(
     }
 }
 
-fn get_salt() -> String {
-    CONFIG.auth.ext_auth_salt.clone()
-}
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
 
     use super::*;
     use crate::common::meta::user::UserRequest;
+
+    #[tokio::test]
+    async fn test_validation_response_builder_from_db_user() {
+        let user = DBUser {
+            email: "test@email.com".into(),
+            first_name: "first_name".into(),
+            last_name: "last_name".into(),
+            password: "some_pass".into(),
+            salt: "some_salt".into(),
+            organizations: vec![],
+            is_external: false,
+            password_ext: Some("some_pass_ext".into()),
+        };
+
+        let resp_from_builder = TokenValidationResponseBuilder::from_db_user(&user).build();
+
+        let resp = TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+            is_internal_user: !user.is_external,
+            user_role: None,
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
+        };
+
+        assert_eq!(resp_from_builder.is_valid, resp.is_valid);
+        assert!(resp_from_builder.user_email.eq(&resp.user_email));
+        assert_eq!(resp_from_builder.is_internal_user, resp.is_internal_user);
+        assert_eq!(resp_from_builder.user_role, resp.user_role);
+        assert!(resp_from_builder.user_name.eq(&resp.user_name));
+        assert!(resp_from_builder.family_name.eq(&resp.family_name));
+        assert!(resp_from_builder.given_name.eq(&resp.given_name));
+    }
+
+    #[tokio::test]
+    async fn test_validation_response_default() {
+        let actual = TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+            is_internal_user: false,
+            user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
+        };
+        let expected1 = TokenValidationResponseBuilder::default().build();
+        let expected2 = TokenValidationResponse::default();
+
+        assert!(actual == expected1);
+        assert!(actual == expected2);
+        assert!(expected1 == expected2);
+    }
 
     #[tokio::test]
     async fn test_validate() {

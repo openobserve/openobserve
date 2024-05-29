@@ -21,8 +21,8 @@ use actix_web::{
     post, put, web, HttpRequest, HttpResponse,
 };
 use config::{
+    get_config,
     utils::{base64, json},
-    CONFIG,
 };
 use strum::IntoEnumIterator;
 
@@ -275,6 +275,7 @@ pub async fn authentication(
         }
     };
     if resp.status {
+        let cfg = get_config();
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
@@ -287,12 +288,12 @@ pub async fn authentication(
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
         );
         auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
         auth_cookie.set_path("/");
-        if CONFIG.auth.cookie_same_site_lax {
+        if cfg.auth.cookie_same_site_lax {
             auth_cookie.set_same_site(cookie::SameSite::Lax);
         } else {
             auth_cookie.set_same_site(cookie::SameSite::None);
@@ -339,6 +340,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     return unauthorized_error(resp);
                 }
             };
+
             match query.get("exp_in") {
                 Some(exp_in_str) => {
                     expires_in = exp_in_str.parse::<i64>().unwrap();
@@ -350,6 +352,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             if Utc::now().timestamp() - req_ts > expires_in {
                 return unauthorized_error(resp);
             }
+            println!("Is the token set {}", s);
             format!("q_auth {}", s)
         } else if let Some(auth_header) = _req.headers().get("Authorization") {
             match auth_header.to_str() {
@@ -362,6 +365,10 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             return unauthorized_error(resp);
         };
 
+        log::info!(
+            "Auth header before fetching user from token: {}",
+            auth_header
+        );
         if let Some((name, password)) =
             o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
         {
@@ -386,6 +393,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             };
 
             if resp.status {
+                let cfg = get_config();
                 let auth_ext = format!(
                     "auth_ext {}",
                     base64::encode(&format!("{}:{}", &name, &password))
@@ -409,18 +417,18 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                         + cookie::time::Duration::seconds(req_ts),
                 );
                 auth_cookie.set_http_only(true);
-                auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+                auth_cookie.set_secure(cfg.auth.cookie_secure_only);
                 auth_cookie.set_path("/");
 
-                if CONFIG.auth.cookie_same_site_lax {
+                if cfg.auth.cookie_same_site_lax {
                     auth_cookie.set_same_site(cookie::SameSite::Lax);
                 } else {
                     auth_cookie.set_same_site(cookie::SameSite::None);
                 }
                 let url = format!(
                     "{}{}/web/cb#id_token={}.{}",
-                    CONFIG.common.web_url,
-                    CONFIG.common.base_uri,
+                    cfg.common.web_url,
+                    cfg.common.base_uri,
                     ID_TOKEN_HEADER,
                     base64::encode(&id_token.to_string())
                 );
@@ -432,6 +440,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 unauthorized_error(resp)
             }
         } else {
+            log::error!("User can not be found from auth-header");
             unauthorized_error(resp)
         }
     }
