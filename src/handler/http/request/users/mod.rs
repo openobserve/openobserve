@@ -21,7 +21,8 @@ use actix_web::{
     post, put, web, HttpRequest, HttpResponse,
 };
 use config::{
-    utils::{base64, json, get_config},
+    utils::{base64, json},
+    get_config
 };
 use strum::IntoEnumIterator;
 
