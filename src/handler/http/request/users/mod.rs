@@ -21,6 +21,7 @@ use actix_web::{
     post, put, web, HttpRequest, HttpResponse,
 };
 use config::{
+    get_config,
     utils::{base64, json},
     get_config
 };
@@ -275,6 +276,7 @@ pub async fn authentication(
         }
     };
     if resp.status {
+        let cfg = get_config();
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))

@@ -719,9 +719,6 @@ pub(crate) async fn list_objects_for_user(
     }
 }
 
-fn get_salt() -> String {
-    CONFIG.auth.ext_auth_salt.clone()
-}
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
