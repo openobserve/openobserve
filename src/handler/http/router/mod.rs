@@ -273,9 +273,10 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
     cfg.service(
         web::scope("/config")
-            .wrap(cors)
+            .wrap(cors.clone())
             .service(status::zo_config)
-            .service(status::logout),
+            .service(status::logout)
+            .service(web::scope("/reload").service(status::config_reload)),
     );
 }
 
@@ -289,7 +290,8 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
             .service(status::redirect)
             .service(status::dex_login)
             .service(status::refresh_token_with_dex)
-            .service(status::logout),
+            .service(status::logout)
+            .service(web::scope("/reload").service(status::config_reload)),
     );
 }
 

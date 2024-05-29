@@ -321,6 +321,17 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(stats))
 }
 
+#[get("")]
+pub async fn config_reload() -> Result<HttpResponse, Error> {
+    if let Err(e) = config::refresh_config() {
+        return Ok(
+            HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
+        );
+    }
+    let status = "succcessfully reloaded config";
+    Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
+}
+
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
