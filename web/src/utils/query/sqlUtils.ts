@@ -154,7 +154,7 @@ export const isGivenFieldInOrderBy = async (
   await importSqlParser();
   const ast: any = parser.astify(sqlQuery);
 
-  if (ast && ast.orderby) {
+  if (ast?.orderby) {
     for (const item of ast.orderby) {
       if (item?.expr?.column === fieldAlias) {
         return item.type; // 'ASC' or 'DESC'
