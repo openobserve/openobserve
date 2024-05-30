@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,6 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
-use config::CONFIG;
 use once_cell::sync::Lazy;
 use tokio::{
     net::{TcpListener, UdpSocket},
@@ -38,10 +37,11 @@ pub static BROADCASTER: Lazy<RwLock<broadcast::Sender<bool>>> = Lazy::new(|| {
 });
 
 pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
+    let cfg = config::get_config();
     let server_running = *SYSLOG_ENABLED.read();
     let bind_addr = "0.0.0.0";
-    let tcp_addr: SocketAddr = format!("{bind_addr}:{}", CONFIG.tcp.tcp_port).parse()?;
-    let udp_addr: SocketAddr = format!("{bind_addr}:{}", CONFIG.tcp.udp_port).parse()?;
+    let tcp_addr: SocketAddr = format!("{bind_addr}:{}", cfg.tcp.tcp_port).parse()?;
+    let udp_addr: SocketAddr = format!("{bind_addr}:{}", cfg.tcp.udp_port).parse()?;
     if (!server_running || is_init) && start_srv {
         log::info!("Starting TCP UDP server");
         let tcp_listener: TcpListener = TcpListener::bind(tcp_addr).await?;

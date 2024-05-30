@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -93,7 +93,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         if let db::Event::Put(ev) = ev {
             let item_key = ev.key;
             let item_value = ev.value.unwrap();
-            let json_val: OrganizationSetting = if config::CONFIG.common.meta_store_external {
+            let json_val: OrganizationSetting = if config::get_config().common.meta_store_external {
                 match db::get(&item_key).await {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,

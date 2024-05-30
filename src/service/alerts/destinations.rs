@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http;
-use config::CONFIG;
 
 use crate::{
     common::{
@@ -51,7 +50,7 @@ pub async fn save(
                     anyhow::anyhow!("Atleast one alert destination email is required"),
                 ));
             }
-            if !CONFIG.smtp.smtp_enabled {
+            if !config::get_config().smtp.smtp_enabled {
                 return Err((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     anyhow::anyhow!("SMTP not configured"),

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,6 @@
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 use config::utils::json;
-#[cfg(feature = "enterprise")]
-use config::CONFIG;
 use futures::future::{ready, Ready};
 
 #[cfg(feature = "enterprise")]
@@ -177,11 +175,12 @@ impl FromRequest for AuthExtractor {
 
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
-        let path =
-            match local_path.strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str()) {
-                Some(path) => path,
-                None => &local_path,
-            };
+        let path = match local_path
+            .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
+        {
+            Some(path) => path,
+            None => &local_path,
+        };
 
         let path_columns = path.split('/').collect::<Vec<&str>>();
         let url_len = path_columns.len();

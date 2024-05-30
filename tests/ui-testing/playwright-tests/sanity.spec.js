@@ -8,7 +8,7 @@ const folderName = `Folder ${Date.now()}`
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
-    // await page.getByText('Login as internal user').click();
+    //  await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -99,6 +99,7 @@ test.describe("Sanity testcases", () => {
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await selectStreamAndStreamTypeForLogs(page,logData.Stream);
     await applyQueryButton(page);
+    
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
   
@@ -192,6 +193,11 @@ test('should only display 5 result if limit 5 added', async ({ page }) => {
   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click({force: true});
   await page.waitForTimeout(2000)
   await page.getByText('Showing 1 to 5 out of 5').click();
+  await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click();
+  await page.waitForTimeout(2000)
+  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  await page.waitForTimeout(2000)
+  await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
 });
 
 test('should create a function and then delete it', async ({ page }) => {
@@ -414,9 +420,65 @@ test('should display results on click refresh stats', async ({ page }) => {
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
   await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
   page.reload();
-  await page.getByRole('cell', { name: '01', exact: true }).click();
-  
+  await page.getByRole('cell', { name: '01', exact: true }).click(); 
 })
 
+test('should display pagination for schema', async ({ page }) => {
+  await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
+  await page.getByText('fast_rewind1/2fast_forward').click();
+  await page.locator('[data-test="logs-page-fields-list-pagination-nextpage-button"]').click();
+  await page.locator('[data-test="logs-page-fields-list-pagination-previouspage-button"]').click();
+})
+
+test('should display pagination when histogram is off and clicking and closing the result', async ({ page }) => {
+  await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+  await page.locator('[data-test="log-table-column-0-\\@timestamp"]').click();
+  await page.locator('[data-test="close-dialog"]').click();
+  await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
+})
+
+test('should display pagination when only SQL is on clicking and closing the result', async ({ page }) => {
+  await page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+  await page.getByLabel('SQL Mode').locator('div').first().click();
+  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  await page.locator('[data-test="log-table-column-1-\\@timestamp"]').click();
+  await page.locator('[data-test="close-dialog"]').click();
+  await page.getByText('fast_rewind12345fast_forward250arrow_drop_down').click();
+})
+
+test(' should display histogram in sql mode', async ({ page }) => {
+  await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+    position: {
+      x: 182,
+      y: 66
+    }
+  });
+  await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  // await page.getByRole('heading', { name: 'Error while fetching' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
+  await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+    position: {
+      x: 182,
+      y: 66
+    }
+  });
+
+});
+
+
+test('should display results when SQL+histogram is on and then stream is selected', async ({ page }) => {
+  await page.locator('[data-test="menu-link-\\/-item"]').click();
+  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
+  await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines').click();
+  await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+  await page.locator('[data-test="log-search-index-list-select-stream"]').click();
+  await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_automate');
+  await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
+  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  await page.locator('[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
+})
 
 })
+

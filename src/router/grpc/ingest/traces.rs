@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::CONFIG;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_client::TraceServiceClient, trace_service_server::TraceService,
     ExportTraceServiceRequest, ExportTraceServiceResponse,
@@ -35,11 +34,12 @@ impl TraceService for TraceServer {
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
         let (metadata, extensions, message) = request.into_parts();
 
+        let cfg = config::get_config();
         // basic validation
-        if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
+        if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &CONFIG.grpc.org_header_key
+                &cfg.grpc.org_header_key
             )));
         }
 

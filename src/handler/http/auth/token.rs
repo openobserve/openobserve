@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,6 @@ use actix_web::{
     error::ErrorUnauthorized,
     http::{header, Method},
 };
-#[cfg(feature = "enterprise")]
-use config::CONFIG;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, dex::service::auth::get_jwks};
 
@@ -44,7 +42,7 @@ pub async fn token_validator(
     let path = match req
         .request()
         .path()
-        .strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str())
+        .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
     {
         Some(path) => path,
         None => req.request().path(),

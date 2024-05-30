@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, CONFIG};
+use config::cluster;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
@@ -45,11 +45,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     )
     .expect("Email regex is valid");
 
+    let cfg = config::get_config();
     // init root user
     if !db::user::root_user_exists().await {
-        if CONFIG.auth.root_user_email.is_empty()
-            || !email_regex.is_match(&CONFIG.auth.root_user_email)
-            || CONFIG.auth.root_user_password.is_empty()
+        if cfg.auth.root_user_email.is_empty()
+            || !email_regex.is_match(&cfg.auth.root_user_email)
+            || cfg.auth.root_user_password.is_empty()
         {
             panic!(
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
@@ -58,8 +59,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let _ = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
-                email: CONFIG.auth.root_user_email.clone(),
-                password: CONFIG.auth.root_user_password.clone(),
+                email: cfg.auth.root_user_email.clone(),
+                password: cfg.auth.root_user_password.clone(),
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -69,7 +70,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
-    if !CONFIG.common.mmdb_disable_download {
+    if !cfg.common.mmdb_disable_download {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
@@ -90,7 +91,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // telemetry run
-    if CONFIG.common.telemetry_enabled && cluster::is_querier(&cluster::LOCAL_NODE_ROLE) {
+    if cfg.common.telemetry_enabled && cluster::is_querier(&cluster::LOCAL_NODE_ROLE) {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
@@ -155,7 +156,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // cache file list
-    if !CONFIG.common.meta_store_external {
+    if !cfg.common.meta_store_external {
         if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
             // load the wal file_list into memory
             db::file_list::local::load_wal_in_cache()
@@ -195,10 +196,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         // create wal dir
-        if let Err(e) = std::fs::create_dir_all(&CONFIG.common.data_wal_dir) {
+        if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
             log::error!("Failed to create wal dir: {}", e);
         }
-        if let Err(e) = std::fs::create_dir_all(&CONFIG.common.data_idx_dir) {
+        if let Err(e) = std::fs::create_dir_all(&cfg.common.data_idx_dir) {
             log::error!("Failed to create wal dir: {}", e);
         }
     }

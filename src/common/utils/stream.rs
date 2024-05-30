@@ -20,9 +20,10 @@ use std::{
 
 use actix_web::HttpResponse;
 use config::{
+    get_config,
     meta::stream::{FileMeta, StreamType},
     utils::{arrow::record_batches_to_json_rows, json},
-    CONFIG, FILE_EXT_JSON,
+    FILE_EXT_JSON,
 };
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
@@ -60,7 +61,7 @@ pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String 
     // "./data/openobserve/olympics/olympics#2022#09#13#13_1.json"
     format!(
         "{}{}/{}/{}/{}_{}{}",
-        &CONFIG.common.data_wal_dir,
+        get_config().common.data_wal_dir,
         org_id,
         StreamType::Logs,
         stream_name,
@@ -84,7 +85,7 @@ pub async fn populate_file_meta(
 
     let sql = format!(
         "SELECT min({0}) as min, max({0}) as max, count({0}) as num_records FROM temp;",
-        CONFIG.common.column_timestamp
+        get_config().common.column_timestamp
     );
     let df = ctx.sql(sql.as_str()).await?;
     let batches = df.collect().await?;

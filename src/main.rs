@@ -29,7 +29,7 @@ use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpSe
 use actix_web_opentelemetry::RequestTracing;
 use config::{
     cluster::{is_router, LOCAL_NODE_ROLE},
-    CONFIG,
+    get_config,
 };
 use log::LevelFilter;
 use openobserve::{
@@ -91,16 +91,17 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
-            CONFIG.tokio_console.tokio_console_retention,
+            cfg.tokio_console.tokio_console_retention,
         ))
         .server_addr(
             format!(
                 "{}:{}",
-                CONFIG.tokio_console.tokio_console_server_addr,
-                CONFIG.tokio_console.tokio_console_server_port
+                cfg.tokio_console.tokio_console_server_addr,
+                cfg.tokio_console.tokio_console_server_port
             )
             .as_str()
             .parse::<SocketAddr>()?,
@@ -118,22 +119,21 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let agent = if !CONFIG.profiling.enabled {
+    let agent = if !cfg.profiling.enabled {
         None
     } else {
-        let agent =
-            PyroscopeAgent::builder(&CONFIG.profiling.server_url, &CONFIG.profiling.project_name)
-                .tags(
-                    [
-                        ("role", CONFIG.common.node_role.as_str()),
-                        ("instance", CONFIG.common.instance_name.as_str()),
-                        ("version", VERSION),
-                    ]
-                    .to_vec(),
-                )
-                .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-                .build()
-                .expect("Failed to setup pyroscope agent");
+        let agent = PyroscopeAgent::builder(&cfg.profiling.server_url, &cfg.profiling.project_name)
+            .tags(
+                [
+                    ("role", cfg.common.node_role.as_str()),
+                    ("instance", cfg.common.instance_name.as_str()),
+                    ("version", VERSION),
+                ]
+                .to_vec(),
+            )
+            .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+            .build()
+            .expect("Failed to setup pyroscope agent");
         #[cfg(feature = "profiling")]
         let agent_running = agent.start().expect("Failed to start pyroscope agent");
         Some(agent_running)
@@ -151,17 +151,15 @@ async fn main() -> Result<(), anyhow::Error> {
     let enable_tokio_console = false;
     let _guard: Option<WorkerGuard> = if enable_tokio_console {
         None
-    } else if CONFIG.log.events_enabled {
+    } else if cfg.log.events_enabled {
         let logger = zo_logger::ZoLogger {
             sender: zo_logger::EVENT_SENDER.clone(),
         };
         log::set_boxed_logger(Box::new(logger)).map(|()| {
-            log::set_max_level(
-                LevelFilter::from_str(&CONFIG.log.level).unwrap_or(LevelFilter::Info),
-            )
+            log::set_max_level(LevelFilter::from_str(&cfg.log.level).unwrap_or(LevelFilter::Info))
         })?;
         None
-    } else if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+    } else if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
         enable_tracing()?;
         None
     } else {
@@ -171,10 +169,10 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
-        CONFIG.limit.cpu_num,
-        CONFIG.limit.mem_total / 1024 / 1024,
-        CONFIG.limit.disk_total / 1024 / 1024 / 1024,
-        CONFIG.limit.disk_free / 1024 / 1024 / 1024,
+        cfg.limit.cpu_num,
+        cfg.limit.mem_total / 1024 / 1024,
+        cfg.limit.disk_total / 1024 / 1024 / 1024,
+        cfg.limit.disk_free / 1024 / 1024 / 1024,
     );
 
     // it must be initialized before the server starts
@@ -225,10 +223,10 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
 
-    if CONFIG.log.events_enabled {
+    if cfg.log.events_enabled {
         tokio::task::spawn(async move { zo_logger::send_logs().await });
     }
-    if CONFIG.common.telemetry_enabled {
+    if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
             meta::telemetry::Telemetry::new()
                 .event("OpenObserve - Starting server", None, false)
@@ -237,7 +235,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // init http server
-    if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+    if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
             log::error!("HTTP server runs failed: {}", e);
         }
@@ -269,7 +267,7 @@ async fn main() -> Result<(), anyhow::Error> {
     _ = db.close().await;
 
     // stop telemetry
-    if CONFIG.common.telemetry_enabled {
+    if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
             .event("OpenObserve - Server stopped", None, false)
             .await;
@@ -290,12 +288,13 @@ fn init_common_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
-    let ip = if !CONFIG.grpc.addr.is_empty() {
-        CONFIG.grpc.addr.clone()
+    let cfg = get_config();
+    let ip = if !cfg.grpc.addr.is_empty() {
+        cfg.grpc.addr.clone()
     } else {
         "0.0.0.0".to_string()
     };
-    let gaddr: SocketAddr = format!("{}:{}", ip, CONFIG.grpc.port).parse()?;
+    let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -349,12 +348,13 @@ fn init_router_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
-    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let cfg = get_config();
+    let gaddr: SocketAddr = format!("0.0.0.0:{}", cfg.grpc.port).parse()?;
     let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -381,24 +381,26 @@ fn init_router_grpc_server(
 }
 
 async fn init_http_server() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
-    let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
-        format!("[::]:{}", CONFIG.http.port).parse()?
+    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
+        format!("[::]:{}", cfg.http.port).parse()?
     } else {
-        let ip = if !CONFIG.http.addr.is_empty() {
-            CONFIG.http.addr.clone()
+        let ip = if !cfg.http.addr.is_empty() {
+            cfg.http.addr.clone()
         } else {
             "0.0.0.0".to_string()
         };
-        format!("{}:{}", ip, CONFIG.http.port).parse()?
+        format!("{}:{}", ip, cfg.http.port).parse()?
     };
 
     let server = HttpServer::new(move || {
+        let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if CONFIG.common.feature_per_thread_lock {
+        if cfg.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         log::info!(
@@ -409,14 +411,14 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
             let client = awc::Client::builder()
-                .connector(awc::Connector::new().limit(CONFIG.route.max_connections))
-                .timeout(Duration::from_secs(CONFIG.route.timeout))
+                .connector(awc::Connector::new().limit(cfg.route.max_connections))
+                .timeout(Duration::from_secs(cfg.route.timeout))
                 .disable_redirects()
                 .finish();
             app = app
                 .service(
-                    // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
-                    web::scope(&CONFIG.common.base_uri)
+                    // if `cfg.common.base_uri` is empty, scope("") still works as expected.
+                    web::scope(&cfg.common.base_uri)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -429,7 +431,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .app_data(web::Data::new(client))
         } else {
             app = app.service(
-                web::scope(&CONFIG.common.base_uri)
+                web::scope(&cfg.common.base_uri)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -437,8 +439,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes),
             )
         }
-        app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-            .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
+        app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
+            .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id%10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
@@ -448,17 +450,15 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
         15,
-        CONFIG.limit.keep_alive,
+        cfg.limit.keep_alive,
     ))))
-    .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
-    .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
+    .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
+    .shutdown_timeout(max(1, cfg.limit.shutdown_timeout))
     .bind(haddr)?;
 
     let server = server
-        .workers(CONFIG.limit.http_worker_num)
-        .worker_max_blocking_threads(
-            CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
-        )
+        .workers(cfg.limit.http_worker_num)
+        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
@@ -470,24 +470,26 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 }
 
 async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
-    let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
-        format!("[::]:{}", CONFIG.http.port).parse()?
+    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
+        format!("[::]:{}", cfg.http.port).parse()?
     } else {
-        let ip = if !CONFIG.http.addr.is_empty() {
-            CONFIG.http.addr.clone()
+        let ip = if !cfg.http.addr.is_empty() {
+            cfg.http.addr.clone()
         } else {
             "0.0.0.0".to_string()
         };
-        format!("{}:{}", ip, CONFIG.http.port).parse()?
+        format!("{}:{}", ip, cfg.http.port).parse()?
     };
 
     let server = HttpServer::new(move || {
+        let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if CONFIG.common.feature_per_thread_lock {
+        if cfg.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         log::info!(
@@ -498,14 +500,14 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
             let client = awc::Client::builder()
-                .connector(awc::Connector::new().limit(CONFIG.route.max_connections))
-                .timeout(Duration::from_secs(CONFIG.route.timeout))
+                .connector(awc::Connector::new().limit(cfg.route.max_connections))
+                .timeout(Duration::from_secs(cfg.route.timeout))
                 .disable_redirects()
                 .finish();
             app = app
                 .service(
-                    // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
-                    web::scope(&CONFIG.common.base_uri)
+                    // if `cfg.common.base_uri` is empty, scope("") still works as expected.
+                    web::scope(&cfg.common.base_uri)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -518,7 +520,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 .app_data(web::Data::new(client))
         } else {
             app = app.service(
-                web::scope(&CONFIG.common.base_uri)
+                web::scope(&cfg.common.base_uri)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -526,8 +528,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes),
             )
         }
-        app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-            .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
+        app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
+            .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id%10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
@@ -536,17 +538,15 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
         15,
-        CONFIG.limit.keep_alive,
+        cfg.limit.keep_alive,
     ))))
-    .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
-    .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
+    .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
+    .shutdown_timeout(max(1, cfg.limit.shutdown_timeout))
     .bind(haddr)?;
 
     let server = server
-        .workers(CONFIG.limit.http_worker_num)
-        .worker_max_blocking_threads(
-            CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
-        )
+        .workers(cfg.limit.http_worker_num)
+        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
@@ -605,21 +605,21 @@ async fn graceful_shutdown(handle: ServerHandle) {
 pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
-    let (writer, guard) = if CONFIG.log.file_dir.is_empty() {
+    let cfg = get_config();
+    let (writer, guard) = if cfg.log.file_dir.is_empty() {
         let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
         (BoxMakeWriter::new(non_blocking), _guard)
     } else {
-        let file_name_prefix = if CONFIG.log.file_name_prefix.is_empty() {
-            format!("o2.{}.log", CONFIG.common.instance_name.as_str())
+        let file_name_prefix = if cfg.log.file_name_prefix.is_empty() {
+            format!("o2.{}.log", cfg.common.instance_name.as_str())
         } else {
-            CONFIG.log.file_name_prefix.to_string()
+            cfg.log.file_name_prefix.to_string()
         };
-        let file_appender =
-            tracing_appender::rolling::daily(&CONFIG.log.file_dir, file_name_prefix);
+        let file_appender = tracing_appender::rolling::daily(&cfg.log.file_dir, file_name_prefix);
         let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
         (BoxMakeWriter::new(non_blocking), _guard)
     };
-    let layer = if CONFIG.log.json_format {
+    let layer = if cfg.log.json_format {
         Layer::default()
             .with_writer(writer)
             .with_timer(config::meta::logger::CustomTimeFormat)
@@ -649,28 +649,29 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
 }
 
 fn enable_tracing() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let mut headers = HashMap::new();
     headers.insert(
-        CONFIG.common.tracing_header_key.clone(),
-        CONFIG.common.tracing_header_value.clone(),
+        cfg.common.tracing_header_key.clone(),
+        cfg.common.tracing_header_value.clone(),
     );
     let tracer = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(
             opentelemetry_otlp::new_exporter()
                 .http()
-                .with_endpoint(&CONFIG.common.otel_otlp_url)
+                .with_endpoint(&cfg.common.otel_otlp_url)
                 .with_headers(headers),
         )
         .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", CONFIG.common.node_role.as_str()),
-            KeyValue::new("service.instance", CONFIG.common.instance_name.as_str()),
+            KeyValue::new("service.name", cfg.common.node_role.to_string()),
+            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
             KeyValue::new("service.version", VERSION),
         ])))
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
-    let layer = if CONFIG.log.json_format {
+    let layer = if cfg.log.json_format {
         tracing_subscriber::fmt::layer()
             .with_ansi(false)
             .json()
@@ -680,7 +681,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
     };
 
     Registry::default()
-        .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
+        .with(tracing_subscriber::EnvFilter::new(&cfg.log.level))
         .with(layer)
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .init();

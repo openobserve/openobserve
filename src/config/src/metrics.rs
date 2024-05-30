@@ -21,8 +21,6 @@ use prometheus::{
     CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
 };
 
-use crate::CONFIG;
-
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
@@ -682,10 +680,11 @@ fn register_metrics(registry: &Registry) {
 }
 
 fn create_const_labels() -> HashMap<String, String> {
+    let cfg = crate::config::get_config();
     let mut labels = HashMap::new();
-    labels.insert("cluster".to_string(), CONFIG.common.cluster_name.clone());
-    labels.insert("instance".to_string(), CONFIG.common.instance_name.clone());
-    labels.insert("role".to_string(), CONFIG.common.node_role.clone());
+    labels.insert("cluster".to_string(), cfg.common.cluster_name.clone());
+    labels.insert("instance".to_string(), cfg.common.instance_name.clone());
+    labels.insert("role".to_string(), cfg.common.node_role.clone());
     labels
 }
 
@@ -694,7 +693,7 @@ pub fn create_prometheus_handler() -> PrometheusMetrics {
     register_metrics(&registry);
 
     PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", CONFIG.common.base_uri).as_str())
+        .endpoint(format!("{}/metrics", crate::config::get_config().common.base_uri).as_str())
         .const_labels(create_const_labels())
         .registry(registry)
         .build()

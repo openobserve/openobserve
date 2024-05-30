@@ -17,14 +17,13 @@ use std::io::Write;
 
 use config::{
     cluster::LOCAL_NODE_UUID,
-    ider,
+    get_config, ider,
     meta::{
         cluster::Node,
         search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
     utils::{file::get_file_meta as util_get_file_meta, json},
-    CONFIG,
 };
 use futures::future::try_join_all;
 use infra::{
@@ -32,7 +31,12 @@ use infra::{
     file_list, storage,
 };
 use proto::cluster_rpc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{
+    codec::CompressionEncoding,
+    metadata::{MetadataKey, MetadataValue},
+    transport::Channel,
+    Request,
+};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
@@ -49,7 +53,8 @@ pub async fn query(
     time_max: i64,
     is_local: bool,
 ) -> Result<Vec<FileKey>, anyhow::Error> {
-    if is_local || CONFIG.common.local_mode {
+    let cfg = get_config();
+    if is_local || cfg.common.local_mode {
         return query_inner(
             org_id,
             stream_name,
@@ -72,6 +77,7 @@ pub async fn query(
     let mut tasks = Vec::with_capacity(3);
     // get first three nodes to check file list max id
     for node in nodes.into_iter().take(3) {
+        let cfg = cfg.clone();
         let org_id = org_id.to_string();
         let task = tokio::task::spawn(async move {
             let req = cluster_rpc::EmptyRequest::default();
@@ -87,12 +93,17 @@ pub async fn query(
                 )
             });
 
+            let org_header_key: MetadataKey<_> = cfg
+                .grpc
+                .org_header_key
+                .parse()
+                .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
             let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                 .parse()
                 .map_err(|_| Error::Message("invalid token".to_string()))?;
             let channel = Channel::from_shared(node.grpc_addr.clone())
                 .unwrap()
-                .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                 .connect()
                 .await
                 .map_err(|err| {
@@ -110,15 +121,15 @@ pub async fn query(
                 move |mut req: Request<()>| {
                     req.metadata_mut().insert("authorization", token.clone());
                     req.metadata_mut()
-                        .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                        .insert(org_header_key.clone(), org_id.clone());
                     Ok(req)
                 },
             );
             client = client
                 .send_compressed(CompressionEncoding::Gzip)
                 .accept_compressed(CompressionEncoding::Gzip)
-                .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
             let response: cluster_rpc::MaxIdResponse = match client.max_id(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -194,12 +205,17 @@ pub async fn query(
         )
     });
 
+    let org_header_key: MetadataKey<_> = cfg
+        .grpc
+        .org_header_key
+        .parse()
+        .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
     let token: MetadataValue<_> = cluster::get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::Message("invalid token".to_string()))?;
     let channel = Channel::from_shared(node.grpc_addr.clone())
         .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
         .connect()
         .await
         .map_err(|err| {
@@ -218,15 +234,16 @@ pub async fn query(
         move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             req.metadata_mut()
-                .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                .insert(org_header_key.clone(), org_id.clone());
             Ok(req)
         },
     );
+
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let response: cluster_rpc::FileList = match client.query(request).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
@@ -313,7 +330,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
-    if CONFIG.common.meta_store_external {
+    if get_config().common.meta_store_external {
         delete_parquet_file_db_only(key, file_list_only).await
     } else {
         delete_parquet_file_s3(key, file_list_only).await
