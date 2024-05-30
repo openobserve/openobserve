@@ -147,6 +147,7 @@ export const getStreamFromQuery = async (query: any) => {
 
 // returns 'ASC' or 'DESC' if exist
 // return null if not exist
+
 export const isGivenFieldInOrderBy = async (
   sqlQuery: string,
   fieldAlias: string
