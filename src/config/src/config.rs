@@ -18,7 +18,7 @@ use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration
 use arc_swap::ArcSwap;
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
-use dotenvy::dotenv;
+use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
 use itertools::chain;
 use lettre::{
@@ -1028,7 +1028,7 @@ pub struct RUM {
 }
 
 pub fn init() -> Config {
-    dotenv().ok();
+    dotenv_override().ok();
     let mut cfg = Config::init().unwrap();
     // set cpu num
     let cpu_num = cgroup::get_cpu_limit();
