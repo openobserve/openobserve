@@ -1236,9 +1236,13 @@ const useLogs = () => {
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
         searchObj.data.histogramQuery.query.start_time =
-          searchObj.data.datetime.startTime;
+          searchObj.data.datetime.startTime.toString().length > 13
+            ? searchObj.data.datetime.startTime
+            : searchObj.data.datetime.startTime * 1000;
         searchObj.data.histogramQuery.query.end_time =
-          searchObj.data.datetime.endTime;
+          searchObj.data.datetime.endTime.toString().length > 13
+            ? searchObj.data.datetime.endTime
+            : searchObj.data.datetime.endTime * 1000;
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
 
