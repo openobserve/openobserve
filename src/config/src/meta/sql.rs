@@ -845,6 +845,20 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::Cast { expr, .. } | SqlExpr::TryCast { expr, .. } => {
             get_field_name_from_expr(expr)
         }
+        SqlExpr::Case {
+            operand: _,
+            conditions,
+            results: _,
+            else_result: _,
+        } => {
+            let mut fields = Vec::new();
+            for expr in conditions.iter() {
+                if let Some(v) = get_field_name_from_expr(expr) {
+                    fields.extend(v);
+                }
+            }
+            (!fields.is_empty()).then_some(fields)
+        }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
@@ -1029,6 +1043,14 @@ mod tests {
             (
                 "select _timestamp, message FROM tbl where  (pid='2fs93s' or stream_id='asdf834sdf2') AND str_match(new_message, 'Error')",
                 vec!["_timestamp", "message", "new_message", "pid", "stream_id"],
+            ),
+            (
+                "SELECT COUNT(CASE WHEN k8s_namespace_name IS NULL THEN 0 ELSE 1 END) AS null_count FROM default1",
+                vec!["k8s_namespace_name"],
+            ),
+            (
+                "SELECT COUNT(CASE WHEN k8s_namespace_name IS NULL THEN 0 ELSE 1 END) AS null_count FROM default1 WHERE a=1",
+                vec!["a", "k8s_namespace_name"],
             ),
         ];
         for (sql, fields) in samples {
