@@ -54,6 +54,7 @@ impl Context for Export {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            is_histogram: false,
         };
 
         let req = search::Request {

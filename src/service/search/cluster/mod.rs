@@ -150,6 +150,11 @@ pub async fn search(
             meta.stream_name, search_condition
         );
 
+        // fast_mode is for 1st page optimization
+        //  1. single WHERE clause of `match_all()`
+        //  2. not a histogram query (todo)
+        let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+            && !idx_req.query.as_ref().unwrap().is_histogram);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -174,15 +179,10 @@ pub async fn search(
                 }
             })
             .collect::<HashSet<_>>();
-        // fast_mode is for 1st page optimization
-        //  1. single WHERE clause of `match_all()`
-        //  2. not a histogram query (todo)
-        let fast_mode = matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)));
         let (unique_files, inverted_index_count) = if fast_mode {
             // should be query size * 2
             // let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
             let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
-            log::warn!("TL: limit_count {}", limit_count);
             let mut total_count = 0;
             let sorted_data = idx_resp
                 .hits

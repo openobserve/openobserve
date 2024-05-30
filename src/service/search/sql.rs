@@ -1030,6 +1030,7 @@ mod tests {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            is_histogram: false,
         };
 
         let req: config::meta::search::Request = config::meta::search::Request {
@@ -1141,6 +1142,7 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                is_histogram: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
@@ -1264,6 +1266,7 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                is_histogram: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),

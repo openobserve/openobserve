@@ -31,6 +31,7 @@ message SearchQuery {
     bool        uses_zo_fn = 12;
     string        query_fn = 13;
     bool          skip_wal = 14;
+    bool      is_histogram = 15;
 }
 
 // Search request
