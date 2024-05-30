@@ -1962,7 +1962,7 @@ const useLogs = () => {
                 ? [...environmentInterestingFields]
                 : [...schemaInterestingFields];
 
-            // create a schema field mapping based on field name to avoind iteration over object.
+            // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
             for (const field of stream.schema) {
               fieldObj = {
