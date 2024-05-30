@@ -168,8 +168,8 @@ const defaultObject = {
     },
     editorValue: <any>"",
     datetime: <any>{
-      startTime: 0,
-      endTime: 0,
+      startTime: (new Date().getTime() - 900000) * 1000,
+      endTime: new Date().getTime(),
       relativeTimePeriod: "15m",
       type: "relative",
       selectedDate: <any>{},
