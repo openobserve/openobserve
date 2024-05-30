@@ -151,6 +151,7 @@ pub async fn search(
         );
 
         let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        let track_total_hits = idx_req.query.as_ref().unwrap().track_total_hits;
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -163,7 +164,7 @@ pub async fn search(
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = http::search(idx_req).await?;
-        let (unique_files, inverted_index_count) = if is_first_page {
+        let (unique_files, inverted_index_count) = if is_first_page && track_total_hits {
             // should be query size * 2
             let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
             let mut total_count = 0;
