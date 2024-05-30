@@ -67,10 +67,11 @@ pub(crate) fn get_search_type_from_request(
             "reports" => Some(SearchEventType::Reports),
             "alerts" => Some(SearchEventType::Alerts),
             "values" => Some(SearchEventType::Values),
+            "rum" => Some(SearchEventType::RUM),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,
-                    "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts'  or 'values' allowed",
+                    "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed",
                 ));
             }
         },
