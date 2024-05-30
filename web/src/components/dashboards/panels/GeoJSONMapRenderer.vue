@@ -26,13 +26,11 @@ import {
   nextTick,
 } from "vue";
 import { useStore } from "vuex";
-import * as map from "./../../../locales/languages/map.json";
 import * as echarts from "echarts/core";
 import { MapChart } from "echarts/charts";
+import worldMap from "./../../../locales/languages/map.json";
 
-echarts.use([
-  MapChart,
-]);
+echarts.use([MapChart]);
 
 export default defineComponent({
   name: "GeoJSONMapRenderer",
@@ -46,28 +44,37 @@ export default defineComponent({
   setup(props: any) {
     const chartRef: any = ref(null);
     let chart: any;
-    const store = useStore();
+
     const windowResizeEventCallback = async () => {
-      await nextTick();
       await nextTick();
       chart.resize();
     };
 
-    onMounted(async () => {
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-
+    const initChart = async () => {
       if (chartRef.value) {
         chart = echarts.init(chartRef.value);
-        echarts.registerMap("world", map as any);
-        chart?.setOption(props?.data?.options || {}, true);
-        window.addEventListener("resize", windowResizeEventCallback);
+        echarts.registerMap("world", worldMap as any);
+
+        // Default empty chart configuration to ensure map is visible
+        const defaultOptions = {
+          tooltip: {},
+          series: [
+            {
+              type: "map",
+              map: "world",
+              data: [],
+            },
+          ],
+        };
+
+        chart.setOption(defaultOptions, true);
       }
+    };
+
+    onMounted(async () => {
+      await nextTick();
+      await initChart();
+      window.addEventListener("resize", windowResizeEventCallback);
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
@@ -75,10 +82,11 @@ export default defineComponent({
     });
     watch(
       () => props.data.options,
-      async () => {
-        await nextTick();
-        chart?.resize();
-        chart?.setOption(props?.data?.options || {}, true);
+      async (newOptions) => {
+        if (chart) {
+          await nextTick();
+          chart?.setOption(newOptions || {}, true);
+        }
       },
       { deep: true }
     );
