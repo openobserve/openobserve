@@ -43,12 +43,15 @@ const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
 static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
+static FLATTEN_COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
+    Lazy::new(Default::default);
 static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
 
 pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
     let mut nodes = match role {
         Role::Querier => QUERIER_CONSISTENT_HASH.write().await,
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
+        Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
     let mut h = config::utils::hash::gxhash::new();
@@ -63,6 +66,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
     let mut nodes = match role {
         Role::Querier => QUERIER_CONSISTENT_HASH.write().await,
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
+        Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
     let mut h = config::utils::hash::gxhash::new();
@@ -77,6 +81,7 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     let nodes = match role {
         Role::Querier => QUERIER_CONSISTENT_HASH.read().await,
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.read().await,
+        Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await,
         _ => return None,
     };
     if nodes.is_empty() {
@@ -115,6 +120,7 @@ pub async fn register_and_keepalive() -> Result<()> {
         let node = load_local_mode_node();
         add_node_to_consistent_hash(&node, &Role::Querier).await;
         add_node_to_consistent_hash(&node, &Role::Compactor).await;
+        add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
         NODES.write().await.insert(LOCAL_NODE_UUID.clone(), node);
         return Ok(());
     }
@@ -242,6 +248,10 @@ async fn watch_node_list() -> Result<()> {
                     if is_compactor(&item_value.role) {
                         remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
                     }
+                    if is_flatten_compactor(&item_value.role) {
+                        remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor)
+                            .await;
+                    }
                     NODES.write().await.remove(item_key);
                     continue;
                 }
@@ -278,6 +288,9 @@ async fn watch_node_list() -> Result<()> {
                 if is_compactor(&item_value.role) {
                     add_node_to_consistent_hash(&item_value, &Role::Compactor).await;
                 }
+                if is_flatten_compactor(&item_value.role) {
+                    add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor).await;
+                }
                 NODES.write().await.insert(item_key.to_string(), item_value);
             }
             Event::Delete(ev) => {
@@ -294,6 +307,9 @@ async fn watch_node_list() -> Result<()> {
                 }
                 if is_compactor(&item_value.role) {
                     remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
+                }
+                if is_flatten_compactor(&item_value.role) {
+                    remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor).await;
                 }
                 NODES.write().await.remove(item_key);
             }
@@ -328,6 +344,9 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                 }
                 if is_compactor(&node.role) {
                     remove_node_from_consistent_hash(&node, &Role::Compactor).await;
+                }
+                if is_flatten_compactor(&node.role) {
+                    remove_node_from_consistent_hash(&node, &Role::FlattenCompactor).await;
                 }
                 NODES.write().await.remove(&node.uuid);
             }
@@ -447,6 +466,7 @@ mod tests {
             };
             add_node_to_consistent_hash(&node_q, &Role::Querier).await;
             add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
+            add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor).await;
         }
 
         for key in ["test", "test1", "test2", "test3"] {

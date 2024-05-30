@@ -53,18 +53,13 @@ impl std::fmt::Display for Remote {
 
 #[async_trait]
 impl ObjectStore for Remote {
-    async fn put_opts(
-        &self,
-        location: &Path,
-        bytes: Bytes,
-        _opts: PutOptions,
-    ) -> Result<PutResult> {
+    async fn put_opts(&self, location: &Path, bytes: Bytes, opts: PutOptions) -> Result<PutResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
         match self
             .client
-            .put(&(format_key(&file, true).into()), bytes)
+            .put_opts(&(format_key(&file, true).into()), bytes, opts)
             .await
         {
             Ok(_) => {

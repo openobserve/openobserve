@@ -32,6 +32,7 @@ use crate::{
 
 mod file_list;
 pub mod file_list_deleted;
+pub mod flatten;
 pub mod merge;
 pub mod retention;
 pub mod stats;

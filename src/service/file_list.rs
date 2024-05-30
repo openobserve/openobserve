@@ -283,7 +283,8 @@ async fn query_inner(
         stream_type,
         stream_name,
         time_level,
-        (time_min, time_max),
+        Some((time_min, time_max)),
+        None,
     )
     .await?;
     let mut file_keys = Vec::with_capacity(files.len());
