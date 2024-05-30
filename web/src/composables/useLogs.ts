@@ -1571,7 +1571,10 @@ const useLogs = () => {
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
           if (searchObj.meta.sqlMode == true) {
-            if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+            if (
+              hasAggregation(parsedSQL?.columns) ||
+              parsedSQL.groupby != null
+            ) {
               const parsedSQL: any = fnParsedSQL();
               searchAggData.total = res.data.total;
               searchAggData.hasAggregation = true;
@@ -2201,6 +2204,14 @@ const useLogs = () => {
 
     if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
       totalCount = searchAggData.total;
+    }
+
+    if (typeof totalCount === "NaN") {
+      totalCount = 0;
+    }
+
+    if (typeof endCount === "NaN") {
+      endCount = 0;
     }
     const title =
       "Showing " +
