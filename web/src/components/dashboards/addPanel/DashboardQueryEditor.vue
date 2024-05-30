@@ -365,13 +365,11 @@ export default defineComponent({
             case "p99":
               query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
               break;
+            case "count-distinct":
+              query += `, count(distinct(${weight.column})) as ${weight.alias}`;
+              break;
             default:
-              const weightField = weight.aggregationFunction
-                ? weight.aggregationFunction == "count-distinct"
-                  ? `count(distinct(${weight.column}))`
-                  : `${weight.aggregationFunction}(${weight.column})`
-                : `${weight.column}`;
-              query += `, ${weightField} as ${weight.alias}`;
+              query += `, ${weight.aggregationFunction}(${weight.column}) as ${weight.alias}`;
               break;
           }
         }
