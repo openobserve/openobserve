@@ -905,8 +905,6 @@ pub struct Log {
     pub events_url: String,
     #[env_config(name = "ZO_EVENTS_BATCH_SIZE", default = 10)]
     pub events_batch_size: usize,
-    #[env_config(name = "ZO_ENABLE_SCHEMA_CHANGE_LOG", default = false)]
-    pub enable_schema_change_log: bool,
 }
 
 #[derive(Debug, EnvConfig)]

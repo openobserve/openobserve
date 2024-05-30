@@ -297,7 +297,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Some((ev_start_dt, chrono::Utc::now().timestamp_micros()))
                 };
 
-                let schema_versions =
+                let mut schema_versions =
                     match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
                         Ok(val) => val,
                         Err(e) => {
@@ -308,33 +308,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if schema_versions.is_empty() {
                     continue;
                 }
-                let schema_data = schema_versions.last().unwrap().1.as_ref();
-                let latest_schema: Vec<Schema> = match json::from_slice(schema_data) {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
-                        continue;
-                    }
-                };
+                let latest_start_dt = schema_versions.last().unwrap().0;
+                let mut latest_schema: Vec<Schema> =
+                    match json::from_slice(&schema_versions.last().unwrap().1) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error parsing schema, key: {}, error: {}", item_key, e);
+                            continue;
+                        }
+                    };
                 if latest_schema.is_empty() {
                     continue;
                 }
-                let latest_schema = latest_schema.last().unwrap();
-                if latest_schema == &Schema::empty() {
-                    log::error!("Error parsing schema, key: {}, schema is empty", item_key);
-                    continue;
-                }
-                let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
+                let latest_schema = latest_schema.pop().unwrap();
+                let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                log::warn!(
-                    "Caching schema: updated stream schema {}, fields num: {}, start_dt: {:?}",
-                    item_key,
-                    latest_schema.fields().len(),
-                    ts_range
-                );
                 w.insert(
                     item_key.to_string(),
                     SchemaCache::new(latest_schema.clone()),
@@ -360,9 +351,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     w.shrink_to_fit();
                     drop(w);
                 } else {
-                    let schema_versions = schema_versions
-                        .into_iter()
-                        .map(|(start_dt, data)| {
+                    // remove latest, already parsed it
+                    _ = schema_versions.pop().unwrap();
+                    // parse other versions
+                    let schema_versions = itertools::chain(
+                        schema_versions.into_iter().map(|(start_dt, data)| {
                             (
                                 start_dt,
                                 json::from_slice::<Vec<Schema>>(&data)
@@ -370,8 +363,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     .pop()
                                     .unwrap(),
                             )
-                        })
-                        .collect::<Vec<_>>();
+                        }),
+                        // add latest version here
+                        vec![(latest_start_dt, latest_schema)],
+                    )
+                    .collect::<Vec<_>>();
                     let mut w = STREAM_SCHEMAS.write().await;
                     w.entry(item_key.to_string())
                         .and_modify(|existing_vec| {
@@ -380,7 +376,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             existing_vec.extend(schema_versions.clone())
                         })
                         .or_insert(schema_versions);
-                    w.shrink_to_fit();
                     drop(w);
                 }
 
@@ -416,18 +411,21 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     // delete only one version
                     continue;
                 }
-                log::warn!("Caching schema: deleted stream schema {}", item_key);
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
+                w.shrink_to_fit();
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
@@ -490,11 +488,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         w.insert(item_key.to_string(), settings);
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        log::warn!(
-            "Caching schema: cache stream schema {}, fields num: {}",
-            item_key,
-            latest_schema.fields().len(),
-        );
         w.insert(
             item_key.to_string(),
             SchemaCache::new(latest_schema.clone()),

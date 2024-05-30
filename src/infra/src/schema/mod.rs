@@ -90,7 +90,7 @@ pub async fn get_from_db(
 ) -> Result<Schema> {
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
-    let ret = match db.get(&key).await {
+    Ok(match db.get(&key).await {
         Err(e) => {
             if let Error::DbError(DbError::KeyNotExists(_)) = e {
                 Schema::empty()
@@ -110,13 +110,7 @@ pub async fn get_from_db(
                 json::from_slice(&v)?
             }
         }
-    };
-    log::warn!(
-        "Schema cache is not exist, get from db for stream {}, fields num: {}",
-        key,
-        ret.fields().len()
-    );
-    Ok(ret)
+    })
 }
 
 pub async fn get_versions(
@@ -300,7 +294,6 @@ pub async fn merge(
     let inferred_schema = schema.clone();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let db = infra_db::get_db().await;
-    log::info!("[infra::schema::mod::merge]: Called get_for_update for {key}");
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
@@ -414,7 +407,6 @@ pub async fn update_setting(
     #[cfg(feature = "enterprise")]
     let metadata_for_update = metadata.clone();
     let db = infra_db::get_db().await;
-    log::info!("[infra::schema::mod::update_setting]: Called get_for_update for {key}");
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
@@ -492,7 +484,6 @@ pub async fn delete_fields(
     #[cfg(feature = "enterprise")]
     let deleted_fields_for_update = deleted_fields.clone();
     let db = infra_db::get_db().await;
-    log::info!("[infra::schema::mod::delete_fields]: Called get_for_update for {key}");
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
