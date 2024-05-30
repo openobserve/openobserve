@@ -505,6 +505,7 @@ pub enum SearchEventType {
     Alerts,
     Values,
     Other,
+    RUM,
 }
 
 impl std::fmt::Display for SearchEventType {
@@ -516,6 +517,7 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Alerts => write!(f, "Alerts"),
             SearchEventType::Other => write!(f, "Other"),
             SearchEventType::Values => write!(f, "_values"),
+            SearchEventType::RUM => write!(f, "RUM"),
         }
     }
 }

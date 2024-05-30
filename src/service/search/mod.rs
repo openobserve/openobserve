@@ -73,6 +73,7 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
 ) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
     let trace_id = if trace_id.is_empty() {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
@@ -152,6 +153,7 @@ pub async fn search(
                     search::SearchEventType::Dashboards => (true, in_req.search_type),
                     search::SearchEventType::Reports => (true, in_req.search_type),
                     search::SearchEventType::Alerts => (true, in_req.search_type),
+                    search::SearchEventType::RUM => (true, in_req.search_type),
                     search::SearchEventType::Values => (false, None),
                     search::SearchEventType::Other => (false, None),
                 },
