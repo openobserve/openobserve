@@ -404,7 +404,6 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
-      // console.log(variablesData, "variablesData");
     };
     const currentDashboardData: any = reactive({
       data: {},
@@ -511,7 +510,8 @@ export default defineComponent({
       if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
         selectedDate.value = {
           valueType: "relative",
-          relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
+          relativeTimePeriod:
+            data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
         };
       } else {
         // else, dashboard will have absolute time settings

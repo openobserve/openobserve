@@ -794,8 +794,6 @@ const useDashboardPanelData = () => {
   };
 
   const addFilteredItem = async (name: string) => {
-    console.log("addFilteredItem start", dashboardPanelData.data.queries);
-
     const currentQuery =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -803,12 +801,10 @@ const useDashboardPanelData = () => {
 
     // Ensure the filter array is initialized
     if (!currentQuery.fields.filter) {
-      console.log("no filter", dashboardPanelData.data.queries);
       currentQuery.fields.filter = [];
     }
 
     // Add the new filter item
-    console.log("adding filter", name);
     currentQuery.fields.filter.push({
       type: "list",
       values: [],
@@ -837,8 +833,6 @@ const useDashboardPanelData = () => {
         type: currentQuery.fields.stream_type,
       });
 
-      console.log("addFilteredItem success", res);
-
       dashboardPanelData.meta.filterValue.push({
         column: name,
         value: res?.data?.hits?.[0]?.values
@@ -846,8 +840,6 @@ const useDashboardPanelData = () => {
           .filter((it: any) => it),
       });
     } catch (error: any) {
-      console.log("addFilteredItem error", error);
-
       const errorDetailValue =
         error.response?.data.error_detail ||
         error.response?.data.message ||
