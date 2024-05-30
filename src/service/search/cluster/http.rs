@@ -164,18 +164,11 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     result.aggs.remove("ingester_count");
 
     let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
-    // TODO: ingester mixed with querier will has problem.
-    let inverted_index_total = inverted_index_count + ingester_total;
     log::info!("response_total: {}", total);
     log::info!("ingester_total: {}", ingester_total);
     log::info!("inverted_index_count: {}", inverted_index_count);
 
-    // Maybe inverted index count is wrong, we use the max value
-    if inverted_index_total > total {
-        result.set_total(inverted_index_total);
-    } else {
-        result.set_total(total);
-    }
+    result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);

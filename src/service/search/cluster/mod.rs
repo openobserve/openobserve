@@ -150,8 +150,6 @@ pub async fn search(
             meta.stream_name, search_condition
         );
 
-        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
-        let track_total_hits = idx_req.query.as_ref().unwrap().track_total_hits;
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -164,73 +162,14 @@ pub async fn search(
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = http::search(idx_req).await?;
-        let (unique_files, inverted_index_count) = if is_first_page && track_total_hits {
-            // should be query size * 2
-            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
-            let mut total_count = 0;
-            // get deleted file
-            let deleted_files = idx_resp
+        let (unique_files, inverted_index_count) = (
+            idx_resp
                 .hits
                 .iter()
-                .filter_map(|hit| {
-                    if hit.get("deleted").unwrap().as_bool().unwrap() {
-                        Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
-            let sorted_data = idx_resp
-                .hits
-                .iter()
-                .filter_map(|hit| {
-                    let term = hit.get("term").unwrap().as_str().unwrap().to_string();
-                    let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-                    let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
-                    let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    if deleted_files.contains(&file_name) {
-                        None
-                    } else {
-                        total_count += count;
-                        Some((term, file_name, count, timestamp))
-                    }
-                })
-                .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
-            let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
-            let mut term_counts: HashMap<String, u64> = HashMap::new();
-
-            for (term, filename, count, _timestamp) in sorted_data {
-                let term = term.as_str();
-                for search_term in terms.iter() {
-                    if term.contains(search_term) {
-                        let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
-                        if *current_count < limit_count {
-                            *current_count += count;
-                            term_map
-                                .entry(search_term.to_string())
-                                .or_insert_with(Vec::new)
-                                .push(filename.to_string());
-                        }
-                    }
-                }
-            }
-            (
-                term_map
-                    .into_iter()
-                    .flat_map(|(_, filenames)| filenames)
-                    .collect::<HashSet<_>>(),
-                Some(total_count),
-            )
-        } else {
-            (
-                idx_resp
-                    .hits
-                    .iter()
-                    .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    .collect::<HashSet<_>>(),
-                None,
-            )
-        };
+                .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                .collect::<HashSet<_>>(),
+            None,
+        );
 
         let mut idx_file_list: Vec<FileKey> = vec![];
         for filename in unique_files {
