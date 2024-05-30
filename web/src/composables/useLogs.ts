@@ -2199,7 +2199,7 @@ const useLogs = () => {
       }
     }
 
-    if (searchAggData.hasAggregation) {
+    if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
       totalCount = searchAggData.total;
     }
     const title =
