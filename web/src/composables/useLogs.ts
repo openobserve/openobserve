@@ -2210,11 +2210,11 @@ const useLogs = () => {
       totalCount = searchAggData.total;
     }
 
-    if (typeof totalCount === "NaN") {
+    if (isNaN(totalCount)) {
       totalCount = 0;
     }
 
-    if (typeof endCount === "NaN") {
+    if (isNaN(endCount)) {
       endCount = 0;
     }
     const title =
