@@ -212,6 +212,11 @@ const searchObjDebug = reactive({
   extractFieldsWithAPI: "",
 });
 
+const searchAggData = reactive({
+  total: 0,
+  hasAggregation: false,
+});
+
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
@@ -638,11 +643,13 @@ const useLogs = () => {
 
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
-        const histogramParsedSQL: any = fnHistogramParsedSQL(req.aggs.histogram);
+        const histogramParsedSQL: any = fnHistogramParsedSQL(
+          req.aggs.histogram
+        );
 
         histogramParsedSQL.where = parsedSQL.where;
 
-        let histogramQuery = parser.sqlify(histogramParsedSQL)
+        let histogramQuery = parser.sqlify(histogramParsedSQL);
         histogramQuery = histogramQuery.replace(/`/g, '"');
         req.aggs.histogram = histogramQuery;
 
@@ -823,7 +830,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(parsedSQL?.limit);
+    return !parsedSQL?.limit;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1208,8 +1215,10 @@ const useLogs = () => {
               router.currentRoute.value.name == "logs" &&
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
-              const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
-              const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
+              const start_time: number =
+                initialQueryPayload.value?.query?.start_time || 0;
+              const end_time: number =
+                initialQueryPayload.value?.query?.end_time || 0;
               queryReq.query.start_time = start_time;
               queryReq.query.end_time = end_time;
             }
@@ -1511,9 +1520,9 @@ const useLogs = () => {
       // ) {
       //   delete queryReq.query.track_total_hits;
       // }
+      const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        const parsedSQL: any = fnParsedSQL();
         if (parsedSQL.limit != null) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -1556,6 +1565,17 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.partitionTotal[
                 index
               ] = res.data.total;
+            }
+          }
+
+          searchAggData.total = 0;
+          searchAggData.hasAggregation = false;
+          if (searchObj.meta.sqlMode == true) {
+            if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+              const parsedSQL: any = fnParsedSQL();
+              searchAggData.total = res.data.total;
+              searchAggData.hasAggregation = true;
+              searchObj.meta.resultGrid.showPagination = false;
             }
           }
 
@@ -2177,6 +2197,10 @@ const useLogs = () => {
       } else {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
       }
+    }
+
+    if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
+      totalCount = searchAggData.total;
     }
     const title =
       "Showing " +
@@ -2848,6 +2872,7 @@ const useLogs = () => {
 
   return {
     searchObj,
+    searchAggData,
     getStreams,
     resetSearchObj,
     resetStreamData,
