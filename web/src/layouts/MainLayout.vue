@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <ThemeSwitcher></ThemeSwitcher>
-        <template v-if="config.isCloud !== 'true'">
+        <template v-if="config.isCloud !== 'true' && !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')">
           <q-btn
             class="q-ml-xs no-border"
             size="13px"
