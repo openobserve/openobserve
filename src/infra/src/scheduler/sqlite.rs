@@ -15,7 +15,7 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::{utils::json, CONFIG};
+use config::utils::json;
 use sqlx::Row;
 
 use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
@@ -311,7 +311,7 @@ RETURNING *;"#;
             .bind(report_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(CONFIG.limit.scheduler_max_retries)
+            .bind(config::get_config().limit.scheduler_max_retries)
             .bind(true)
             .bind(false)
             .bind(concurrency)
@@ -367,7 +367,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         let client = client.lock().await;
         sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
             .bind(TriggerStatus::Completed)
-            .bind(CONFIG.limit.scheduler_max_retries)
+            .bind(config::get_config().limit.scheduler_max_retries)
             .execute(&*client)
             .await?;
         Ok(())

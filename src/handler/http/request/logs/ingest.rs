@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,6 @@
 use std::io::Error;
 
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
-use config::CONFIG;
 
 use crate::{
     common::meta::{
@@ -288,7 +287,7 @@ pub async fn otlp_logs_write(
     let user_email = req.headers().get("user_id").unwrap().to_str().unwrap();
     let in_stream_name = req
         .headers()
-        .get(&CONFIG.grpc.stream_header_key)
+        .get(&config::get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");

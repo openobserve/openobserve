@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::config::{ider, INSTANCE_ID};
+use ::config::{cache_instance_id, ider};
 
 use crate::service::db::instance;
 
@@ -32,7 +32,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             id
         }
     };
-    INSTANCE_ID.insert("instance_id".to_owned(), instance_id);
+    cache_instance_id(&instance_id);
 
     wal::init().await?;
     // because of asynchronous, we need to wait for a while

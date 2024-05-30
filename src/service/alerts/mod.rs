@@ -22,13 +22,13 @@ use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
 use config::{
-    ider,
+    get_config, ider,
     meta::stream::StreamType,
     utils::{
         base64,
         json::{Map, Value},
     },
-    CONFIG, SMTP_CLIENT,
+    SMTP_CLIENT,
 };
 use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
@@ -90,7 +90,8 @@ pub async fn save(
         Schedule::from_str(&alert.trigger_condition.cron)?;
     } else if alert.trigger_condition.frequency == 0 {
         // default frequency is 60 seconds
-        alert.trigger_condition.frequency = std::cmp::max(10, CONFIG.limit.alert_schedule_interval);
+        alert.trigger_condition.frequency =
+            std::cmp::max(10, get_config().limit.alert_schedule_interval);
     }
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
@@ -613,14 +614,15 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
     };
 
+    let cfg = get_config();
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
                 "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
                 func_expr,
-                CONFIG.common.column_timestamp,
-                CONFIG.common.column_timestamp,
+                cfg.common.column_timestamp,
+                cfg.common.column_timestamp,
                 alert.stream_name,
                 where_sql,
                 group.join(", "),
@@ -632,8 +634,8 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         sql = format!(
             "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
             func_expr,
-            CONFIG.common.column_timestamp,
-            CONFIG.common.column_timestamp,
+            cfg.common.column_timestamp,
+            cfg.common.column_timestamp,
             alert.stream_name,
             where_sql,
             having_expr
@@ -865,7 +867,8 @@ pub async fn send_email_notification(
     dest: &DestinationWithTemplate,
     msg: String,
 ) -> Result<(), anyhow::Error> {
-    if !CONFIG.smtp.smtp_enabled {
+    let cfg = get_config();
+    if !cfg.smtp.smtp_enabled {
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
     }
 
@@ -875,15 +878,15 @@ pub async fn send_email_notification(
     }
 
     let mut email = Message::builder()
-        .from(CONFIG.smtp.smtp_from_email.parse()?)
+        .from(cfg.smtp.smtp_from_email.parse()?)
         .subject(format!("Openobserve Alert - {}", alert_name));
 
     for recepient in recepients {
         email = email.to(recepient.parse()?);
     }
 
-    if !CONFIG.smtp.smtp_reply_to.is_empty() {
-        email = email.reply_to(CONFIG.smtp.smtp_reply_to.parse()?);
+    if !cfg.smtp.smtp_reply_to.is_empty() {
+        email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
     let email = email.singlepart(SinglePart::html(msg)).unwrap();
@@ -918,7 +921,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             process_variable_replace(&mut resp, key, &VarValue::Str(&value));
 
             // calculate start and end time
-            if key == &CONFIG.common.column_timestamp {
+            if key == &get_config().common.column_timestamp {
                 let val = value.parse::<i64>().unwrap_or_default();
                 if alert_start_time == 0 || val < alert_start_time {
                     alert_start_time = val;
@@ -1003,6 +1006,7 @@ async fn process_dest_template(
     rows: &[Map<String, Value>],
     rows_tpl_val: &[String],
 ) -> String {
+    let cfg = get_config();
     // format values
     let alert_count = rows.len();
     let mut vars = HashMap::with_capacity(rows.len());
@@ -1023,7 +1027,7 @@ async fn process_dest_template(
     // calculate start and end time
     let mut alert_start_time = 0;
     let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&CONFIG.common.column_timestamp) {
+    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
         for val in values {
             let val = val.parse::<i64>().unwrap_or_default();
             if alert_start_time == 0 || val < alert_start_time {
@@ -1122,8 +1126,8 @@ async fn process_dest_template(
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
             "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}",
-            CONFIG.common.web_url,
-            CONFIG.common.base_uri,
+            cfg.common.web_url,
+            cfg.common.base_uri,
             alert.stream_type,
             alert.stream_name,
             alert.stream_name,
@@ -1151,8 +1155,8 @@ async fn process_dest_template(
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
             "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
-            CONFIG.common.web_url,
-            CONFIG.common.base_uri,
+            cfg.common.web_url,
+            cfg.common.base_uri,
             alert.stream_type,
             alert.stream_name,
             alert.stream_name,

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,6 @@
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_recursion::async_recursion;
-use config::CONFIG;
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -916,13 +915,14 @@ async fn selector_load_data_from_datafusion(
         }
     };
 
+    let cfg = config::get_config();
     let mut df_group = table.clone().filter(
-        col(&CONFIG.common.column_timestamp)
+        col(&cfg.common.column_timestamp)
             .gt(lit(start))
-            .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
+            .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
     )?;
     for mat in selector.matchers.matchers.iter() {
-        if mat.name == CONFIG.common.column_timestamp
+        if mat.name == cfg.common.column_timestamp
             || mat.name == VALUE_LABEL
             || schema.field_with_name(&mat.name).is_err()
         {
@@ -952,7 +952,7 @@ async fn selector_load_data_from_datafusion(
         }
     }
     let batches = df_group
-        .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+        .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
 
@@ -965,7 +965,7 @@ async fn selector_load_data_from_datafusion(
             .downcast_ref::<StringArray>()
             .unwrap();
         let time_values = batch
-            .column_by_name(&CONFIG.common.column_timestamp)
+            .column_by_name(&cfg.common.column_timestamp)
             .unwrap()
             .as_any()
             .downcast_ref::<Int64Array>()
@@ -982,7 +982,7 @@ async fn selector_load_data_from_datafusion(
                 let mut labels = Vec::with_capacity(batch.num_columns());
                 for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
                     let name = k.name();
-                    if name == &CONFIG.common.column_timestamp
+                    if name == &cfg.common.column_timestamp
                         || name == HASH_LABEL
                         || name == VALUE_LABEL
                     {

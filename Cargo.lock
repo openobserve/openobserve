@@ -2265,6 +2265,7 @@ dependencies = [
  "actix-web-prometheus",
  "ahash 0.8.11",
  "anyhow",
+ "arc-swap",
  "arrow",
  "arrow-json",
  "arrow-schema",
@@ -5329,7 +5330,7 @@ dependencies = [
  "rayon",
  "regex",
  "regex-syntax 0.8.3",
- "reportserver",
+ "report_server",
  "reqwest 0.12.4",
  "rust-embed-for-web",
  "segment",
@@ -6358,7 +6359,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reportserver"
+name = "report_server"
 version = "0.1.0"
 dependencies = [
  "actix-web",

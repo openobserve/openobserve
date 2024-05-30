@@ -17,9 +17,9 @@ use std::{fs, path::Path};
 
 use config::{
     cluster::{is_compactor, is_ingester, is_querier, LOCAL_NODE_ROLE},
+    get_config,
     meta::stream::StreamType,
     utils::file::scan_files,
-    CONFIG,
 };
 use infra::storage;
 use tokio::time;
@@ -30,7 +30,8 @@ use crate::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if CONFIG.common.local_mode || CONFIG.common.meta_store_external {
+    let cfg = get_config();
+    if cfg.common.local_mode || cfg.common.meta_store_external {
         return Ok(());
     }
 
@@ -45,7 +46,9 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
+    let mut interval = time::interval(time::Duration::from_secs(
+        get_config().limit.file_push_interval,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -57,11 +60,10 @@ pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
 
 // upload compressed file_list to storage & delete moved files from local
 pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow::Error> {
-    let data_dir = Path::new(&CONFIG.common.data_wal_dir)
-        .canonicalize()
-        .unwrap();
+    let cfg = get_config();
+    let data_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
 
-    let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
+    let pattern = format!("{}file_list/", &cfg.common.data_wal_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
 
     for file in files {
@@ -147,7 +149,9 @@ async fn _run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
         return Ok(()); // only querier or compactor need to sync
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.s3.sync_to_cache_interval));
+    let mut interval = time::interval(time::Duration::from_secs(
+        get_config().s3.sync_to_cache_interval,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

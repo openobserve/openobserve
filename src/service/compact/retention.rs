@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,10 +21,9 @@ use std::{
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
-    ider, is_local_disk_storage,
+    get_config, ider, is_local_disk_storage,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     utils::{json, time::BASE_TIME},
-    CONFIG,
 };
 use infra::{cache, dist_lock, file_list as infra_file_list, storage};
 
@@ -106,10 +105,11 @@ pub async fn delete_all(
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = Utc::now().timestamp_micros();
 
+    let cfg = get_config();
     if is_local_disk_storage() {
         let data_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}",
-            CONFIG.common.data_stream_dir
+            cfg.common.data_stream_dir
         );
         let path = std::path::Path::new(&data_dir);
         if path.exists() {
@@ -129,7 +129,7 @@ pub async fn delete_all(
             true,
         )
         .await?;
-        if CONFIG.compact.data_retention_history {
+        if cfg.compact.data_retention_history {
             // only store the file_list into history, don't delete files
             if let Err(e) = infra_file_list::batch_add_history(&files).await {
                 log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
@@ -208,11 +208,12 @@ pub async fn delete_by_date(
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc);
     let time_range = { (date_start.timestamp_micros(), date_end.timestamp_micros()) };
 
+    let cfg = get_config();
     if is_local_disk_storage() {
         while date_start <= date_end {
             let data_dir = format!(
                 "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-                CONFIG.common.data_stream_dir,
+                cfg.common.data_stream_dir,
                 date_start.format("%Y/%m/%d")
             );
             let path = std::path::Path::new(&data_dir);
@@ -234,7 +235,7 @@ pub async fn delete_by_date(
             true,
         )
         .await?;
-        if CONFIG.compact.data_retention_history {
+        if cfg.compact.data_retention_history {
             // only store the file_list into history, don't delete files
             if let Err(e) = infra_file_list::batch_add_history(&files).await {
                 log::error!("[COMPACT] file_list batch_add_history failed: {}", e);
@@ -358,7 +359,7 @@ async fn write_file_list(
     file_list_days: HashSet<String>,
     hours_files: HashMap<String, Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
-    if CONFIG.common.meta_store_external {
+    if get_config().common.meta_store_external {
         write_file_list_db_only(org_id, hours_files).await
     } else {
         write_file_list_s3(org_id, file_list_days, hours_files).await

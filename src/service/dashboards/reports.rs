@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
-use config::{get_chrome_launch_options, CONFIG, SMTP_CLIENT};
+use config::{get_chrome_launch_options, get_config, SMTP_CLIENT};
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
 use lettre::{
@@ -46,20 +46,19 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), anyhow::Error> {
-    if CONFIG.common.report_server_url.is_empty() {
+    let cfg = get_config();
+    if cfg.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
-        if !CONFIG.smtp.smtp_enabled {
+        if !cfg.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
         // Check if Chrome is enabled, otherwise don't save the report
-        if !CONFIG.chrome.chrome_enabled || CONFIG.chrome.chrome_path.is_empty() {
+        if !cfg.chrome.chrome_enabled || cfg.chrome.chrome_path.is_empty() {
             return Err(anyhow::anyhow!("Chrome not enabled"));
         }
 
-        if CONFIG.common.report_user_name.is_empty()
-            || CONFIG.common.report_user_password.is_empty()
-        {
+        if cfg.common.report_user_name.is_empty() || cfg.common.report_user_password.is_empty() {
             return Err(anyhow::anyhow!("Report username and password ENVs not set"));
         }
     }
@@ -240,7 +239,8 @@ impl Report {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
 
-        if !CONFIG.common.report_server_url.is_empty() {
+        let cfg = get_config();
+        if !cfg.common.report_server_url.is_empty() {
             let mut recepients = vec![];
             for recepient in &self.destinations {
                 match recepient {
@@ -255,17 +255,17 @@ impl Report {
                     recepients,
                     name: self.name.clone(),
                     message: self.message.clone(),
-                    dashb_url: format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri),
+                    dashb_url: format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri),
                 },
             };
 
             let url = url::Url::parse(&format!(
                 "{}/{}/reports/{}/send",
-                &CONFIG.common.report_server_url, &self.org_id, &self.name
+                &cfg.common.report_server_url, &self.org_id, &self.name
             ))
             .unwrap();
             match Client::builder()
-                .danger_accept_invalid_certs(CONFIG.common.report_server_skip_tls_verify)
+                .danger_accept_invalid_certs(cfg.common.report_server_skip_tls_verify)
                 .build()
                 .unwrap()
                 .put(url)
@@ -295,8 +295,8 @@ impl Report {
             let report = generate_report(
                 dashboard,
                 &self.org_id,
-                &CONFIG.common.report_user_name,
-                &CONFIG.common.report_user_password,
+                &cfg.common.report_user_name,
+                &cfg.common.report_user_password,
                 &self.timezone,
             )
             .await?;
@@ -306,7 +306,8 @@ impl Report {
 
     /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
     async fn send_email(&self, pdf_data: &[u8], dashb_url: String) -> Result<(), anyhow::Error> {
-        if !CONFIG.smtp.smtp_enabled {
+        let cfg = get_config();
+        if !cfg.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
@@ -318,15 +319,15 @@ impl Report {
         }
 
         let mut email = Message::builder()
-            .from(CONFIG.smtp.smtp_from_email.parse()?)
+            .from(cfg.smtp.smtp_from_email.parse()?)
             .subject(format!("Openobserve Report - {}", &self.title));
 
         for recepient in recepients {
             email = email.to(recepient.parse()?);
         }
 
-        if !CONFIG.smtp.smtp_reply_to.is_empty() {
-            email = email.reply_to(CONFIG.smtp.smtp_reply_to.parse()?);
+        if !cfg.smtp.smtp_reply_to.is_empty() {
+            email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
         }
 
         let email = email
@@ -364,8 +365,9 @@ async fn generate_report(
     user_pass: &str,
     timezone: &str,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
+    let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
-    if !CONFIG.chrome.chrome_enabled {
+    if !cfg.chrome.chrome_enabled {
         return Err(anyhow::anyhow!("Chrome not enabled"));
     }
 
@@ -396,7 +398,7 @@ async fn generate_report(
         }
     });
 
-    let web_url = format!("{}{}/web", CONFIG.common.web_url, CONFIG.common.base_uri);
+    let web_url = format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri);
     log::debug!("Navigating to web url: {}", &web_url);
     let page = browser
         .new_page(&format!("{web_url}/login?login_as_internal_user=true"))
@@ -548,7 +550,7 @@ async fn generate_report(
 
 async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
-    let timeout = Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
+    let timeout = Duration::from_secs(get_config().chrome.chrome_sleep_secs.into());
     log::info!("waiting for headless data to load");
     loop {
         if page

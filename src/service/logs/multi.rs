@@ -25,7 +25,7 @@ use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use infra::schema::SchemaCache;
 
@@ -71,6 +71,7 @@ async fn ingest_inner(
     thread_id: usize,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
+    let cfg = config::get_config();
 
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
@@ -80,7 +81,7 @@ async fn ingest_inner(
     check_ingestion_allowed(org_id, Some(stream_name))?;
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -131,7 +132,7 @@ async fn ingest_inner(
         }
 
         // JSON Flattening
-        value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
+        value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
         // Start row based transform
 
         if !local_trans.is_empty() {
@@ -158,7 +159,7 @@ async fn ingest_inner(
         };
 
         // handle timestamp
-        let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
+        let timestamp = match local_val.get(&cfg.common.column_timestamp) {
             Some(v) => match parse_timestamp_micro_from_value(v) {
                 Ok(t) => t,
                 Err(e) => {
@@ -176,7 +177,7 @@ async fn ingest_inner(
             continue;
         }
         local_val.insert(
-            CONFIG.common.column_timestamp.clone(),
+            cfg.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
 
