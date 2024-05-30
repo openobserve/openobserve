@@ -229,10 +229,7 @@
                 searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
-                style="
-                  width: auto !important;
-                  padding-top: 3px !important;
-                "
+                style="width: auto !important; padding-top: 3px !important"
               ></CommonAutoComplete>
 
               <q-icon
@@ -327,6 +324,10 @@ export default defineComponent({
     drilldownDataIndex: {
       type: Number,
       default: -1,
+    },
+    variablesData: {
+      type: Object,
+      default: false,
     },
   },
   emits: ["close"],
@@ -556,6 +557,13 @@ export default defineComponent({
     //want label for dropdown in input and value for its input value
     const selectedValue = computed(() => {
       let selectedValues: any = [];
+      const variableListName = props.variablesData.values
+        .filter((variable: any) => variable.type !== "dynamic_filters")
+        .map((variable: any) => ({
+          label: variable.name,
+          value: "${" + variable.name + "}",
+        }));
+
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
           { label: "Edge Source", value: "${edge.__source}" },
@@ -563,6 +571,7 @@ export default defineComponent({
           { label: "Edge Value", value: "${edge.__value}" },
           { label: "Node Name", value: "${node.__name}" },
           { label: "Node Value", value: "${node.__value}" },
+          ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "table") {
         dashboardPanelData.data.queries.forEach((query: any) => {
@@ -570,6 +579,7 @@ export default defineComponent({
             ...query.fields.x,
             ...query.fields.y,
             ...query.fields.z,
+            ...variableListName,
           ];
           panelFields.forEach((field) => {
             selectedValues.push({
@@ -582,6 +592,7 @@ export default defineComponent({
         selectedValues = [
           { label: "Series Name", value: "${series.__name}" },
           { label: "Series Value", value: "${series.__value}" },
+          ...variableListName,
         ];
       }
       return selectedValues;
