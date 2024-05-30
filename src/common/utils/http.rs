@@ -20,7 +20,7 @@ use std::{
 
 use actix_web::web::Query;
 use awc::http::header::HeaderMap;
-use config::meta::stream::StreamType;
+use config::meta::{search::SearchEventType, stream::StreamType};
 use opentelemetry::propagation::Extractor;
 
 #[inline(always)]
@@ -46,6 +46,31 @@ pub(crate) fn get_stream_type_from_request(
     };
 
     Ok(stream_type)
+}
+
+#[inline(always)]
+pub(crate) fn get_search_type_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Result<Option<SearchEventType>, Error> {
+    let event_type = match query.get("search_type") {
+        Some(s) => match s.to_lowercase().as_str() {
+            "ui" => Some(SearchEventType::UI),
+            "dashboards" => Some(SearchEventType::Dashboards),
+            "reports" => Some(SearchEventType::Reports),
+            "alerts" => Some(SearchEventType::Alerts),
+            "values" => Some(SearchEventType::Values),
+            "rum" => Some(SearchEventType::RUM),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed",
+                ));
+            }
+        },
+        None => None,
+    };
+
+    Ok(event_type)
 }
 
 #[inline(always)]

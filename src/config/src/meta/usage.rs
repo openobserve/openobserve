@@ -15,6 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::search::SearchEventType;
 use crate::{
     meta::stream::{FileMeta, StreamType},
     SIZE_IN_MB,
@@ -82,6 +83,8 @@ pub struct UsageData {
     pub min_ts: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_type: Option<SearchEventType>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -220,6 +223,8 @@ pub struct RequestStats {
     pub max_ts: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_type: Option<SearchEventType>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -233,6 +238,7 @@ impl Default for RequestStats {
             min_ts: None,
             max_ts: None,
             user_email: None,
+            search_type: None,
         }
     }
 }
@@ -249,6 +255,7 @@ impl From<FileMeta> for RequestStats {
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),
             user_email: None,
+            search_type: None,
         }
     }
 }
