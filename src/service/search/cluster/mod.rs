@@ -180,8 +180,6 @@ pub async fn search(
             })
             .collect::<HashSet<_>>();
         let (unique_files, inverted_index_count) = if fast_mode {
-            // should be query size * 2
-            // let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
             let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
             let mut total_count = 0;
             let sorted_data = idx_resp
