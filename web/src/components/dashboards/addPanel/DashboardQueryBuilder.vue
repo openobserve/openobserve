@@ -988,7 +988,6 @@ export default defineComponent({
             value: null,
           },
         ];
-
         return { value: null, label: "Auto" };
       } else if (field?.args?.length === 0) {
         field?.args?.push({
