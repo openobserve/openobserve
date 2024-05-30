@@ -16,7 +16,7 @@
 use config::{
     get_config,
     meta::stream::{FileKey, PartitionTimeLevel, StreamType},
-    utils::{file::get_file_meta, time::BASE_TIME},
+    utils::time::BASE_TIME,
 };
 use infra::file_list as infra_file_list;
 
@@ -26,10 +26,8 @@ use crate::{
 };
 
 pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error> {
-    if get_file_meta(&get_config().common.data_wal_dir).is_err() {
-        // there is no local wal files, no need upgrade
-        return Ok(());
-    }
+    // check wal dir
+    std::fs::create_dir_all(&get_config().common.data_wal_dir).expect("create wal dir success");
 
     // load stream list
     let mut from_storage = false;

@@ -33,12 +33,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(3600));
     loop {
         if cluster::is_offline() {
             break;
         }
-        interval.tick().await;
+        time::sleep(time::Duration::from_secs(3600)).await;
         let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         if let Err(e) = config::utils::asynchronism::file::clean_empty_dirs(
             &config::get_config().common.data_wal_dir,

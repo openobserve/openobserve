@@ -19,6 +19,8 @@ use std::{
     path::Path,
 };
 
+use async_recursion::async_recursion;
+
 #[inline(always)]
 pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
     let file = File::open(file)?;
@@ -74,6 +76,45 @@ pub fn scan_files<P: AsRef<Path>>(
         }
     }
     Ok(files)
+}
+
+#[async_recursion]
+pub async fn scan_files_with_channel(
+    root: &Path,
+    ext: &str,
+    limit: Option<usize>,
+    tx: tokio::sync::mpsc::Sender<Vec<String>>,
+) -> Result<(), std::io::Error> {
+    let limit = limit.unwrap_or_default();
+    let mut files = Vec::with_capacity(std::cmp::max(16, limit));
+    let dir = std::fs::read_dir(root)?;
+    for entry in dir {
+        let path = entry?.path();
+        if !path.is_file() {
+            scan_files_with_channel(&path, ext, Some(limit), tx.clone()).await?;
+        } else {
+            let path_ext = path
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
+            if path_ext == ext {
+                files.push(path.to_str().unwrap().to_string());
+                if limit > 0 && files.len() >= limit {
+                    tx.send(files.clone()).await.map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                    })?;
+                    files.clear();
+                }
+            }
+        }
+    }
+    if !files.is_empty() {
+        tx.send(files)
+            .await
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
