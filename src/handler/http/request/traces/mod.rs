@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::{ider, meta::stream::StreamType, metrics, utils::json, CONFIG};
+use config::{get_config, ider, meta::stream::StreamType, metrics, utils::json};
 use infra::errors;
 use opentelemetry::{global, trace::TraceContextExt};
 use serde::Serialize;
@@ -76,7 +76,7 @@ async fn handle_req(
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     let in_stream_name = req
         .headers()
-        .get(&CONFIG.grpc.stream_header_key)
+        .get(&get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         otlp_http::traces_proto(&org_id, **thread_id, body, in_stream_name).await
@@ -136,14 +136,14 @@ pub async fn get_latest_traces(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
-
+    let cfg = get_config();
     let mut http_span = None;
-    let trace_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if cfg.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
-    } else if CONFIG.common.tracing_search_enabled {
+    } else if cfg.common.tracing_search_enabled {
         let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/latest",
             org_id = org_id.clone(),
@@ -221,13 +221,14 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    let cfg = get_config();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !CONFIG.common.feature_query_queue_enabled {
+    if !cfg.common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
@@ -239,7 +240,7 @@ pub async fn get_latest_traces(
     // search
     let query_sql = format!(
         "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
-        CONFIG.common.column_timestamp
+        cfg.common.column_timestamp
     );
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
@@ -279,7 +280,7 @@ pub async fn get_latest_traces(
         .map(|v| v.to_string());
 
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span.clone().unwrap()).await
     } else {
         search_fut.await
@@ -360,7 +361,7 @@ pub async fn get_latest_traces(
         .join("','");
     let query_sql = format!(
         "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{}') ORDER BY {} ASC",
-        CONFIG.common.column_timestamp, trace_ids, CONFIG.common.column_timestamp,
+        cfg.common.column_timestamp, trace_ids, cfg.common.column_timestamp,
     );
     req.query.from = 0;
     req.query.size = 9999;
@@ -372,7 +373,7 @@ pub async fn get_latest_traces(
     loop {
         let search_fut =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
             search_fut.instrument(http_span.clone().unwrap()).await
         } else {
             search_fut.await

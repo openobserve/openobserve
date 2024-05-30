@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,6 @@ use std::io::{BufRead, BufReader};
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::CONFIG;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
@@ -84,7 +83,7 @@ async fn query_deleted(
     time_max: i64,
     limit: i64,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
-    if CONFIG.common.meta_store_external {
+    if config::get_config().common.meta_store_external {
         query_deleted_from_table(org_id, time_min, time_max, limit).await
     } else {
         query_deleted_from_s3(org_id, time_min, time_max, limit).await
@@ -160,8 +159,9 @@ pub async fn load_prefix_from_s3(
     }
     log::info!("Load file_list_deleted gets {} files", files_num);
 
-    let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
-    let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);
+    let cfg = config::get_config();
+    let mut tasks = Vec::with_capacity(cfg.limit.query_thread_num + 1);
+    let chunk_size = std::cmp::max(1, files_num / cfg.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
         let task: tokio::task::JoinHandle<Result<HashMap<String, Vec<String>>, anyhow::Error>> =

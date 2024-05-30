@@ -159,7 +159,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
-reportserver.workspace = true
+report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 
@@ -173,7 +173,7 @@ float-cmp = "0.9"
 async-walkdir = "1.0.0"
 
 [workspace]
-members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto", "src/reportserver"]
+members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto", "src/report_server"]
 resolver = "2"
 
 [workspace.package]
@@ -187,12 +187,13 @@ infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
-reportserver = { path = "src/reportserver" }
+report_server = { path = "src/report_server" }
 
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.5"
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 anyhow = "1.0"
+arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"

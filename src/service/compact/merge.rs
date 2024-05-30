@@ -21,7 +21,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
-    ider,
+    get_config, ider,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
     utils::{
@@ -31,7 +31,7 @@ use config::{
         },
         record_batch_ext::format_recordbatch_by_schema,
     },
-    CONFIG, FILE_EXT_PARQUET,
+    FILE_EXT_PARQUET,
 };
 use hashbrown::HashSet;
 use infra::{
@@ -167,6 +167,7 @@ pub async fn merge_by_stream(
         .unwrap()
         .timestamp_micros();
 
+    let cfg = get_config();
     // check offset
     let time_now: DateTime<Utc> = Utc::now();
     let time_now_hour = Utc
@@ -186,16 +187,16 @@ pub async fn merge_by_stream(
     // -- second period, the last hour file list upload to storage
     // -- third period, we can do the merge, so, at least 3 times of
     // max_file_retention_time
-    if (CONFIG.compact.step_secs < 3600
+    if (cfg.compact.step_secs < 3600
         && time_now.timestamp_micros() - offset
-            <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                 .unwrap()
                 .num_microseconds()
                 .unwrap())
-        || (CONFIG.compact.step_secs >= 3600
+        || (cfg.compact.step_secs >= 3600
             && (offset >= time_now_hour
                 || time_now.timestamp_micros() - offset
-                    <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                    <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                         .unwrap()
                         .num_microseconds()
                         .unwrap()
@@ -230,8 +231,8 @@ pub async fn merge_by_stream(
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     // check lookback files
-    if CONFIG.compact.lookback_hours > 0 {
-        let lookback_offset = Duration::try_hours(CONFIG.compact.lookback_hours)
+    if cfg.compact.lookback_hours > 0 {
+        let lookback_offset = Duration::try_hours(cfg.compact.lookback_hours)
             .unwrap()
             .num_microseconds()
             .unwrap();
@@ -268,11 +269,11 @@ pub async fn merge_by_stream(
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
-        // Duration::try_hours(CONFIG.limit.allowed_upto).unwrap().num_microseconds().unwrap() <
+        // Duration::try_hours(cfg.limit.allowed_upto).unwrap().num_microseconds().unwrap() <
         // time_now_hour { -- no check it
         // }
         let offset = offset
-            + Duration::try_seconds(CONFIG.compact.step_secs)
+            + Duration::try_seconds(cfg.compact.step_secs)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
@@ -300,7 +301,7 @@ pub async fn merge_by_stream(
     let mut stream_stats = StreamStats::default();
 
     // use mutiple threads to merge
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_move_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
     for (prefix, files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();
@@ -308,6 +309,7 @@ pub async fn merge_by_stream(
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
+            let cfg = get_config();
             // sort by file size
             let mut files_with_size = files_with_size.to_owned();
             files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
@@ -323,7 +325,7 @@ pub async fn merge_by_stream(
             let mut new_file_list = Vec::new();
             let mut new_file_size = 0;
             for file in files_with_size.iter() {
-                if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
+                if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
                     if new_file_list.len() <= 1 {
                         break; // no files need to merge
                     }
@@ -445,7 +447,7 @@ pub async fn merge_by_stream(
 
     // write new offset
     let offset = offset
-        + Duration::try_seconds(CONFIG.compact.step_secs)
+        + Duration::try_seconds(cfg.compact.step_secs)
             .unwrap()
             .num_microseconds()
             .unwrap();
@@ -503,8 +505,9 @@ pub async fn merge_files(
     let mut total_records = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
+    let cfg = get_config();
     for file in files_with_size.iter() {
-        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
+        if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
             break;
         }
         new_file_size += file.meta.original_size;
@@ -585,7 +588,7 @@ pub async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_latest).unwrap();
     let full_text_search_fields = get_stream_setting_fts_fields(&schema_latest).unwrap();
-    if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
+    if cfg.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
             let schema_ver_id = match db::schema::filter_schema_version_id(
@@ -735,7 +738,7 @@ pub async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
+            if cfg.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
                     inverted_idx_batches,
@@ -788,7 +791,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
     if events.is_empty() {
         return Ok(());
     }
-    if CONFIG.common.meta_store_external {
+    if get_config().common.meta_store_external {
         write_file_list_db_only(org_id, events).await
     } else {
         write_file_list_s3(org_id, events).await
@@ -833,7 +836,7 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
             continue;
         }
         // send broadcast to other nodes
-        if CONFIG.memory_cache.cache_latest_files {
+        if get_config().memory_cache.cache_latest_files {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
                 log::error!("[COMPACT] send broadcast for file_list failed: {}", e);
             }
@@ -925,10 +928,8 @@ pub fn generate_inverted_idx_recordbatch(
     stream_type: StreamType,
     full_text_search_fields: &[String],
 ) -> Vec<RecordBatch> {
-    if !CONFIG.common.inverted_index_enabled
-        || batches.is_empty()
-        || stream_type != StreamType::Logs
-    {
+    let cfg = get_config();
+    if !cfg.common.inverted_index_enabled || batches.is_empty() || stream_type != StreamType::Logs {
         return Vec::new();
     }
 
@@ -948,8 +949,8 @@ pub fn generate_inverted_idx_recordbatch(
         return Vec::new();
     }
     // add _timestamp column to columns_to_index
-    if !inverted_idx_columns.contains(&CONFIG.common.column_timestamp) {
-        inverted_idx_columns.push(CONFIG.common.column_timestamp.to_string());
+    if !inverted_idx_columns.contains(&cfg.common.column_timestamp) {
+        inverted_idx_columns.push(cfg.common.column_timestamp.to_string());
     }
 
     let mut inverted_idx_batches = Vec::with_capacity(batches.len());
@@ -1029,7 +1030,7 @@ pub async fn merge_parquet_files(
     // 3. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
         concatenated_record_batch
-            .column_by_name(&CONFIG.common.column_timestamp)
+            .column_by_name(&get_config().common.column_timestamp)
             .ok_or_else(|| {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",

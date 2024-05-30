@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::FileMeta, RwHashMap, RwHashSet, CONFIG};
+use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
 use dashmap::{DashMap, DashSet};
 use infra::{cache, file_list};
 use once_cell::sync::Lazy;
@@ -28,8 +28,14 @@ pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
-pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
-    Lazy::new(|| CONFIG.compact.blocked_orgs.split(',').collect());
+pub static BLOCKED_ORGS: Lazy<Vec<String>> = Lazy::new(|| {
+    config::get_config()
+        .compact
+        .blocked_orgs
+        .split(',')
+        .map(|x| x.to_string())
+        .collect()
+});
 
 pub async fn progress(
     key: &str,
@@ -53,7 +59,7 @@ pub async fn progress(
             );
         }
         // update stream stats realtime
-        if CONFIG.common.local_mode {
+        if config::get_config().common.local_mode {
             if let Err(e) = cache::stats::incr_stream_stats(key, data.unwrap()) {
                 log::error!(
                     "service:db:file_list: add {}, incr_stream_stats error: {}",

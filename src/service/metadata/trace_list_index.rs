@@ -24,9 +24,9 @@ use std::{
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
+    get_config,
     meta::stream::{StreamPartition, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    CONFIG,
 };
 use infra::schema::unwrap_partition_time_level;
 use once_cell::sync::Lazy;
@@ -65,7 +65,7 @@ impl Metadata for TraceListIndex {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
             Field::new(
-                CONFIG.common.column_timestamp.as_str(),
+                get_config().common.column_timestamp.as_str(),
                 DataType::Int64,
                 false,
             ),
@@ -202,7 +202,7 @@ impl TraceListIndex {
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
-    use config::{meta::stream::StreamType, utils::json, CONFIG};
+    use config::{meta::stream::StreamType, utils::json};
     use infra::schema::unwrap_partition_time_level;
 
     use crate::{
@@ -240,7 +240,7 @@ mod tests {
         let mut data = json::to_value(item).unwrap();
         let data = data.as_object_mut().unwrap();
         data.insert(
-            CONFIG.common.column_timestamp.clone(),
+            config::get_config().common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
         let hour_key = ingestion::get_wal_time_key(

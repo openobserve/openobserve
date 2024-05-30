@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,7 @@ pub async fn init() -> errors::Result<()> {
     tokio::task::spawn(async move {
         // immutable persist every 10 (default) seconds
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::CONFIG.limit.mem_persist_interval,
+            config::get_config().limit.mem_persist_interval,
         ));
         interval.tick().await; // the first tick is immediate
         loop {
@@ -60,7 +60,7 @@ pub async fn init() -> errors::Result<()> {
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::CONFIG.limit.max_file_retention_time,
+            config::get_config().limit.max_file_retention_time,
         ));
         interval.tick().await; // the first tick is immediate
         loop {

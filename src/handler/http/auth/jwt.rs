@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::str::FromStr;
 
 #[cfg(feature = "enterprise")]
-use config::CONFIG;
+use config::get_config;
 #[cfg(feature = "enterprise")]
 use jsonwebtoken::TokenData;
 #[cfg(feature = "enterprise")]
@@ -220,7 +220,7 @@ pub async fn process_token(
                 &org.name,
                 &user_email,
                 org.role.clone(),
-                &CONFIG.auth.root_user_email,
+                &get_config().auth.root_user_email,
             )
             .await
             {
@@ -239,8 +239,12 @@ pub async fn process_token(
         }
 
         for org in orgs_removed {
-            match users::remove_user_from_org(&org.name, &user_email, &CONFIG.auth.root_user_email)
-                .await
+            match users::remove_user_from_org(
+                &org.name,
+                &user_email,
+                &get_config().auth.root_user_email,
+            )
+            .await
             {
                 Ok(_) => {
                     log::info!("User removed from the organization {}", org.name);
@@ -264,7 +268,7 @@ pub async fn process_token(
                 &org.name,
                 &user_email,
                 false,
-                &CONFIG.auth.root_user_email,
+                &get_config().auth.root_user_email,
                 crate::common::meta::user::UpdateUser {
                     role: Some(org.role.clone()),
                     ..Default::default()

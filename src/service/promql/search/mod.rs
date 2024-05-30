@@ -25,13 +25,17 @@ use config::{
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
-    CONFIG,
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{
+    codec::CompressionEncoding,
+    metadata::{MetadataKey, MetadataValue},
+    transport::Channel,
+    Request,
+};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -151,12 +155,13 @@ async fn search_in_cluster(
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
+                let cfg = config::get_config();
                 let org_id: MetadataValue<_> = req
                     .org_id
                     .parse()
                     .map_err(|_| Error::Message(format!("invalid org_id: {}", req.org_id)))?;
                 let mut request = tonic::Request::new(req);
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -165,12 +170,13 @@ async fn search_in_cluster(
                     )
                 });
 
+                let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
                 let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -181,20 +187,21 @@ async fn search_in_cluster(
                         );
                         server_internal_error("connect search node error")
                     })?;
-                let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
+
+                    let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
+                        channel,
+                        move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
                         req.metadata_mut()
-                            .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                            .insert(org_header_key.clone(), org_id.clone());
                         Ok(req)
                     },
                 );
-                client = client
+                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
                 {
                     Ok(res) => res.into_inner(),

@@ -19,14 +19,13 @@ use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         stream::{PartitioningDetails, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    CONFIG,
 };
 use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
@@ -91,7 +90,9 @@ pub async fn metrics_json_handler(
         );
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
@@ -145,6 +146,7 @@ pub async fn metrics_json_handler(
         }
     };
 
+    let cfg = get_config();
     for res_metric in res_metrics.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
         if res_metric.get("resource").is_some() {
@@ -381,7 +383,7 @@ pub async fn metrics_json_handler(
                             rec.as_object_mut().unwrap();
 
                         let timestamp = val_map
-                            .get(&CONFIG.common.column_timestamp)
+                            .get(&cfg.common.column_timestamp)
                             .unwrap()
                             .as_i64()
                             .unwrap_or(Utc::now().timestamp_micros());
@@ -764,7 +766,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
         rec["start_time"] =
             json::get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     }
-    rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
+    rec[&get_config().common.column_timestamp] = (ts / 1000).into();
 
     set_data_point_value(rec, data_point);
 
@@ -803,7 +805,7 @@ fn process_hist_data_point(
         rec["start_time"] =
             json::get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     }
-    rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
+    rec[&get_config().common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
             DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -874,7 +876,7 @@ fn process_exp_hist_data_point(
         rec["start_time"] =
             json::get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     }
-    rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
+    rec[&get_config().common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
             DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -962,7 +964,7 @@ fn process_summary_data_point(
         rec["start_time"] =
             json::get_string_value(data_point.get("startTimeUnixNano").unwrap()).into();
     }
-    rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
+    rec[&get_config().common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
             DataPointFlags::NoRecordedValueMask.as_str_name()
@@ -1038,7 +1040,7 @@ fn process_exemplars(rec: &mut json::Value, data_point: &json::Map<String, json:
             }
         }
         set_data_point_value(&mut exemplar_rec, exemp);
-        exemplar_rec[&CONFIG.common.column_timestamp] =
+        exemplar_rec[&get_config().common.column_timestamp] =
             (exemplar.get("timeUnixNano").unwrap().as_u64().unwrap() / 1000).into();
 
         let trace_id_bytes = hex::decode(exemplar.get("traceId").unwrap().as_str().unwrap())
