@@ -37,9 +37,11 @@ import {
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import {
+  vrlLanguageDefinition,
+  vrlThemeDefinition,
+} from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
@@ -125,7 +127,7 @@ export default defineComponent({
       });
     };
 
-    onMounted(async () => {
+    const setupEditor = () => {
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -210,6 +212,44 @@ export default defineComponent({
       window.addEventListener("click", () => {
         editorObj.layout();
       });
+    };
+
+    onMounted(async () => {
+      if (props.language === "vrl") {
+        monaco.languages.register({ id: "vrl" });
+
+        // Register a tokens provider for the language
+        monaco.languages.setMonarchTokensProvider(
+          "vrl",
+          vrlLanguageDefinition as any
+        );
+      }
+
+      if (props.language === "sql") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
+        );
+      }
+
+      if (props.language === "json") {
+        await import(
+          "monaco-editor/esm/vs/language/json/monaco.contribution.js"
+        );
+      }
+
+      if (props.language === "html") {
+        await import(
+          "monaco-editor/esm/vs/language/html/monaco.contribution.js"
+        );
+      }
+
+      if (props.language === "markdown") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"
+        );
+      }
+
+      setupEditor();
     });
 
     onActivated(async () => {
