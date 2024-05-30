@@ -63,8 +63,6 @@ static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -457,10 +455,7 @@ impl Sql {
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
                 for cap in RE_MATCH_ALL_INDEXED.captures_iter(token) {
-                    indexed_text.push((cap[0].to_string(), cap[1].to_string()));
-                }
-                for cap in RE_MATCH_ALL_INDEXED_IGNORE_CASE.captures_iter(token) {
-                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase()));
+                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase())); // since `terms` are indexed in lowercase
                 }
             }
         }
@@ -475,11 +470,7 @@ impl Sql {
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
-                let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_ignore_case") {
-                    func = "ILIKE";
-                }
-                indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+                indexed_search.push(format!("\"{}\" LIKE '%{}%'", field.name(), item.1));
 
                 // add full text field to meta fields
                 meta.fields.push(field.name().to_string());

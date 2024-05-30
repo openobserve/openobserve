@@ -150,8 +150,6 @@ pub async fn search(
             meta.stream_name, search_condition
         );
 
-        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
-        let track_total_hits = idx_req.query.as_ref().unwrap().track_total_hits;
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -164,22 +162,28 @@ pub async fn search(
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = http::search(idx_req).await?;
-        let (unique_files, inverted_index_count) = if is_first_page && track_total_hits {
+        // get deleted file
+        let deleted_files = idx_resp
+            .hits
+            .iter()
+            .filter_map(|hit| {
+                if hit.get("deleted").unwrap().as_bool().unwrap() {
+                    Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>();
+        // fast_mode is for 1st page optimization
+        //  1. single WHERE clause of `match_all()`
+        //  2. not a histogram query (todo)
+        let fast_mode = matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)));
+        let (unique_files, inverted_index_count) = if fast_mode {
             // should be query size * 2
-            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+            // let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+            let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
+            log::warn!("TL: limit_count {}", limit_count);
             let mut total_count = 0;
-            // get deleted file
-            let deleted_files = idx_resp
-                .hits
-                .iter()
-                .filter_map(|hit| {
-                    if hit.get("deleted").unwrap().as_bool().unwrap() {
-                        Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
             let sorted_data = idx_resp
                 .hits
                 .iter()
@@ -226,7 +230,12 @@ pub async fn search(
                 idx_resp
                     .hits
                     .iter()
-                    .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                    .filter_map(|hit| {
+                        hit.get("file_name")
+                            .and_then(|value| value.as_str())
+                            .filter(|&name| !deleted_files.contains(name))
+                            .map(String::from)
+                    })
                     .collect::<HashSet<_>>(),
                 None,
             )
