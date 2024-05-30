@@ -19,8 +19,7 @@ use std::{
     path::Path,
 };
 
-use tokio::sync::mpsc::Sender;
-use walkdir::WalkDir;
+use async_recursion::async_recursion;
 
 #[inline(always)]
 pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
@@ -79,52 +78,42 @@ pub fn scan_files<P: AsRef<Path>>(
     Ok(files)
 }
 
-#[inline(always)]
-pub async fn scan_files_for_move<P: AsRef<Path>>(
-    root: P,
+#[async_recursion]
+pub async fn scan_files_with_channel(
+    root: &Path,
     ext: &str,
     limit: Option<usize>,
-    tx: Sender<Vec<String>>,
+    tx: tokio::sync::mpsc::Sender<Vec<String>>,
 ) -> Result<(), std::io::Error> {
     let limit = limit.unwrap_or_default();
-    let mut iter = WalkDir::new(&root)
-        .sort_by_file_name()
-        .into_iter()
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.is_file() {
-                let path_ext = path.extension()?.to_str()?;
-                if path_ext == ext {
-                    Some(path.to_str()?.to_string())
-                } else {
-                    None
+    let mut files = Vec::with_capacity(std::cmp::max(16, limit));
+    let dir = std::fs::read_dir(root)?;
+    for entry in dir {
+        let path = entry?.path();
+        if !path.is_file() {
+            scan_files_with_channel(&path, ext, Some(limit), tx.clone()).await?;
+        } else {
+            let path_ext = path
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
+            if path_ext == ext {
+                files.push(path.to_str().unwrap().to_string());
+                if limit > 0 && files.len() >= limit {
+                    tx.send(files.clone()).await.map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                    })?;
+                    files.clear();
                 }
-            } else {
-                None
-            }
-        })
-        .peekable();
-
-    loop {
-        let mut files: Vec<String> = Vec::new();
-
-        while let Some(_) = iter.peek() {
-            if files.len() == limit {
-                break;
-            }
-            if let Some(file) = iter.next() {
-                files.push(file);
             }
         }
-
-        if files.is_empty() {
-            break;
-        }
-
-        tx.send(files).await.unwrap();
     }
-
+    if !files.is_empty() {
+        tx.send(files)
+            .await
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    }
     Ok(())
 }
 

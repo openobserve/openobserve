@@ -27,6 +27,7 @@ use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
+use tokio::time;
 pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
 
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
@@ -41,34 +42,31 @@ pub async fn init() -> errors::Result<()> {
 
     // start a job to dump immutable data to disk
     tokio::task::spawn(async move {
-        // immutable persist every 10 (default) seconds
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::get_config().limit.mem_persist_interval,
-        ));
-        interval.tick().await; // the first tick is immediate
         loop {
+            time::sleep(time::Duration::from_secs(
+                config::get_config().limit.mem_persist_interval,
+            ))
+            .await;
             // persist immutable data to disk
             if let Err(e) = immutable::persist().await {
                 log::error!("immutable persist error: {}", e);
             }
             // shrink metadata cache
             WAL_PARQUET_METADATA.write().await.shrink_to_fit();
-            interval.tick().await;
         }
     });
 
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            config::get_config().limit.max_file_retention_time,
-        ));
-        interval.tick().await; // the first tick is immediate
         loop {
+            time::sleep(time::Duration::from_secs(
+                config::get_config().limit.max_file_retention_time,
+            ))
+            .await;
             // check memtable ttl
             if let Err(e) = writer::check_ttl().await {
                 log::error!("memtable check ttl error: {}", e);
             }
-            interval.tick().await;
         }
     });
 

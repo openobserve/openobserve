@@ -101,10 +101,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(get_config().compact.interval));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
         let locker = compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         log::debug!("[COMPACTOR] Running data merge");
@@ -118,10 +116,8 @@ async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), an
 
 /// Deletion for data retention
 async fn run_retention() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(get_config().compact.interval + 1));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        time::sleep(time::Duration::from_secs(get_config().compact.interval + 1)).await;
         let locker = compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         log::debug!("[COMPACTOR] Running data retention");
@@ -135,10 +131,8 @@ async fn run_retention() -> Result<(), anyhow::Error> {
 
 /// Delete files based on the file_file_deleted in the database
 async fn run_delay_deletion() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(get_config().compact.interval + 2));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        time::sleep(time::Duration::from_secs(get_config().compact.interval + 2)).await;
         let locker = compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         log::debug!("[COMPACTOR] Running data delay deletion");
@@ -151,12 +145,11 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
 }
 
 async fn run_sync_to_db() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().compact.sync_to_db_interval,
-    ));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        time::sleep(time::Duration::from_secs(
+            get_config().compact.sync_to_db_interval,
+        ))
+        .await;
         if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
             log::error!("[COMPACTOR] run offset sync cache to db error: {}", e);
         }

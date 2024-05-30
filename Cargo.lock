@@ -2269,6 +2269,7 @@ dependencies = [
  "arrow",
  "arrow-json",
  "arrow-schema",
+ "async-recursion",
  "async-walkdir",
  "base64 0.21.7",
  "byteorder",
@@ -2310,7 +2311,6 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "utoipa",
- "walkdir",
 ]
 
 [[package]]
@@ -5274,7 +5274,6 @@ dependencies = [
  "arrow-schema",
  "async-recursion",
  "async-trait",
- "async-walkdir",
  "awc",
  "base64 0.21.7",
  "blake3",
@@ -5359,7 +5358,6 @@ dependencies = [
  "utoipa-swagger-ui",
  "version-compare",
  "vrl",
- "walkdir",
  "zstd",
 ]
 

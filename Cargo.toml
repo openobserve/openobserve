@@ -162,7 +162,6 @@ ingester.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-walkdir.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -171,7 +170,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 expect-test = "1.4"
 base64 = "0.21"
 float-cmp = "0.9"
-async-walkdir = "1.0.0"
 
 [workspace]
 members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto", "src/report_server"]
@@ -198,6 +196,7 @@ arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"
+async-walkdir = "1.0.0"
 aws-config = "0.56.1"
 base64 = "0.21"
 bytes = "1.4"
@@ -286,6 +285,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
-async-walkdir = "1.0.0"
 zstd = "0.13"
-walkdir = "2"

@@ -1476,7 +1476,8 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 #[inline]
 pub fn is_local_disk_storage() -> bool {
     let cfg = get_config();
-    cfg.common.local_mode && cfg.common.local_mode_storage.eq("disk")
+    cfg.common.local_mode
+        && (cfg.common.local_mode_storage == "disk" || cfg.common.local_mode_storage == "local")
 }
 
 #[inline]
