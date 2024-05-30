@@ -17,13 +17,12 @@ use std::cmp::max;
 
 use chrono::Duration;
 use config::{
-    ider,
+    get_config, ider,
     meta::{
         search,
         stream::{FileKey, StreamType},
     },
     utils::str::find,
-    CONFIG,
 };
 use infra::{
     errors::{Error, ErrorCodes},
@@ -72,8 +71,9 @@ pub async fn search(
     user_id: Option<String>,
     req: &search::Request,
 ) -> Result<search::Response, Error> {
+    let cfg = get_config();
     let trace_id = if trace_id.is_empty() {
-        if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             let ctx = tracing::Span::current().context();
             ctx.span().span_context().trace_id().to_string()
         } else {
@@ -152,6 +152,7 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
+    let cfg = get_config();
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
@@ -209,16 +210,16 @@ pub async fn search_partition(
         compressed_size: compressed_size as usize,
         partitions: vec![],
     };
-    let mut total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
-    if total_secs * CONFIG.limit.query_group_base_speed * cpu_cores < resp.original_size {
+    let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
+    if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
     }
-    let mut part_num = max(1, total_secs / CONFIG.limit.query_partition_by_secs);
-    if part_num * CONFIG.limit.query_partition_by_secs < total_secs {
+    let mut part_num = max(1, total_secs / cfg.limit.query_partition_by_secs);
+    if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
     let mut step = max(
-        Duration::try_seconds(CONFIG.limit.query_partition_min_secs)
+        Duration::try_seconds(cfg.limit.query_partition_min_secs)
             .unwrap()
             .num_microseconds()
             .unwrap(),
@@ -269,6 +270,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
         let task = tokio::task::spawn(
             async move {
+                let cfg = get_config();
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
@@ -283,7 +285,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -298,16 +300,14 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     channel,
                     move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
-                        //  req.metadata_mut()
-                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
                         Ok(req)
                     },
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -416,9 +416,10 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
         let trace_id = trace_id.to_string();
         let task = tokio::task::spawn(
             async move {
+                let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -432,7 +433,7 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -447,16 +448,14 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     channel,
                     move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
-                        //  req.metadata_mut()
-                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
                         Ok(req)
                     },
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response = match client.cancel_query(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {

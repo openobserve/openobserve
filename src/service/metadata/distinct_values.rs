@@ -23,9 +23,10 @@ use std::{
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
+    get_config,
     meta::stream::StreamType,
     utils::{json, schema_ext::SchemaExt},
-    FxIndexMap, CONFIG,
+    FxIndexMap,
 };
 use infra::{
     errors::{Error, Result},
@@ -152,7 +153,7 @@ impl Metadata for DistinctValues {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
             Field::new(
-                CONFIG.common.column_timestamp.as_str(),
+                get_config().common.column_timestamp.as_str(),
                 DataType::Int64,
                 false,
             ),
@@ -222,7 +223,7 @@ impl Metadata for DistinctValues {
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    CONFIG.common.column_timestamp.clone(),
+                    get_config().common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_wal_time_key(
@@ -274,7 +275,7 @@ impl Metadata for DistinctValues {
 
 async fn run_flush() {
     let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.distinct_values_interval,
+        get_config().limit.distinct_values_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {

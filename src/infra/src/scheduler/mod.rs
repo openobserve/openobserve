@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use config::{meta::meta_store::MetaStore, CONFIG};
+use config::meta::meta_store::MetaStore;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
 pub const TRIGGERS_KEY: &str = "/triggers/";
 
 pub fn connect() -> Box<dyn Scheduler> {
-    match CONFIG.common.meta_store.as_str().into() {
+    match config::get_config().common.meta_store.as_str().into() {
         MetaStore::MySQL => Box::<mysql::MySqlScheduler>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresScheduler>::default(),
         _ => Box::<sqlite::SqliteScheduler>::default(),
