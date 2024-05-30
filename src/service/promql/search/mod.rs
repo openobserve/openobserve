@@ -221,7 +221,7 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}, scan_size: {}",
+                    "promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     req_need_wal,
                     response.took,
@@ -273,7 +273,7 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "promql->search->result: took: {}, file_count: {}, scan_size: {}",
+        "promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
         op_start.elapsed().as_millis(),
         scan_stats.files,
         scan_stats.original_size,

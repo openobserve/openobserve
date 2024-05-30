@@ -38,7 +38,7 @@ pub async fn delete(
         &files
             .values()
             .flatten()
-            .map(|file| file.as_str())
+            .map(|file| file.0.as_str())
             .collect::<Vec<_>>(),
     )
     .await
@@ -47,6 +47,39 @@ pub async fn delete(
         if !e.to_string().to_lowercase().contains("not found") {
             log::error!("[COMPACT] delete files from storage failed: {}", e);
             return Err(e);
+        }
+    }
+
+    // delete flattened files from storage
+    let flattened_files = files
+        .values()
+        .flatten()
+        .filter_map(|file| {
+            if file.1 {
+                Some(format!(
+                    "files{}/{}",
+                    config::get_config().common.all_fields_name,
+                    file.0.strip_prefix("files/").unwrap()
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if !flattened_files.is_empty() {
+        if let Err(e) = storage::del(
+            &flattened_files
+                .iter()
+                .map(|file| file.as_str())
+                .collect::<Vec<_>>(),
+        )
+        .await
+        {
+            // maybe the file already deleted, so we just skip the `not found` error
+            if !e.to_string().to_lowercase().contains("not found") {
+                log::error!("[COMPACT] delete files from storage failed: {}", e);
+                return Err(e);
+            }
         }
     }
 
@@ -65,7 +98,7 @@ pub async fn delete(
         &files
             .values()
             .flatten()
-            .map(|file| file.to_owned())
+            .map(|file| file.0.to_owned())
             .collect::<Vec<_>>(),
     )
     .await
@@ -82,7 +115,7 @@ async fn query_deleted(
     time_min: i64,
     time_max: i64,
     limit: i64,
-) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+) -> Result<HashMap<String, Vec<(String, bool)>>, anyhow::Error> {
     if config::get_config().common.meta_store_external {
         query_deleted_from_table(org_id, time_min, time_max, limit).await
     } else {
@@ -95,7 +128,7 @@ async fn query_deleted_from_table(
     _time_min: i64,
     time_max: i64,
     limit: i64,
-) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+) -> Result<HashMap<String, Vec<(String, bool)>>, anyhow::Error> {
     let files = infra_file_list::query_deleted(org_id, time_max, limit).await?;
     let mut hash_files = HashMap::default();
     if !files.is_empty() {
@@ -109,7 +142,7 @@ async fn query_deleted_from_s3(
     time_min: i64,
     time_max: i64,
     _limit: i64,
-) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+) -> Result<HashMap<String, Vec<(String, bool)>>, anyhow::Error> {
     let mut cur_time = if time_min != 0 {
         time_min
     } else {
@@ -150,7 +183,7 @@ async fn query_deleted_from_s3(
 
 pub async fn load_prefix_from_s3(
     prefix: &str,
-) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+) -> Result<HashMap<String, Vec<(String, bool)>>, anyhow::Error> {
     let prefix = format!("file_list_deleted/{prefix}/");
     let files = storage::list(&prefix).await?;
     let files_num = files.len();
@@ -164,7 +197,7 @@ pub async fn load_prefix_from_s3(
     let chunk_size = std::cmp::max(1, files_num / cfg.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
-        let task: tokio::task::JoinHandle<Result<HashMap<String, Vec<String>>, anyhow::Error>> =
+        let task: tokio::task::JoinHandle<Result<HashMap<String, Vec<_>>, anyhow::Error>> =
             tokio::task::spawn(async move {
                 let mut files = HashMap::with_capacity(chunk.len());
                 for file in chunk {
@@ -199,7 +232,7 @@ pub async fn load_prefix_from_s3(
     Ok(files)
 }
 
-async fn process_file(file: &str) -> Result<Vec<String>, anyhow::Error> {
+async fn process_file(file: &str) -> Result<Vec<(String, bool)>, anyhow::Error> {
     // download file list from storage
     let data = match storage::get(file).await {
         Ok(data) => data,
@@ -218,7 +251,7 @@ async fn process_file(file: &str) -> Result<Vec<String>, anyhow::Error> {
         if line.is_empty() {
             continue;
         }
-        records.push(line);
+        records.push((line, false));
     }
 
     Ok(records)

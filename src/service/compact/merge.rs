@@ -416,7 +416,7 @@ pub async fn merge_by_stream(
                     stream_stats = stream_stats - file.meta.clone();
                     events.push(FileKey {
                         key: file.key.clone(),
-                        meta: FileMeta::default(),
+                        meta: file.meta.clone(),
                         deleted: true,
                     });
                 }
@@ -670,6 +670,7 @@ pub async fn merge_files(
         records: total_records,
         original_size: new_file_size,
         compressed_size: 0,
+        flattened: false,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
@@ -726,7 +727,7 @@ pub async fn merge_files(
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
     log::info!(
-        "[COMPACT:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {:?}",
+        "[COMPACT:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -804,9 +805,14 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
         .filter(|v| !v.deleted)
         .map(|v| v.to_owned())
         .collect::<Vec<_>>();
-    let del_items = events
+    let del_items_need_flatten = events
         .iter()
-        .filter(|v| v.deleted)
+        .filter(|v| v.deleted && v.meta.flattened)
+        .map(|v| v.key.clone())
+        .collect::<Vec<_>>();
+    let del_items_noneed_flatten = events
+        .iter()
+        .filter(|v| v.deleted && !v.meta.flattened)
         .map(|v| v.key.clone())
         .collect::<Vec<_>>();
     // set to external db
@@ -814,26 +820,64 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
     let mut success = false;
     let created_at = Utc::now().timestamp_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await {
-            log::error!(
-                "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
-                e
-            );
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
+        if !del_items_need_flatten.is_empty() {
+            if let Err(e) = infra_file_list::batch_add_deleted(
+                org_id,
+                true,
+                created_at,
+                &del_items_need_flatten,
+            )
+            .await
+            {
+                log::error!(
+                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
+        }
+        if !del_items_noneed_flatten.is_empty() {
+            if let Err(e) = infra_file_list::batch_add_deleted(
+                org_id,
+                false,
+                created_at,
+                &del_items_noneed_flatten,
+            )
+            .await
+            {
+                log::error!(
+                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
         }
         if let Err(e) = infra_file_list::batch_add(&put_items).await {
             log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
-        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
-            log::error!(
-                "[COMPACT] batch_delete to external db failed, retrying: {}",
-                e
-            );
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
+        if !del_items_need_flatten.is_empty() {
+            if let Err(e) = infra_file_list::batch_remove(&del_items_need_flatten).await {
+                log::error!(
+                    "[COMPACT] batch_delete to external db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
+        }
+        if !del_items_noneed_flatten.is_empty() {
+            if let Err(e) = infra_file_list::batch_remove(&del_items_noneed_flatten).await {
+                log::error!(
+                    "[COMPACT] batch_delete to external db failed, retrying: {}",
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
         }
         // send broadcast to other nodes
         if get_config().memory_cache.cache_latest_files {
@@ -1056,8 +1100,8 @@ pub async fn merge_parquet_files(
     let schema = final_record_batch.schema();
 
     log::info!(
-        "merge_parquet_files took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
+        "merge_parquet_files took {} ms",
+        start.elapsed().as_millis()
     );
 
     Ok((schema, vec![final_record_batch]))

@@ -90,6 +90,11 @@ pub fn is_compactor(role: &[Role]) -> bool {
 }
 
 #[inline(always)]
+pub fn is_flatten_compactor(role: &[Role]) -> bool {
+    role.contains(&Role::FlattenCompactor) || role.contains(&Role::All)
+}
+
+#[inline(always)]
 pub fn is_router(role: &[Role]) -> bool {
     role.contains(&Role::Router)
 }
