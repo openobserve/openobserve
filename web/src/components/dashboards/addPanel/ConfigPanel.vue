@@ -933,6 +933,7 @@ export default defineComponent({
       const openingBraceIndex = inputValue.lastIndexOf("{");
 
       //if { is not present add it at the start and than return
+
       if (openingBraceIndex === -1) {
         const newValue =
           "{" + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
