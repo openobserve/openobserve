@@ -931,7 +931,9 @@ export default defineComponent({
     const dashboardVariablesFilterItems = computed(() =>
       (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
         label: it.name,
-        value: "'" + "$" + it.name + "'",
+        value: it.multiSelect
+          ? "(" + "$" + "{" + it.name + "}" + ")"
+          : "'" + "$" + it.name + "'",
       }))
     );
 
@@ -969,6 +971,7 @@ export default defineComponent({
         "<=",
         ">",
         "<",
+        "IN",
         "Contains",
         "Not Contains",
         "Is Null",
