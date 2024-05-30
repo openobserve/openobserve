@@ -929,10 +929,20 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.promql_legend;
 
+      // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
-      const newValue =
-        inputValue.slice(0, openingBraceIndex + 1) + option + "}";
-      return newValue;
+
+      //if { is not present add it at the start and than return
+
+      if (openingBraceIndex === -1) {
+        const newValue =
+          "{" + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+        return newValue;
+      } else {
+        const newValue =
+          inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+        return newValue;
+      }
     };
 
     const dashboardSelectfieldPromQlList = computed(() =>
