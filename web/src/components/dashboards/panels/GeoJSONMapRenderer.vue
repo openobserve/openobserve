@@ -47,7 +47,9 @@ export default defineComponent({
 
     const windowResizeEventCallback = async () => {
       await nextTick();
-      chart.resize();
+      if (chart) {
+        chart.resize();
+      }
     };
 
     const initChart = async () => {
@@ -76,16 +78,32 @@ export default defineComponent({
       await initChart();
       window.addEventListener("resize", windowResizeEventCallback);
     });
+
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
       if (chart) chart?.dispose();
     });
+
     watch(
       () => props.data.options,
       async (newOptions) => {
         if (chart) {
           await nextTick();
-          chart?.setOption(newOptions || {}, true);
+          if (newOptions && newOptions.series && newOptions.series.length > 0) {
+            chart?.setOption(newOptions, true);
+          } else {
+            // If no data provided, set a default empty map
+            const defaultOptions = {
+              series: [
+                {
+                  type: "map",
+                  map: "world",
+                  data: [],
+                },
+              ],
+            };
+            chart?.setOption(defaultOptions, true);
+          }
         }
       },
       { deep: true }
