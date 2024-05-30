@@ -17,8 +17,8 @@ use std::sync::Arc;
 
 use config::{
     cluster::{is_flatten_compactor, LOCAL_NODE_ROLE},
+    get_config,
     meta::stream::FileKey,
-    CONFIG,
 };
 use tokio::{
     sync::{mpsc, Mutex},
@@ -32,14 +32,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    if !CONFIG.compact.enabled {
+    let cfg = get_config();
+    if !cfg.compact.enabled {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<FileKey>(CONFIG.limit.file_move_thread_num);
+    let (tx, rx) = mpsc::channel::<FileKey>(cfg.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
-    for _ in 0..CONFIG.limit.file_move_thread_num {
+    for _ in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
             loop {
@@ -70,10 +71,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 /// Generate flatten data file for parquet files
 async fn run_generate(tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
         log::debug!("[COMPACTOR] Running parquet file data flatten");
         let ret = compact::flatten::run_generate(tx.clone()).await;
         if ret.is_err() {

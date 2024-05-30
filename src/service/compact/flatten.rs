@@ -22,6 +22,7 @@ use arrow::array::{
 use arrow_schema::{DataType, Field};
 use config::{
     cluster::LOCAL_NODE_UUID,
+    get_config,
     meta::{
         cluster::Role,
         stream::{FileKey, PartitionTimeLevel, StreamType},
@@ -30,7 +31,7 @@ use config::{
         json,
         parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
     },
-    FxIndexMap, CONFIG,
+    FxIndexMap,
 };
 use hashbrown::HashSet;
 use infra::{file_list as infra_file_list, storage};
@@ -43,13 +44,12 @@ use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_move_thread_num));
     let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [StreamType::Logs];
     for org_id in orgs {
         // check backlist
-        if !db::file_list::BLOCKED_ORGS.is_empty()
-            && db::file_list::BLOCKED_ORGS.contains(&org_id.as_str())
+        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
@@ -188,7 +188,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let full_text_search_fields = stream_setting.full_text_search_keys;
     let new_file = format!(
         "files{}/{}",
-        CONFIG.common.all_fields_name,
+        get_config().common.all_fields_name,
         file.key.strip_prefix("files/").unwrap()
     );
     let new_schema = new_batches.first().unwrap().schema();
@@ -227,7 +227,7 @@ fn generate_vertical_partition_recordbatch(
     if records_len == 0 {
         return Ok(Vec::new());
     }
-    let Ok(all_field_idx) = schema.index_of(&CONFIG.common.all_fields_name) else {
+    let Ok(all_field_idx) = schema.index_of(&get_config().common.all_fields_name) else {
         return Ok(vec![batches]);
     };
 
