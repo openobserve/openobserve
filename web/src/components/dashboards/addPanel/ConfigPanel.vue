@@ -750,7 +750,6 @@ export default defineComponent({
   setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
-    console.log("variablesData", props.variablesData);
 
     const basemapTypeOptions = [
       {

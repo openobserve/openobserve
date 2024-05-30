@@ -335,7 +335,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData();
-    console.log("variablesData", props.variablesData);
 
     const getDefaultDrilldownData = () => ({
       name: "",
@@ -564,8 +563,6 @@ export default defineComponent({
           label: variable.name,
           value: "${" + variable.name + "}",
         }));
-
-      console.log("variableListName", variableListName);
 
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
