@@ -90,16 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
-        <div
+        <query-editor
+          data-test="logs-vrl-function-editor"
           ref="editorRef"
-          id="editor"
-          :label="t('function.jsfunction')"
-          stack-label
-          style="border: 1px solid #dbdbdb; border-radius: 5px"
-          @keyup="editorUpdate"
-          class="showLabelOnTop"
-          resize
-        ></div>
+          editor-id="add-function-editor"
+          class="monaco-editor"
+          v-model:query="formData.function"
+          language="vrl"
+        />
 
         <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
                                                                                     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
@@ -140,6 +138,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 const defaultValue: any = () => {
   return {
@@ -163,6 +162,9 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+  },
+  components: {
+    QueryEditor,
   },
   emits: ["update:list", "cancel:hideform"],
   setup(props, { emit }) {
@@ -188,45 +190,8 @@ export default defineComponent({
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
     };
-    const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
-
-    onMounted(async () => {
-      monaco.editor.defineTheme("myCustomTheme", {
-        base: "vs", // can also be vs-dark or hc-black
-        inherit: true, // can also be false to completely replace the builtin rules
-        rules: [
-          {
-            token: "comment",
-            foreground: "ffa500",
-            fontStyle: "italic underline",
-          },
-          { token: "comment.js", foreground: "008800", fontStyle: "bold" },
-          { token: "comment.css", foreground: "0000ff" }, // will inherit fontStyle from `comment` above
-        ],
-        colors: {
-          "editor.foreground": "#000000",
-        },
-      });
-      editorobj = monaco.editor.create(editorRef.value, {
-        value: ``,
-        language: "vrl",
-        minimap: {
-          enabled: false,
-        },
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-      });
-
-      editorobj.onKeyUp((e: any) => {
-        if (editorobj.getValue() != "") {
-          editorData.value = editorobj.getValue();
-          formData.value.function = editorobj.getValue();
-        }
-      });
-
-      editorobj.setValue(formData.value.function);
-    });
 
     watch(
       () => store.state.theme,
@@ -256,11 +221,9 @@ end`;
         suffixCode.value = ``;
       }
 
-      const someCode = `${prefixCode.value}
-    ${editorData.value}
+      formData.value.function = `${prefixCode.value}
+    ${formData.value.function}
     ${suffixCode.value}`;
-      editorobj.setValue(someCode);
-      formData.value.function = editorobj.getValue();
     };
 
     const onSubmit = () => {
@@ -270,7 +233,6 @@ end`;
         timeout: 2000,
       });
 
-      formData.value.function = editorobj.getValue();
       addJSTransformForm.value.validate().then((valid: any) => {
         if (!valid) {
           return false;
@@ -349,7 +311,6 @@ end`;
       editorobj,
       prefixCode,
       suffixCode,
-      editorData,
       editorUpdate,
       updateEditorContent,
       streamTypes,
@@ -377,11 +338,10 @@ end`;
 </script>
 
 <style scoped>
-#editor {
+.monaco-editor {
   width: 100%;
   min-height: 15rem;
-  /* padding-bottom: 14px; */
-  resize: both;
+  border-radius: 5px;
 }
 </style>
 <style>
