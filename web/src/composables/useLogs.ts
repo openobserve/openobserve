@@ -168,8 +168,8 @@ const defaultObject = {
     },
     editorValue: <any>"",
     datetime: <any>{
-      startTime: 0,
-      endTime: 0,
+      startTime: (new Date().getTime() - 900000) * 1000,
+      endTime: new Date().getTime(),
       relativeTimePeriod: "15m",
       type: "relative",
       selectedDate: <any>{},
@@ -1236,9 +1236,13 @@ const useLogs = () => {
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
         searchObj.data.histogramQuery.query.start_time =
-          searchObj.data.datetime.startTime;
+          searchObj.data.datetime.startTime.toString().length > 13
+            ? searchObj.data.datetime.startTime
+            : searchObj.data.datetime.startTime * 1000;
         searchObj.data.histogramQuery.query.end_time =
-          searchObj.data.datetime.endTime;
+          searchObj.data.datetime.endTime.toString().length > 13
+            ? searchObj.data.datetime.endTime
+            : searchObj.data.datetime.endTime * 1000;
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
 
@@ -1571,7 +1575,10 @@ const useLogs = () => {
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
           if (searchObj.meta.sqlMode == true) {
-            if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+            if (
+              hasAggregation(parsedSQL?.columns) ||
+              parsedSQL.groupby != null
+            ) {
               const parsedSQL: any = fnParsedSQL();
               searchAggData.total = res.data.total;
               searchAggData.hasAggregation = true;
@@ -2201,6 +2208,14 @@ const useLogs = () => {
 
     if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
       totalCount = searchAggData.total;
+    }
+
+    if (isNaN(totalCount)) {
+      totalCount = 0;
+    }
+
+    if (isNaN(endCount)) {
+      endCount = 0;
     }
     const title =
       "Showing " +

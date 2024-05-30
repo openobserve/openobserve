@@ -393,12 +393,25 @@ export default defineComponent({
 
     onMounted(() => {
       // updateDisplayValue();
+      console.log(props.defaultAbsoluteTime)
       try {
         resetTime("", "");
+
+        let startTime = (new Date().getTime() - 900000) * 1000;
+        let endTime = new Date().getTime();
+
+        if(props.defaultAbsoluteTime?.startTime) {
+          startTime = props.defaultAbsoluteTime?.startTime.toString().length > 13? props.defaultAbsoluteTime?.startTime : props.defaultAbsoluteTime?.startTime * 1000;
+        }
+
+        if(props.defaultAbsoluteTime?.endTime) {
+          endTime = props.defaultAbsoluteTime?.endTime.toString().length > 13? props.defaultAbsoluteTime?.endTime : props.defaultAbsoluteTime?.endTime * 1000;
+        }
+
         selectedType.value = props.defaultType;
         setAbsoluteTime(
-          props.defaultAbsoluteTime?.startTime,
-          props.defaultAbsoluteTime?.endTime
+          startTime,
+          endTime
         );
         setRelativeTime(props.defaultRelativeTime);
         displayValue.value = getDisplayValue();
