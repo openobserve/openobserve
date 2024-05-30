@@ -1570,10 +1570,13 @@ const useLogs = () => {
 
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
-          if (hasAggregation(parsedSQL?.columns)) {
-            searchAggData.total = res.data.total;
-            searchAggData.hasAggregation = true;
-            searchObj.meta.resultGrid.showPagination = false;
+          if (searchObj.meta.sqlMode == true) {
+            if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+              const parsedSQL: any = fnParsedSQL();
+              searchAggData.total = res.data.total;
+              searchAggData.hasAggregation = true;
+              searchObj.meta.resultGrid.showPagination = false;
+            }
           }
 
           let regeratePaginationFlag = false;
