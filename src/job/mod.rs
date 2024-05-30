@@ -28,9 +28,10 @@ use crate::{
 };
 
 mod alert_manager;
-mod compact;
+mod compactor;
 pub(crate) mod file_list;
 pub(crate) mod files;
+mod flatten_compactor;
 mod metrics;
 mod mmdb_downloader;
 mod prom;
@@ -206,7 +207,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { compact::run().await });
+    tokio::task::spawn(async move { compactor::run().await });
+    tokio::task::spawn(async move { flatten_compactor::run().await });
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });

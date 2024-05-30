@@ -44,7 +44,7 @@ jobs:
         run: mkdir -p web/dist && touch web/dist/index.html
       
       - name: Print rustc cfg
-        run: rustc --print cfg
+        run: rustc -C target-cpu=native --print cfg
 
       - name: Setup cargo config
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings

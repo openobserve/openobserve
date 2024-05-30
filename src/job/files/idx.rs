@@ -62,6 +62,7 @@ pub(crate) async fn write_to_disk(
         records: 0,
         original_size: file_size as i64,
         compressed_size: 0,
+        flattened: false,
     };
     populate_file_meta(schema.clone(), vec![batches.to_vec()], &mut file_meta).await?;
 

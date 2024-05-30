@@ -235,7 +235,10 @@ pub async fn get_latest_traces(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http traces latest API wait in queue took: {}", took_wait);
+    log::info!(
+        "http traces latest API wait in queue took: {} ms",
+        took_wait
+    );
 
     // search
     let query_sql = format!(

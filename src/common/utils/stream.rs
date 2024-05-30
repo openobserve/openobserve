@@ -183,6 +183,7 @@ mod tests {
             records: 0,
             original_size: 1000,
             compressed_size: 700,
+            flattened: false,
         };
         populate_file_meta(schema, vec![vec![batch]], &mut file_meta)
             .await

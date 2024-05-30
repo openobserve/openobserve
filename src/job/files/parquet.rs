@@ -289,11 +289,6 @@ async fn move_files(
         return Ok(());
     }
 
-    log::debug!(
-        "[INGESTER:JOB:{thread_id}] get schema for partition: {}",
-        prefix
-    );
-
     // get latest schema
     let latest_schema = match infra::schema::get(&org_id, &stream_name, stream_type).await {
         Ok(schema) => Arc::new(schema),
@@ -574,6 +569,7 @@ async fn merge_files(
         records: total_records,
         original_size: new_file_size,
         compressed_size: 0,
+        flattened: false,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!(

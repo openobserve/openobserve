@@ -106,6 +106,9 @@ async fn register() -> Result<()> {
         if is_compactor(&node.role) {
             super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
         }
+        if is_flatten_compactor(&node.role) {
+            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
+        }
         node_ids.push(node.id);
         w.insert(node.uuid.clone(), node);
     }
@@ -151,6 +154,9 @@ async fn register() -> Result<()> {
     }
     if is_compactor(&node.role) {
         super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
+    }
+    if is_flatten_compactor(&node.role) {
+        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
     }
 
     let mut w = super::NODES.write().await;

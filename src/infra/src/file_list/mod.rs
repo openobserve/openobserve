@@ -51,12 +51,14 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
+        flattened: bool,
         created_at: i64,
         files: &[String],
     ) -> Result<()>;
     async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
+    async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn list(&self) -> Result<Vec<(String, FileMeta)>>;
     async fn query(
         &self,
@@ -64,9 +66,15 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
         time_level: PartitionTimeLevel,
-        time_range: (i64, i64),
+        time_range: Option<(i64, i64)>,
+        flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>>;
+    async fn query_deleted(
+        &self,
+        org_id: &str,
+        time_max: i64,
+        limit: i64,
+    ) -> Result<Vec<(String, bool)>>;
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -146,8 +154,15 @@ pub async fn batch_remove(files: &[String]) -> Result<()> {
 }
 
 #[inline]
-pub async fn batch_add_deleted(org_id: &str, created_at: i64, files: &[String]) -> Result<()> {
-    CLIENT.batch_add_deleted(org_id, created_at, files).await
+pub async fn batch_add_deleted(
+    org_id: &str,
+    flattened: bool,
+    created_at: i64,
+    files: &[String],
+) -> Result<()> {
+    CLIENT
+        .batch_add_deleted(org_id, flattened, created_at, files)
+        .await
 }
 
 #[inline]
@@ -166,6 +181,11 @@ pub async fn contains(file: &str) -> Result<bool> {
 }
 
 #[inline]
+pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
+    CLIENT.update_flattened(file, flattened).await
+}
+
+#[inline]
 pub async fn list() -> Result<Vec<(String, FileMeta)>> {
     CLIENT.list().await
 }
@@ -176,18 +196,28 @@ pub async fn query(
     stream_type: StreamType,
     stream_name: &str,
     time_level: PartitionTimeLevel,
-    time_range: (i64, i64),
+    time_range: Option<(i64, i64)>,
+    flattened: Option<bool>,
 ) -> Result<Vec<(String, FileMeta)>> {
-    if time_range.0 > time_range.1 || time_range.0 == 0 || time_range.1 == 0 {
-        return Err(Error::Message("[file_list] invalid time range".to_string()));
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
     }
     CLIENT
-        .query(org_id, stream_type, stream_name, time_level, time_range)
+        .query(
+            org_id,
+            stream_type,
+            stream_name,
+            time_level,
+            time_range,
+            flattened,
+        )
         .await
 }
 
 #[inline]
-pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
+pub async fn query_deleted(org_id: &str, time_max: i64, limit: i64) -> Result<Vec<(String, bool)>> {
     CLIENT.query_deleted(org_id, time_max, limit).await
 }
 
@@ -278,6 +308,7 @@ pub struct FileRecord {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub flattened: bool,
 }
 
 impl From<&FileRecord> for FileMeta {
@@ -288,6 +319,7 @@ impl From<&FileRecord> for FileMeta {
             records: record.records,
             original_size: record.original_size,
             compressed_size: record.compressed_size,
+            flattened: record.flattened,
         }
     }
 }
@@ -322,4 +354,5 @@ pub struct FileDeletedRecord {
     pub stream: String,
     pub date: String,
     pub file: String,
+    pub flattened: bool,
 }

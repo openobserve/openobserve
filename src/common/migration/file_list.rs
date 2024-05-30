@@ -84,7 +84,8 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
                         stream_type,
                         stream_name,
                         PartitionTimeLevel::Unset,
-                        (start_time, end_time),
+                        Some((start_time, end_time)),
+                        None,
                     )
                     .await
                     .expect("load file_list failed");
@@ -106,9 +107,12 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
                 let files = files
                     .values()
                     .flatten()
-                    .map(|file| file.to_owned())
+                    .map(|file| file.0.to_owned())
                     .collect::<Vec<_>>();
-                if let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
+                if let Err(e) = dest
+                    .batch_add_deleted(org_id, false, end_time, &files)
+                    .await
+                {
                     log::error!("load file_list_deleted into db err: {}", e);
                 }
             }
@@ -119,9 +123,43 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
             .query_deleted(org_id, end_time, 1_000_000)
             .await
             .expect("load file_list_deleted failed");
-        if let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
-            log::error!("load file_list_deleted into db err: {}", e);
-            continue;
+        let files_need_flatten = files
+            .iter()
+            .filter_map(|(file, flattened)| {
+                if *flattened {
+                    Some(file.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        let files_noneed_flatten = files
+            .iter()
+            .filter_map(|(file, flattened)| {
+                if !*flattened {
+                    Some(file.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        if !files_need_flatten.is_empty() {
+            if let Err(e) = dest
+                .batch_add_deleted(org_id, true, end_time, &files_need_flatten)
+                .await
+            {
+                log::error!("load file_list_deleted into db err: {}", e);
+                continue;
+            }
+        }
+        if !files_noneed_flatten.is_empty() {
+            if let Err(e) = dest
+                .batch_add_deleted(org_id, false, end_time, &files_noneed_flatten)
+                .await
+            {
+                log::error!("load file_list_deleted into db err: {}", e);
+                continue;
+            }
         }
     }
 
