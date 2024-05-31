@@ -130,8 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
@@ -192,15 +190,6 @@ export default defineComponent({
     };
     const prefixCode = ref("");
     const suffixCode = ref("");
-
-    watch(
-      () => store.state.theme,
-      () => {
-        monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
-        );
-      }
-    );
 
     const isValidParam = () => {
       const methodPattern = /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/g;

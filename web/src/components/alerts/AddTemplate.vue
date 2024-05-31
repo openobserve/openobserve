@@ -81,15 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alert_templates.body") + " *" }}
             </div>
-            <div
-              data-test="add-template-body-input"
+            <query-editor
+              editor-id="add-template-editor"
+              class="monaco-editor q-mt-sm"
+              language="json"
               ref="editorRef"
-              id="editor"
+              v-model:query="formData.body"
+              data-test="add-template-body-input"
               :label="t('alerts.sql')"
-              stack-label
-              style="border: 1px solid #dbdbdb; border-radius: 5px"
-              class="showLabelOnTop"
-              resize
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
@@ -169,22 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import {
-  ref,
-  onMounted,
-  defineProps,
-  onBeforeMount,
-  onActivated,
-  defineEmits,
-  watch,
-} from "vue";
+import { ref, defineProps, onBeforeMount, onActivated, defineEmits } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/language/json/monaco.contribution.js";
-import "monaco-editor/esm/vs/language/json/jsonMode.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
@@ -192,6 +178,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -204,8 +191,6 @@ const formData: Ref<Template> = ref({
 const store = useStore();
 const q = useQuasar();
 const editorRef: any = ref(null);
-let editorobj: any = null;
-const editorData = ref("");
 const isUpdatingTemplate = ref(false);
 const sampleTemplates = [
   {
@@ -238,51 +223,6 @@ onActivated(() => setupTemplateData());
 onBeforeMount(() => {
   setupTemplateData();
 });
-onMounted(async () => {
-  monaco.editor.defineTheme("myCustomTheme", {
-    base: "vs", // can also be vs-dark or hc-black
-    inherit: true, // can also be false to completely replace the builtin rules
-    rules: [
-      {
-        token: "comment",
-        foreground: "ffa500",
-        background: "FFFFFF",
-        fontStyle: "italic underline",
-      },
-      {
-        token: "comment.js",
-        foreground: "008800",
-        fontStyle: "bold",
-        background: "FFFFFF",
-      },
-      { token: "comment.css", foreground: "0000ff", background: "FFFFFF" }, // will inherit fontStyle from `comment` above
-    ],
-    colors: {
-      "editor.foreground": "#000000",
-      "editor.background": "#FFFFFF",
-      "editorCursor.foreground": "#000000",
-      "editor.lineHighlightBackground": "#FFFFFF",
-      "editorLineNumber.foreground": "#000000",
-      "editor.border": "#FFFFFF",
-    },
-  });
-  editorobj = monaco.editor.create(editorRef.value, {
-    value: ``,
-    language: "json",
-    minimap: {
-      enabled: false,
-    },
-    theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-    automaticLayout: true,
-    suggestOnTriggerCharacters: false,
-    wordWrap: "on",
-  });
-  editorobj.onKeyUp((e: any) => {
-    editorData.value = editorobj.getValue();
-    formData.value.body = editorobj.getValue();
-  });
-  editorobj.setValue(formData.value.body);
-});
 const setupTemplateData = () => {
   if (props.template) {
     isUpdatingTemplate.value = true;
@@ -290,15 +230,6 @@ const setupTemplateData = () => {
     formData.value.body = props.template.body;
   }
 };
-
-watch(
-  () => store.state.theme,
-  () => {
-    monaco.editor.setTheme(
-      store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
-    );
-  },
-);
 
 const isTemplateBodyValid = () => {
   try {
@@ -406,13 +337,10 @@ const copyTemplateBody = (text: any) => {
 };
 </script>
 <style lang="scss" scoped>
-#editor {
+.monaco-editor {
   width: 100%;
-  min-height: 310px;
-  // padding-bottom: 14px;
-  resize: vertical;
-  overflow: auto;
-  max-height: 350px;
+  min-height: 310px !important;
+  border-radius: 5px;
 }
 
 .example-template-body {
