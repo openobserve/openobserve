@@ -396,7 +396,7 @@ def test_e2e_matchallcount(create_session, base_url):
     response_data2 = resp_get_allsearch2.json()
 
     # Asserting the counts match
-    assert (response_data1.get('total'), response_data2.get('total'))
+    assert response_data1.get('total') == response_data2.get('total')
 
 
 def test_e2e_matchallignorecasesql(create_session, base_url):
