@@ -1234,7 +1234,6 @@ const useLogs = () => {
         searchObj.data.histogramQuery.query.sql =
           searchObj.data.histogramQuery.aggs.histogram;
         searchObj.data.histogramQuery.query.sql_mode = "full";
-        searchObj.data.histogramQuery.query.is_histogram = true;
 
         searchObj.data.histogramQuery.query.start_time =
           searchObj.data.datetime.startTime.toString().length > 13

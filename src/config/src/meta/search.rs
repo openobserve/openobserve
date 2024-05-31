@@ -119,8 +119,6 @@ pub struct Query {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
-    #[serde(default)]
-    pub is_histogram: bool,
 }
 
 fn default_size() -> usize {
@@ -144,7 +142,6 @@ impl Default for Query {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
-            is_histogram: false,
         }
     }
 }
@@ -442,7 +439,6 @@ impl From<Request> for cluster_rpc::SearchRequest {
             uses_zo_fn: req.query.uses_zo_fn,
             query_fn: req.query.query_fn.unwrap_or_default(),
             skip_wal: req.query.skip_wal,
-            is_histogram: req.query.is_histogram,
         };
 
         let job = cluster_rpc::Job {
@@ -584,7 +580,6 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
-                is_histogram: false
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),
