@@ -1117,7 +1117,7 @@ mod tests {
                 (1679202494333000, 1679203394333000),
             ),
             (
-                "select * from table1 where match_allq('abc') order by _timestamp desc limit 10 offset 10",
+                "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
                 false,
                 (0, 0),
             ),
