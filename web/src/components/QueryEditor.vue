@@ -38,10 +38,7 @@ import {
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import {
-  vrlLanguageDefinition,
-  vrlThemeDefinition,
-} from "@/utils/query/vrlLanguageDefinition";
+import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
 import { debounce } from "quasar";
@@ -212,9 +209,17 @@ export default defineComponent({
       window.addEventListener("click", () => {
         editorObj.layout();
       });
+
+      window.addEventListener("resize", async () => {
+        await nextTick();
+        editorObj.layout();
+        // queryEditorRef.value.resetEditorLayout();
+      });
     };
 
     onMounted(async () => {
+      provider.value?.dispose();
+
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
 
