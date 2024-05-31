@@ -365,9 +365,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
-              <div>
-                <div class="q-pa-xs">
-                  <div class="q-gutter-xs">
+              <div style="height: 100%">
+                <div class="q-pa-xs" style="height: 100%">
+                  <div class="q-gutter-xs" style="height: 100%">
                     <q-tabs
                       v-model="
                         dashboardPanelData.data.queries[
@@ -400,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.filter[index].type
                       "
                       animated
+                      style="height: 100%"
                     >
                       <q-tab-panel
                         data-test="dashboard-filter-condition-panel"
@@ -407,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="condition"
                         class="q-pa-none"
                       >
-                        <div class="flex justify-between">
+                        <div class="flex column" style="height: 220px">
                           <q-select
                             dense
                             filled
@@ -422,9 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 100%"
                             :rules="[(val) => !!val || 'Required']"
                           />
-                          <q-input
-                            dense
-                            filled
+                          <CommonAutoComplete
                             v-if="
                               !['Is Null', 'Is Not Null'].includes(
                                 dashboardPanelData.data.queries[
@@ -432,16 +431,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ].fields?.filter[index]?.operator
                               )
                             "
+                            :label="t('common.value')"
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
                               ].fields.filter[index].value_for_maps
                             "
-                            data-test="dashboard-filter-condition-input"
-                            :label="t('common.value')"
-                            style="width: 100%; margin-top: 5px"
-                            :rules="[(val) => val?.length > 0 || 'Required']"
-                          />
+                            :items="dashboardVariablesFilterItems"
+                            searchRegex="(?:^|[^$])\$?(\w+)"
+                            :rules="[(val: any) => val?.length > 0 || 'Required']"
+                            >{{
+                              dashboardVariablesFilterItems
+                            }}</CommonAutoComplete
+                          >
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
@@ -515,7 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ></q-checkbox>
                               </q-item-section>
                               <q-item-section>
-                                <div v-html="opt"></div>
+                                <SanitizedHtmlRenderer :html-content="opt" />
                               </q-item-section>
                             </q-item>
                           </template>
@@ -564,11 +566,14 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useQuasar } from "quasar";
+import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "DashboardGeoMapQueryBuilder",
-  components: { SortByBtnGrp },
-  setup() {
+  components: { SortByBtnGrp, CommonAutoComplete, SanitizedHtmlRenderer },
+  props: ["dashboardData"],
+  setup(props) {
     const { t } = useI18n();
     const $q = useQuasar();
     const expansionItems = reactive({
@@ -596,6 +601,22 @@ export default defineComponent({
       { label: t("dashboard.avg"), value: "avg" },
       { label: t("dashboard.min"), value: "min" },
       { label: t("dashboard.max"), value: "max" },
+      {
+        label: t("dashboard.p50"),
+        value: "p50",
+      },
+      {
+        label: t("dashboard.p90"),
+        value: "p90",
+      },
+      {
+        label: t("dashboard.p95"),
+        value: "p95",
+      },
+      {
+        label: t("dashboard.p99"),
+        value: "p99",
+      },
     ];
 
     watch(
@@ -756,6 +777,15 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
+    const dashboardVariablesFilterItems = computed(() =>
+      (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
+        label: it.name,
+        value: it.multiSelect
+          ? "(" + "$" + "{" + it.name + "}" + ")"
+          : "'" + "$" + it.name + "'",
+      }))
+    );
+
     return {
       t,
       dashboardPanelData,
@@ -780,6 +810,7 @@ export default defineComponent({
       Hint,
       promqlMode,
       onFieldDragStart,
+      dashboardVariablesFilterItems,
       options: [
         "=",
         "<>",
@@ -787,6 +818,7 @@ export default defineComponent({
         "<=",
         ">",
         "<",
+        "IN",
         "Contains",
         "Not Contains",
         "Is Null",
