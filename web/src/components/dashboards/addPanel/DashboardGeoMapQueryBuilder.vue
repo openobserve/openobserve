@@ -435,15 +435,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.filter[index].value_for_maps
+                              ].fields.filter[index].value
                             "
                             :items="dashboardVariablesFilterItems"
                             searchRegex="(?:^|[^$])\$?(\w+)"
                             :rules="[(val: any) => val?.length > 0 || 'Required']"
-                            >{{
-                              dashboardVariablesFilterItems
-                            }}</CommonAutoComplete
-                          >
+                          ></CommonAutoComplete>
                         </div>
                       </q-tab-panel>
                       <q-tab-panel
