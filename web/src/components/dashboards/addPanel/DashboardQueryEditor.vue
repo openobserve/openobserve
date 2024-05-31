@@ -936,10 +936,18 @@ export default defineComponent({
     const updatePromQLQuery = async (event, value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.text = event.changes[0].text;
-      autoCompleteData.value.dateTime = {
-        startTime: dashboardPanelData.meta.dateTime.start_time?.getTime(),
-        endTime: dashboardPanelData.meta.dateTime.end_time?.getTime(),
-      };
+
+      // set the start and end time
+      if (
+        dashboardPanelData.meta.dateTime.start_time &&
+        dashboardPanelData.meta.dateTime.end_time
+      ) {
+        autoCompleteData.value.dateTime = {
+          startTime: dashboardPanelData.meta.dateTime.start_time?.getTime(),
+          endTime: dashboardPanelData.meta.dateTime.end_time?.getTime(),
+        };
+      }
+
       autoCompleteData.value.position.cursorIndex =
         queryEditorRef.value.getCursorIndex();
       autoCompleteData.value.popup.open =
