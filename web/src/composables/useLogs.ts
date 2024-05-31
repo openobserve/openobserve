@@ -879,7 +879,32 @@ const useLogs = () => {
           }
         }
 
-        if (!hasAggregation(parsedSQL?.columns)) {
+        if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
+          searchObj.data.queryResults.partitionDetail = {
+            partitions: [],
+            partitionTotal: [],
+            paginations: [],
+          };
+          let pageObject: any = [];
+          const partitions: any = [
+            [partitionQueryReq.start_time, partitionQueryReq.end_time],
+          ];
+          searchObj.data.queryResults.partitionDetail.partitions = partitions;
+          for (const [index, item] of partitions.entries()) {
+            pageObject = [
+              {
+                startTime: item[0],
+                endTime: item[1],
+                from: 0,
+                size: searchObj.meta.resultGrid.rowsPerPage,
+              },
+            ];
+            searchObj.data.queryResults.partitionDetail.paginations.push(
+              pageObject
+            );
+            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+          }
+        } else {
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdetifier,
@@ -930,31 +955,6 @@ const useLogs = () => {
                 );
               }
             });
-        } else {
-          searchObj.data.queryResults.partitionDetail = {
-            partitions: [],
-            partitionTotal: [],
-            paginations: [],
-          };
-          let pageObject: any = [];
-          const partitions: any = [
-            [partitionQueryReq.start_time, partitionQueryReq.end_time],
-          ];
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
-          for (const [index, item] of partitions.entries()) {
-            pageObject = [
-              {
-                startTime: item[0],
-                endTime: item[1],
-                from: 0,
-                size: searchObj.meta.resultGrid.rowsPerPage,
-              },
-            ];
-            searchObj.data.queryResults.partitionDetail.paginations.push(
-              pageObject
-            );
-            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          }
         }
       } else {
         searchObj.data.queryResults.partitionDetail = {
