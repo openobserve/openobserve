@@ -241,11 +241,14 @@ export default defineComponent({
       };
 
       searchService
-        .search({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: req,
-          page_type: "logs",
-        }, "RUM")
+        .search(
+          {
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: req,
+            page_type: "logs",
+          },
+          "RUM"
+        )
         .then((res) => {
           res.data.hits.forEach((element: any) => {
             topErrorResources.value.push({

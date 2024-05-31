@@ -188,7 +188,7 @@ const getSession = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
-      }, "UI")
+      }, "RUM")
       .then((res) => {
         if (res.data.hits.length === 0) {
           return;
@@ -238,7 +238,7 @@ const getSessionSegments = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    }, "UI")
+    }, "RUM")
     .then((res) => {
       // const segmentsCopy = [];
       // const viewIds = [];
@@ -288,7 +288,7 @@ const getSessionEvents = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    }, "UI")
+    }, "RUM")
     .then((res) => {
       const events = ["action", "view", "error"];
 
@@ -336,7 +336,7 @@ const getSessionErrorLogs = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    }, "UI")
+    }, "RUM")
     .then((res) => {
       const events = res.data.hits.filter((hit: any) => {
         return hit.date >= Number(sessionState.data.selectedSession.start_time);
