@@ -181,7 +181,7 @@ def test_e2e_matchallhistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw(\'provide_credentials\')',
+            "sql": 'select * from "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -214,7 +214,7 @@ def test_e2e_matchallindexhistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
+            "sql": 'select * from "stream_pytest_data" WHERE match_all_indexed(\'provide_credentials\')',
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -247,7 +247,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
+            "sql": 'select * from "stream_pytest_data" WHERE match_all_ignore_case(\'provide_credentials\')',
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -274,7 +274,7 @@ def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_ur
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw_ignore_case()',
+            "sql": 'select * from "stream_pytest_data" WHERE match_all_ignore_case()',
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -307,7 +307,7 @@ def test_e2e_matchallsql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,
@@ -334,7 +334,7 @@ def test_e2e_matchallindexedsql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_indexed(\'provide_credentials\')',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,
@@ -372,7 +372,7 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_ignore_case(\'provide_credentials\')',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,

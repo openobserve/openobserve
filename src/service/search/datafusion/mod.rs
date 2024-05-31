@@ -71,11 +71,11 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
     },
     ZoFunction {
         name: MATCH_UDF_NAME,
-        text: "match_all_raw('v')",
+        text: "match_all('v')",
     },
     ZoFunction {
         name: MATCH_UDF_IGNORE_CASE_NAME,
-        text: "match_all_raw_ignore_case('v')",
+        text: "match_all_ignore_case('v')",
     },
     ZoFunction {
         name: REGEX_MATCH_UDF_NAME,
