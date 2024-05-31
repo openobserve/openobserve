@@ -460,6 +460,15 @@ impl Sql {
             }
         }
 
+        // use full text search instead if inverted index feature is not enabled but it's an
+        // inverted index search
+        let rerouted = if !cfg.common.inverted_index_enabled & fulltext.is_empty() {
+            fulltext = std::mem::take(&mut indexed_text);
+            true
+        } else {
+            false
+        };
+
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
             let mut indexed_search = Vec::new();
@@ -494,7 +503,7 @@ impl Sql {
                     continue;
                 }
                 let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_ignore_case") {
+                if rerouted || item.0.to_lowercase().contains("_ignore_case") {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
