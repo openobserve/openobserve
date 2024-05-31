@@ -57,9 +57,10 @@ static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwr
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
 static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 
@@ -1116,7 +1117,7 @@ mod tests {
                 (1679202494333000, 1679203394333000),
             ),
             (
-                "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
+                "select * from table1 where match_allq('abc') order by _timestamp desc limit 10 offset 10",
                 false,
                 (0, 0),
             ),
