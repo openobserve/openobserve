@@ -339,7 +339,7 @@ impl Sql {
         if meta.limit == 0 {
             meta.offset = req_query.from as usize;
             meta.limit = req_query.size as usize;
-            if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) {
+            if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) && !track_total_hits {
                 // sql mode context, allow limit 0, used to no hits, but return aggs
                 // sql mode full, disallow without limit, default limit 1000
                 meta.limit = cfg.limit.query_full_mode_limit;

@@ -146,7 +146,7 @@ pub enum AggregationFunc {
     P50,
     P90,
     P95,
-    P99
+    P99,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
