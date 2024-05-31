@@ -314,10 +314,6 @@ export default defineComponent({
     };
 
     const formatDocument = () => {
-      console.log(
-        "formatDocument",
-        editorObj.getAction("editor.action.formatDocument")
-      );
       editorObj.getAction("editor.action.formatDocument").run();
     };
 

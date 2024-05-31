@@ -369,6 +369,10 @@ export default defineComponent({
       editorRef.value.dispatchEvent(escEvent);
     };
 
+    const formatDocument = () => {
+      editorObj.getAction("editor.action.formatDocument").run();
+    };
+
     const getCursorIndex = () => {
       const currentPosition = editorObj.getPosition();
       const cursorIndex = editorObj.getModel().getOffsetAt(currentPosition) - 1;
@@ -384,6 +388,7 @@ export default defineComponent({
       triggerAutoComplete,
       getCursorIndex,
       searchObj,
+      formatDocument,
     };
   },
 });
