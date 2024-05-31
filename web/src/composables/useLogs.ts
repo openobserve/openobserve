@@ -852,6 +852,12 @@ const useLogs = () => {
 
       const parsedSQL: any = fnParsedSQL();
 
+      if (searchObj.meta.sqlMode && parsedSQL == undefined) {
+        searchObj.data.queryResults.error = "Invalid SQL Syntax";
+        throw new Error("Invalid SQL Syntax");
+        return;
+      }
+
       if (
         !searchObj.meta.sqlMode ||
         (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
@@ -1005,6 +1011,7 @@ const useLogs = () => {
     } catch (e: any) {
       console.log("error", e);
       searchObj.data.queryResults.error = e.message;
+      throw e;
     }
   };
 
