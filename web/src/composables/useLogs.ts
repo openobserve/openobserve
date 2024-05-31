@@ -880,7 +880,6 @@ const useLogs = () => {
         }
 
         if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
-
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
             partitionTotal: [],
