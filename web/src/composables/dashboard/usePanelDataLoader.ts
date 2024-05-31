@@ -38,7 +38,8 @@ export const usePanelDataLoader = (
   selectedTimeObj: any,
   variablesData: any,
   chartPanelRef: any,
-  forceLoad: any
+  forceLoad: any,
+  searchType: any
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -298,21 +299,25 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
+
             // console.log("Calling search API", query, metadata);
             return await queryService
-              .search({
-                org_identifier: store.state.selectedOrganization.identifier,
-                query: {
+              .search(
+                {
+                  org_identifier: store.state.selectedOrganization.identifier,
                   query: {
-                    sql: query,
-                    sql_mode: "full",
-                    start_time: startISOTimestamp,
-                    end_time: endISOTimestamp,
-                    size: -1,
+                    query: {
+                      sql: query,
+                      sql_mode: "full",
+                      start_time: startISOTimestamp,
+                      end_time: endISOTimestamp,
+                      size: -1,
+                    },
                   },
+                  page_type: pageType,
                 },
-                page_type: pageType,
-              },"UI")
+                searchType.value ?? "Dashboards"
+              )
               .then((res) => {
                 // Set searchQueryData.data to the API response hits
                 // state.data = res.data.hits;

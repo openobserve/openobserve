@@ -939,7 +939,7 @@ export default defineComponent({
           org_identifier: this.searchObj.organizationIdetifier,
           query: this.searchObj.data.customDownloadQueryObj,
           page_type: this.searchObj.data.stream.streamType,
-        })
+        }, "UI")
         .then((res) => {
           this.customDownloadDialog = false;
           if (res.data.hits.length > 0) {

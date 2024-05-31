@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboardData="currentDashboardData.data"
           :currentTimeObj="dateTime"
           @variablesData="variablesDataUpdated"
+          searchType="RUM"
         />
       </div>
     </div>
@@ -162,11 +163,14 @@ export default defineComponent({
       };
 
       searchService
-        .search({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: req,
-          page_type: "logs",
-        })
+        .search(
+          {
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: req,
+            page_type: "logs",
+          },
+          "RUM"
+        )
         .then((res) => {
           res.data.hits.slice(0, topCount).forEach((element: any) => {
             topSlowResources.value.push({
@@ -198,11 +202,14 @@ export default defineComponent({
       };
 
       searchService
-        .search({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: req,
-          page_type: "logs",
-        })
+        .search(
+          {
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: req,
+            page_type: "logs",
+          },
+          "RUM"
+        )
         .then((res) => {
           res.data.hits.forEach((element: any) => {
             topHeavyResources.value.push({
@@ -238,7 +245,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           query: req,
           page_type: "logs",
-        })
+        }, "RUM")
         .then((res) => {
           res.data.hits.forEach((element: any) => {
             topErrorResources.value.push({
