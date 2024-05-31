@@ -1807,13 +1807,13 @@ const useLogs = () => {
         queryReq.query.size = 0;
         const parsedSQL: any = fnParsedSQL();
 
-        let hasAggregationFlag = false;
-        if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-          hasAggregationFlag = hasAggregation(parsedSQL?.columns);
-          if (hasAggregationFlag) {
-            queryReq.query.track_total_hits = true;
-          }
-        }
+        // let hasAggregationFlag = false;
+        // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+        //   hasAggregationFlag = hasAggregation(parsedSQL?.columns);
+        //   if (hasAggregationFlag) {
+        //     queryReq.query.track_total_hits = true;
+        //   }
+        // }
 
         searchService
           .search({
@@ -1827,9 +1827,9 @@ const useLogs = () => {
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
-            if (hasAggregationFlag) {
-              searchObj.data.queryResults.total = res.data.total;
-            }
+            // if (hasAggregationFlag) {
+            //   searchObj.data.queryResults.total = res.data.total;
+            // }
             await generateHistogramData();
 
             let regeratePaginationFlag = false;
