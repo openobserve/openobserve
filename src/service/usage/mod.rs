@@ -45,6 +45,12 @@ pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
 pub static TRIGGERS_USAGE_DATA: Lazy<Arc<RwLock<Vec<TriggerData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
 
+pub static LAST_PUBLISHED_USAGE: Lazy<Arc<RwLock<i64>>> =
+    Lazy::new(|| Arc::new(RwLock::new(Utc::now().timestamp())));
+
+pub static LAST_PUBLISHED_TRIGGERS: Lazy<Arc<RwLock<i64>>> =
+    Lazy::new(|| Arc::new(RwLock::new(Utc::now().timestamp())));
+
 pub async fn report_request_usage_stats(
     stats: RequestStats,
     org_id: &str,
@@ -138,9 +144,16 @@ pub async fn report_request_usage_stats(
 pub async fn publish_usage(mut usage: Vec<UsageData>) {
     let mut usages = USAGE_DATA.write().await;
     usages.append(&mut usage);
-    if usages.len() < get_config().common.usage_batch_size {
+
+    let current_ts = Utc::now().timestamp();
+    let r = LAST_PUBLISHED_USAGE.read().await;
+    let last_published = *r;
+    if usages.len() < get_config().common.usage_batch_size
+        && current_ts - last_published < get_config().common.usage_publish_interval
+    {
         return;
     }
+    drop(r);
 
     let curr_usages = std::mem::take(&mut *usages);
     // release the write lock
@@ -157,9 +170,17 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 
     let mut usages = TRIGGERS_USAGE_DATA.write().await;
     usages.push(trigger);
-    if usages.len() < cfg.common.usage_batch_size {
+
+    let current_ts = Utc::now().timestamp();
+    let r = LAST_PUBLISHED_TRIGGERS.read().await;
+    let last_published = *r;
+
+    if usages.len() < cfg.common.usage_batch_size
+        && current_ts - last_published < cfg.common.usage_publish_interval
+    {
         return;
     }
+    drop(r);
 
     let curr_usages = std::mem::take(&mut *usages);
     // release the write lock
@@ -214,6 +235,10 @@ async fn flush_triggers_usage() {
 }
 
 async fn ingest_usages(curr_usages: Vec<UsageData>) {
+    if curr_usages.is_empty() {
+        log::info!(" Returning as no usages reported ");
+        return;
+    }
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
     let mut search_events = vec![];
     for usage_data in &curr_usages {
@@ -309,9 +334,17 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             drop(usages);
         }
     }
+    let mut w = LAST_PUBLISHED_USAGE.write().await;
+    *w = Utc::now().timestamp();
+    drop(w);
 }
 
 async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
+    if curr_usages.is_empty() {
+        log::info!(" Returning as no triggers reported ");
+        return;
+    }
+
     let mut json_triggers = vec![];
     for trigger_data in &curr_usages {
         json_triggers.push(json::to_value(trigger_data).unwrap());
@@ -330,6 +363,9 @@ async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
         usages.append(&mut curr_usages);
         drop(usages);
     }
+    let mut w = LAST_PUBLISHED_TRIGGERS.write().await;
+    *w = Utc::now().timestamp();
+    drop(w);
 }
 
 #[cfg(feature = "enterprise")]
