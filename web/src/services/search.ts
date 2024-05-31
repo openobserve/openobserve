@@ -24,8 +24,9 @@ const search = {
     org_identifier: string;
     query: any;
     page_type: string;
-  }) => {
-    const url = `/api/${org_identifier}/_search?type=${page_type}`;
+  },
+  search_type: string,) => {
+    const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     return http().post(url, query);
   },
   search_around: ({

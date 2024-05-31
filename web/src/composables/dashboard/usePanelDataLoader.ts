@@ -312,7 +312,7 @@ export const usePanelDataLoader = (
                   },
                 },
                 page_type: pageType,
-              })
+              },"UI")
               .then((res) => {
                 // Set searchQueryData.data to the API response hits
                 // state.data = res.data.hits;
