@@ -969,7 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ></DashboardFiltersOption>
   </div>
   <DashboardMapQueryBuilder :dashboardData="dashboardData" />
-  <DashboardGeoMapQueryBuilder />
+  <DashboardGeoMapQueryBuilder :dashboardData="dashboardData" />
   <DashboardSankeyChartBuilder :dashboardData="dashboardData" />
 </template>
 
