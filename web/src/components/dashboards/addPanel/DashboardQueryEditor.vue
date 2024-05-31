@@ -716,6 +716,18 @@ export default defineComponent({
 
         if (value_for_maps?.aggregationFunction) {
           switch (value_for_maps.aggregationFunction) {
+            case "p50":
+              query += `approx_percentile_cont(${value_for_maps.column}, 0.5) as ${value_for_maps.alias}`;
+              break;
+            case "p90":
+              query += `approx_percentile_cont(${value_for_maps.column}, 0.9) as ${value_for_maps.alias}`;
+              break;
+            case "p95":
+              query += `approx_percentile_cont(${value_for_maps.column}, 0.95) as ${value_for_maps.alias}`;
+              break;
+            case "p99":
+              query += `approx_percentile_cont(${value_for_maps.column}, 0.99) as ${value_for_maps.alias}`;
+              break;
             case "count-distinct":
               query += `count(distinct(${value_for_maps.column})) as "${value_for_maps.alias}"`;
               break;
