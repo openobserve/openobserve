@@ -501,6 +501,15 @@ export default defineComponent({
 
     const editMode = ref(false);
 
+    watch(
+      () => variableData.query_data.max_record_size,
+      (newVal, oldVal) => {
+        if (newVal === "") {
+          variableData.query_data.max_record_size = null;
+        }
+      }
+    );
+
     onMounted(async () => {
       if (props.variableName) {
         editMode.value = true;
