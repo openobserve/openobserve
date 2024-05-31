@@ -16,16 +16,18 @@
 import http from "./http";
 
 const search = {
-  search: ({
-    org_identifier,
-    query,
-    page_type = "logs",
-  }: {
-    org_identifier: string;
-    query: any;
-    page_type: string;
-  },
-  search_type: string,) => {
+  search: (
+    {
+      org_identifier,
+      query,
+      page_type = "logs",
+    }: {
+      org_identifier: string;
+      query: any;
+      page_type: string;
+    },
+    search_type: string = "UI"
+  ) => {
     const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     return http().post(url, query);
   },
@@ -55,11 +57,11 @@ const search = {
       url = url + `&query_fn=${query_fn}`;
     }
 
-    if (regions.trim()!= "") {
+    if (regions.trim() != "") {
       url = url + `&regions=${regions}`;
     }
 
-    if (clusters.trim()!= "") {
+    if (clusters.trim() != "") {
       url = url + `&clusters=${clusters}`;
     }
     return http().get(url);
@@ -141,11 +143,11 @@ const search = {
     const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
     return http().post(url, query);
   },
-  get_running_queries: (org_identifier:string) => {
+  get_running_queries: (org_identifier: string) => {
     const url = `/api/${org_identifier}/query_manager/status`;
     return http().get(url);
   },
-  delete_running_query: (org_identifier:string,traceID: string) => {
+  delete_running_query: (org_identifier: string, traceID: string) => {
     const url = `/api/${org_identifier}/query_manager/${traceID}`;
     return http().delete(url);
   },
