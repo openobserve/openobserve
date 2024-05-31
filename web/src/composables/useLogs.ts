@@ -2247,8 +2247,7 @@ const useLogs = () => {
 
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
-        searchObj.data.queryResults.aggs &&
-        !hasAggregationFlag
+        searchObj.data.queryResults.aggs
       ) {
         searchObj.data.queryResults.aggs.map(
           (bucket: {
