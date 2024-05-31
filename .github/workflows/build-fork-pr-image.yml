@@ -70,7 +70,7 @@ jobs:
           run: cd web && npm install && npm run build
         
         - name: Print rustc cfg
-          run: rustc --print cfg
+          run: rustc -C target-cpu=native --print cfg
           
         - name: Build and run binary
           run: |

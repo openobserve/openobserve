@@ -125,6 +125,7 @@ impl super::FileList for MysqlFileList {
     async fn batch_add_deleted(
         &self,
         org_id: &str,
+        flattened: bool,
         created_at: i64,
         files: &[String],
     ) -> Result<()> {
@@ -136,7 +137,7 @@ impl super::FileList for MysqlFileList {
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, created_at)",
+                "INSERT INTO file_list_deleted (org, stream, date, file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -145,6 +146,7 @@ impl super::FileList for MysqlFileList {
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
+                    .push_bind(flattened)
                     .push_bind(created_at);
             });
             if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -214,7 +216,7 @@ impl super::FileList for MysqlFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = ? AND date = ? AND file = ?;
             "#,
         )
@@ -230,21 +232,33 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-        let ret = sqlx::query(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
-    FROM file_list WHERE stream = ? AND date = ? AND file = ?;
-            "#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .fetch_one(&pool)
-        .await;
+        let ret =
+            sqlx::query(r#"SELECT * FROM file_list WHERE stream = ? AND date = ? AND file = ?;"#)
+                .bind(stream_key)
+                .bind(date_key)
+                .bind(file_name)
+                .fetch_one(&pool)
+                .await;
         if let Err(sqlx::Error::RowNotFound) = ret {
             return Ok(false);
         }
         Ok(!ret.unwrap().is_empty())
+    }
+
+    async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()> {
+        let pool = CLIENT.clone();
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+        sqlx::query(
+            r#"UPDATE file_list SET flattened = ? WHERE stream = ? AND date = ? AND file = ?;"#,
+        )
+        .bind(flattened)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&pool)
+        .await?;
+        Ok(())
     }
 
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
@@ -257,30 +271,48 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         stream_type: StreamType,
         stream_name: &str,
         _time_level: PartitionTimeLevel,
-        time_range: (i64, i64),
+        time_range: Option<(i64, i64)>,
+        flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>> {
-        let (time_start, time_end) = time_range;
-        if time_start == 0 && time_end == 0 {
-            return Ok(Vec::new());
+        if let Some((start, end)) = time_range {
+            if start == 0 && end == 0 {
+                return Ok(Vec::new());
+            }
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
         let pool = CLIENT.clone();
-        let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
+        let ret = if flattened.is_some() {
+            sqlx::query_as::<_, super::FileRecord>(
+                r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    FROM file_list 
+    FORCE INDEX (file_list_stream_ts_idx) 
+    WHERE stream = ? AND flattened = ? LIMIT 1000;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(flattened.unwrap())
+            .fetch_all(&pool)
+            .await
+        } else {
+            let (time_start, time_end) = time_range.unwrap_or((0, 0));
+            sqlx::query_as::<_, super::FileRecord>(
+                r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     FORCE INDEX (file_list_stream_ts_idx) 
     WHERE stream = ? AND min_ts <= ? AND max_ts >= ?;
-            "#,
-        )
-        .bind(stream_key)
-        .bind(time_end)
-        .bind(time_start)
-        .fetch_all(&pool)
-        .await?;
-        Ok(ret
+                "#,
+            )
+            .bind(stream_key)
+            .bind(time_end)
+            .bind(time_start)
+            .fetch_all(&pool)
+            .await
+        };
+        Ok(ret?
             .into_iter()
             .map(|r| {
                 (
@@ -291,13 +323,18 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_deleted(&self, org_id: &str, time_max: i64, limit: i64) -> Result<Vec<String>> {
+    async fn query_deleted(
+        &self,
+        org_id: &str,
+        time_max: i64,
+        limit: i64,
+    ) -> Result<Vec<(String, bool)>> {
         if time_max == 0 {
             return Ok(Vec::new());
         }
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
+            r#"SELECT stream, date, file, flattened FROM file_list_deleted WHERE org = ? AND created_at < ? LIMIT ?;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -306,7 +343,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         .await?;
         Ok(ret
             .iter()
-            .map(|r| format!("files/{}/{}/{}", r.stream, r.date, r.file))
+            .map(|r| {
+                (
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    r.flattened,
+                )
+            })
             .collect())
     }
 
@@ -561,8 +603,8 @@ impl MysqlFileList {
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
         .bind(org_id)
@@ -575,6 +617,7 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
         .bind(meta.records)
         .bind(meta.original_size)
         .bind(meta.compressed_size)
+        .bind(meta.flattened)
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -596,7 +639,7 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)").as_str(),
+                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)").as_str(),
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -611,7 +654,8 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
                     .push_bind(item.meta.max_ts)
                     .push_bind(item.meta.records)
                     .push_bind(item.meta.original_size)
-                    .push_bind(item.meta.compressed_size);
+                    .push_bind(item.meta.compressed_size)
+                    .push_bind(item.meta.flattened);
             });
             let need_single_insert = match query_builder.build().execute(&mut *tx).await {
                 Ok(_) => false,
@@ -658,15 +702,16 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id       BIGINT not null primary key AUTO_INCREMENT,
-    org      VARCHAR(100) not null,
-    stream   VARCHAR(256) not null,
-    date     VARCHAR(16)  not null,
-    file     VARCHAR(256) not null,
-    deleted  BOOLEAN default false not null,
-    min_ts   BIGINT not null,
-    max_ts   BIGINT not null,
-    records  BIGINT not null,
+    id        BIGINT not null primary key AUTO_INCREMENT,
+    org       VARCHAR(100) not null,
+    stream    VARCHAR(256) not null,
+    date      VARCHAR(16)  not null,
+    file      VARCHAR(256) not null,
+    deleted   BOOLEAN default false not null,
+    flattened BOOLEAN default false not null,
+    min_ts    BIGINT not null,
+    max_ts    BIGINT not null,
+    records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
@@ -679,15 +724,16 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
 (
-    id       BIGINT not null primary key AUTO_INCREMENT,
-    org      VARCHAR(100) not null,
-    stream   VARCHAR(256) not null,
-    date     VARCHAR(16)  not null,
-    file     VARCHAR(256) not null,
-    deleted  BOOLEAN default false not null,
-    min_ts   BIGINT not null,
-    max_ts   BIGINT not null,
-    records  BIGINT not null,
+    id        BIGINT not null primary key AUTO_INCREMENT,
+    org       VARCHAR(100) not null,
+    stream    VARCHAR(256) not null,
+    date      VARCHAR(16)  not null,
+    file      VARCHAR(256) not null,
+    deleted   BOOLEAN default false not null,
+    flattened BOOLEAN default false not null,
+    min_ts    BIGINT not null,
+    max_ts    BIGINT not null,
+    records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null
 );
@@ -700,11 +746,12 @@ CREATE TABLE IF NOT EXISTS file_list_history
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
-    id       BIGINT not null primary key AUTO_INCREMENT,
-    org      VARCHAR(100) not null,
-    stream   VARCHAR(256) not null,
-    date     VARCHAR(16)  not null,
-    file     VARCHAR(256) not null,
+    id         BIGINT not null primary key AUTO_INCREMENT,
+    org        VARCHAR(100) not null,
+    stream     VARCHAR(256) not null,
+    date       VARCHAR(16)  not null,
+    file       VARCHAR(256) not null,
+    flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
         "#,
@@ -730,6 +777,11 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .execute(&pool)
     .await?;
+
+    // create column flattened for old version <= 0.10.5
+    add_column_flattened("file_list").await?;
+    add_column_flattened("file_list_history").await?;
+    add_column_flattened("file_list_deleted").await?;
 
     Ok(())
 }
@@ -823,5 +875,38 @@ pub async fn create_table_index() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+async fn add_column_flattened(table: &str) -> Result<()> {
+    let pool = CLIENT.clone();
+    let column = "flattened";
+    let check_sql = format!(
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+    );
+    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
+        .fetch_one(&pool)
+        .await?;
+    if has_column > 0 {
+        return Ok(());
+    }
+
+    let alert_sql =
+        format!("ALTER TABLE {table} ADD COLUMN {column} BOOLEAN default false not null;");
+    let mut tx = pool.begin().await?;
+    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
+        if !e.to_string().contains("Duplicate column name") {
+            // Check for the specific MySQL error code for duplicate column
+            log::error!("[MYSQL] Unexpected error in adding column {column}: {}", e);
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+            }
+            return Err(e.into());
+        }
+    }
+    if let Err(e) = tx.commit().await {
+        log::info!("[MYSQL] Error in committing transaction: {}", e);
+        return Err(e.into());
+    };
     Ok(())
 }

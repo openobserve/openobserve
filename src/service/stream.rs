@@ -20,7 +20,7 @@ use config::{
     is_local_disk_storage,
     meta::stream::{StreamSettings, StreamStats, StreamType},
     utils::json,
-    CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{
@@ -354,7 +354,7 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    if !CONFIG.common.widening_schema_evolution {
+    if !config::get_config().common.widening_schema_evolution {
         return Err(anyhow::anyhow!(
             "widening schema evolution is disabled, can't delete fields"
         ));

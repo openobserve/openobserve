@@ -17,12 +17,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use config::{
     cluster::LOCAL_NODE_UUID,
+    get_config,
     meta::{
         stream::StreamType,
         usage::{Stats, UsageEvent, STATS_STREAM, USAGE_STREAM},
     },
     utils::json,
-    CONFIG,
 };
 use infra::dist_lock;
 use once_cell::sync::Lazy;
@@ -38,8 +38,9 @@ use crate::{
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     let mut orgs = db::schema::list_organizations_from_cache().await;
-    orgs.retain(|org: &String| org != &CONFIG.common.usage_org);
+    orgs.retain(|org: &String| org != &cfg.common.usage_org);
 
     for org_id in orgs {
         // get the working node for the organization
@@ -94,9 +95,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             timeout: 0,
         };
         // do search
-        match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req)
-            .await
-        {
+        match SearchService::search("", &cfg.common.usage_org, StreamType::Logs, None, &req).await {
             Ok(res) => {
                 if !res.hits.is_empty() {
                     match report_stats(res.hits, &org_id, last_query_ts, current_ts).await {
@@ -153,7 +152,15 @@ async fn get_last_stats(
         clusters: vec![],
         timeout: 0,
     };
-    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {
+    match SearchService::search(
+        "",
+        &get_config().common.usage_org,
+        StreamType::Logs,
+        None,
+        &req,
+    )
+    .await
+    {
         Ok(res) => Ok(res.hits),
         Err(err) => match &err {
             infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)) => {
@@ -217,7 +224,7 @@ async fn report_stats(
         data: Some(cluster_rpc::UsageData::from(report_data)),
     };
 
-    match ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+    match ingestion_service::ingest(&get_config().common.usage_org, req).await {
         Ok(_) => Ok(()),
         Err(err) => Err(err),
     }

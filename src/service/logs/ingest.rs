@@ -22,10 +22,11 @@ use actix_web::http;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
+    get_config,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use flate2::read::GzDecoder;
 use infra::schema::SchemaCache;
@@ -74,7 +75,8 @@ pub async fn ingest(
         });
     }
 
-    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+    let cfg = get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
     // Start Register Transforms for stream
@@ -299,7 +301,8 @@ pub fn apply_functions<'a>(
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value> {
-    let mut value = flatten::flatten_with_level(item, CONFIG.limit.ingest_flatten_level)?;
+    let cfg = get_config();
+    let mut value = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
@@ -323,8 +326,9 @@ pub fn handle_timestamp(
     local_val: &mut json::Map<String, json::Value>,
     min_ts: i64,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // handle timestamp
-    let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
+    let timestamp = match local_val.get(&cfg.common.column_timestamp) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
             Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
@@ -336,7 +340,7 @@ pub fn handle_timestamp(
         return Err(get_upto_discard_error());
     }
     local_val.insert(
-        CONFIG.common.column_timestamp.clone(),
+        cfg.common.column_timestamp.clone(),
         json::Value::Number(timestamp.into()),
     );
     Ok(())
@@ -502,7 +506,7 @@ fn deserialize_aws_record_from_str(data: &str, request_id: &str) -> Result<Vec<j
                     }
 
                     local_val.insert(
-                        CONFIG.common.column_timestamp.clone(),
+                        get_config().common.column_timestamp.clone(),
                         event.timestamp.into(),
                     );
 
@@ -542,8 +546,10 @@ fn deserialize_aws_record_from_str(data: &str, request_id: &str) -> Result<Vec<j
                     .insert("metric_dimensions".to_owned(), metric_dimensions.into());
                 local_parsed_metric_value.remove("dimensions");
 
-                local_parsed_metric_value
-                    .insert(CONFIG.common.column_timestamp.clone(), timestamp.into());
+                local_parsed_metric_value.insert(
+                    get_config().common.column_timestamp.clone(),
+                    timestamp.into(),
+                );
                 local_parsed_metric_value.remove("timestamp");
 
                 value = local_parsed_metric_value.clone().into();

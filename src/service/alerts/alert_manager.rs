@@ -17,11 +17,11 @@ use std::str::FromStr;
 
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
+    get_config,
     meta::{
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
-    CONFIG,
 };
 use cron::Schedule;
 
@@ -32,14 +32,15 @@ use crate::{
 
 pub async fn run() -> Result<(), anyhow::Error> {
     log::debug!("Pulling jobs from scheduler");
+    let cfg = get_config();
     // Scheduler pulls only those triggers that match the conditions-
     // - trigger.next_run_at <= now
     // - !(trigger.is_realtime && !trigger.is_silenced)
     // - trigger.status == "Waiting"
     let triggers = db::scheduler::pull(
-        CONFIG.limit.alert_schedule_concurrency,
-        CONFIG.limit.alert_schedule_timeout,
-        CONFIG.limit.report_schedule_timeout,
+        cfg.limit.alert_schedule_concurrency,
+        cfg.limit.alert_schedule_timeout,
+        cfg.limit.report_schedule_timeout,
     )
     .await?;
 
@@ -174,7 +175,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
-                if trigger.retries + 1 >= CONFIG.limit.scheduler_max_retries {
+                if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
                     // It has been tried the maximum time, just update the
                     // next_run_at to the next expected trigger time
                     log::debug!(
@@ -324,7 +325,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
         Err(e) => {
             log::error!("Error sending report to subscribers: {e}");
-            if trigger.retries + 1 >= CONFIG.limit.scheduler_max_retries && !run_once {
+            if trigger.retries + 1 >= get_config().limit.scheduler_max_retries && !run_once {
                 // It has been tried the maximum time, just update the
                 // next_run_at to the next expected trigger time
                 log::debug!(

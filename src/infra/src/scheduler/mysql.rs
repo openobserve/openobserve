@@ -16,7 +16,6 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Duration;
-use config::CONFIG;
 use sqlx::Row;
 
 use super::{Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY};
@@ -284,7 +283,7 @@ FOR UPDATE;
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
-        .bind(CONFIG.limit.scheduler_max_retries)
+        .bind(config::get_config().limit.scheduler_max_retries)
         .bind(true)
         .bind(false)
         .bind(concurrency)
@@ -313,24 +312,24 @@ FOR UPDATE;
         }
 
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
-        if let Err(e) = sqlx::query(
-            r#"UPDATE scheduled_jobs
+        let query = format!(
+            "UPDATE scheduled_jobs
 SET status = ?, start_time = ?,
     end_time = CASE
         WHEN module = ? THEN ?
         ELSE ?
     END
-WHERE id IN (?);
-            "#,
-        )
-        .bind(TriggerStatus::Processing)
-        .bind(now)
-        .bind(TriggerModule::Alert)
-        .bind(alert_max_time)
-        .bind(report_max_time)
-        .bind(job_ids.join(","))
-        .execute(&mut *tx)
-        .await
+WHERE id IN ({});",
+            job_ids.join(",")
+        );
+        if let Err(e) = sqlx::query(&query)
+            .bind(TriggerStatus::Processing)
+            .bind(now)
+            .bind(TriggerModule::Alert)
+            .bind(alert_max_time)
+            .bind(report_max_time)
+            .execute(&mut *tx)
+            .await
         {
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback update scheduled jobs status error: {}", e);
@@ -344,10 +343,12 @@ WHERE id IN (?);
             return Err(e.into());
         }
 
-        let query = r#"SELECT * FROM scheduled_jobs WHERE id IN (?);"#;
+        let query = format!(
+            "SELECT * FROM scheduled_jobs WHERE id IN ({});",
+            job_ids.join(",")
+        );
         let pool = CLIENT.clone();
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
-            .bind(job_ids.join(","))
+        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query.as_str())
             .fetch_all(&pool)
             .await?;
         log::debug!("Returning the pulled triggers: {}", jobs.len());
@@ -397,7 +398,7 @@ WHERE id IN (?);
         let pool = CLIENT.clone();
         sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
             .bind(TriggerStatus::Completed)
-            .bind(CONFIG.limit.scheduler_max_retries)
+            .bind(config::get_config().limit.scheduler_max_retries)
             .execute(&pool)
             .await?;
         Ok(())

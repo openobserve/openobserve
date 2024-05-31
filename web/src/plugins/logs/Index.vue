@@ -429,7 +429,7 @@ export default defineComponent({
         resetSearchObj();
         resetStreamData();
         restoreUrlQueryParams();
-        loadLogsData();
+        // loadLogsData();
         return;
       }
 

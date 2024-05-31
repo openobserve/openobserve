@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, FxIndexMap, CONFIG};
+use config::{cluster, FxIndexMap};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -45,8 +45,9 @@ static WATCHERS: Lazy<RwLock<FxIndexMap<String, EventChannel>>> =
 type EventChannel = Arc<mpsc::Sender<Event>>;
 
 fn connect_rw() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
-    if !CONFIG.common.local_mode && std::path::Path::new(&url).exists() {
+    let cfg = config::get_config();
+    let url = format!("{}{}", cfg.common.data_db_dir, "metadata.sqlite");
+    if !cfg.common.local_mode && std::path::Path::new(&url).exists() {
         std::fs::remove_file(&url).expect("remove file sqlite failed");
         _ = std::fs::remove_file(format!("{url}-shm"));
         _ = std::fs::remove_file(format!("{url}-wal"));
@@ -68,7 +69,9 @@ fn connect_rw() -> Pool<Sqlite> {
 }
 
 fn connect_ro() -> Pool<Sqlite> {
-    let url = format!("{}{}", CONFIG.common.data_db_dir, "metadata.sqlite");
+    let cfg = config::get_config();
+
+    let url = format!("{}{}", cfg.common.data_db_dir, "metadata.sqlite");
     let db_opts = SqliteConnectOptions::from_str(&url)
         .expect("sqlite connect options create failed")
         .journal_mode(SqliteJournalMode::Wal)
@@ -78,8 +81,8 @@ fn connect_ro() -> Pool<Sqlite> {
         // .disable_statement_logging()
         .read_only(true);
     SqlitePoolOptions::new()
-        .min_connections(CONFIG.limit.sql_min_db_connections)
-        .max_connections(CONFIG.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_min_db_connections)
+        .max_connections(cfg.limit.sql_max_db_connections)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
 }
@@ -109,7 +112,7 @@ impl SqliteDbChannel {
                         break;
                     }
                 };
-                if CONFIG.common.print_key_event {
+                if config::get_config().common.print_key_event {
                     log::info!("[SQLITE] watch event: {:?}", event);
                 }
                 for (prefix, tx) in WATCHERS.read().await.iter() {
@@ -264,6 +267,7 @@ impl super::Db for SqliteDb {
                 .send(Event::Put(EventData {
                     key: key.to_string(),
                     value: Some(value),
+                    start_dt,
                 }))
                 .await
             {
@@ -405,26 +409,32 @@ impl super::Db for SqliteDb {
 
         // event watch
         if need_watch {
-            if value.is_some() {
-                if let Err(e) = CHANNEL
-                    .watch_tx
-                    .clone()
-                    .send(Event::Put(EventData {
-                        key: key.to_string(),
-                        value: Some(Bytes::from(need_watch_dt.to_string())),
-                    }))
-                    .await
-                {
-                    log::error!("[SQLITE] send event error: {}", e);
-                }
-            }
+            let start_dt = if need_watch_dt > 0 {
+                Some(need_watch_dt)
+            } else {
+                None
+            };
             if new_value.is_some() {
                 if let Err(e) = CHANNEL
                     .watch_tx
                     .clone()
                     .send(Event::Put(EventData {
                         key: key.to_string(),
-                        value: Some(Bytes::from(need_watch_dt.to_string())),
+                        value: Some(Bytes::from("")),
+                        start_dt,
+                    }))
+                    .await
+                {
+                    log::error!("[SQLITE] send event error: {}", e);
+                }
+            } else if value.is_some() {
+                if let Err(e) = CHANNEL
+                    .watch_tx
+                    .clone()
+                    .send(Event::Put(EventData {
+                        key: key.to_string(),
+                        value: Some(Bytes::from("")),
+                        start_dt,
                     }))
                     .await
                 {
@@ -469,6 +479,7 @@ impl super::Db for SqliteDb {
                         .send(Event::Delete(EventData {
                             key: key.to_string(),
                             value: None,
+                            start_dt,
                         }))
                         .await
                     {

@@ -23,7 +23,7 @@ use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -102,7 +102,9 @@ pub async fn logs_json_handler(
         );
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
@@ -144,7 +146,8 @@ pub async fn logs_json_handler(
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<TriggerAlertData> = None;
 
-    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+    let cfg = config::get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
     let partition_det = crate::service::ingestion::get_stream_partition_keys(
@@ -350,9 +353,8 @@ pub async fn logs_json_handler(
                     stream_status.status.error = get_upto_discard_error().to_string();
                     continue;
                 }
-
                 local_val.insert(
-                    CONFIG.common.column_timestamp.clone(),
+                    cfg.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -361,8 +363,7 @@ pub async fn logs_json_handler(
                 value = json::to_value(local_val)?;
 
                 // JSON Flattening
-                value =
-                    flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level).unwrap();
+                value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_functions(

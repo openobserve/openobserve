@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{meta::meta_store::MetaStore, CONFIG};
+use config::{get_config, meta::meta_store::MetaStore};
 use hashbrown::HashMap;
 use tokio::sync::{mpsc, OnceCell};
 
@@ -57,13 +57,14 @@ pub async fn init() -> Result<()> {
 }
 
 async fn default() -> Box<dyn Db> {
-    if !CONFIG.common.local_mode
-        && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
+    let cfg = get_config();
+    if !cfg.common.local_mode
+        && (cfg.common.meta_store == "sled" || cfg.common.meta_store == "sqlite")
     {
         panic!("cluster mode is not supported for ZO_META_STORE=sqlite");
     }
 
-    match CONFIG.common.meta_store.as_str().into() {
+    match cfg.common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
         MetaStore::Nats => Box::<nats::NatsDb>::default(),
@@ -73,13 +74,14 @@ async fn default() -> Box<dyn Db> {
 }
 
 async fn init_cluster_coordinator() -> Box<dyn Db> {
-    if CONFIG.common.local_mode {
-        match CONFIG.common.meta_store.as_str().into() {
+    let cfg = get_config();
+    if cfg.common.local_mode {
+        match cfg.common.meta_store.as_str().into() {
             MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
             _ => Box::<sqlite::SqliteDb>::default(),
         }
     } else {
-        match CONFIG.common.cluster_coordinator.as_str().into() {
+        match cfg.common.cluster_coordinator.as_str().into() {
             MetaStore::Nats => Box::<nats::NatsDb>::default(),
             _ => Box::<etcd::Etcd>::default(),
         }
@@ -87,7 +89,7 @@ async fn init_cluster_coordinator() -> Box<dyn Db> {
 }
 
 async fn init_super_cluster() -> Box<dyn Db> {
-    if CONFIG.common.local_mode {
+    if get_config().common.local_mode {
         panic!("super cluster is not supported in local mode");
     }
     Box::new(nats::NatsDb::super_cluster())
@@ -95,7 +97,7 @@ async fn init_super_cluster() -> Box<dyn Db> {
 
 pub async fn create_table() -> Result<()> {
     // check db dir
-    std::fs::create_dir_all(&CONFIG.common.data_db_dir)?;
+    std::fs::create_dir_all(&get_config().common.data_db_dir)?;
     // create for meta store
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator.create_table().await?;
@@ -219,6 +221,7 @@ pub enum Event {
 pub struct EventData {
     pub key: String,
     pub value: Option<Bytes>,
+    pub start_dt: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

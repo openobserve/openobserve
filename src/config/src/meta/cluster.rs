@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -71,6 +71,7 @@ pub enum Role {
     Compactor,
     Router,
     AlertManager,
+    FlattenCompactor,
 }
 
 impl FromStr for Role {
@@ -83,7 +84,8 @@ impl FromStr for Role {
             "querier" => Ok(Role::Querier),
             "compactor" => Ok(Role::Compactor),
             "router" => Ok(Role::Router),
-            "alertmanager" => Ok(Role::AlertManager),
+            "alertmanager" | "alert_manager" => Ok(Role::AlertManager),
+            "flatten_compactor" => Ok(Role::FlattenCompactor),
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -97,7 +99,8 @@ impl std::fmt::Display for Role {
             Role::Querier => write!(f, "querier"),
             Role::Compactor => write!(f, "compactor"),
             Role::Router => write!(f, "router"),
-            Role::AlertManager => write!(f, "alertmanager"),
+            Role::AlertManager => write!(f, "alert_manager"),
+            Role::FlattenCompactor => write!(f, "flatten_compactor"),
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,8 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use config::CONFIG;
 
 use crate::{
     db::{etcd, nats},
@@ -30,10 +28,11 @@ enum LockerStore {
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
 pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
-    if CONFIG.common.local_mode {
+    let cfg = config::get_config();
+    if cfg.common.local_mode {
         return Ok(None);
     }
-    match CONFIG.common.cluster_coordinator.as_str() {
+    match cfg.common.cluster_coordinator.as_str() {
         "nats" => {
             let mut lock = nats::Locker::new(key);
             lock.lock(wait_ttl).await?;

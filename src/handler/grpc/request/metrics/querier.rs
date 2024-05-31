@@ -23,7 +23,6 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
         schema_ext::SchemaExt,
     },
-    CONFIG,
 };
 use infra::errors;
 use opentelemetry::global;
@@ -150,20 +149,21 @@ impl Metrics for Querier {
         }
 
         // get parquet files
-        let wal_dir = match std::path::Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
-            Ok(path) => {
-                let mut path = path.to_str().unwrap().to_string();
-                // Hack for windows
-                if path.starts_with("\\\\?\\") {
-                    path = path[4..].to_string();
-                    path = path.replace('\\', "/");
+        let wal_dir =
+            match std::path::Path::new(&config::get_config().common.data_wal_dir).canonicalize() {
+                Ok(path) => {
+                    let mut path = path.to_str().unwrap().to_string();
+                    // Hack for windows
+                    if path.starts_with("\\\\?\\") {
+                        path = path[4..].to_string();
+                        path = path.replace('\\', "/");
+                    }
+                    path
                 }
-                path
-            }
-            Err(_) => {
-                return Ok(Response::new(resp));
-            }
-        };
+                Err(_) => {
+                    return Ok(Response::new(resp));
+                }
+            };
 
         let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
         let files = scan_files(&pattern, "parquet", None).unwrap_or_default();

@@ -168,8 +168,8 @@ const defaultObject = {
     },
     editorValue: <any>"",
     datetime: <any>{
-      startTime: 0,
-      endTime: 0,
+      startTime: (new Date().getTime() - 900000) * 1000,
+      endTime: new Date().getTime(),
       relativeTimePeriod: "15m",
       type: "relative",
       selectedDate: <any>{},
@@ -210,6 +210,11 @@ const searchObjDebug = reactive({
   extractFieldsStartTime: 0,
   extractFieldsEndTime: 0,
   extractFieldsWithAPI: "",
+});
+
+const searchAggData = reactive({
+  total: 0,
+  hasAggregation: false,
 });
 
 const useLogs = () => {
@@ -629,8 +634,24 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
+        req.aggs.histogram = req.aggs.histogram.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+
+        req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
+
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
+        const histogramParsedSQL: any = fnHistogramParsedSQL(
+          req.aggs.histogram
+        );
+
+        histogramParsedSQL.where = parsedSQL.where;
+
+        let histogramQuery = parser.sqlify(histogramParsedSQL);
+        histogramQuery = histogramQuery.replace(/`/g, '"');
+        req.aggs.histogram = histogramQuery;
 
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
@@ -809,91 +830,72 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(
-      parsedSQL?.groupby ||
-      hasAggregation(parsedSQL?.columns) ||
-      parsedSQL?.limit
-    );
+    return !parsedSQL?.limit;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
-    // const queryReq = buildSearch();
-    searchObj.data.queryResults.hits = [];
-    searchObj.data.histogram = {
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorCode: 0,
-      errorMsg: "",
-      errorDetail: "",
-    };
-
-    const parsedSQL: any = fnParsedSQL();
-
-    if (
-      !searchObj.meta.sqlMode ||
-      (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
-    ) {
-      const partitionQueryReq: any = {
-        sql: queryReq.query.sql,
-        start_time: queryReq.query.start_time,
-        end_time: queryReq.query.end_time,
-        sql_mode: searchObj.meta.sqlMode ? "full" : "context",
+    try{
+      // const queryReq = buildSearch();
+      searchObj.data.queryResults.hits = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
       };
-      if (store.state.zoConfig.sql_base64_enabled) {
-        partitionQueryReq["encoding"] = "base64";
+
+      const parsedSQL: any = fnParsedSQL();
+
+      if (searchObj.meta.sqlMode && parsedSQL == undefined) {
+        searchObj.data.queryResults.error = "Invalid SQL Syntax";
+        throw new Error("Invalid SQL Syntax");
+        return;
       }
 
       if (
-        config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
+        !searchObj.meta.sqlMode ||
+        (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
       ) {
-        if (queryReq.query.hasOwnProperty("regions")) {
-          partitionQueryReq["regions"] = queryReq.query.regions;
+        const partitionQueryReq: any = {
+          sql: queryReq.query.sql,
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
+          sql_mode: searchObj.meta.sqlMode ? "full" : "context",
+        };
+        if (store.state.zoConfig.sql_base64_enabled) {
+          partitionQueryReq["encoding"] = "base64";
         }
 
-        if (queryReq.query.hasOwnProperty("clusters")) {
-          partitionQueryReq["clusters"] = queryReq.query.clusters;
-        }
-      }
+        if (
+          config.isEnterprise == "true" &&
+          store.state.zoConfig.super_cluster_enabled
+        ) {
+          if (queryReq.query.hasOwnProperty("regions")) {
+            partitionQueryReq["regions"] = queryReq.query.regions;
+          }
 
-      await searchService
-        .partition({
-          org_identifier: searchObj.organizationIdetifier,
-          query: partitionQueryReq,
-          page_type: searchObj.data.stream.streamType,
-        })
-        .then(async (res) => {
+          if (queryReq.query.hasOwnProperty("clusters")) {
+            partitionQueryReq["clusters"] = queryReq.query.clusters;
+          }
+        }
+
+        if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
             partitionTotal: [],
             paginations: [],
           };
-
-          // searchObj.data.queryResults.total = res.data.records;
-          const partitions = res.data.partitions;
-
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
-
           let pageObject: any = [];
-          // partitions.forEach((item: any, index: number) => {
-          //   pageObject = [
-          //     {
-          //       startTime: item[0],
-          //       endTime: item[1],
-          //       from: 0,
-          //       size: searchObj.meta.resultGrid.rowsPerPage,
-          //     },
-          //   ];
-          //   searchObj.data.queryResults.partitionDetail.paginations.push(
-          //     pageObject
-          //   );
-          //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          // });
+          const partitions: any = [
+            [partitionQueryReq.start_time, partitionQueryReq.end_time],
+          ];
+          searchObj.data.queryResults.partitionDetail.partitions = partitions;
           for (const [index, item] of partitions.entries()) {
             pageObject = [
               {
@@ -908,52 +910,108 @@ const useLogs = () => {
             );
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
-        });
-    } else {
-      searchObj.data.queryResults.partitionDetail = {
-        partitions: [],
-        partitionTotal: [],
-        paginations: [],
-      };
+        } else {
+          await searchService
+            .partition({
+              org_identifier: searchObj.organizationIdetifier,
+              query: partitionQueryReq,
+              page_type: searchObj.data.stream.streamType,
+            })
+            .then(async (res) => {
+              searchObj.data.queryResults.partitionDetail = {
+                partitions: [],
+                partitionTotal: [],
+                paginations: [],
+              };
 
-      searchObj.data.queryResults.partitionDetail.partitions = [
-        [queryReq.query.start_time, queryReq.query.end_time],
-      ];
+              // searchObj.data.queryResults.total = res.data.records;
+              const partitions = res.data.partitions;
 
-      let pageObject: any = [];
-      // searchObj.data.queryResults.partitionDetail.partitions.forEach(
-      //   (item: any, index: number) => {
-      //     pageObject = [
-      //       {
-      //         startTime: item[0],
-      //         endTime: item[1],
-      //         from: 0,
-      //         size: searchObj.meta.resultGrid.rowsPerPage,
-      //       },
-      //     ];
-      //     searchObj.data.queryResults.partitionDetail.paginations.push(
-      //       pageObject
-      //     );
-      //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-      //   }
-      // );
-      for (const [
-        index,
-        item,
-      ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
-        pageObject = [
-          {
-            startTime: item[0],
-            endTime: item[1],
-            from: 0,
-            size: searchObj.meta.resultGrid.rowsPerPage,
-          },
+              searchObj.data.queryResults.partitionDetail.partitions = partitions;
+
+              let pageObject: any = [];
+              // partitions.forEach((item: any, index: number) => {
+              //   pageObject = [
+              //     {
+              //       startTime: item[0],
+              //       endTime: item[1],
+              //       from: 0,
+              //       size: searchObj.meta.resultGrid.rowsPerPage,
+              //     },
+              //   ];
+              //   searchObj.data.queryResults.partitionDetail.paginations.push(
+              //     pageObject
+              //   );
+              //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+              // });
+              for (const [index, item] of partitions.entries()) {
+                pageObject = [
+                  {
+                    startTime: item[0],
+                    endTime: item[1],
+                    from: 0,
+                    size: searchObj.meta.resultGrid.rowsPerPage,
+                  },
+                ];
+                searchObj.data.queryResults.partitionDetail.paginations.push(
+                  pageObject
+                );
+                searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                  -1
+                );
+              }
+            });
+        }
+      } else {
+        searchObj.data.queryResults.partitionDetail = {
+          partitions: [],
+          partitionTotal: [],
+          paginations: [],
+        };
+
+        searchObj.data.queryResults.partitionDetail.partitions = [
+          [queryReq.query.start_time, queryReq.query.end_time],
         ];
-        searchObj.data.queryResults.partitionDetail.paginations.push(
-          pageObject
-        );
-        searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+
+        let pageObject: any = [];
+        // searchObj.data.queryResults.partitionDetail.partitions.forEach(
+        //   (item: any, index: number) => {
+        //     pageObject = [
+        //       {
+        //         startTime: item[0],
+        //         endTime: item[1],
+        //         from: 0,
+        //         size: searchObj.meta.resultGrid.rowsPerPage,
+        //       },
+        //     ];
+        //     searchObj.data.queryResults.partitionDetail.paginations.push(
+        //       pageObject
+        //     );
+        //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+        //   }
+        // );
+        for (const [
+          index,
+          item,
+        ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+          pageObject = [
+            {
+              startTime: item[0],
+              endTime: item[1],
+              from: 0,
+              size: searchObj.meta.resultGrid.rowsPerPage,
+            },
+          ];
+          searchObj.data.queryResults.partitionDetail.paginations.push(
+            pageObject
+          );
+          searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+        }
       }
+    } catch (e: any) {
+      console.log("error", e);
+      searchObj.data.queryResults.error = e.message;
+      throw e;
     }
   };
 
@@ -981,9 +1039,8 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
 
       if (
-        (searchObj.data.queryResults.aggs == undefined &&
+        (searchObj.data.queryResults.aggs !== undefined &&
           searchObj.data.resultGrid.currentPage == 1 &&
-          searchObj.loadingHistogram == false &&
           searchObj.meta.showHistogram == true &&
           (!searchObj.meta.sqlMode ||
             (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
@@ -992,13 +1049,17 @@ const useLogs = () => {
           searchObj.meta.sqlMode == false &&
           searchObj.data.resultGrid.currentPage == 1)
       ) {
-        console.log(searchObj.data.queryResults)
-        if(searchObj.data.queryResults.hasOwnProperty("aggs") && searchObj.data.queryResults.aggs != null) {
-        searchObj.data.queryResults.total = searchObj.data.queryResults.aggs.reduce(
-            (accumulator: number, currentValue: any) =>
-              accumulator + Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-            0
-          );
+        if (
+          searchObj.data.queryResults.hasOwnProperty("aggs") &&
+          searchObj.data.queryResults.aggs != null
+        ) {
+          searchObj.data.queryResults.total =
+            searchObj.data.queryResults.aggs.reduce(
+              (accumulator: number, currentValue: any) =>
+                accumulator +
+                Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+              0
+            );
           partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
         }
       } else {
@@ -1195,10 +1256,12 @@ const useLogs = () => {
               router.currentRoute.value.name == "logs" &&
               searchObj.data.queryResults.hasOwnProperty("hits")
             ) {
-              queryReq.query.start_time =
-                initialQueryPayload.value?.query?.start_time;
-              queryReq.query.end_time =
-                initialQueryPayload.value?.query?.end_time;
+              const start_time: number =
+                initialQueryPayload.value?.query?.start_time || 0;
+              const end_time: number =
+                initialQueryPayload.value?.query?.end_time || 0;
+              queryReq.query.start_time = start_time;
+              queryReq.query.end_time = end_time;
             }
           }
         }
@@ -1214,9 +1277,13 @@ const useLogs = () => {
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
         searchObj.data.histogramQuery.query.start_time =
-          searchObj.data.datetime.startTime;
+          searchObj.data.datetime.startTime.toString().length > 13
+            ? searchObj.data.datetime.startTime
+            : searchObj.data.datetime.startTime * 1000;
         searchObj.data.histogramQuery.query.end_time =
-          searchObj.data.datetime.endTime;
+          searchObj.data.datetime.endTime.toString().length > 13
+            ? searchObj.data.datetime.endTime
+            : searchObj.data.datetime.endTime * 1000;
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
 
@@ -1390,6 +1457,24 @@ const useLogs = () => {
     }
   };
 
+  const fnHistogramParsedSQL = (query: string) => {
+    try {
+      const filteredQuery = query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      return parser.astify(filteredQuery);
+    } catch (e: any) {
+      return {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+    }
+  };
+
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
       queryReq.query.size = 0;
@@ -1480,9 +1565,9 @@ const useLogs = () => {
       // ) {
       //   delete queryReq.query.track_total_hits;
       // }
+      const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        const parsedSQL: any = fnParsedSQL();
         if (parsedSQL.limit != null) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -1495,10 +1580,10 @@ const useLogs = () => {
         }
 
         // for group by query no need to get total.
-        if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
-          searchObj.meta.resultGrid.showPagination = false;
-          delete queryReq.query.track_total_hits;
-        }
+        // if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
+        //   searchObj.meta.resultGrid.showPagination = false;
+        //   delete queryReq.query.track_total_hits;
+        // }
       }
 
       searchService
@@ -1525,6 +1610,20 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.partitionTotal[
                 index
               ] = res.data.total;
+            }
+          }
+
+          searchAggData.total = 0;
+          searchAggData.hasAggregation = false;
+          if (searchObj.meta.sqlMode == true) {
+            if (
+              hasAggregation(parsedSQL?.columns) ||
+              parsedSQL.groupby != null
+            ) {
+              const parsedSQL: any = fnParsedSQL();
+              searchAggData.total = res.data.total;
+              searchAggData.hasAggregation = true;
+              searchObj.meta.resultGrid.showPagination = false;
             }
           }
 
@@ -1706,7 +1805,16 @@ const useLogs = () => {
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
-        //queryReq.query.track_total_hits = true;
+        const parsedSQL: any = fnParsedSQL();
+
+        // let hasAggregationFlag = false;
+        // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+        //   hasAggregationFlag = hasAggregation(parsedSQL?.columns);
+        //   if (hasAggregationFlag) {
+        //     queryReq.query.track_total_hits = true;
+        //   }
+        // }
+
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -1719,6 +1827,9 @@ const useLogs = () => {
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
+            // if (hasAggregationFlag) {
+            //   searchObj.data.queryResults.total = res.data.total;
+            // }
             await generateHistogramData();
 
             let regeratePaginationFlag = false;
@@ -1899,7 +2010,7 @@ const useLogs = () => {
                 ? [...environmentInterestingFields]
                 : [...schemaInterestingFields];
 
-            // create a schema field mapping based on field name to avoind iteration over object.
+            // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
             for (const field of stream.schema) {
               fieldObj = {
@@ -2135,6 +2246,18 @@ const useLogs = () => {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
       }
     }
+
+    if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
+      totalCount = searchAggData.total;
+    }
+
+    if (isNaN(totalCount)) {
+      totalCount = 0;
+    }
+
+    if (isNaN(endCount)) {
+      endCount = 0;
+    }
     const title =
       "Showing " +
       startCount +
@@ -2156,6 +2279,12 @@ const useLogs = () => {
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
+      let hasAggregationFlag = false;
+
+      const parsedSQL: any = fnParsedSQL();
+      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+      }
 
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
@@ -2176,8 +2305,8 @@ const useLogs = () => {
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }
         );
+        searchObj.data.queryResults.total = num_records;
       }
-      searchObj.data.queryResults.total = num_records;
 
       const chartParams = {
         title: getHistogramTitle(),
@@ -2798,6 +2927,7 @@ const useLogs = () => {
 
   return {
     searchObj,
+    searchAggData,
     getStreams,
     resetSearchObj,
     resetStreamData,

@@ -25,7 +25,6 @@ use config::{
     },
     metrics,
     utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
-    CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
@@ -54,7 +53,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Err(anyhow::anyhow!(
             "Quota exceeded for this organization [{}]",
             org_id
@@ -134,8 +135,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         let record = record.as_object_mut().unwrap();
 
+        let cfg = config::get_config();
         // check timestamp & value
-        let timestamp: i64 = match record.get(&CONFIG.common.column_timestamp) {
+        let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
             None => chrono::Utc::now().timestamp_micros(),
             Some(json::Value::Number(s)) => {
                 time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
@@ -152,7 +154,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         };
         // reset time & value
         record.insert(
-            CONFIG.common.column_timestamp.clone(),
+            cfg.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
         record.insert(
@@ -170,7 +172,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             if k == NAME_LABEL
                 || k == TYPE_LABEL
                 || k == VALUE_LABEL
-                || k == &CONFIG.common.column_timestamp
+                || k == &cfg.common.column_timestamp
             {
                 continue;
             }

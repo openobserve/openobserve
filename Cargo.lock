@@ -2265,9 +2265,11 @@ dependencies = [
  "actix-web-prometheus",
  "ahash 0.8.11",
  "anyhow",
+ "arc-swap",
  "arrow",
  "arrow-json",
  "arrow-schema",
+ "async-recursion",
  "async-walkdir",
  "base64 0.21.7",
  "byteorder",
@@ -5254,7 +5256,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.10.6"
+version = "0.10.7"
 dependencies = [
  "actix-cors",
  "actix-http",
@@ -5272,7 +5274,6 @@ dependencies = [
  "arrow-schema",
  "async-recursion",
  "async-trait",
- "async-walkdir",
  "awc",
  "base64 0.21.7",
  "blake3",
@@ -5328,7 +5329,7 @@ dependencies = [
  "rayon",
  "regex",
  "regex-syntax 0.8.3",
- "reportserver",
+ "report_server",
  "reqwest 0.12.4",
  "rust-embed-for-web",
  "segment",
@@ -6356,7 +6357,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reportserver"
+name = "report_server"
 version = "0.1.0"
 dependencies = [
  "actix-web",

@@ -24,12 +24,11 @@ use utoipa::ToSchema;
 
 use super::usage::Stats;
 use crate::{
+    get_config,
     utils::{
         hash::{gxhash, Sum64},
-        json,
-        json::{Map, Value},
+        json::{self, Map, Value},
     },
-    CONFIG,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -108,6 +107,7 @@ pub struct FileMeta {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub flattened: bool,
 }
 
 impl FileMeta {
@@ -149,6 +149,7 @@ impl TryFrom<&[u8]> for FileMeta {
             records,
             original_size,
             compressed_size,
+            flattened: false,
         })
     }
 }
@@ -223,7 +224,7 @@ impl StreamStats {
 
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval = Duration::try_seconds(CONFIG.limit.file_push_interval as _)
+        let file_push_interval = Duration::try_seconds(get_config().limit.file_push_interval as _)
             .unwrap()
             .num_microseconds()
             .unwrap();
@@ -339,6 +340,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
+            flattened: false,
         }
     }
 }
@@ -743,6 +745,7 @@ mod tests {
             records: 300,
             original_size: 10,
             compressed_size: 1,
+            flattened: false,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);

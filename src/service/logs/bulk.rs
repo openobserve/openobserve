@@ -23,14 +23,14 @@ use actix_web::web;
 use anyhow::{Error, Result};
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         stream::{PartitioningDetails, Routing, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS, CONFIG, DISTINCT_FIELDS,
+    BLOCKED_STREAMS, DISTINCT_FIELDS,
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
@@ -49,7 +49,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_invalid_schema_start_dt, get_upto_discard_error, stream_schema_exists},
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -69,7 +69,9 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Err(anyhow::anyhow!(
             "Quota exceeded for this organization [{}]",
             org_id
@@ -86,7 +88,8 @@ pub async fn ingest(
         items: vec![],
     };
 
-    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+    let cfg = get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -130,13 +133,13 @@ pub async fn ingest(
             }
             (action, stream_name, doc_id) = ret.unwrap();
 
-            if !CONFIG.common.skip_formatting_bulk_stream_name {
+            if !cfg.common.skip_formatting_bulk_stream_name {
                 stream_name = format_stream_name(&stream_name);
             }
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-            if BLOCKED_STREAMS.contains(&key.as_str()) {
+            if BLOCKED_STREAMS.contains(&key) {
                 // print warning only once
                 blocked_stream_warnings.entry(key).or_insert_with(|| {
                     log::warn!("stream [{stream_name}] is blocked from ingestion");
@@ -225,7 +228,7 @@ pub async fn ingest(
             next_line_is_data = false;
 
             // JSON Flattening
-            let mut value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
+            let mut value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
 
             if let Some(routing) = stream_routing_map.get(&stream_name) {
                 if !routing.is_empty() {
@@ -305,7 +308,7 @@ pub async fn ingest(
             }
 
             // handle timestamp
-            let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
+            let timestamp = match local_val.get(&cfg.common.column_timestamp) {
                 Some(v) => match parse_timestamp_micro_from_value(v) {
                     Ok(t) => t,
                     Err(_e) => {
@@ -340,7 +343,7 @@ pub async fn ingest(
                 continue;
             }
             local_val.insert(
-                CONFIG.common.column_timestamp.clone(),
+                cfg.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
             let (partition_keys, partition_time_level) =
@@ -375,7 +378,7 @@ pub async fn ingest(
 
             // this is for schema inference at stream level , which avoids locks in case schema
             // changes are frequent within request
-            if CONFIG.common.infer_schema_per_request {
+            if cfg.common.infer_schema_per_request {
                 if let Err(e) = add_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
@@ -478,7 +481,7 @@ pub async fn ingest(
         }
 
         // new flow for schema inference at stream level
-        stream_data.data = if CONFIG.common.infer_schema_per_request {
+        stream_data.data = if cfg.common.infer_schema_per_request {
             process_record(
                 &mut stream_data,
                 &StreamParams {
@@ -563,6 +566,7 @@ async fn process_record(
 ) -> Result<HashMap<String, crate::common::meta::stream::SchemaRecords>, Error> {
     let mut new_stream_buf = HashMap::new();
     let mut trigger: TriggerAlertData = Vec::new();
+    let cfg = get_config();
     for schema_records in stream_data.data.values_mut() {
         // check schema
         let mut timestamp = 0;
@@ -573,7 +577,7 @@ async fn process_record(
                 .map(|record| {
                     let rec = record.as_ref();
                     let rec_ts = rec
-                        .get(&CONFIG.common.column_timestamp)
+                        .get(&cfg.common.column_timestamp)
                         .unwrap()
                         .as_i64()
                         .unwrap();
@@ -583,7 +587,7 @@ async fn process_record(
                     rec.as_object().unwrap()
                 })
                 .collect();
-        if let Err(e) = crate::service::schema::check_for_schema(
+        _ = crate::service::schema::check_for_schema(
             &stream.org_id,
             &stream.stream_name,
             StreamType::Logs,
@@ -591,20 +595,7 @@ async fn process_record(
             records.clone(),
             timestamp,
         )
-        .await
-        {
-            if e.to_string() == get_invalid_schema_start_dt().to_string() {
-                log::error!(
-                    "Invalid schema start_dt detected for stream: {}, start_dt: {}",
-                    stream.stream_name,
-                    timestamp
-                );
-                // discard records
-                continue;
-            } else {
-                return Err(e);
-            }
-        }
+        .await?;
 
         // get schema
         let rec_schema = stream_schema_map
@@ -627,7 +618,7 @@ async fn process_record(
             match cast_to_schema_v1(&mut local_rec, &schema_latest_map) {
                 Ok(_) => {
                     let timestamp: i64 = local_rec
-                        .get(&CONFIG.common.column_timestamp)
+                        .get(&cfg.common.column_timestamp)
                         .unwrap()
                         .as_i64()
                         .unwrap();
@@ -757,7 +748,7 @@ fn add_record_status(
                 action,
                 BulkResponseItem::new(stream_name.clone(), doc_id, value, stream_name),
             );
-            if !CONFIG.common.bulk_api_response_errors_only {
+            if !get_config().common.bulk_api_response_errors_only {
                 bulk_res.items.push(item);
             }
         }

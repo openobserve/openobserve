@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.10.6"
+version = "0.10.7"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -159,7 +159,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
-reportserver.workspace = true
+report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 
@@ -170,10 +170,16 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 expect-test = "1.4"
 base64 = "0.21"
 float-cmp = "0.9"
-async-walkdir = "1.0.0"
 
 [workspace]
-members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto", "src/reportserver"]
+members = [
+  "src/config",
+  "src/infra",
+  "src/ingester",
+  "src/wal",
+  "src/proto",
+  "src/report_server",
+]
 resolver = "2"
 
 [workspace.package]
@@ -187,15 +193,17 @@ infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
-reportserver = { path = "src/reportserver" }
+report_server = { path = "src/report_server" }
 
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.5"
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 anyhow = "1.0"
+arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"
+async-walkdir = "1.0.0"
 aws-config = "0.56.1"
 base64 = "0.21"
 bytes = "1.4"
@@ -209,7 +217,7 @@ cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
 datafusion = "38"
 datafusion-expr = "38"
-arrow = { version = "51.0.0", features = ["ipc_compression"] }
+arrow = { version = "51.0.0", features = ["ipc_compression", "prettyprint"] }
 arrow-json = "51.0.0"
 arrow-schema = { version = "51.0.0", features = ["serde"] }
 parquet = { version = "51.0.0", features = ["arrow", "async", "object_store"] }
@@ -239,7 +247,7 @@ lettre = { version = "0.11", default-features = false, features = [
   "tokio1-rustls-tls",
 ] }
 log = "0.4"
-memchr = "2.5"
+memchr = "2.7"
 murmur3 = "0.5"
 async-nats = "0.35.1"
 once_cell = "1.17"
@@ -284,5 +292,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
-async-walkdir = "1.0.0"
 zstd = "0.13"

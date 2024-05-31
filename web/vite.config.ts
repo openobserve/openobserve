@@ -154,6 +154,11 @@ export default defineConfig({
           if (name.startsWith("o2cs-")) {
             return `assets/vendor/${name}.[hash].js`;
           }
+          
+          if (name.includes("editor.api")) {
+            return `assets/${name}.v1.js`;
+          }
+
           return `assets/${name}.[hash].js`;
         },
       },

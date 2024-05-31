@@ -25,7 +25,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::CONFIG;
+use crate::get_config;
 
 const MAX_LIMIT: usize = 100000;
 const MAX_OFFSET: usize = 100000;
@@ -313,7 +313,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
             Some(expr) => parse_expr_for_field(
                 expr,
                 &SqlOperator::And,
-                &CONFIG.common.column_timestamp,
+                &get_config().common.column_timestamp,
                 &mut fields,
             )?,
             None => {}
@@ -544,7 +544,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     if s == field {
         return true;
     }
-    if field == "*" && s != "_all" && s != CONFIG.common.column_timestamp.clone() {
+    if field == "*" && s != "_all" && s != get_config().common.column_timestamp.clone() {
         return true;
     }
 
@@ -845,6 +845,20 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::Cast { expr, .. } | SqlExpr::TryCast { expr, .. } => {
             get_field_name_from_expr(expr)
         }
+        SqlExpr::Case {
+            operand: _,
+            conditions,
+            results: _,
+            else_result: _,
+        } => {
+            let mut fields = Vec::new();
+            for expr in conditions.iter() {
+                if let Some(v) = get_field_name_from_expr(expr) {
+                    fields.extend(v);
+                }
+            }
+            (!fields.is_empty()).then_some(fields)
+        }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
@@ -1029,6 +1043,14 @@ mod tests {
             (
                 "select _timestamp, message FROM tbl where  (pid='2fs93s' or stream_id='asdf834sdf2') AND str_match(new_message, 'Error')",
                 vec!["_timestamp", "message", "new_message", "pid", "stream_id"],
+            ),
+            (
+                "SELECT COUNT(CASE WHEN k8s_namespace_name IS NULL THEN 0 ELSE 1 END) AS null_count FROM default1",
+                vec!["k8s_namespace_name"],
+            ),
+            (
+                "SELECT COUNT(CASE WHEN k8s_namespace_name IS NULL THEN 0 ELSE 1 END) AS null_count FROM default1 WHERE a=1",
+                vec!["a", "k8s_namespace_name"],
             ),
         ];
         for (sql, fields) in samples {

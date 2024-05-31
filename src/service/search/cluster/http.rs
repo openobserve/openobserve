@@ -195,7 +195,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->result: total: {}, took: {}, scan_size: {}",
+        "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,

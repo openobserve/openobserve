@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
@@ -30,22 +29,23 @@ impl TraceService for TraceServer {
         &self,
         request: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
+        let cfg = config::get_config();
         let metadata = request.metadata().clone();
         let msg = format!(
             "Please specify organization id with header key '{}' ",
-            &CONFIG.grpc.org_header_key
+            &cfg.grpc.org_header_key
         );
-        if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
+        if !metadata.contains_key(&cfg.grpc.org_header_key) {
             return Err(Status::invalid_argument(msg));
         }
 
         let in_req = request.into_inner();
-        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        let org_id = metadata.get(&cfg.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(msg));
         }
 
-        let stream_name = metadata.get(&CONFIG.grpc.stream_header_key);
+        let stream_name = metadata.get(&cfg.grpc.stream_header_key);
         let mut in_stream_name: Option<&str> = None;
         if let Some(stream_name) = stream_name {
             in_stream_name = Some(stream_name.to_str().unwrap());
