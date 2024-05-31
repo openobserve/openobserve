@@ -805,6 +805,27 @@ export default defineComponent({
         }
       }
 
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
+
+      [name, value_for_maps].forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
+
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
       return query;
     };
 
