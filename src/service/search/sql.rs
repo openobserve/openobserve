@@ -337,6 +337,7 @@ impl Sql {
         // Hack offset limit and sort by for sql
         if meta.limit == 0 {
             meta.offset = req_query.from as i64;
+            // If `size` is negative, use the backend's default limit setting
             meta.limit = if req_query.size >= 0 {
                 req_query.size as i64
             } else {
