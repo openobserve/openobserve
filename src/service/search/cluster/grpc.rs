@@ -49,7 +49,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     );
 
     // handle query function
-    let (merge_results, scan_stats, inverted_index_count, _, is_partial) =
+    let (merge_results, scan_stats, _, is_partial) =
         super::search(&trace_id, sql.clone(), req).await?;
 
     // final result
@@ -99,19 +99,12 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
         });
     }
 
-    let inverted_index_total = inverted_index_count.unwrap_or_default() as usize;
-    let total = if inverted_index_total > hits_total {
-        inverted_index_total
-    } else {
-        hits_total
-    };
-
     let result = cluster_rpc::SearchResponse {
         job,
         took: start.elapsed().as_millis() as i32,
         from: sql.meta.offset as i32,
         size: sql.meta.limit as i32,
-        total: total as i64,
+        total: hits_total as i64,
         hits: hits_buf,
         aggs: aggs_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
