@@ -166,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-popup-proxy
                             transition-show="scale"
                             transition-hide="scale"
+                            style="z-index: 10002"
                           >
                             <q-time v-model="selectedTime.startTime">
                               <div class="row items-center justify-end">
@@ -198,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-popup-proxy
                             transition-show="scale"
                             transition-hide="scale"
+                            style="z-index: 10002"
                           >
                             <q-time v-model="selectedTime.endTime">
                               <div class="row items-center justify-end">
