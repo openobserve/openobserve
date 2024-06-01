@@ -582,4 +582,54 @@ mod test {
 +---------+------+----------+"
         );
     }
+
+    #[tokio::test]
+    async fn test_format_recordbatch_by_schema_with_empty_schema() {
+        // Create a sample schema
+        let schema = Arc::new(Schema::empty());
+
+        // Create a sample schema
+        let record_schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Utf8, false),
+            Field::new("city", DataType::Utf8, true),
+        ]));
+
+        // Create a sample record batch
+        let name = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
+        let age = StringArray::from(vec!["25", "30", "35"]);
+        let city = StringArray::from(vec!["New York", "London", "Paris"]);
+        let record_batch = RecordBatch::try_new(
+            record_schema.clone(),
+            vec![
+                Arc::new(name.clone()) as ArrayRef,
+                Arc::new(age.clone()) as ArrayRef,
+                Arc::new(city.clone()) as ArrayRef,
+            ],
+        )
+        .unwrap();
+
+        // Format the record batch by the schema
+        let formatted_batch = format_recordbatch_by_schema(schema.clone(), record_batch);
+
+        // Assert that the formatted batch has the same schema as the input schema
+        assert_eq!(formatted_batch.schema(), record_schema);
+
+        // Assert that the formatted batch has the same number of rows as the input batch
+        assert_eq!(formatted_batch.num_rows(), 3);
+
+        // Assert that the formatted batch has the same data as the input batch
+        assert_eq!(
+            pretty_format_batches(&[formatted_batch])
+                .unwrap()
+                .to_string(),
+            "+---------+-----+----------+
+| name    | age | city     |
++---------+-----+----------+
+| Alice   | 25  | New York |
+| Bob     | 30  | London   |
+| Charlie | 35  | Paris    |
++---------+-----+----------+"
+        );
+    }
 }
