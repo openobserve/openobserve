@@ -216,7 +216,7 @@ pub fn convert_json_to_record_batch(
 }
 
 pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
-    if schema.fields() == batch.schema().fields() {
+    if schema.fields().is_empty() || schema.fields() == batch.schema().fields() {
         return batch;
     }
     let records_len = batch.num_rows();
