@@ -308,7 +308,7 @@ export const usePanelDataLoader = (
                     sql_mode: "full",
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
-                    size: 0,
+                    size: -1,
                   },
                 },
                 page_type: pageType,

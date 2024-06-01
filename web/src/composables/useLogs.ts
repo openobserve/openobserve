@@ -1804,7 +1804,7 @@ const useLogs = () => {
         searchObj.data.histogram.errorCode = 0;
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
-        queryReq.query.size = 0;
+        queryReq.query.size = -1;
         const parsedSQL: any = fnParsedSQL();
 
         // let hasAggregationFlag = false;
