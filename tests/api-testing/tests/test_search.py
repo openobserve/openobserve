@@ -370,7 +370,7 @@ def test_e2e_matchallcount(create_session, base_url):
                         "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
                         "start_time": one_min_ago,
                         "end_time": end_time,
-                        "size": 0,
+                        "size": -1,
                         "track_total_hits": True,
                 },
             }
@@ -379,7 +379,7 @@ def test_e2e_matchallcount(create_session, base_url):
                         "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
                         "start_time": one_min_ago,
                         "end_time": end_time,
-                        "size": 0,
+                        "size": -1,
                         "track_total_hits": True,
                 },
             }

@@ -146,9 +146,9 @@ pub async fn search(
 
         // fast_mode is for 1st page optimization
         //  1. single WHERE clause of `match_all()`
-        //  2. size != 0 => paginated
+        //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
         let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
-            && idx_req.query.as_ref().unwrap().size != 0);
+            && idx_req.query.as_ref().unwrap().size > 0);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
