@@ -1043,11 +1043,17 @@ pub async fn convert_parquet_file(
 }
 
 pub async fn merge_parquet_files(
-    trace_id: &str,
+    work_dir: &str,
     stream_type: StreamType,
     stream_name: &str,
     schema: Arc<Schema>,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
+    let work_dir = std::path::Path::new(work_dir)
+        .to_path_buf()
+        .canonicalize()?
+        .to_string_lossy()
+        .to_string();
+    println!("merge_parquet_files -> work_dir: {}", work_dir);
     let start = std::time::Instant::now();
     let cfg = get_config();
     // Configure listing options
@@ -1055,7 +1061,7 @@ pub async fn merge_parquet_files(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(cfg.limit.cpu_num);
-    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
+    let prefix = ListingTableUrl::parse(work_dir)?;
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
         .with_schema(schema.clone());

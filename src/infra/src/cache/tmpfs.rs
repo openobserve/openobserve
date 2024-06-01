@@ -21,7 +21,7 @@ use parking_lot::RwLock;
 
 use crate::errors::*;
 
-const CAP_LEN: usize = 10240;
+const CAP_LEN: usize = 64;
 
 static FILES: Lazy<RwLock<HashMap<String, File>>> =
     Lazy::new(|| RwLock::new(HashMap::with_capacity(CAP_LEN)));
