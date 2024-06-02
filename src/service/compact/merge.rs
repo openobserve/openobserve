@@ -575,6 +575,13 @@ pub async fn merge_files(
         return Ok((String::from(""), FileMeta::default(), retain_file_list));
     }
 
+    log::info!(
+        "[COMPACT:{thread_id}] merge small files: {}, total size: {}, total records: {}, checking schema...",
+        new_file_list.len(),
+        new_file_size,
+        total_records
+    );
+
     // get time range for these files
     let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
     let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
@@ -657,6 +664,11 @@ pub async fn merge_files(
                 }
                 return Err(anyhow::anyhow!("merge_files error: file data is empty"));
             }
+            log::info!(
+                "[COMPACT:{thread_id}] convert file: {}, schema version: {}",
+                &file.key,
+                schema_ver_id
+            );
             file_tmp_dir.set(&file.key, file_data)?;
             datafusion::exec::convert_parquet_file(
                 file_tmp_dir.name(),
@@ -689,6 +701,13 @@ pub async fn merge_files(
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }
+
+    log::info!(
+        "[COMPACT:{thread_id}] merge small files: {}, total size: {}, total records: {}, starting merge...",
+        new_file_list.len(),
+        new_file_size,
+        total_records
+    );
 
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {

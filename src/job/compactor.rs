@@ -63,7 +63,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             &msg.files,
                         )
                         .await;
-                        time::sleep(time::Duration::from_millis(10)).await;
+                        time::sleep(time::Duration::from_secs(10)).await;
                         match ret {
                             Ok((file, meta, _)) => {
                                 if let Err(e) = tx
