@@ -23,7 +23,7 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config, ider,
+    cluster, get_config,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     metrics,
     utils::{
@@ -41,9 +41,8 @@ use config::{
 };
 use datafusion::{datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
-use infra::{schema::SchemaCache, storage};
+use infra::{cache::tmpfs, schema::SchemaCache, storage};
 use ingester::WAL_PARQUET_METADATA;
-use object_store::ObjectStore;
 use once_cell::sync::Lazy;
 use tokio::{
     sync::{Mutex, RwLock},
@@ -501,9 +500,7 @@ async fn merge_files(
     let mut retain_file_list = new_file_list.clone();
 
     // write parquet files into tmpfs
-    let tmp_dir = format!("{}merge/{}/", cfg.common.data_cache_dir, ider::uuid());
-    std::fs::create_dir_all(&tmp_dir)?;
-    let tmp_fs = storage::local::Local::new(&tmp_dir, false);
+    let tmp_dir = tmpfs::Directory::default();
     for file in retain_file_list.iter_mut() {
         log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
         let data = match get_file_contents(&wal_dir.join(&file.key)).await {
@@ -525,7 +522,7 @@ async fn merge_files(
         };
         let file_size = data.len();
         file.meta.compressed_size = file_size as i64;
-        tmp_fs.put(&file.key.clone().into(), data.into()).await?;
+        tmp_dir.set(&file.key, data.into())?;
     }
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
@@ -585,7 +582,7 @@ async fn merge_files(
     let merge_result = if single_file {
         move_single_file(
             thread_id,
-            &tmp_dir,
+            tmp_dir.name(),
             file,
             stream_type,
             &stream_name,
@@ -593,15 +590,11 @@ async fn merge_files(
         )
         .await
     } else if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, &tmp_dir, schema.clone()).await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
     } else {
-        merge_parquet_files_by_datafusion(&tmp_dir, stream_type, &stream_name, schema.clone()).await
+        merge_parquet_files_by_datafusion(tmp_dir.name(), stream_type, &stream_name, schema.clone())
+            .await
     };
-
-    // delete tmpfs
-    std::fs::remove_dir_all(&tmp_dir)?;
-    drop(tmp_fs);
-
     let (new_schema, new_batches) = match merge_result {
         Ok(v) => v,
         Err(e) => {
@@ -893,14 +886,13 @@ async fn prepare_index_record_batches(
 #[allow(clippy::too_many_arguments)]
 async fn move_single_file(
     thread_id: usize,
-    work_dir: &str,
+    trace_id: &str,
     file: &FileKey,
     stream_type: StreamType,
     stream_name: &str,
     buf: &mut Vec<u8>,
 ) -> datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
-    let work_fs = storage::local::Local::new(work_dir, false);
-    let data = work_fs.get(&file.key.clone().into()).await.map_err(|e| {
+    let data = tmpfs::get(format!("{trace_id}/{}", &file.key).as_str()).map_err(|e| {
         log::error!(
             "[INGESTER:JOB:{thread_id}] merge small file: {}, err: {}",
             file.key,
@@ -908,14 +900,14 @@ async fn move_single_file(
         );
         datafusion::error::DataFusionError::Execution(e.to_string())
     })?;
-    let file_data = data.bytes().await?;
 
     // copy data to buf
-    buf.extend_from_slice(&file_data);
+    buf.extend_from_slice(&data);
 
-    read_recordbatch_from_bytes(&file_data).await.map_err(|e| {
+    read_recordbatch_from_bytes(&data).await.map_err(|e| {
         log::error!(
-            "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for stream -> '{}/{}'",
+            "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for stream -> '{}/{}/{}'",
+            trace_id,
             stream_type,
             stream_name
         );
