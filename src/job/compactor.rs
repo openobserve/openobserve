@@ -54,7 +54,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((tx, msg)) => {
-                        let ret = compact::merge::merge_files(
+                        match compact::merge::merge_files(
                             thread_id,
                             &msg.org_id,
                             msg.stream_type,
@@ -62,8 +62,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             &msg.prefix,
                             &msg.files,
                         )
-                        .await;
-                        match ret {
+                        .await
+                        {
                             Ok((file, meta, _)) => {
                                 if let Err(e) = tx
                                     .send(Ok((msg.batch_id, FileKey::new(&file, meta, false))))
