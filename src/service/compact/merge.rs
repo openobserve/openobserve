@@ -29,7 +29,7 @@ use config::{
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::format_recordbatch_by_schema,
+        record_batch_ext::{concat_batches, format_recordbatch_by_schema},
     },
     FILE_EXT_PARQUET,
 };
@@ -1072,19 +1072,20 @@ pub async fn merge_parquet_files(
         .list(None)
         .map_ok(|meta| meta.location.to_string())
         .try_collect::<Vec<String>>()
-        .await.map_err(|e| {
-        log::error!(
-            "[INGESTER:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
-            e
-        );
-        DataFusionError::Execution(e.to_string())
-    })?;
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[MERGE:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
+                e
+            );
+            DataFusionError::Execution(e.to_string())
+        })?;
 
     let mut record_batches = Vec::new();
     for file in temp_files {
         let file_data = work_fs.get(&file.clone().into()).await.map_err(|e| {
             log::error!(
-                "[INGESTER:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
+                "[MERGE:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
                 e
             );
             DataFusionError::Execution(e.to_string())
@@ -1092,9 +1093,9 @@ pub async fn merge_parquet_files(
         let file_data = file_data.bytes().await?;
 
         let (_, batches) = read_recordbatch_from_bytes(&file_data).await.map_err(|e| {
-            log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
+            log::error!("[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error");
             log::error!(
-                "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {file}, err: {e}"
+                "[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {file}, err: {e}"
             );
             DataFusionError::Execution(e.to_string())
         })?;
@@ -1108,7 +1109,7 @@ pub async fn merge_parquet_files(
         .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
-    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
+    let mut concatenated_record_batch = concat_batches(schema.clone(), record_batches)?;
 
     // 3. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
@@ -1116,7 +1117,7 @@ pub async fn merge_parquet_files(
             .column_by_name(&get_config().common.column_timestamp)
             .ok_or_else(|| {
                 log::error!(
-                    "[INGESTER:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
+                    "[MERGE:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
                 );
                 DataFusionError::Execution(
                     "No _timestamp column found in merged record batch".to_string(),
@@ -1129,17 +1130,28 @@ pub async fn merge_parquet_files(
         None,
     )?;
 
-    let sorted_columns = concatenated_record_batch
-        .columns()
-        .iter()
-        .map(|c| arrow::compute::take(c, &sort_indices, None))
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+    // let sorted_columns = concatenated_record_batch
+    //     .columns()
+    //     .into_iter()
+    //     .map(|c| arrow::compute::take(c, &sort_indices, None))
+    //     .collect::<std::result::Result<Vec<_>, _>>()?;
+    let batch_columns_len = concatenated_record_batch.columns().len();
+    let mut sorted_columns = Vec::with_capacity(batch_columns_len);
+    for i in 0..batch_columns_len {
+        let i = i - sorted_columns.len();
+        let sorted_column = arrow::compute::take(
+            &concatenated_record_batch.remove_column(i),
+            &sort_indices,
+            None,
+        )?;
+        sorted_columns.push(sorted_column);
+    }
 
     let final_record_batch = RecordBatch::try_new(schema.clone(), sorted_columns)?;
     let schema = final_record_batch.schema();
 
     log::info!(
-        "merge_parquet_files took {} ms",
+        "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
