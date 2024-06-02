@@ -537,7 +537,8 @@ pub async fn merge_files(
     let retain_file_list = new_file_list.clone();
 
     // write parquet files into tmpfs
-    let tmp_dir = format!("{}/{}/", cfg.common.data_cache_dir, ider::uuid());
+    let tmp_dir = format!("{}merge/{}/", cfg.common.data_cache_dir, ider::uuid());
+    std::fs::create_dir_all(&tmp_dir)?;
     let tmp_fs = storage::local::Local::new(&tmp_dir, false);
     let mut fi = 0;
     for file in new_file_list.iter() {

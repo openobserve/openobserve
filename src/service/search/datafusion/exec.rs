@@ -1061,7 +1061,7 @@ pub async fn merge_parquet_files(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(cfg.limit.cpu_num);
-    let prefix = ListingTableUrl::parse(work_dir)?;
+    let prefix = ListingTableUrl::parse(format!("file:///{work_dir}/"))?;
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
