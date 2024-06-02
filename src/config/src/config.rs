@@ -949,7 +949,7 @@ pub struct Nats {
     pub password: String,
     #[env_config(name = "ZO_NATS_REPLICAS", default = 3)]
     pub replicas: usize,
-    #[env_config(name = "ZO_NATS_HISTORY", default = 1)]
+    #[env_config(name = "ZO_NATS_HISTORY", default = 3)]
     pub history: i64,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
