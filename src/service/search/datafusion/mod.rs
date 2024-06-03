@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,7 @@ pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
 /// The name of the not_regex_match UDF given to DataFusion.
 pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 
-pub const DEFAULT_FUNCTIONS: [ZoFunction; 8] = [
+pub const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
     ZoFunction {
         name: "match_all_raw",
         text: "match_all_raw('v')",
@@ -70,16 +70,12 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 8] = [
         text: "match_all('v')",
     },
     ZoFunction {
-        name: "match_all_ignore_case",
-        text: "match_all_ignore_case('v')",
-    },
-    ZoFunction {
         name: MATCH_UDF_NAME,
-        text: "match_all_raw('v')",
+        text: "match_all('v')",
     },
     ZoFunction {
         name: MATCH_UDF_IGNORE_CASE_NAME,
-        text: "match_all_raw_ignore_case('v')",
+        text: "match_all_ignore_case('v')",
     },
     ZoFunction {
         name: REGEX_MATCH_UDF_NAME,

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{utils::rand::get_rand_element, RwAHashMap, CONFIG};
+use config::{utils::rand::get_rand_element, RwAHashMap};
 use once_cell::sync::Lazy;
 use tonic::{transport::Channel, Status};
 
@@ -37,7 +37,9 @@ pub(crate) async fn get_ingester_channel() -> Result<Channel, tonic::Status> {
     // cache miss, connect to ingester
     let channel = Channel::from_shared(grpc_addr.clone())
         .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+        .connect_timeout(std::time::Duration::from_secs(
+            config::get_config().grpc.connect_timeout,
+        ))
         .connect()
         .await
         .map_err(|err| {
@@ -56,12 +58,13 @@ pub(crate) async fn get_ingester_channel() -> Result<Channel, tonic::Status> {
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
+    let cfg = config::get_config();
     let nodes = cluster::get_cached_online_ingester_nodes().await;
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        if !CONFIG.route.ingester_srv_url.is_empty() {
+        if !cfg.route.ingester_srv_url.is_empty() {
             Ok(format!(
                 "http://{}:{}",
-                CONFIG.route.ingester_srv_url, CONFIG.grpc.port
+                cfg.route.ingester_srv_url, cfg.grpc.port
             ))
         } else {
             Err(tonic::Status::internal(

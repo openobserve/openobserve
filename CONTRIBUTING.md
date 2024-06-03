@@ -6,7 +6,7 @@
 
 OpenObserve uses Rust & embdeds sled db (For server) & VueJS (For Web UI)
 
-You must have follwing installed:
+You must have following installed:
 
 1. Git
 2. Rust & Cargo 1.70+
@@ -89,7 +89,7 @@ environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used f
 
 ### UI
 
-If not alredy present create .env file in web directory & set VITE_OPENOBSERVE_ENDPOINT=http://localhost:5080
+If not already present create .env file in web directory & set VITE_OPENOBSERVE_ENDPOINT=http://localhost:5080
 
 ```shell
 cd web
@@ -136,7 +136,7 @@ We check for following in CI pipeline for any pull requests.
    - Run `cargo llvm-cov --lcov --output-path lcov.info` to generate report and use [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) with VS code for visualizing code coverage.
    - You can also generate html report by using `cargo llvm-cov --html` to generate html report in target/debug/llvm-cov/html/index.html
 1. Linting in Javascript for GUI
-   - We run eslint for javacript anf any linting failures will result in build failures.
+   - We run eslint for javascript anf any linting failures will result in build failures.
    - You can test for linting failures by running `./eslint.sh` in web folder.
 
 ## How to contribute code

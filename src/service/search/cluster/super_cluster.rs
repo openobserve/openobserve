@@ -162,12 +162,6 @@ pub async fn search(
         None => result.hits.len(),
     };
     result.aggs.remove("_count");
-    // ingester total
-    let _ingester_total = match result.aggs.get("ingester_count") {
-        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => result.hits.len(),
-    };
-    result.aggs.remove("ingester_count");
 
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);
@@ -190,7 +184,7 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->result: total: {}, took: {}, scan_size: {}",
+        "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,

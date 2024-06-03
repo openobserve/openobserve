@@ -24,12 +24,11 @@ use utoipa::ToSchema;
 
 use super::usage::Stats;
 use crate::{
+    get_config,
     utils::{
         hash::{gxhash, Sum64},
-        json,
-        json::{Map, Value},
+        json::{self, Map, Value},
     },
-    CONFIG,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
@@ -108,6 +107,7 @@ pub struct FileMeta {
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
+    pub flattened: bool,
 }
 
 impl FileMeta {
@@ -149,6 +149,7 @@ impl TryFrom<&[u8]> for FileMeta {
             records,
             original_size,
             compressed_size,
+            flattened: false,
         })
     }
 }
@@ -223,7 +224,7 @@ impl StreamStats {
 
     fn time_range(&self) -> (i64, i64) {
         assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval = Duration::try_seconds(CONFIG.limit.file_push_interval as _)
+        let file_push_interval = Duration::try_seconds(get_config().limit.file_push_interval as _)
             .unwrap()
             .num_microseconds()
             .unwrap();
@@ -339,6 +340,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             records: req.records,
             original_size: req.original_size,
             compressed_size: req.compressed_size,
+            flattened: false,
         }
     }
 }
@@ -743,6 +745,7 @@ mod tests {
             records: 300,
             original_size: 10,
             compressed_size: 1,
+            flattened: false,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
@@ -750,6 +753,7 @@ mod tests {
         assert_eq!(file_meta, resp);
     }
 
+    #[cfg(feature = "gxhash")]
     #[test]
     fn test_hash_partition() {
         let part = StreamPartition::new("field");
@@ -776,5 +780,34 @@ mod tests {
         assert_eq!(part.get_partition_key("test1"), "field=21");
         assert_eq!(part.get_partition_key("test2"), "field=18");
         assert_eq!(part.get_partition_key("test3"), "field=6");
+    }
+
+    #[cfg(not(feature = "gxhash"))]
+    #[test]
+    fn test_hash_partition() {
+        let part = StreamPartition::new("field");
+        assert_eq!(
+            json::to_string(&part).unwrap(),
+            r#"{"field":"field","types":"value","disabled":false}"#
+        );
+        let part = StreamPartition::new_hash("field", 32);
+        assert_eq!(
+            json::to_string(&part).unwrap(),
+            r#"{"field":"field","types":{"hash":32},"disabled":false}"#
+        );
+
+        for key in &[
+            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
+        ] {
+            println!("{}: {}", key, part.get_partition_key(key));
+        }
+        assert_eq!(part.get_partition_key("hello"), "field=30");
+        assert_eq!(part.get_partition_key("world"), "field=20");
+        assert_eq!(part.get_partition_key("foo"), "field=26");
+        assert_eq!(part.get_partition_key("bar"), "field=7");
+        assert_eq!(part.get_partition_key("test"), "field=13");
+        assert_eq!(part.get_partition_key("test1"), "field=25");
+        assert_eq!(part.get_partition_key("test2"), "field=4");
+        assert_eq!(part.get_partition_key("test3"), "field=2");
     }
 }

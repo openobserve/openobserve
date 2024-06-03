@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{utils::hash::Sum32, CONFIG};
+use config::utils::hash::Sum64;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -31,13 +31,14 @@ use crate::errors::*;
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(connect);
 
 fn connect() -> Pool<Postgres> {
-    let db_opts = PgConnectOptions::from_str(&CONFIG.common.meta_postgres_dsn)
+    let cfg = config::get_config();
+    let db_opts = PgConnectOptions::from_str(&cfg.common.meta_postgres_dsn)
         .expect("postgres connect options create failed")
         .disable_statement_logging();
 
     PgPoolOptions::new()
-        .min_connections(CONFIG.limit.sql_min_db_connections)
-        .max_connections(CONFIG.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_min_db_connections)
+        .max_connections(cfg.limit.sql_max_db_connections)
         .connect_lazy_with(db_opts)
 }
 
@@ -162,8 +163,8 @@ impl super::Db for PostgresDb {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = format!("get_for_update_{}", key);
-        let lock_id = config::utils::hash::gxhash::new().sum32(&lock_key);
-        let lock_sql = format!("SELECT pg_advisory_xact_lock({})", lock_id as i64);
+        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {
                 log::error!("[POSTGRES] rollback get_for_update error: {}", e);

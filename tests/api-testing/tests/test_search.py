@@ -181,16 +181,11 @@ def test_e2e_matchallhistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw(\'provide_credentials\')',
+            "sql": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from stream_pytest_data WHERE match_all_raw(\'provide_credentials\') GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": one_min_ago,
             "end_time": end_time,
-            "from": 0,
             "size": 0,
-            "quick_mode": True,
-            "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
+            "sql_mode":"full"
         }
 } 
 
@@ -263,46 +258,6 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
 
 
-def test_e2e_matchallindexedignorecasehistogram(create_session, base_url):
-    """Running an E2E test for valid match all histogram query."""
-
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_ignore_case(\'provide_credentials\')',
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 0,
-            "quick_mode": True,
-            "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
-        }
-} 
-
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-
-    # print(resp_get_allalerts.content)
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-
-    response_data = resp_get_allsearch.json()
-
-    # In histogram type queries, there should be no hits.
-    assert(len(response_data.get("hits")) == 0 )
-
-    # In histogram type queries, there should be agg.histogram type keys.
-    assert len(response_data.get("aggs", {}).get("histogram")) != 0
- 
-
 def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
     """Running an E2E test for valid match all histogram query."""
 
@@ -335,38 +290,6 @@ def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_ur
         resp_get_allsearch.status_code == 500
     ), f"histogram mode added 500, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
-
-def test_e2e_matchallindexedignorecaseinvalidsearchfeild(create_session, base_url):
-    """Running an E2E test for valid match all histogram query."""
-
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_ignore_case('')',
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 0,
-            "quick_mode": True,
-            "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
-        }
-} 
-
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-
-    # print(resp_get_allalerts.content)
-    assert (
-        resp_get_allsearch.status_code == 500
-    ), f"histogram mode added 500, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 def test_e2e_matchallsql(create_session, base_url):
     """Running an E2E test for valid sql query."""
@@ -433,7 +356,7 @@ def test_e2e_matchallindexedsql(create_session, base_url):
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_matchallindexedignorecasesql(create_session, base_url):
+def test_e2e_matchallcount(create_session, base_url):
     """Running an E2E test for valid sql query."""
 
     session = create_session
@@ -442,33 +365,38 @@ def test_e2e_matchallindexedignorecasesql(create_session, base_url):
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    json_data = {
+    json_data1 = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_ignore_case(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
                         "start_time": one_min_ago,
                         "end_time": end_time,
-                        "from": 0,
-                        "size": 150,
-                        "sql_mode": "full",
+                        "size": -1,
+                        "track_total_hits": True,
+                },
+            }
+    json_data2 = {
+                "query": {
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
+                        "start_time": one_min_ago,
+                        "end_time": end_time,
+                        "size": -1,
+                        "track_total_hits": True,
                 },
             }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_allsearch1 = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data1)
+    resp_get_allsearch2 = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data2)
     assert (
-        resp_get_allsearch.status_code == 200
-    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    response_data = resp_get_allsearch.json()
-        
+        resp_get_allsearch1.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch1.status_code} {resp_get_allsearch1.content}"
+    assert (
+        resp_get_allsearch2.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch2.status_code} {resp_get_allsearch2.content}"
+    response_data1 = resp_get_allsearch1.json()
+    response_data2 = resp_get_allsearch2.json()
 
-    log_messages = [hit['log'] for hit in response_data.get('hits', [])]
-   
-        
-        # Asserting that at least one log message contains 'provide_credentials'
-    assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
-   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    # Asserting the counts match
+    assert response_data1.get('total') == response_data2.get('total')
 
 
 def test_e2e_matchallignorecasesql(create_session, base_url):

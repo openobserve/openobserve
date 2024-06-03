@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,9 +18,8 @@ use std::net::IpAddr;
 use once_cell::sync::Lazy;
 
 use crate::{
-    ider,
+    get_config, ider,
     meta::cluster::{NodeStatus, Role},
-    CONFIG,
 };
 
 pub static mut LOCAL_NODE_ID: i32 = 0;
@@ -36,8 +35,9 @@ pub fn load_local_node_uuid() -> String {
 
 #[inline(always)]
 pub fn get_local_http_ip() -> String {
-    if !CONFIG.http.addr.is_empty() {
-        CONFIG.http.addr.clone()
+    let cfg = get_config();
+    if !cfg.http.addr.is_empty() {
+        cfg.http.addr.clone()
     } else {
         get_local_node_ip()
     }
@@ -45,8 +45,9 @@ pub fn get_local_http_ip() -> String {
 
 #[inline(always)]
 pub fn get_local_grpc_ip() -> String {
-    if !CONFIG.grpc.addr.is_empty() {
-        CONFIG.grpc.addr.clone()
+    let cfg = get_config();
+    if !cfg.grpc.addr.is_empty() {
+        cfg.grpc.addr.clone()
     } else {
         get_local_node_ip()
     }
@@ -64,7 +65,7 @@ pub fn get_local_node_ip() -> String {
 
 #[inline(always)]
 pub fn load_local_node_role() -> Vec<Role> {
-    CONFIG
+    get_config()
         .common
         .node_role
         .clone()
@@ -86,6 +87,11 @@ pub fn is_querier(role: &[Role]) -> bool {
 #[inline(always)]
 pub fn is_compactor(role: &[Role]) -> bool {
     role.contains(&Role::Compactor) || role.contains(&Role::All)
+}
+
+#[inline(always)]
+pub fn is_flatten_compactor(role: &[Role]) -> bool {
+    role.contains(&Role::FlattenCompactor) || role.contains(&Role::All)
 }
 
 #[inline(always)]
@@ -124,7 +130,7 @@ mod tests {
         assert_eq!(parse("alertmanager"), Role::AlertManager);
         assert_eq!(parse("alertManager"), Role::AlertManager);
         assert_eq!(parse("AlertManager"), Role::AlertManager);
-        assert!("alert_manager".parse::<Role>().is_err());
+        assert!("alert_manager".parse::<Role>().is_ok());
     }
 
     #[test]

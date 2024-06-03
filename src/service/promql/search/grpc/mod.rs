@@ -19,7 +19,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use config::CONFIG;
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use infra::{cache::tmpfs, errors::Result};
 use promql_parser::parser;
@@ -97,7 +96,7 @@ pub async fn search(
     let timeout = if req.timeout > 0 {
         req.timeout as u64
     } else {
-        CONFIG.limit.query_timeout
+        config::get_config().limit.query_timeout
     };
 
     let mut engine = Query::new(

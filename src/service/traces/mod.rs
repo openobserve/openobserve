@@ -19,14 +19,14 @@ use actix_web::{http, HttpResponse};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    cluster, get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamPartition, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    CONFIG, DISTINCT_FIELDS,
+    DISTINCT_FIELDS,
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use opentelemetry::trace::{SpanId, TraceId};
@@ -84,7 +84,9 @@ pub async fn handle_trace_request(
         );
     }
 
-    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
             format!("Quota exceeded for this organization [{}]", org_id),
@@ -119,9 +121,11 @@ pub async fn handle_trace_request(
     )
     .await;
 
+    let cfg = get_config();
+
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
-        PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str());
+        PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
     if stream_schema.has_partition_keys {
         let partition_det = crate::service::ingestion::get_stream_partition_keys(
             org_id,
@@ -159,7 +163,7 @@ pub async fn handle_trace_request(
 
     let mut trigger: Option<TriggerAlertData> = None;
 
-    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
 
@@ -288,7 +292,7 @@ pub async fn handle_trace_request(
                 };
 
                 record_val.insert(
-                    CONFIG.common.column_timestamp.clone(),
+                    cfg.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 

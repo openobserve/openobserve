@@ -50,7 +50,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (merge_batches, scan_stats, inverted_index_count, took_wait, is_partial) =
+    let (merge_batches, scan_stats, took_wait, is_partial) =
         super::search(&trace_id, sql.clone(), req).await?;
 
     // final result
@@ -156,26 +156,8 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         None => result.hits.len(),
     };
     result.aggs.remove("_count");
-    // ingester total
-    let ingester_total = match result.aggs.get("ingester_count") {
-        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => 0,
-    };
-    result.aggs.remove("ingester_count");
 
-    let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
-    // TODO: ingester mixed with querier will has problem.
-    let inverted_index_total = inverted_index_count + ingester_total;
-    log::info!("response_total: {}", total);
-    log::info!("ingester_total: {}", ingester_total);
-    log::info!("inverted_index_count: {}", inverted_index_count);
-
-    // Maybe inverted index count is wrong, we use the max value
-    if inverted_index_total > total {
-        result.set_total(inverted_index_total);
-    } else {
-        result.set_total(total);
-    }
+    result.set_total(total);
     result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
@@ -195,7 +177,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->result: total: {}, took: {}, scan_size: {}",
+        "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,

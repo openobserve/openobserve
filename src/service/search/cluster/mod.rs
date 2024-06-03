@@ -19,6 +19,7 @@ use ::datafusion::arrow::{datatypes::Schema, ipc, record_batch::RecordBatch};
 use async_recursion::async_recursion;
 use config::{
     cluster::{is_ingester, is_querier},
+    get_config,
     meta::{
         cluster::{Node, Role},
         search::{self, ScanStats},
@@ -27,7 +28,7 @@ use config::{
         },
     },
     utils::json,
-    CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
+    DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -37,7 +38,12 @@ use infra::{
 };
 use itertools::Itertools;
 use proto::cluster_rpc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{
+    codec::CompressionEncoding,
+    metadata::{MetadataKey, MetadataValue},
+    transport::Channel,
+    Request,
+};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -58,15 +64,10 @@ pub async fn search(
     trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut req: cluster_rpc::SearchRequest,
-) -> Result<(
-    HashMap<String, Vec<RecordBatch>>,
-    ScanStats,
-    Option<u64>,
-    usize,
-    bool,
-)> {
+) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, usize, bool)> {
     let start = std::time::Instant::now();
 
+    let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
 
@@ -97,7 +98,7 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = !meta.fts_terms.is_empty();
+    let is_inverted_index = cfg.common.inverted_index_enabled && !meta.fts_terms.is_empty();
 
     log::info!(
         "[trace_id {trace_id}] search: is_agg_query {:?} is_inverted_index {:?}",
@@ -111,7 +112,7 @@ pub async fn search(
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // If the query is of type inverted index and this is not an aggregations request
-    let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {
+    let file_list = if is_inverted_index && req.aggs.is_empty() {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -120,7 +121,7 @@ pub async fn search(
             .iter()
             .flat_map(|t| {
                 let mut tokenized_search_terms = vec![];
-                t.split(|c| CONFIG.common.inverted_index_split_chars.contains(c))
+                t.split(|c| cfg.common.inverted_index_split_chars.contains(c))
                     .for_each(|s| {
                         let s = s.trim_matches(|c| DEFAULT_INDEX_TRIM_CHARS.contains(c));
                         if !s.is_empty() && s.len() >= INDEX_MIN_CHAR_LEN {
@@ -143,7 +144,11 @@ pub async fn search(
             meta.stream_name, search_condition
         );
 
-        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        // fast_mode is for 1st page optimization
+        //  1. single WHERE clause of `match_all()`
+        //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
+        let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+            && idx_req.query.as_ref().unwrap().size > 0);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -156,22 +161,21 @@ pub async fn search(
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = http::search(idx_req).await?;
-        let (unique_files, inverted_index_count) = if is_first_page {
-            // should be query size * 2
-            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+        // get deleted file
+        let deleted_files = idx_resp
+            .hits
+            .iter()
+            .filter_map(|hit| {
+                if hit.get("deleted").unwrap().as_bool().unwrap() {
+                    Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>();
+        let unique_files = if fast_mode {
+            let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
             let mut total_count = 0;
-            // get deleted file
-            let deleted_files = idx_resp
-                .hits
-                .iter()
-                .filter_map(|hit| {
-                    if hit.get("deleted").unwrap().as_bool().unwrap() {
-                        Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
             let sorted_data = idx_resp
                 .hits
                 .iter()
@@ -206,22 +210,21 @@ pub async fn search(
                     }
                 }
             }
-            (
-                term_map
-                    .into_iter()
-                    .flat_map(|(_, filenames)| filenames)
-                    .collect::<HashSet<_>>(),
-                Some(total_count),
-            )
+            term_map
+                .into_iter()
+                .flat_map(|(_, filenames)| filenames)
+                .collect::<HashSet<_>>()
         } else {
-            (
-                idx_resp
-                    .hits
-                    .iter()
-                    .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    .collect::<HashSet<_>>(),
-                None,
-            )
+            idx_resp
+                .hits
+                .iter()
+                .filter_map(|hit| {
+                    hit.get("file_name")
+                        .and_then(|value| value.as_str())
+                        .filter(|&name| !deleted_files.contains(name))
+                        .map(String::from)
+                })
+                .collect::<HashSet<_>>()
         };
 
         let mut idx_file_list: Vec<FileKey> = vec![];
@@ -240,24 +243,21 @@ pub async fn search(
         }
         // sorted by _timestamp
         idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-        (idx_file_list, inverted_index_count)
+        idx_file_list
     } else {
-        (
-            get_file_list(
-                trace_id,
-                &meta,
-                stream_type,
-                partition_time_level,
-                &stream_settings.partition_keys,
-            )
-            .await,
-            None,
+        get_file_list(
+            trace_id,
+            &meta,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
         )
+        .await
     };
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {}",
+        "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {} ms",
         meta.meta.time_range,
         file_list.len(),
         file_list_took,
@@ -278,7 +278,7 @@ pub async fn search(
 
     let locker_key = "/search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
-    let locker = if CONFIG.common.local_mode || !CONFIG.common.feature_query_queue_enabled {
+    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
         dist_lock::lock(&locker_key, 0).await?
@@ -308,7 +308,7 @@ pub async fn search(
     dist_lock::unlock(&locker).await?;
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
-        "[trace_id {trace_id}] search: wait in queue took: {}",
+        "[trace_id {trace_id}] search: wait in queue took: {} ms",
         took_wait,
     );
 
@@ -318,8 +318,8 @@ pub async fn search(
     let mut partition_files = Vec::new();
     let mut file_num = file_list.len();
     let mut partition_strategy =
-        QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy);
-    if CONFIG.memory_cache.cache_latest_files {
+        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    if cfg.memory_cache.cache_latest_files {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
     let offset = match partition_strategy {
@@ -451,12 +451,13 @@ pub async fn search(
 
         let task = tokio::task::spawn(
             async move {
+                let cfg = config::get_config();
                 let org_id: MetadataValue<_> = req
                     .org_id
                     .parse()
                     .map_err(|_| Error::Message("invalid org_id".to_string()))?;
                 let mut request = tonic::Request::new(req);
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -467,12 +468,17 @@ pub async fn search(
 
                 log::info!("[trace_id {trace_id}] search->grpc: request node: {}, is_querier: {}, files: {req_files}", &node_addr, is_querier);
 
+                let org_header_key: MetadataKey<_> = cfg
+                .grpc
+                .org_header_key
+                .parse()
+                .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)
                     .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(CONFIG.grpc.connect_timeout))
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
                     .connect()
                     .await
                     .map_err(|err| {
@@ -484,15 +490,15 @@ pub async fn search(
                     move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
                         req.metadata_mut()
-                            .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                            .insert(org_header_key.clone(), org_id.clone());
                         Ok(req)
                     },
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
                 let response;
                 tokio::select! {
                     result = client.search(request) => {
@@ -520,7 +526,7 @@ pub async fn search(
                 }
 
                 log::info!(
-                    "[trace_id {trace_id}] search->grpc: response node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] search->grpc: response node: {}, is_querier: {}, total: {}, took: {} ms, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     is_querier,
                     response.total,
@@ -610,13 +616,7 @@ pub async fn search(
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
-    Ok((
-        merge_batches,
-        scan_stats,
-        inverted_index_count,
-        took_wait,
-        is_partial,
-    ))
+    Ok((merge_batches, scan_stats, took_wait, is_partial))
 }
 
 async fn merge_grpc_result(
@@ -629,7 +629,7 @@ async fn merge_grpc_result(
     let mut scan_stats = search::ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let mut is_partial = false;
-    for (node, resp) in results {
+    for (_, resp) in results {
         if resp.is_partial {
             is_partial = true;
             continue;
@@ -655,10 +655,6 @@ async fn merge_grpc_result(
                     .into_iter()
                     .map(std::result::Result::unwrap)
                     .collect::<Vec<_>>();
-                if agg.name == "_count" && node.role.contains(&Role::Ingester) {
-                    let value = batches.entry("agg_ingester_count".to_string()).or_default();
-                    value.extend(batch.clone());
-                }
                 let value = batches.entry(format!("agg_{}", agg.name)).or_default();
                 value.extend(batch);
             }
@@ -684,10 +680,7 @@ async fn merge_grpc_result(
         let (merge_sql, select_fields) = if name == "query" {
             (sql.origin_sql.clone(), select_fields.clone())
         } else {
-            let mut agg_name = name.strip_prefix("agg_").unwrap();
-            if agg_name == "ingester_count" {
-                agg_name = "_count";
-            }
+            let agg_name = name.strip_prefix("agg_").unwrap();
             (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
         };
 
@@ -750,7 +743,7 @@ pub(crate) async fn get_file_list(
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
-    let is_local = CONFIG.common.meta_store_external
+    let is_local = get_config().common.meta_store_external
         || infra_cluster::get_cached_online_querier_nodes()
             .await
             .unwrap_or_default()
@@ -864,27 +857,25 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     // handle metrics response
     let mut results_metrics: HashMap<String, json::Value> = HashMap::with_capacity(16);
     let mut results_values: HashMap<String, Vec<[json::Value; 2]>> = HashMap::with_capacity(16);
+    let cfg = get_config();
     for source in sources {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
-            if *k != CONFIG.common.column_timestamp && k != "value" {
+            if *k != cfg.common.column_timestamp && k != "value" {
                 key.push(format!("{k}_{v}"));
             }
         });
         let key = key.join("_");
         if !results_metrics.contains_key(&key) {
             let mut fields = fields.clone();
-            fields.remove(&CONFIG.common.column_timestamp);
+            fields.remove(&cfg.common.column_timestamp);
             fields.remove("value");
             results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
         let entry = results_values.entry(key).or_default();
         let value = [
-            fields
-                .get(&CONFIG.common.column_timestamp)
-                .unwrap()
-                .to_owned(),
+            fields.get(&cfg.common.column_timestamp).unwrap().to_owned(),
             json::Value::String(fields.get("value").unwrap().to_string()),
         ];
         entry.push(value);
@@ -918,6 +909,7 @@ mod tests {
                     records: -1,
                     original_size: 256,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -929,6 +921,7 @@ mod tests {
                     records: -1,
                     original_size: 256,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -940,6 +933,7 @@ mod tests {
                     records: -1,
                     original_size: 100,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -951,6 +945,7 @@ mod tests {
                     records: -1,
                     original_size: 256,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -962,6 +957,7 @@ mod tests {
                     records: -1,
                     original_size: 1,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -973,6 +969,7 @@ mod tests {
                     records: -1,
                     original_size: 256,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -984,6 +981,7 @@ mod tests {
                     records: -1,
                     original_size: 200,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -995,6 +993,7 @@ mod tests {
                     records: -1,
                     original_size: 30,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -1006,6 +1005,7 @@ mod tests {
                     records: -1,
                     original_size: 90,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -1017,6 +1017,7 @@ mod tests {
                     records: -1,
                     original_size: 256,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -1028,6 +1029,7 @@ mod tests {
                     records: -1,
                     original_size: 5,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),
@@ -1039,6 +1041,7 @@ mod tests {
                     records: -1,
                     original_size: 150,
                     compressed_size: -1,
+                    flattened: false,
                 },
                 false,
             ),

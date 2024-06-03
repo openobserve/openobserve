@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,8 +20,4 @@ pub mod murmur3;
 
 pub trait Sum64 {
     fn sum64(&mut self, key: &str) -> u64;
-}
-
-pub trait Sum32 {
-    fn sum32(&mut self, key: &str) -> u32;
 }

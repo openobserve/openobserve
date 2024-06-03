@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,8 +54,16 @@ impl SchemaExt for Schema {
         Schema::new(fields)
     }
 
+    #[cfg(feature = "gxhash")]
     fn hash_key(&self) -> String {
         let mut hasher = gxhash::GxHasher::with_seed(0);
+        self.hash(&mut hasher);
+        format!("{:x}", hasher.finish())
+    }
+
+    #[cfg(not(feature = "gxhash"))]
+    fn hash_key(&self) -> String {
+        let mut hasher = std::hash::DefaultHasher::new();
         self.hash(&mut hasher);
         format!("{:x}", hasher.finish())
     }

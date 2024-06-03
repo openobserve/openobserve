@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       emit-value
                       @update:modelValue="onCustomPeriodSelect"
+                      popup-content-style="z-index: 10002"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel }}</div>
@@ -166,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-popup-proxy
                             transition-show="scale"
                             transition-hide="scale"
+                            style="z-index: 10002"
                           >
                             <q-time v-model="selectedTime.startTime">
                               <div class="row items-center justify-end">
@@ -198,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-popup-proxy
                             transition-show="scale"
                             transition-hide="scale"
+                            style="z-index: 10002"
                           >
                             <q-time v-model="selectedTime.endTime">
                               <div class="row items-center justify-end">
@@ -241,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:modelValue="onTimezoneChange"
           :display-value="`Timezone: ${timezone}`"
           class="timezone-select"
+          popup-content-style="z-index: 10002"
         >
         </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
@@ -395,11 +399,26 @@ export default defineComponent({
       // updateDisplayValue();
       try {
         resetTime("", "");
+
+        let startTime = (new Date().getTime() - 900000) * 1000;
+        let endTime = new Date().getTime();
+
+        if (props.defaultAbsoluteTime?.startTime) {
+          startTime =
+            props.defaultAbsoluteTime?.startTime.toString().length > 13
+              ? props.defaultAbsoluteTime?.startTime
+              : props.defaultAbsoluteTime?.startTime * 1000;
+        }
+
+        if (props.defaultAbsoluteTime?.endTime) {
+          endTime =
+            props.defaultAbsoluteTime?.endTime.toString().length > 13
+              ? props.defaultAbsoluteTime?.endTime
+              : props.defaultAbsoluteTime?.endTime * 1000;
+        }
+
         selectedType.value = props.defaultType;
-        setAbsoluteTime(
-          props.defaultAbsoluteTime?.startTime,
-          props.defaultAbsoluteTime?.endTime
-        );
+        setAbsoluteTime(startTime, endTime);
         setRelativeTime(props.defaultRelativeTime);
         displayValue.value = getDisplayValue();
 
@@ -826,6 +845,7 @@ export default defineComponent({
 
 .date-time-dialog {
   width: 341px;
+  z-index: 10001;
 
   .tab-button {
     &.q-btn {

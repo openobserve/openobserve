@@ -20,11 +20,12 @@ use std::{
 
 use chrono::Duration;
 use config::{
+    get_config,
     meta::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamType},
     },
-    CONFIG, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -62,8 +63,6 @@ static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -140,13 +139,14 @@ impl Sql {
             }
         };
 
+        let cfg = get_config();
         // need check some things:
         // 1. no where
         // 2. no aggregation
         // 3. no group by
         let mut fast_mode = meta.selection.is_none()
             && meta.group_by.is_empty()
-            && (meta.order_by.is_empty() || meta.order_by[0].0 == CONFIG.common.column_timestamp)
+            && (meta.order_by.is_empty() || meta.order_by[0].0 == cfg.common.column_timestamp)
             && !meta.fields.iter().any(|f| f.contains('('))
             && !meta.field_alias.iter().any(|f| f.0.contains('('))
             && !origin_sql.to_lowercase().contains("distinct");
@@ -232,10 +232,10 @@ impl Sql {
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
-            if !cap_str.contains(&CONFIG.common.column_timestamp) {
+            if !cap_str.contains(&cfg.common.column_timestamp) {
                 origin_sql = origin_sql.replace(
                     cap_str,
-                    &format!("{}, {}", &CONFIG.common.column_timestamp, cap_str),
+                    &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
                 );
             }
         }
@@ -278,15 +278,15 @@ impl Sql {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
                     "({} >= {} AND {} < {})",
-                    CONFIG.common.column_timestamp,
+                    cfg.common.column_timestamp,
                     time_range.0,
-                    CONFIG.common.column_timestamp,
+                    cfg.common.column_timestamp,
                     time_range.1
                 )
             } else if time_range.0 > 0 {
-                format!("{} >= {}", CONFIG.common.column_timestamp, time_range.0)
+                format!("{} >= {}", cfg.common.column_timestamp, time_range.0)
             } else if time_range.1 > 0 {
-                format!("{} < {}", CONFIG.common.column_timestamp, time_range.1)
+                format!("{} < {}", cfg.common.column_timestamp, time_range.1)
             } else {
                 "".to_string()
             };
@@ -335,13 +335,13 @@ impl Sql {
 
         // Hack offset limit and sort by for sql
         if meta.limit == 0 {
-            meta.offset = req_query.from as usize;
-            meta.limit = req_query.size as usize;
-            if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) {
-                // sql mode context, allow limit 0, used to no hits, but return aggs
-                // sql mode full, disallow without limit, default limit 1000
-                meta.limit = CONFIG.limit.query_full_mode_limit;
-            }
+            meta.offset = req_query.from as i64;
+            // If `size` is negative, use the backend's default limit setting
+            meta.limit = if req_query.size >= 0 {
+                req_query.size as i64
+            } else {
+                cfg.limit.query_default_limit
+            };
             origin_sql = if meta.order_by.is_empty()
                 && (!sql_mode.eq(&SqlMode::Full)
                     || (meta.group_by.is_empty()
@@ -353,8 +353,8 @@ impl Sql {
                             .contains('(')))
             {
                 let sort_by = if req_query.sort_by.is_empty() {
-                    meta.order_by = vec![(CONFIG.common.column_timestamp.to_string(), true)];
-                    format!("{} DESC", CONFIG.common.column_timestamp)
+                    meta.order_by = vec![(cfg.common.column_timestamp.to_string(), true)];
+                    format!("{} DESC", cfg.common.column_timestamp)
                 } else {
                     if req_query.sort_by.to_uppercase().ends_with(" DESC") {
                         meta.order_by = vec![(
@@ -402,11 +402,11 @@ impl Sql {
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
         if req_query.quick_mode
-            && schema_fields.len() > CONFIG.limit.quick_mode_num_fields
+            && schema_fields.len() > cfg.limit.quick_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
             let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
-            let cached_fields: Option<Vec<String>> = if CONFIG.limit.quick_mode_file_list_enabled {
+            let cached_fields: Option<Vec<String>> = if cfg.limit.quick_mode_file_list_enabled {
                 STREAM_SCHEMAS_FIELDS
                     .read()
                     .await
@@ -455,13 +455,19 @@ impl Sql {
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
                 for cap in RE_MATCH_ALL_INDEXED.captures_iter(token) {
-                    indexed_text.push((cap[0].to_string(), cap[1].to_string()));
-                }
-                for cap in RE_MATCH_ALL_INDEXED_IGNORE_CASE.captures_iter(token) {
-                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase()));
+                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase())); // since `terms` are indexed in lowercase
                 }
             }
         }
+
+        // use full text search instead if inverted index feature is not enabled but it's an
+        // inverted index search
+        let rerouted = if !cfg.common.inverted_index_enabled & fulltext.is_empty() {
+            fulltext = std::mem::take(&mut indexed_text);
+            true
+        } else {
+            false
+        };
 
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
@@ -473,11 +479,7 @@ impl Sql {
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
-                let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_ignore_case") {
-                    func = "ILIKE";
-                }
-                indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+                indexed_search.push(format!("\"{}\" LIKE '%{}%'", field.name(), item.1));
 
                 // add full text field to meta fields
                 meta.fields.push(field.name().to_string());
@@ -501,7 +503,7 @@ impl Sql {
                     continue;
                 }
                 let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_ignore_case") {
+                if rerouted || item.0.to_lowercase().contains("_ignore_case") {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
@@ -784,7 +786,8 @@ pub(crate) fn generate_quick_mode_fields(
     cached_fields: Option<Vec<String>>,
     fts_fields: &[String],
 ) -> Vec<String> {
-    let strategy = CONFIG.limit.quick_mode_strategy.to_lowercase();
+    let cfg = get_config();
+    let strategy = cfg.limit.quick_mode_strategy.to_lowercase();
     let schema_fields = match cached_fields {
         Some(v) => v,
         None => schema
@@ -795,11 +798,11 @@ pub(crate) fn generate_quick_mode_fields(
     };
     let mut fields = match strategy.as_str() {
         "last" => {
-            let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.quick_mode_num_fields);
+            let skip = std::cmp::max(0, schema_fields.len() - cfg.limit.quick_mode_num_fields);
             schema_fields.into_iter().skip(skip).collect()
         }
         "both" => {
-            let need_num = std::cmp::min(schema_fields.len(), CONFIG.limit.quick_mode_num_fields);
+            let need_num = std::cmp::min(schema_fields.len(), cfg.limit.quick_mode_num_fields);
             let mut inner_fields = schema_fields
                 .iter()
                 .take(need_num / 2)
@@ -815,13 +818,13 @@ pub(crate) fn generate_quick_mode_fields(
             // default is first mode
             schema_fields
                 .into_iter()
-                .take(CONFIG.limit.quick_mode_num_fields)
+                .take(cfg.limit.quick_mode_num_fields)
                 .collect()
         }
     };
     // check _timestamp
-    if !fields.contains(&CONFIG.common.column_timestamp) {
-        fields.push(CONFIG.common.column_timestamp.to_string());
+    if !fields.contains(&cfg.common.column_timestamp) {
+        fields.push(cfg.common.column_timestamp.to_string());
     }
     // check fts fields
     for field in fts_fields {

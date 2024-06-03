@@ -26,9 +26,12 @@ import {
   formatDate,
   formatUnitValue,
   getUnitValue,
+  isTimeSeries,
+  isTimeStamp,
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
-export const convertSQLData = (
+import { isGivenFieldInOrderBy } from "../query/sqlUtils";
+export const convertSQLData = async (
   panelSchema: any,
   searchQueryData: any,
   store: any,
@@ -82,11 +85,6 @@ export const convertSQLData = (
           yAxisKeys.every((key: any) => item[key] != null)
         );
       }) || [];
-
-    // if h-bar or h-stacked need to reverse data due proper view when asc or desc is used
-    if (["h-bar", "h-stacked"].includes(panelSchema.type)) {
-      data = data.reverse();
-    }
 
     // if data is not there use {} as a default value
     const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
@@ -310,6 +308,8 @@ export const convertSQLData = (
       return {
         type: "category",
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
+        // inverse data for h-stacked and h-bar
+        inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
         nameGap: 9 * (xAxisKeys.length - index + 1),
@@ -1481,6 +1481,53 @@ export const convertSQLData = (
     }
   }
 
+  // stacked chart sort by y axis
+  // ignore if time series chart
+  if (
+    ["stacked", "h-stacked", "area-stacked"].includes(panelSchema?.type) &&
+    isTimeSeriesFlag == false
+  ) {
+    // get x axis object
+    // for h-stacked, categorical axis is y axis
+    // for stacked and area-stacked, categorical axis is x axis
+    const xAxisObj =
+      panelSchema.type == "h-stacked" ? options.yAxis : options.xAxis;
+
+    // check if order by uses y axis field
+    // will return null if not exist
+    // will return ASC or DESC if exist
+    const isYAxisExistInOrderBy = await isGivenFieldInOrderBy(
+      panelSchema?.queries[0]?.query ?? "",
+      yAxisKeys[0]
+    );
+    if (isYAxisExistInOrderBy) {
+      // Calculate the total for each series and combine it with the corresponding x-axis label
+      let totals = new Map();
+      for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
+        let total = options?.series?.reduce(
+          (sum: number, currentSeries: any) =>
+            sum + currentSeries?.data[i] ?? 0,
+          0
+        );
+        totals.set(i, { label: xAxisObj[0]?.data[i], total });
+      }
+
+      // Sort the indices by total in the specified order
+      // ASC for ascending, DESC for descending
+      let sortedIndices = Array.from(totals.keys()).sort((a, b) => {
+        let diff = totals.get(a).total - totals.get(b).total;
+        return isYAxisExistInOrderBy == "ASC" ? diff : -diff;
+      });
+
+      // Create new sorted arrays for the x-axis labels and series
+      xAxisObj[0].data = sortedIndices.map((i) => totals.get(i).label);
+      options.series = options?.series?.map((currentSeries: any) => {
+        currentSeries.data = sortedIndices?.map((i) => currentSeries?.data[i]);
+        return currentSeries;
+      });
+    }
+  }
+
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
   if (
@@ -1564,21 +1611,6 @@ const getLegendPosition = (legendPosition: string) => {
     default:
       return "horizontal";
   }
-};
-
-const isTimeSeries = (sample: any) => {
-  const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-  return sample.every((value: any) => {
-    return iso8601Pattern.test(value);
-  });
-};
-
-//Check if the sample is timestamp
-const isTimeStamp = (sample: any) => {
-  const microsecondsPattern = /^\d{16}$/;
-  return sample.every((value: any) =>
-    microsecondsPattern.test(value.toString())
-  );
 };
 
 /**

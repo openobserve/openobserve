@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::{Sum32, Sum64};
+use super::Sum64;
 
 pub struct GxHash {}
 
@@ -23,13 +23,16 @@ pub fn new() -> GxHash {
 
 impl Sum64 for GxHash {
     fn sum64(&mut self, key: &str) -> u64 {
-        gxhash::gxhash64(key.as_bytes(), 0)
-    }
-}
-
-impl Sum32 for GxHash {
-    fn sum32(&mut self, key: &str) -> u32 {
-        gxhash::gxhash32(key.as_bytes(), 0)
+        #[cfg(feature = "gxhash")]
+        let n = gxhash::gxhash64(key.as_bytes(), 0);
+        #[cfg(not(feature = "gxhash"))]
+        let n = {
+            use std::hash::{DefaultHasher, Hasher};
+            let mut h = DefaultHasher::new();
+            h.write(key.as_bytes());
+            h.finish()
+        };
+        n
     }
 }
 
@@ -37,6 +40,7 @@ impl Sum32 for GxHash {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "gxhash")]
     #[test]
     fn test_gxhash_sum64() {
         let mut h = new();
@@ -56,22 +60,23 @@ mod tests {
         assert_eq!(h.sum64("test3"), 14341735574462002086);
     }
 
+    #[cfg(not(feature = "gxhash"))]
     #[test]
-    fn test_gxhash_sum32() {
+    fn test_gxhash_sum64() {
         let mut h = new();
         for key in &[
             "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
         ] {
-            let sum = h.sum32(key);
+            let sum = h.sum64(key);
             println!("{}: {}", key, sum);
         }
-        assert_eq!(h.sum32("hello"), 4291260564);
-        assert_eq!(h.sum32("world"), 4261637453);
-        assert_eq!(h.sum32("foo"), 2535078453);
-        assert_eq!(h.sum32("bar"), 2957347844);
-        assert_eq!(h.sum32("test"), 4200198634);
-        assert_eq!(h.sum32("test1"), 688936565);
-        assert_eq!(h.sum32("test2"), 2770310354);
-        assert_eq!(h.sum32("test3"), 3932418982);
+        assert_eq!(h.sum64("hello"), 16350172494705860510);
+        assert_eq!(h.sum64("world"), 17970961829702799988);
+        assert_eq!(h.sum64("foo"), 7664243301495174138);
+        assert_eq!(h.sum64("bar"), 15647602356402206823);
+        assert_eq!(h.sum64("test"), 16183295663280961421);
+        assert_eq!(h.sum64("test1"), 17623087596200270265);
+        assert_eq!(h.sum64("test2"), 2079727570557907492);
+        assert_eq!(h.sum64("test3"), 3631677894875752354);
     }
 }

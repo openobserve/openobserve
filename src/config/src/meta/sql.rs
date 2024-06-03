@@ -25,10 +25,10 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::CONFIG;
+use crate::get_config;
 
-const MAX_LIMIT: usize = 100000;
-const MAX_OFFSET: usize = 100000;
+const MAX_LIMIT: i64 = 100000;
+const MAX_OFFSET: i64 = 100000;
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
@@ -39,8 +39,8 @@ pub struct Sql {
     pub order_by: Vec<(String, bool)>, // desc: true / false
     pub group_by: Vec<String>,         // field
     pub having: bool,
-    pub offset: usize,
-    pub limit: usize,
+    pub offset: i64,
+    pub limit: i64,
     pub time_range: Option<(i64, i64)>,
     pub quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
     pub field_alias: Vec<(String, String)>,             // alias for select field
@@ -185,14 +185,14 @@ impl std::fmt::Display for SqlValue {
     }
 }
 
-impl<'a> From<Offset<'a>> for usize {
+impl<'a> From<Offset<'a>> for i64 {
     fn from(offset: Offset) -> Self {
         match offset.0 {
             SqlOffset {
                 value: SqlExpr::Value(Value::Number(v, _b)),
                 ..
             } => {
-                let mut v: usize = v.parse().unwrap_or(0);
+                let mut v: i64 = v.parse().unwrap_or(0);
                 if v > MAX_OFFSET {
                     v = MAX_OFFSET;
                 }
@@ -203,11 +203,11 @@ impl<'a> From<Offset<'a>> for usize {
     }
 }
 
-impl<'a> From<Limit<'a>> for usize {
+impl<'a> From<Limit<'a>> for i64 {
     fn from(l: Limit<'a>) -> Self {
         match l.0 {
             SqlExpr::Value(Value::Number(v, _b)) => {
-                let mut v: usize = v.parse().unwrap_or(0);
+                let mut v: i64 = v.parse().unwrap_or(0);
                 if v > MAX_LIMIT {
                     v = MAX_LIMIT;
                 }
@@ -313,7 +313,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
             Some(expr) => parse_expr_for_field(
                 expr,
                 &SqlOperator::And,
-                &CONFIG.common.column_timestamp,
+                &get_config().common.column_timestamp,
                 &mut fields,
             )?,
             None => {}
@@ -544,7 +544,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     if s == field {
         return true;
     }
-    if field == "*" && s != "_all" && s != CONFIG.common.column_timestamp.clone() {
+    if field == "*" && s != "_all" && s != get_config().common.column_timestamp.clone() {
         return true;
     }
 
@@ -845,6 +845,20 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::Cast { expr, .. } | SqlExpr::TryCast { expr, .. } => {
             get_field_name_from_expr(expr)
         }
+        SqlExpr::Case {
+            operand: _,
+            conditions,
+            results: _,
+            else_result: _,
+        } => {
+            let mut fields = Vec::new();
+            for expr in conditions.iter() {
+                if let Some(v) = get_field_name_from_expr(expr) {
+                    fields.extend(v);
+                }
+            }
+            (!fields.is_empty()).then_some(fields)
+        }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
@@ -1029,6 +1043,14 @@ mod tests {
             (
                 "select _timestamp, message FROM tbl where  (pid='2fs93s' or stream_id='asdf834sdf2') AND str_match(new_message, 'Error')",
                 vec!["_timestamp", "message", "new_message", "pid", "stream_id"],
+            ),
+            (
+                "SELECT COUNT(CASE WHEN k8s_namespace_name IS NULL THEN 0 ELSE 1 END) AS null_count FROM default1",
+                vec!["k8s_namespace_name"],
+            ),
+            (
+                "SELECT COUNT(CASE WHEN k8s_namespace_name IS NULL THEN 0 ELSE 1 END) AS null_count FROM default1 WHERE a=1",
+                vec!["a", "k8s_namespace_name"],
             ),
         ];
         for (sql, fields) in samples {

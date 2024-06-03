@@ -138,7 +138,7 @@ jobs:
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
 
       - name: Print rustc cfg
-        run: rustc --print cfg
+        run: rustc -C target-cpu=native --print cfg
 
       - name: Run cargo build
         if: contains(matrix.file_name, '-simd') == false
