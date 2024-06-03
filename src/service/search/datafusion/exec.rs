@@ -54,6 +54,8 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 use infra::cache::tmpfs::Directory;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::WorkGroup;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
@@ -63,6 +65,8 @@ use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{datafusion::rewrite, sql::Sql, RE_SELECT_WILDCARD},
 };
+
+const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
     "min",
@@ -97,66 +101,33 @@ pub async fn sql(
     let cfg = get_config();
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-    let without_optimizer = select_wildcard
-        && cfg.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > cfg.limit.query_optimization_num_fields;
-    let (mut ctx, mut ctx_aggs) = if !file_type.eq(&FileType::ARROW) {
-        let ctx = register_table(
+    // let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
+    // let without_optimizer = select_wildcard
+    //     && cfg.limit.query_optimization_num_fields > 0
+    //     && schema.fields().len() > cfg.limit.query_optimization_num_fields;
+    let mut ctx = if !file_type.eq(&FileType::ARROW) {
+        register_table(
             session,
             schema.clone(),
             "tbl",
             files,
             file_type.clone(),
-            without_optimizer,
+            false,
         )
-        .await?;
-        let mut ctx_aggs = None;
-        if without_optimizer && !sql.aggs.is_empty() {
-            ctx_aggs = Some(
-                register_table(
-                    session,
-                    schema.clone(),
-                    "tbl",
-                    files,
-                    file_type.clone(),
-                    false,
-                )
-                .await?,
-            );
-        };
-        (ctx, ctx_aggs)
+        .await?
     } else {
-        let ctx = prepare_datafusion_context(
-            session.work_group.clone(),
-            &session.search_type,
-            without_optimizer,
-        )?;
-
+        let ctx =
+            prepare_datafusion_context(session.work_group.clone(), &session.search_type, false)
+                .await?;
         let record_batches = in_records_batches.unwrap();
         let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
-
         // Register the MemTable as a table in the DataFusion context
-        ctx.register_table("tbl", mem_table.clone())?;
-
-        let mut ctx_aggs = None;
-        if without_optimizer && !sql.aggs.is_empty() {
-            let ctx_agg = prepare_datafusion_context(
-                session.work_group.clone(),
-                &session.search_type,
-                false,
-            )?;
-            ctx_agg.register_table("tbl", mem_table)?;
-            ctx_aggs = Some(ctx_agg);
-        }
-        (ctx, ctx_aggs)
+        ctx.register_table("tbl", mem_table)?;
+        ctx
     };
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
-    if let Some(ctx_aggs) = &mut ctx_aggs {
-        register_udf(ctx_aggs, &sql.org_id).await;
-    }
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
 
@@ -179,11 +150,6 @@ pub async fn sql(
     // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
 
-    let ctx_aggs = if let Some(ctx_aggs) = ctx_aggs {
-        ctx_aggs
-    } else {
-        ctx.clone()
-    };
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         if cfg.common.print_key_sql {
@@ -197,7 +163,7 @@ pub async fn sql(
             }
         }
 
-        let mut df = match ctx_aggs.sql(&agg_sql).await {
+        let mut df = match ctx.sql(&agg_sql).await {
             Ok(df) => df,
             Err(e) => {
                 log::error!(
@@ -243,7 +209,6 @@ pub async fn sql(
 
     // drop table
     ctx.deregister_table("tbl")?;
-    ctx_aggs.deregister_table("tbl")?;
     log::info!(
         "[trace_id {trace_id}] Query all took {} ms",
         start.elapsed().as_millis()
@@ -270,12 +235,13 @@ async fn exec_query(
         && schema.fields().len() > cfg.limit.query_optimization_num_fields;
 
     let mut fast_mode = false;
-    let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
-        fast_mode = true;
-        get_fast_mode_ctx(session, schema, sql, files, file_type, without_optimizer).await?
-    } else {
-        (ctx.clone(), schema.clone())
-    };
+    let (q_ctx, schema) =
+        if sql.fast_mode && sql.meta.limit > 0 && session.storage_type != StorageType::Tmpfs {
+            fast_mode = true;
+            get_fast_mode_ctx(session, schema, sql, files, file_type, without_optimizer).await?
+        } else {
+            (ctx.clone(), schema.clone())
+        };
 
     // get used UDF
     let mut field_fns = vec![];
@@ -616,7 +582,7 @@ pub async fn merge(
     }
 
     // query data
-    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
+    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -945,7 +911,7 @@ pub async fn convert_parquet_file(
     let without_optimizer = select_wildcard;
 
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -1085,7 +1051,7 @@ pub async fn merge_parquet_files(
 
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
     ctx.register_table("tbl", table.clone())?;
 
     let df = ctx.sql(&query_sql).await?;
@@ -1126,7 +1092,7 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
     Ok(config)
 }
 
-pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
+pub async fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
     let memory = super::storage::memory::FS::new();
@@ -1158,13 +1124,15 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
         let mut memory_size = cfg.memory_cache.datafusion_max_size;
         #[cfg(feature = "enterprise")]
         if let Some(wg) = _work_group {
-            use o2_enterprise::enterprise::search::WorkGroup;
             if let Ok(wg) = WorkGroup::from_str(&wg) {
-                let (_cpu, mem) = wg.get_resource();
+                let (_cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
+                    DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
+                })?;
                 memory_size = memory_size * mem as usize / 100;
-                log::debug!("group:{} memory pool size: {}", wg, memory_size);
+                log::debug!("[datafusion:{}] memory pool size: {}", wg, memory_size);
             }
         }
+        let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_size);
         let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
             .map_err(|e| {
                 DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
@@ -1182,13 +1150,13 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
     RuntimeEnv::new(rn_config)
 }
 
-pub fn prepare_datafusion_context(
+pub async fn prepare_datafusion_context(
     work_group: Option<String>,
     search_type: &SearchType,
     without_optimizer: bool,
 ) -> Result<SessionContext, DataFusionError> {
     let session_config = create_session_config(search_type)?;
-    let runtime_env = create_runtime_env(work_group)?;
+    let runtime_env = create_runtime_env(work_group).await?;
     if without_optimizer {
         let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
             .with_optimizer_rules(vec![])
@@ -1232,7 +1200,8 @@ pub async fn register_table(
         session.work_group.clone(),
         &session.search_type,
         without_optimizer,
-    )?;
+    )
+    .await?;
 
     let cfg = get_config();
     // Configure listing options
