@@ -7,8 +7,8 @@ test.describe.configure({ mode: 'parallel' });
 const folderName = `Folder ${Date.now()}`
 
 async function login(page) {
-      await page.goto(process.env["ZO_BASE_URL"]);
-    //  await page.getByText('Login as internal user').click();
+      // await page.goto(process.env["ZO_BASE_URL"]);
+    await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -90,9 +90,7 @@ test.describe("Sanity testcases", () => {
       });
     
       console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
+  
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
@@ -479,6 +477,130 @@ test('should display results when SQL+histogram is on and then stream is selecte
   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   await page.locator('[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
 })
+
+
+
+test.only('should check JSON responses for successful:1 with timestamp 15 mins before', async ({ page, request }) => {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
+
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+
+  // First payload
+  const payload1 = [{
+    "level": "info",
+    "job": "test",
+    "log": "test message for openobserve",
+    "e2e": "1"
+  }];
+
+  // Second payload with timestamp 15 minutes before
+  const timestamp = Date.now() - 15 * 60 * 1000; // 15 minutes before
+  const payload2 = [{
+    "level": "info",
+    "job": "test",
+    "log": "test message for openobserve",
+    "e2e": "1.1",
+    "_timestamp": timestamp
+  }];
+
+  // Function to send POST request
+  const sendRequest = async (url, payload) => {
+    return await page.evaluate(async ({ url, headers, payload }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+      return await response.json();
+    }, { url, headers, payload });
+  };
+
+  // URLs for the final requests
+  const ingestionUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  const url1 = ingestionUrl;
+  const url2 = ingestionUrl;
+
+  // Sending first request
+  const response1 = await sendRequest(url1, payload1);
+  console.log(response1);
+
+  // Sending second request
+  const response2 = await sendRequest(url2, payload2);
+  console.log(response2);
+
+  // Assertions
+  expect(response1.status[0].successful).toBe(1);
+  expect(response2.status[0].successful).toBe(1);
+});
+
+
+test.only('should display error if timestamp past the ingestion time limit', async ({ page, request }) => {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
+
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+
+  // First payload
+  const payload1 = [{
+    "level": "info",
+    "job": "test",
+    "log": "test message for openobserve",
+    "e2e": "1"
+  }];
+
+  // Second payload with timestamp 15 minutes before
+  const timestamp = Date.now() - 6 * 60 * 60 * 1000 // 15 minutes before
+  const payload2 = [{
+    "level": "info",
+    "job": "test",
+    "log": "test message for openobserve",
+    "e2e": "1.1",
+    "_timestamp": timestamp
+  }];
+
+  // Function to send POST request
+  const sendRequest = async (url, payload) => {
+    return await page.evaluate(async ({ url, headers, payload }) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+      return await response.json();
+    }, { url, headers, payload });
+  };
+
+  // URLs for the final requests
+  const ingestionUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  const url1 = ingestionUrl;
+  const url2 = ingestionUrl;
+
+  // Sending first request
+  const response1 = await sendRequest(url1, payload1);
+  console.log(response1);
+
+  // Sending second request
+  const response2 = await sendRequest(url2, payload2);
+  console.log(response2);
+
+  // Assertions
+  expect(response1.status[0].successful).toBe(1);
+  expect(response2.status[0].successful).toBe(1);
+});
+
 
 })
 
