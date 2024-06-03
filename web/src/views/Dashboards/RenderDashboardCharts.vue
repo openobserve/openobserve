@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
+              :searchType="searchType"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refresh="refreshDashboard"
@@ -107,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :panelId="viewPanelId"
           :selectedDateForViewPanel="selectedDateForViewPanel"
           :initialVariableValues="variablesData"
+          :searchType="searchType"
           @close-panel="() => (showViewPanel = false)"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
           @update:initial-variable-values="updateInitialVariableValues"
@@ -174,6 +176,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
       required: false,
+    },
+    searchType: {
+      default: null,
+      type: String || null,
     },
   },
 

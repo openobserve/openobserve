@@ -86,6 +86,7 @@
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
                   :variablesData="variablesData"
                   :width="6"
+                  :searchType="searchType"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
@@ -153,6 +154,10 @@ export default defineComponent({
     },
     initialVariableValues: {
       type: Object,
+    },
+    searchType: {
+      default: null,
+      type: String || null,
     },
   },
   emits: ["closePanel", "update:initialVariableValues"],

@@ -185,6 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @refresh="loadDashboard"
         :showTabs="true"
         :forceLoad="store.state.printMode"
+        :searchType="searchType"
       />
 
       <q-dialog
@@ -295,6 +296,9 @@ export default defineComponent({
     // initial timezone, which will come from the route query
     const initialTimezone = ref(route.query.timezone ?? null);
 
+    // search_type for search query
+    const searchType = ref(route.query.searchtype ?? null);
+
     // dispatch setPrintMode, to set print mode
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
@@ -355,6 +359,7 @@ export default defineComponent({
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
           print: store.state.printMode,
+          searchtype: route.query.searchtype,
         },
       });
     };
@@ -586,6 +591,7 @@ export default defineComponent({
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           print: store.state.printMode,
+          searchtype: route.query.searchtype,
         },
       });
     });
@@ -747,6 +753,7 @@ export default defineComponent({
       printDashboard,
       initialTimezone,
       timeString,
+      searchType,
       quasar,
     };
   },

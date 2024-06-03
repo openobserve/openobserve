@@ -225,6 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :panelSchema="chartData"
                 :selectedTimeObj="dashboardPanelData.meta.dateTime"
                 :variablesData="{}"
+                searchType="UI"
               />
             </div>
           </template>
