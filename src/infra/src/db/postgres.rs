@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::utils::hash::Sum32;
+use config::utils::hash::Sum64;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -163,8 +163,8 @@ impl super::Db for PostgresDb {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = format!("get_for_update_{}", key);
-        let lock_id = config::utils::hash::gxhash::new().sum32(&lock_key);
-        let lock_sql = format!("SELECT pg_advisory_xact_lock({})", lock_id as i64);
+        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {
                 log::error!("[POSTGRES] rollback get_for_update error: {}", e);

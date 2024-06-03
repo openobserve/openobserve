@@ -371,7 +371,7 @@ const getErrorLogs = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "RUM")
     .then((res) => {
       errorTrackingState.data.errors = res.data.hits;
       totalErrorsCount.value = res.data.hits.reduce(

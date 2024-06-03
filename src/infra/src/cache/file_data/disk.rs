@@ -25,7 +25,7 @@ use config::{
     get_config, is_local_disk_storage, metrics,
     utils::{
         asynchronism::file::*,
-        hash::{gxhash, Sum32},
+        hash::{gxhash, Sum64},
     },
 };
 use once_cell::sync::Lazy;
@@ -193,8 +193,8 @@ impl FileData {
             return "".to_string();
         }
 
-        let h = gxhash::new().sum32(file);
-        let index = h % (self.multi_dir.len() as u32);
+        let h = gxhash::new().sum64(file);
+        let index = h % (self.multi_dir.len() as u64);
         format!("{}/", self.multi_dir.get(index as usize).unwrap())
     }
 
@@ -426,7 +426,7 @@ fn get_bucket_idx(file: &str) -> usize {
     if cfg.disk_cache.bucket_num <= 1 {
         0
     } else {
-        let h = gxhash::new().sum32(file);
+        let h = gxhash::new().sum64(file);
         (h as usize) % cfg.disk_cache.bucket_num
     }
 }

@@ -41,11 +41,7 @@ use config::{
 };
 use datafusion::{datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
-use infra::{
-    cache::{self, tmpfs},
-    schema::SchemaCache,
-    storage,
-};
+use infra::{cache::tmpfs, schema::SchemaCache, storage};
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use tokio::{
@@ -483,6 +479,7 @@ async fn merge_files(
 
     let cfg = get_config();
     let mut new_file_size: i64 = 0;
+    let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     let mut min_ts = i64::MAX;
@@ -491,20 +488,22 @@ async fn merge_files(
 
     for file in files_with_size.iter() {
         if new_file_size > 0
-            && ((new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64)
+            && (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
+                || new_compressed_file_size + file.meta.compressed_size
+                    > cfg.compact.max_file_size as i64
                 || (cfg.limit.file_move_fields_limit > 0
                     && group_schema_field_num > cfg.limit.file_move_fields_limit))
         {
             break;
         }
         new_file_size += file.meta.original_size;
-
+        new_compressed_file_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
     }
     let mut retain_file_list = new_file_list.clone();
 
     // write parquet files into tmpfs
-    let tmp_dir = cache::tmpfs::Directory::default();
+    let tmp_dir = tmpfs::Directory::default();
     for file in retain_file_list.iter_mut() {
         log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
         let data = match get_file_contents(&wal_dir.join(&file.key)).await {

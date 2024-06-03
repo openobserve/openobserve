@@ -568,6 +568,9 @@ pub struct Common {
     pub usage_reporting_creds: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
+    #[env_config(name = "ZO_USAGE_PUBLISH_INTERVAL",  help = "duration in seconds after last reporting usage will be published " default = 600)]
+    // in seconds
+    pub usage_publish_interval: i64,
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
     #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = "false")]
@@ -633,7 +636,7 @@ pub struct Common {
     pub show_stream_dates_doc_num: bool,
     #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
     pub blocked_streams: String,
-    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
+    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = true)]
     pub infer_schema_per_request: bool,
     #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]
     pub report_user_name: String,

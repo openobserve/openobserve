@@ -204,8 +204,9 @@ impl ObjectStore for Remote {
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        self.client
-            .list(Some(&format_key(prefix.unwrap().as_ref(), true).into()))
+        let key = prefix.map(|p| p.as_ref());
+        let prefix = format_key(key.unwrap_or(""), true);
+        self.client.list(Some(&prefix.into()))
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {

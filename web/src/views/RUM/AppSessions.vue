@@ -440,7 +440,7 @@ const getSessions = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "RUM")
     .then((res) => {
       res.data.hits.forEach((hit: any) => {
         sessionState.data.sessions[hit.session_id] = hit;
@@ -493,7 +493,7 @@ const getSessionLogs = (req: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "RUM")
     .then((res) => {
       const hits = res.data.hits;
       hits.forEach((hit: any) => {
