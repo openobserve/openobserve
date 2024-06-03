@@ -81,7 +81,7 @@ export const convertPanelData = async (
     case "table": {
       return {
         chartType: panelSchema.type,
-        ...convertTableData(panelSchema, data),
+        ...convertTableData(panelSchema, data, store),
       };
     }
     case "geomap": {

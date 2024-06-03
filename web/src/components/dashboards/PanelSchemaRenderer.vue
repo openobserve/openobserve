@@ -211,6 +211,10 @@ export default defineComponent({
       default: false,
       required: false,
     },
+    searchType: {
+      default: null,
+      type: String || null,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -230,15 +234,21 @@ export default defineComponent({
     const drilldownPopUpRef: any = ref(null);
 
     // get refs from props
-    const { panelSchema, selectedTimeObj, variablesData, forceLoad } =
-      toRefs(props);
+    const {
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      forceLoad,
+      searchType,
+    } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let { data, loading, errorDetail, metadata } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
       chartPanelRef,
-      forceLoad
+      forceLoad,
+      searchType
     );
 
     // need tableRendererRef to access downloadTableAsCSV method

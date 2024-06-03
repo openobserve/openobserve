@@ -175,7 +175,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             query: queryReq,
             page_type: streamData.value?.stream_type || "logs",
-          })
+          }, "UI")
           .then((res) => {
             isLoading.value.pop();
             if (res.data.from > 0) {

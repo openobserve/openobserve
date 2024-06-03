@@ -272,6 +272,7 @@ pub async fn get_latest_traces(
         regions: vec![],
         clusters: vec![],
         timeout,
+        search_type: None,
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req
