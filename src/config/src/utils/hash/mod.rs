@@ -21,7 +21,3 @@ pub mod murmur3;
 pub trait Sum64 {
     fn sum64(&mut self, key: &str) -> u64;
 }
-
-pub trait Sum32 {
-    fn sum32(&mut self, key: &str) -> u32;
-}
