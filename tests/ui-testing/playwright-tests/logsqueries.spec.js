@@ -205,7 +205,7 @@ test("should redirect to logs after clicking on stream explorer via stream page"
       await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       await page.keyboard.type(
   
-      "match_all_indexed_ignore_case('provide_credentials')");await page.waitForTimeout(
+      "match_all_raw_ignore_case('provide_credentials')");await page.waitForTimeout(
       2000);await expect(page.locator(
       '[data-cy="search-bar-refresh-button"] > .q-btn__content')).toBeVisible();await page.waitForTimeout(
       3000);await page.locator(
@@ -286,6 +286,31 @@ test("should display error if create stream is clicked without adding name", asy
     await page.waitForTimeout(1000);
     await page.locator('[data-test="save-stream-btn"]').click({ force: true });
     await expect(page.getByText(/Field is required/).first()).toBeVisible();
+});
+
+test("should display enter count query", async ({ page }) =>{
+  await page.locator(
+  
+    '[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+    await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+    await page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
+    await page.waitForTimeout(4000);
+    await page.getByLabel("SQL Mode").locator("div").nth(2).click();
+    await expect(page.locator(
+      '[data-cy="search-bar-refresh-button"] > .q-btn__content')).toBeVisible();await page.waitForTimeout(
+      3000);await page.locator(
+      "[data-test='logs-search-bar-refresh-btn']").click({
+  
+      force: true });
+      await page.waitForTimeout(4000);
+      await expect(page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
+      await page.locator('[data-test="logs-search-result-bar-chart"] canvas').click({
+        position: {
+          x: 182,
+          y: 66
+        }
+      });
+   
 });
 
 
