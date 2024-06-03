@@ -53,19 +53,19 @@ export const convertTableData = (
   // identify histogram fields for auto and custom sql
   if (panelSchema?.queries[0]?.customQuery === false) {
     for (const field of columnData) {
-      if (field.aggregationFunction === "histogram") {
+      if (field?.aggregationFunction === "histogram") {
         histogramFields.push(field.alias);
       }
     }
   } else {
     // need sampling to identify timeseries data
     for (const field of columnData) {
-      if (field.aggregationFunction === "histogram") {
+      if (field?.aggregationFunction === "histogram") {
         histogramFields.push(field.alias);
       } else {
         const sample = tableRows
-          .slice(0, Math.min(20, tableRows.length))
-          .map((it: any) => it[field.alias]);
+          ?.slice(0, Math.min(20, tableRows.length))
+          ?.map((it: any) => it[field.alias]);
 
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample);
@@ -85,7 +85,7 @@ export const convertTableData = (
           utcToZonedTime(
             typeof it[histogramField] === "string"
               ? `${it[histogramField]}Z`
-              : new Date(it[histogramField]).getTime() / 1000,
+              : new Date(it[histogramField])?.getTime() / 1000,
             store.state.timezone
           )
         );
