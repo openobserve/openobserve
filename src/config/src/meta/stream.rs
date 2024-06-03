@@ -753,6 +753,7 @@ mod tests {
         assert_eq!(file_meta, resp);
     }
 
+    #[cfg(feature = "gxhash")]
     #[test]
     fn test_hash_partition() {
         let part = StreamPartition::new("field");
@@ -779,5 +780,34 @@ mod tests {
         assert_eq!(part.get_partition_key("test1"), "field=21");
         assert_eq!(part.get_partition_key("test2"), "field=18");
         assert_eq!(part.get_partition_key("test3"), "field=6");
+    }
+
+    #[cfg(not(feature = "gxhash"))]
+    #[test]
+    fn test_hash_partition() {
+        let part = StreamPartition::new("field");
+        assert_eq!(
+            json::to_string(&part).unwrap(),
+            r#"{"field":"field","types":"value","disabled":false}"#
+        );
+        let part = StreamPartition::new_hash("field", 32);
+        assert_eq!(
+            json::to_string(&part).unwrap(),
+            r#"{"field":"field","types":{"hash":32},"disabled":false}"#
+        );
+
+        for key in &[
+            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
+        ] {
+            println!("{}: {}", key, part.get_partition_key(key));
+        }
+        assert_eq!(part.get_partition_key("hello"), "field=30");
+        assert_eq!(part.get_partition_key("world"), "field=20");
+        assert_eq!(part.get_partition_key("foo"), "field=26");
+        assert_eq!(part.get_partition_key("bar"), "field=7");
+        assert_eq!(part.get_partition_key("test"), "field=13");
+        assert_eq!(part.get_partition_key("test1"), "field=25");
+        assert_eq!(part.get_partition_key("test2"), "field=4");
+        assert_eq!(part.get_partition_key("test3"), "field=2");
     }
 }
