@@ -17,11 +17,14 @@ use std::{collections::HashMap, fs, path::Path};
 
 use actix_web::web::Query;
 use async_trait::async_trait;
-use config::meta::{search, stream::StreamType};
+use config::meta::{
+    search::{self},
+    stream::StreamType,
+};
 
 use crate::{
     cli::data::{cli::Cli, Context},
-    common::utils::http::get_stream_type_from_request,
+    common::utils::http::{get_search_type_from_request, get_stream_type_from_request},
     service::search as SearchService,
 };
 
@@ -39,6 +42,10 @@ impl Context for Export {
 
         let cfg = config::get_config();
         let table = c.stream_name;
+        let search_type = match get_search_type_from_request(&Query(map.clone())) {
+            Ok(v) => v,
+            Err(_) => return Ok(false),
+        };
         let query = search::Query {
             sql: format!("select * from {}", table),
             from: 0,
@@ -63,6 +70,7 @@ impl Context for Export {
             regions: vec![],
             clusters: vec![],
             timeout: 0,
+            search_type,
         };
 
         match SearchService::search("", &c.org, stream_type, None, &req).await {

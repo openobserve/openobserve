@@ -99,7 +99,7 @@ const getErrorLogs = () => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: req,
       page_type: "logs",
-    })
+    }, "RUM")
     .then((res) => {
       const errorIndex = res.data.hits.findIndex(
         (hit: any) => hit.error_id === errorDetails.value.error_id
@@ -149,7 +149,7 @@ const getError = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
-      })
+      }, "RUM")
       .then((res) => {
         errorDetails.value = { ...res.data.hits[0] };
         errorDetails.value["category"] = [];

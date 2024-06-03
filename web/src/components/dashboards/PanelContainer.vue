@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :height="props.height"
       :variablesData="props.variablesData"
       :forceLoad="props.forceLoad"
+      :searchType="searchType"
       @metadata-update="metaDataValue"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
       @update:initial-variable-values="
@@ -242,6 +243,7 @@ export default defineComponent({
     "dashboardId",
     "metaData",
     "forceLoad",
+    "searchType",
   ],
   components: {
     PanelSchemaRenderer,

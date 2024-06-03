@@ -667,7 +667,7 @@ export default defineComponent({
           org_identifier: searchObj.organizationIdetifier,
           query: req,
           page_type: "traces",
-        })
+        }, "UI")
         .then((res) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
         })
