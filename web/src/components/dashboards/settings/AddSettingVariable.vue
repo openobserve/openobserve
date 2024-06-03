@@ -502,7 +502,7 @@ export default defineComponent({
     const editMode = ref(false);
 
     watch(
-      () => variableData.query_data.max_record_size,
+      () => variableData?.query_data?.max_record_size,
       (newVal, oldVal) => {
         if (newVal === "") {
           variableData.query_data.max_record_size = null;
