@@ -564,7 +564,6 @@ mod tests {
         println!("pass3: {}", pass3);
         let user_pass = format!("{}:{}", "best.ankur@gmail.com", pass3);
         let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
-        // let with_header = format!("Basic {}", &auth);
         println!(
             "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
             time, 600, auth

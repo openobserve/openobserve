@@ -364,7 +364,7 @@ impl TokenValidationResponseBuilder {
         }
     }
 
-    pub fn default() -> TokenValidationResponseBuilder {
+    pub fn new() -> TokenValidationResponseBuilder {
         Self {
             response: TokenValidationResponse::default(),
         }

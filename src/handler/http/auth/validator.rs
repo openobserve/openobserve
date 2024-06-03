@@ -345,15 +345,6 @@ async fn validate_user_from_db(
                 }
                 let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                 Ok(resp)
-                // Ok(TokenValidationResponse {
-                //     is_valid: true,
-                //     user_email: user.email,
-                //     is_internal_user: !user.is_external,
-                //     user_role: None,
-                //     user_name: user.first_name.to_owned(),
-                //     family_name: user.last_name,
-                //     given_name: user.first_name,
-                // })
             } else if user.password_ext.is_some() && req_time.is_some() {
                 log::info!("Validating user for query params");
                 let hashed_pass = get_hash(
@@ -374,15 +365,6 @@ async fn validate_user_from_db(
                 if hashed_pass.eq(&user_password) {
                     let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                     return Ok(resp);
-                    // return Ok(TokenValidationResponse {
-                    //     is_valid: true,
-                    //     user_email: user.email,
-                    //     is_internal_user: !user.is_external,
-                    //     user_role: None,
-                    //     user_name: user.first_name.to_owned(),
-                    //     family_name: user.last_name,
-                    //     given_name: user.first_name,
-                    // });
                 } else {
                     Err(ErrorForbidden("Not allowed"))
                 }
@@ -789,7 +771,7 @@ mod tests {
             family_name: "".to_string(),
             given_name: "".to_string(),
         };
-        let expected1 = TokenValidationResponseBuilder::default().build();
+        let expected1 = TokenValidationResponseBuilder::new().build();
         let expected2 = TokenValidationResponse::default();
 
         assert!(actual == expected1);
