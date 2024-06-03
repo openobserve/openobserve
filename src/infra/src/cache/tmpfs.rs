@@ -21,8 +21,12 @@ use parking_lot::RwLock;
 
 use crate::errors::*;
 
-static FILES: Lazy<RwLock<HashMap<String, File>>> = Lazy::new(Default::default);
-static DATA: Lazy<RwLock<HashMap<String, Bytes>>> = Lazy::new(Default::default);
+const CAP_LEN: usize = 64;
+
+static FILES: Lazy<RwLock<HashMap<String, File>>> =
+    Lazy::new(|| RwLock::new(HashMap::with_capacity(CAP_LEN)));
+static DATA: Lazy<RwLock<HashMap<String, Bytes>>> =
+    Lazy::new(|| RwLock::new(HashMap::with_capacity(CAP_LEN)));
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();
@@ -57,6 +61,9 @@ impl Directory {
     pub fn list(&self, extension: &str) -> Result<Vec<File>> {
         list(&self.location, extension)
     }
+    pub fn clear(&self) -> Result<()> {
+        delete(&format!("/{}/", self.location), true)
+    }
 }
 
 impl Default for Directory {
@@ -69,7 +76,7 @@ impl Default for Directory {
 
 impl Drop for Directory {
     fn drop(&mut self) {
-        delete(&format!("/{}/", self.location), true).unwrap();
+        self.clear().unwrap();
     }
 }
 
@@ -142,8 +149,8 @@ pub fn delete(path: &str, prefix: bool) -> Result<()> {
             DATA.write().remove(&f.location);
         }
     }
-    FILES.write().shrink_to_fit();
-    DATA.write().shrink_to_fit();
+    FILES.write().shrink_to(CAP_LEN);
+    DATA.write().shrink_to(CAP_LEN);
     Ok(())
 }
 
