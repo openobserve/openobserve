@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       emit-value
                       @update:modelValue="onCustomPeriodSelect"
+                      popup-content-style="z-index: 10002"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel }}</div>
@@ -243,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:modelValue="onTimezoneChange"
           :display-value="`Timezone: ${timezone}`"
           class="timezone-select"
+          popup-content-style="z-index: 10002"
         >
         </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
