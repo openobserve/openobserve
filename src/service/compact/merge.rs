@@ -755,7 +755,10 @@ pub async fn merge_files(
                         retain_file_list
                     )
                 })?;
-                if !index_file_name.is_empty() {
+                if index_file_name.is_empty() {
+                    // there is no index file generated,
+                    // it means there is no inverted index terms can be generated
+                } else {
                     log::info!("Created index file during compaction {}", index_file_name);
                     // Notify that we wrote the index file to the db.
                     if let Err(e) = write_file_list(
@@ -775,11 +778,6 @@ pub async fn merge_files(
                             retain_file_list
                         );
                     }
-                } else {
-                    log::warn!(
-                        "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
-                        retain_file_list
-                    );
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))

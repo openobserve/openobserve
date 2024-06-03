@@ -57,13 +57,12 @@ static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwr
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
 static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_indexed\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_indexed_ignore_case\('([^']*)'\)").unwrap());
+    Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -456,13 +455,19 @@ impl Sql {
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
                 for cap in RE_MATCH_ALL_INDEXED.captures_iter(token) {
-                    indexed_text.push((cap[0].to_string(), cap[1].to_string()));
-                }
-                for cap in RE_MATCH_ALL_INDEXED_IGNORE_CASE.captures_iter(token) {
-                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase()));
+                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase())); // since `terms` are indexed in lowercase
                 }
             }
         }
+
+        // use full text search instead if inverted index feature is not enabled but it's an
+        // inverted index search
+        let rerouted = if !cfg.common.inverted_index_enabled & fulltext.is_empty() {
+            fulltext = std::mem::take(&mut indexed_text);
+            true
+        } else {
+            false
+        };
 
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
@@ -474,11 +479,7 @@ impl Sql {
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
-                let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_ignore_case") {
-                    func = "ILIKE";
-                }
-                indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+                indexed_search.push(format!("\"{}\" LIKE '%{}%'", field.name(), item.1));
 
                 // add full text field to meta fields
                 meta.fields.push(field.name().to_string());
@@ -502,7 +503,7 @@ impl Sql {
                     continue;
                 }
                 let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_ignore_case") {
+                if rerouted || item.0.to_lowercase().contains("_ignore_case") {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
