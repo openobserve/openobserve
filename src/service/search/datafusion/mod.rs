@@ -56,22 +56,18 @@ pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
 /// The name of the not_regex_match UDF given to DataFusion.
 pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 
-pub const DEFAULT_FUNCTIONS: [ZoFunction; 8] = [
+pub const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
+    ZoFunction {
+        name: "match_all_raw",
+        text: "match_all_raw('v')",
+    },
+    ZoFunction {
+        name: "match_all_raw_ignore_case",
+        text: "match_all_raw_ignore_case('v')",
+    },
     ZoFunction {
         name: "match_all",
         text: "match_all('v')",
-    },
-    ZoFunction {
-        name: "match_all_ignore_case",
-        text: "match_all_ignore_case('v')",
-    },
-    ZoFunction {
-        name: "match_all_indexed",
-        text: "match_all_indexed('v')",
-    },
-    ZoFunction {
-        name: "match_all_indexed_ignore_case",
-        text: "match_all_indexed_ignore_case('v')",
     },
     ZoFunction {
         name: MATCH_UDF_NAME,
