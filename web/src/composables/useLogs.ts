@@ -2779,7 +2779,7 @@ const useLogs = () => {
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
         ? queryStr
-        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
 
     if (searchObj.data.stream.selectedStreamFields.length == 0) {
