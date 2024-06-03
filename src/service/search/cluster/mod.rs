@@ -64,13 +64,7 @@ pub async fn search(
     trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut req: cluster_rpc::SearchRequest,
-) -> Result<(
-    HashMap<String, Vec<RecordBatch>>,
-    ScanStats,
-    Option<u64>,
-    usize,
-    bool,
-)> {
+) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, usize, bool)> {
     let start = std::time::Instant::now();
 
     let cfg = get_config();
@@ -104,7 +98,7 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = !meta.fts_terms.is_empty();
+    let is_inverted_index = cfg.common.inverted_index_enabled && !meta.fts_terms.is_empty();
 
     log::info!(
         "[trace_id {trace_id}] search: is_agg_query {:?} is_inverted_index {:?}",
@@ -118,7 +112,7 @@ pub async fn search(
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // If the query is of type inverted index and this is not an aggregations request
-    let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {
+    let file_list = if is_inverted_index && req.aggs.is_empty() {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -150,7 +144,11 @@ pub async fn search(
             meta.stream_name, search_condition
         );
 
-        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        // fast_mode is for 1st page optimization
+        //  1. single WHERE clause of `match_all()`
+        //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
+        let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+            && idx_req.query.as_ref().unwrap().size > 0);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -163,22 +161,21 @@ pub async fn search(
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = http::search(idx_req).await?;
-        let (unique_files, inverted_index_count) = if is_first_page {
-            // should be query size * 2
-            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+        // get deleted file
+        let deleted_files = idx_resp
+            .hits
+            .iter()
+            .filter_map(|hit| {
+                if hit.get("deleted").unwrap().as_bool().unwrap() {
+                    Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>();
+        let unique_files = if fast_mode {
+            let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
             let mut total_count = 0;
-            // get deleted file
-            let deleted_files = idx_resp
-                .hits
-                .iter()
-                .filter_map(|hit| {
-                    if hit.get("deleted").unwrap().as_bool().unwrap() {
-                        Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
             let sorted_data = idx_resp
                 .hits
                 .iter()
@@ -213,22 +210,21 @@ pub async fn search(
                     }
                 }
             }
-            (
-                term_map
-                    .into_iter()
-                    .flat_map(|(_, filenames)| filenames)
-                    .collect::<HashSet<_>>(),
-                Some(total_count),
-            )
+            term_map
+                .into_iter()
+                .flat_map(|(_, filenames)| filenames)
+                .collect::<HashSet<_>>()
         } else {
-            (
-                idx_resp
-                    .hits
-                    .iter()
-                    .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                    .collect::<HashSet<_>>(),
-                None,
-            )
+            idx_resp
+                .hits
+                .iter()
+                .filter_map(|hit| {
+                    hit.get("file_name")
+                        .and_then(|value| value.as_str())
+                        .filter(|&name| !deleted_files.contains(name))
+                        .map(String::from)
+                })
+                .collect::<HashSet<_>>()
         };
 
         let mut idx_file_list: Vec<FileKey> = vec![];
@@ -247,19 +243,16 @@ pub async fn search(
         }
         // sorted by _timestamp
         idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-        (idx_file_list, inverted_index_count)
+        idx_file_list
     } else {
-        (
-            get_file_list(
-                trace_id,
-                &meta,
-                stream_type,
-                partition_time_level,
-                &stream_settings.partition_keys,
-            )
-            .await,
-            None,
+        get_file_list(
+            trace_id,
+            &meta,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
         )
+        .await
     };
 
     let file_list_took = start.elapsed().as_millis() as usize;
@@ -623,13 +616,7 @@ pub async fn search(
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
-    Ok((
-        merge_batches,
-        scan_stats,
-        inverted_index_count,
-        took_wait,
-        is_partial,
-    ))
+    Ok((merge_batches, scan_stats, took_wait, is_partial))
 }
 
 async fn merge_grpc_result(
@@ -642,7 +629,7 @@ async fn merge_grpc_result(
     let mut scan_stats = search::ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let mut is_partial = false;
-    for (node, resp) in results {
+    for (_, resp) in results {
         if resp.is_partial {
             is_partial = true;
             continue;
@@ -668,10 +655,6 @@ async fn merge_grpc_result(
                     .into_iter()
                     .map(std::result::Result::unwrap)
                     .collect::<Vec<_>>();
-                if agg.name == "_count" && node.role.contains(&Role::Ingester) {
-                    let value = batches.entry("agg_ingester_count".to_string()).or_default();
-                    value.extend(batch.clone());
-                }
                 let value = batches.entry(format!("agg_{}", agg.name)).or_default();
                 value.extend(batch);
             }
@@ -697,10 +680,7 @@ async fn merge_grpc_result(
         let (merge_sql, select_fields) = if name == "query" {
             (sql.origin_sql.clone(), select_fields.clone())
         } else {
-            let mut agg_name = name.strip_prefix("agg_").unwrap();
-            if agg_name == "ingester_count" {
-                agg_name = "_count";
-            }
+            let agg_name = name.strip_prefix("agg_").unwrap();
             (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
         };
 
