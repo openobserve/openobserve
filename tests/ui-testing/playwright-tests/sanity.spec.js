@@ -841,6 +841,10 @@ test.describe("Sanity testcases", () => {
 
     // Assertions
     expect(response1.status[0].successful).toBe(1);
-    expect(response2.status[0].successful).toBe(1);
+    expect(response2.status[0].successful).toBe(0);
+    expect(response2.status[0].failed).toBe(1);
+    expect(response2.status[0].error).toBe(
+      'Too old data, only last 5 hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>'
+    );
   });
 });
