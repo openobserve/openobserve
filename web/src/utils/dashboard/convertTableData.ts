@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { utcToZonedTime } from "date-fns-tz";
+import {
+  formatDate,
+  formatUnitValue,
+  getUnitValue,
+  isTimeSeries,
+  isTimeStamp,
+} from "./convertDataIntoUnitValue";
 
 /**
  * Converts table data based on the panel schema and search query data.
@@ -22,7 +29,11 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
  * @param {any} searchQueryData - The search query data.
  * @return {object} An object containing rows and columns.
  */
-export const convertTableData = (panelSchema: any, searchQueryData: any) => {
+export const convertTableData = (
+  panelSchema: any,
+  searchQueryData: any,
+  store: any
+) => {
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -36,9 +47,55 @@ export const convertTableData = (panelSchema: any, searchQueryData: any) => {
   const y = panelSchema?.queries[0].fields?.y || [];
   const columnData = [...x, ...y];
 
+  const tableRows = JSON.parse(JSON.stringify(searchQueryData[0]));
+  const histogramFields: string[] = [];
+
+  // identify histogram fields for auto and custom sql
+  if (panelSchema?.queries[0]?.customQuery === false) {
+    for (const field of columnData) {
+      if (field?.aggregationFunction === "histogram") {
+        histogramFields.push(field.alias);
+      }
+    }
+  } else {
+    // need sampling to identify timeseries data
+    for (const field of columnData) {
+      if (field?.aggregationFunction === "histogram") {
+        histogramFields.push(field.alias);
+      } else {
+        const sample = tableRows
+          ?.slice(0, Math.min(20, tableRows.length))
+          ?.map((it: any) => it[field.alias]);
+
+        const isTimeSeriesData = isTimeSeries(sample);
+        const isTimeStampData = isTimeStamp(sample);
+
+        if (isTimeSeriesData || isTimeStampData) {
+          histogramFields.push(field.alias);
+        }
+      }
+    }
+  }
+
+  // format date for histogram fields
+  for (const it of tableRows) {
+    for (const histogramField of histogramFields) {
+      if (it[histogramField]) {
+        it[histogramField] = formatDate(
+          utcToZonedTime(
+            typeof it[histogramField] === "string"
+              ? `${it[histogramField]}Z`
+              : new Date(it[histogramField])?.getTime() / 1000,
+            store.state.timezone
+          )
+        );
+      }
+    }
+  }
+
   const columns = columnData.map((it: any) => {
     let obj: any = {};
-    const isNumber = isSampleValuesNumbers(searchQueryData[0], it.alias, 20);
+    const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
     obj["name"] = it.label;
     obj["field"] = it.alias;
     obj["label"] = it.label;
@@ -65,7 +122,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any) => {
   });
 
   return {
-    rows: searchQueryData[0],
+    rows: tableRows,
     columns,
   };
 };

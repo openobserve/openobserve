@@ -166,3 +166,19 @@ export const formatDate = (date: any) => {
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
+
+// Check if the sample is time series
+export const isTimeSeries = (sample: any) => {
+  const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+  return sample.every((value: any) => {
+    return iso8601Pattern.test(value);
+  });
+};
+
+//Check if the sample is timestamp
+export const isTimeStamp = (sample: any) => {
+  const microsecondsPattern = /^\d{16}$/;
+  return sample.every((value: any) =>
+    microsecondsPattern.test(value.toString())
+  );
+};
