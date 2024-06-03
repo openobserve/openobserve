@@ -51,7 +51,7 @@ export const convertTableData = (
   const histogramFields: string[] = [];
 
   // identify histogram fields for auto and custom sql
-  if (panelSchema?.queries[0]?.customQuery == false) {
+  if (panelSchema?.queries[0]?.customQuery === false) {
     for (const field of columnData) {
       if (field.aggregationFunction === "histogram") {
         histogramFields.push(field.alias);
@@ -78,20 +78,20 @@ export const convertTableData = (
   }
 
   // format date for histogram fields
-  tableRows.forEach((it: any) => {
-    histogramFields.forEach((histogramField: any) => {
+  for (const it of tableRows) {
+    for (const histogramField of histogramFields) {
       if (it[histogramField]) {
         it[histogramField] = formatDate(
           utcToZonedTime(
             typeof it[histogramField] === "string"
-              ? it[histogramField] + "Z"
+              ? `${it[histogramField]}Z`
               : new Date(it[histogramField]).getTime() / 1000,
             store.state.timezone
           )
         );
       }
-    });
-  });
+    }
+  }
 
   const columns = columnData.map((it: any) => {
     let obj: any = {};

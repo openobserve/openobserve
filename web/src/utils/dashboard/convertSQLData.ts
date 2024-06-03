@@ -309,9 +309,7 @@ export const convertSQLData = async (
         type: "category",
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
         // inverse data for h-stacked and h-bar
-        inverse: ["h-stacked", "h-bar"].includes(panelSchema.type)
-          ? true
-          : false,
+        inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
         nameGap: 9 * (xAxisKeys.length - index + 1),
