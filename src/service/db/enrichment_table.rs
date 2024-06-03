@@ -49,6 +49,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         regions: vec![],
         clusters: vec![],
         timeout: 0,
+        search_type: None,
     };
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {

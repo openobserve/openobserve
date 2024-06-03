@@ -1491,7 +1491,7 @@ const useLogs = () => {
           org_identifier: searchObj.organizationIdetifier,
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
-        })
+        },"UI")
         .then(async (res) => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
@@ -1594,7 +1594,7 @@ const useLogs = () => {
           org_identifier: searchObj.organizationIdetifier,
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
-        })
+        },"UI")
         .then(async (res) => {
           searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly
@@ -1823,7 +1823,7 @@ const useLogs = () => {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
-          })
+          },"UI")
           .then(async (res) => {
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;

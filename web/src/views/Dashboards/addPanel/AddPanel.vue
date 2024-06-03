@@ -221,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
+                          searchType="Dashboards"
                         />
                         <q-dialog v-model="showViewPanel">
                           <QueryInspector

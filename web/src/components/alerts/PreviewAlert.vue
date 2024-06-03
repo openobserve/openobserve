@@ -8,6 +8,7 @@
         :panelSchema="chartData"
         :selectedTimeObj="dashboardPanelData.meta.dateTime"
         :variablesData="{}"
+        searchType="UI"
       />
     </div>
   </div>
