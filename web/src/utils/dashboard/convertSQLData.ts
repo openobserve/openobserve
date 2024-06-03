@@ -26,6 +26,8 @@ import {
   formatDate,
   formatUnitValue,
   getUnitValue,
+  isTimeSeries,
+  isTimeStamp,
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
@@ -307,7 +309,9 @@ export const convertSQLData = async (
         type: "category",
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
         // inverse data for h-stacked and h-bar
-        inverse: ["h-stacked", "h-bar"].includes(panelSchema.type) ? true : false,
+        inverse: ["h-stacked", "h-bar"].includes(panelSchema.type)
+          ? true
+          : false,
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
         nameGap: 9 * (xAxisKeys.length - index + 1),
@@ -1485,7 +1489,6 @@ export const convertSQLData = async (
     ["stacked", "h-stacked", "area-stacked"].includes(panelSchema?.type) &&
     isTimeSeriesFlag == false
   ) {
-
     // get x axis object
     // for h-stacked, categorical axis is y axis
     // for stacked and area-stacked, categorical axis is x axis
@@ -1504,7 +1507,8 @@ export const convertSQLData = async (
       let totals = new Map();
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
         let total = options?.series?.reduce(
-          (sum: number, currentSeries: any) => sum + currentSeries?.data[i] ?? 0,
+          (sum: number, currentSeries: any) =>
+            sum + currentSeries?.data[i] ?? 0,
           0
         );
         totals.set(i, { label: xAxisObj[0]?.data[i], total });
@@ -1609,21 +1613,6 @@ const getLegendPosition = (legendPosition: string) => {
     default:
       return "horizontal";
   }
-};
-
-const isTimeSeries = (sample: any) => {
-  const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
-  return sample.every((value: any) => {
-    return iso8601Pattern.test(value);
-  });
-};
-
-//Check if the sample is timestamp
-const isTimeStamp = (sample: any) => {
-  const microsecondsPattern = /^\d{16}$/;
-  return sample.every((value: any) =>
-    microsecondsPattern.test(value.toString())
-  );
 };
 
 /**
