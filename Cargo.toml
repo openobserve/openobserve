@@ -231,7 +231,6 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
-gxhash = "~3.0.0"
 hashlink = "0.9.1"
 hashbrown = { version = "0.14", features = ["serde"] }
 hex = "0.4"
