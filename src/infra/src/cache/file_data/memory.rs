@@ -21,7 +21,7 @@ use std::{
 use bytes::Bytes;
 use config::{
     get_config, metrics,
-    utils::hash::{gxhash, Sum32},
+    utils::hash::{gxhash, Sum64},
     RwHashMap,
 };
 use once_cell::sync::Lazy;
@@ -315,7 +315,7 @@ fn get_bucket_idx(file: &str) -> usize {
     if cfg.memory_cache.bucket_num <= 1 {
         0
     } else {
-        let h = gxhash::new().sum32(file);
+        let h = gxhash::new().sum64(file);
         (h as usize) % cfg.memory_cache.bucket_num
     }
 }
