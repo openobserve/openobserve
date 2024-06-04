@@ -22,7 +22,7 @@ use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
 use crate::{
-    common::meta::prom::{HASH_LABEL, NAME_LABEL},
+    common::meta::prom::NAME_LABEL,
     service::promql::{
         value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
         Engine,

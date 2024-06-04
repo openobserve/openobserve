@@ -88,7 +88,6 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
 
     let values = metrics_with_buckets
         .into_values()
-        .filter(|bucket| !bucket.buckets.is_empty())
         .map(|mb| InstantValue {
             labels: mb.labels,
             sample: Sample::new(sample_time, bucket_quantile(phi, mb.buckets)),
@@ -100,7 +99,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76
 fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
-    if phi.is_nan() {
+    if phi.is_nan() || buckets.is_empty() {
         return f64::NAN;
     }
     if phi < 0.0 {
@@ -128,10 +127,11 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     }
     let mut rank = phi * observations;
     let b = match buckets[..buckets.len() - 1]
-        .binary_search_by(|b| b.count.partial_cmp(&rank).unwrap())
+        .iter()
+        .position(|b| b.count >= rank)
     {
-        Ok(b) => b,
-        Err(b) => b,
+        Some(b) => b,
+        None => buckets.len() - 1, // Should not reach here if data is valid
     };
     if b == buckets.len() - 1 {
         return buckets[buckets.len() - 2].upper_bound;
