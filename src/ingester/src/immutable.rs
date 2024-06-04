@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use config::metrics;
 use futures::future::join_all;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::{sync::Semaphore, task};
+use tokio::{fs, sync::Semaphore, task};
 
 use crate::{
     entry::PersistStat,
@@ -79,17 +79,25 @@ impl Immutable {
             .map(|(p, ..)| p.to_string_lossy())
             .collect::<Vec<_>>()
             .join("\n");
-        fs::write(&done_path, lock_data.as_bytes()).context(WriteDataSnafu)?;
+        fs::write(&done_path, lock_data.as_bytes())
+            .await
+            .context(WriteDataSnafu)?;
         // 3. delete wal file
-        fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
+        fs::remove_file(wal_path)
+            .await
+            .context(DeleteFileSnafu { path: wal_path })?;
         // 4. rename the tmp files to parquet files
         for (path, stat) in paths {
             persist_stat += stat;
             let parquet_path = path.with_extension("parquet");
-            fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
+            fs::rename(&path, &parquet_path)
+                .await
+                .context(RenameFileSnafu { path: &path })?;
         }
         // 5. delete the lock file
-        fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
+        fs::remove_file(&done_path)
+            .await
+            .context(DeleteFileSnafu { path: &done_path })?;
         Ok(persist_stat)
     }
 }
