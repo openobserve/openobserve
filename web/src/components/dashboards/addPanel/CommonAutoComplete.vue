@@ -39,6 +39,7 @@ import { ref, toRef, defineComponent, watch } from "vue";
 import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
 import { useSlots } from "vue";
+import { toRefs } from "vue";
 
 export default defineComponent({
   name: "CommonAutoComplete",
@@ -83,9 +84,11 @@ export default defineComponent({
       fieldsFilterFn(value);
     };
 
+    const { items } = toRefs(props);
+
     // apply filter on label
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSearchInputUsingRegex(toRef(props.items), "label", props.searchRegex);
+      useSearchInputUsingRegex(items, "label", props.searchRegex);
 
     const hideOptions = () => {
       showOptions.value = false;
@@ -111,7 +114,7 @@ export default defineComponent({
       store,
       onModelValueChanged,
       inputValue,
-      hasSlot
+      hasSlot,
     };
   },
 });
