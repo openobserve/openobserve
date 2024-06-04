@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <q-td
-              v-for="column in searchObj.data.resultGrid.columns"
+              v-for="(column, colIndex) in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
               :data-test="'log-table-column-' + index + '-' + column.name"
               class="field_list ellipsis"
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
-                  v-if="column.name === '@timestamp'"
+                  v-if="colIndex == 0"
                   :icon="
                     expandedLogs[index.toString()]
                       ? 'expand_more'

@@ -578,7 +578,7 @@ test.describe("Sanity testcases", () => {
     page,
   }) => {
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-table-column-0-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
       .getByText("fast_rewind12345fast_forward250arrow_drop_down")
@@ -625,7 +625,7 @@ test.describe("Sanity testcases", () => {
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
       .click();
-    await page.locator('[data-test="log-table-column-0-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
       .getByText("fast_rewind12345fast_forward250arrow_drop_down")
