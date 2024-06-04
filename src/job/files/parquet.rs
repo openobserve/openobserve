@@ -479,7 +479,6 @@ async fn merge_files(
 
     let cfg = get_config();
     let mut new_file_size: i64 = 0;
-    let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     let mut min_ts = i64::MAX;
@@ -489,15 +488,12 @@ async fn merge_files(
     for file in files_with_size.iter() {
         if new_file_size > 0
             && (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-                || new_compressed_file_size + file.meta.compressed_size
-                    > cfg.compact.max_file_size as i64
                 || (cfg.limit.file_move_fields_limit > 0
                     && group_schema_field_num > cfg.limit.file_move_fields_limit))
         {
             break;
         }
         new_file_size += file.meta.original_size;
-        new_compressed_file_size += file.meta.compressed_size;
         new_file_list.push(file.clone());
     }
     let mut retain_file_list = new_file_list.clone();
