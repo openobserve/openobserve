@@ -25,12 +25,13 @@ use crate::{
     entry::PersistStat,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
     memtable::MemTable,
-    rwmap::RwMap,
+    rwmap::RwIndexMap,
     writer::WriterKey,
     ReadRecordBatchEntry,
 };
 
-pub(crate) static IMMUTABLES: Lazy<RwMap<PathBuf, Arc<Immutable>>> = Lazy::new(RwMap::default);
+pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
+    Lazy::new(RwIndexMap::default);
 
 #[warn(dead_code)]
 pub(crate) struct Immutable {

@@ -14,3 +14,5 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub(crate) type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
+
+pub(crate) type RwIndexMap<K, V> = tokio::sync::RwLock<indexmap::IndexMap<K, V>>;
