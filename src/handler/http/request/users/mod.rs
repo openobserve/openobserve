@@ -20,6 +20,7 @@ use actix_web::{
     http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
+use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     get_config,
     utils::{base64, json},
@@ -36,7 +37,7 @@ use crate::{
                 UserRequest, UserRole,
             },
         },
-        utils::auth::UserEmail,
+        utils::auth::{generate_presigned_url, UserEmail},
     },
     service::users,
 };
@@ -305,6 +306,43 @@ pub async fn authentication(
     }
 }
 
+#[derive(serde::Deserialize)]
+struct PresignedURLGenerator {
+    #[serde(default = "default_exp_in")]
+    exp_in: u32,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct PresignedURLGeneratorResponse {
+    url: String,
+}
+
+const fn default_exp_in() -> u32 {
+    600
+}
+
+#[get("/presigned-url")]
+pub async fn get_presigned_url(
+    _req: HttpRequest,
+    basic_auth: BasicAuth,
+    query: web::Query<PresignedURLGenerator>,
+) -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let time = chrono::Utc::now().timestamp();
+    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
+    let url = generate_presigned_url(
+        basic_auth.user_id(),
+        basic_auth.password().unwrap(),
+        password_ext_salt,
+        &cfg.common.base_uri,
+        query.exp_in as i64,
+        time,
+    );
+
+    let payload = PresignedURLGeneratorResponse { url };
+    Ok(HttpResponse::Ok().json(&payload))
+}
+
 #[get("/login")]
 pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
@@ -489,4 +527,31 @@ fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
     resp.status = false;
     resp.message = "Invalid credentials".to_string();
     Ok(HttpResponse::Unauthorized().json(resp))
+}
+
+#[cfg(test)]
+mod tests {
+    use actix_web::{test, App};
+    use actix_web_httpauth::headers::authorization::Basic;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_presigned_url() {
+        let mut app = test::init_service(App::new().service(get_presigned_url)).await;
+
+        let auth = Basic::new("username", Some("password"));
+        let req = test::TestRequest::get()
+            .uri("/presigned-url")
+            .append_header((actix_web::http::header::AUTHORIZATION, auth))
+            .to_request();
+        let resp = test::call_service(&mut app, req).await;
+
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        let body = test::read_body(resp).await;
+        let response_body: PresignedURLGeneratorResponse = serde_json::from_slice(&body).unwrap();
+
+        assert!(!response_body.url.is_empty());
+    }
 }
