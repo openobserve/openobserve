@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
+const { utcToZonedTime, format } = require('date-fns-tz');
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
@@ -704,20 +705,44 @@ test.describe("Sanity testcases", () => {
       .click();
   });
 
-  test("should check JSON responses for successful:1 with timestamp 15 mins before", async ({
-    page,
-    request,
-  }) => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
+  const getHeaders = () => {
     const basicAuthCredentials = Buffer.from(
       `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
     ).toString("base64");
 
-    const headers = {
+    return {
       Authorization: `Basic ${basicAuthCredentials}`,
       "Content-Type": "application/json",
     };
+  };
+
+  // Helper function to get ingestion URL
+  const getIngestionUrl = (orgId, streamName) => {
+    return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+  };
+
+  // Helper function to send POST request
+  const sendRequest = async (page, url, payload, headers) => {
+    return await page.evaluate(
+      async ({ url, headers, payload }) => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(payload),
+        });
+        return await response.json();
+      },
+      { url, headers, payload }
+    );
+  };
+
+  test("should check JSON responses for successful:1 with timestamp 15 mins before", async ({
+    page,
+  }) => {
+    const orgId = process.env["ORGNAME"];
+    const streamName = "e2e_automate";
+    const headers = getHeaders();
+    const ingestionUrl = getIngestionUrl(orgId, streamName);
 
     // First payload
     const payload1 = [
@@ -741,32 +766,12 @@ test.describe("Sanity testcases", () => {
       },
     ];
 
-    // Function to send POST request
-    const sendRequest = async (url, payload) => {
-      return await page.evaluate(
-        async ({ url, headers, payload }) => {
-          const response = await fetch(url, {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(payload),
-          });
-          return await response.json();
-        },
-        { url, headers, payload }
-      );
-    };
-
-    // URLs for the final requests
-    const ingestionUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-    const url1 = ingestionUrl;
-    const url2 = ingestionUrl;
-
     // Sending first request
-    const response1 = await sendRequest(url1, payload1);
+    const response1 = await sendRequest(page, ingestionUrl, payload1, headers);
     console.log(response1);
 
     // Sending second request
-    const response2 = await sendRequest(url2, payload2);
+    const response2 = await sendRequest(page, ingestionUrl, payload2, headers);
     console.log(response2);
 
     // Assertions
@@ -776,18 +781,11 @@ test.describe("Sanity testcases", () => {
 
   test("should display error if timestamp past the ingestion time limit", async ({
     page,
-    request,
   }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getHeaders();
+    const ingestionUrl = getIngestionUrl(orgId, streamName);
 
     // First payload
     const payload1 = [
@@ -799,8 +797,8 @@ test.describe("Sanity testcases", () => {
       },
     ];
 
-    // Second payload with timestamp 15 minutes before
-    const timestamp = Date.now() - 6 * 60 * 60 * 1000; // 15 minutes before
+    // Second payload with timestamp 6 hours before
+    const timestamp = Date.now() - 6 * 60 * 60 * 1000; // 6 hours before
     const payload2 = [
       {
         level: "info",
@@ -811,32 +809,12 @@ test.describe("Sanity testcases", () => {
       },
     ];
 
-    // Function to send POST request
-    const sendRequest = async (url, payload) => {
-      return await page.evaluate(
-        async ({ url, headers, payload }) => {
-          const response = await fetch(url, {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(payload),
-          });
-          return await response.json();
-        },
-        { url, headers, payload }
-      );
-    };
-
-    // URLs for the final requests
-    const ingestionUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-    const url1 = ingestionUrl;
-    const url2 = ingestionUrl;
-
     // Sending first request
-    const response1 = await sendRequest(url1, payload1);
+    const response1 = await sendRequest(page, ingestionUrl, payload1, headers);
     console.log(response1);
 
     // Sending second request
-    const response2 = await sendRequest(url2, payload2);
+    const response2 = await sendRequest(page, ingestionUrl, payload2, headers);
     console.log(response2);
 
     // Assertions
@@ -844,7 +822,113 @@ test.describe("Sanity testcases", () => {
     expect(response2.status[0].successful).toBe(0);
     expect(response2.status[0].failed).toBe(1);
     expect(response2.status[0].error).toBe(
-      'Too old data, only last 5 hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>'
+      "Too old data, only last 5 hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>"
     );
   });
+
+
+  test("should create and delete dashboard table ", async ({ page }) => {
+    const orgId = process.env["ORGNAME"];
+    const streamName = "e2e_tabledashboard";
+    const headers = getHeaders();
+    const ingestionUrl = getIngestionUrl(orgId, streamName);
+    const timestamp = Date.now() - 10 * 60 * 1000; // 10 minutes before
+    // First payload
+    const payload1 = [
+      {
+        level: "info",
+        job: "test",
+        log: "test message for openobserve",
+        e2e: "1",
+        _timestamp: timestamp,
+      },
+    ];
+
+    // Sending first request
+    const response1 = await sendRequest(page, ingestionUrl, payload1, headers);
+    console.log(response1);
+
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await page.waitForTimeout(5000);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.waitForTimeout(5000);
+    await page.locator('[data-test="add-dashboard-name"]').click();
+
+    await page.locator('[data-test="add-dashboard-name"]').fill("tabledash");
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .click();
+    await page.waitForTimeout(3000);
+    await page.locator('[data-test="selected-chart-table-item"] img').click();
+    await page.locator('[data-test="index-dropdown-stream"]').click();
+    await page.locator('[data-test="index-dropdown-stream"]').fill('e2e_tabledashboard');
+    await page.getByRole('option', { name: 'e2e_tabledashboard' }).click();
+    await page.waitForTimeout(5000);
+   
+    await page.locator('[data-test="field-list-item-logs-e2e_tabledashboard-e2e"] [data-test="dashboard-add-y-data"]').click();
+    await page.locator('[data-test="field-list-item-logs-e2e_tabledashboard-job"] [data-test="dashboard-add-y-data"]').click();
+    await page.locator('[data-test="field-list-item-logs-e2e_tabledashboard-_timestamp"] [data-test="dashboard-add-x-data"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+   await page.locator('[data-test="dashboard-panel-name"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
+     await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-panel-save"]').click();
+    await page.waitForTimeout(2000);
+    const formatDate = (date) => {
+      const year = String(date.getFullYear());
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+
+    const zonedTime = utcToZonedTime(new Date(timestamp), 'UTC');
+    const displayedTimestamp = format(zonedTime, 'yyyy-MM-dd HH:mm:ss', { timeZone: 'UTC' });
+    console.log(displayedTimestamp);
+  
+    const timeCell = await page.getByRole('cell', { name: displayedTimestamp }).textContent();
+    console.log(timeCell);
+  
+    expect(timeCell).toBe(displayedTimestamp); // Directly compare the formatted timestamps
+
+  //  const displayedTimestamp = formatDate (utcToZonedTime(new Date(timestamp), 'UTC'))
+  // console.log(displayedTimestamp)
+  //   const timeCell = await page.getByRole('cell', { name: new RegExp(timestamp.toString().slice(0, 10)) }).textContent();
+  //   console.log(timeCell)
+  // // const displayedTimestamp = formatDate (utcToZonedTime(new Date(timeCell), 'UTC'))
+  // // console.log(displayedTimestamp)
+  // expect(displayedTimestamp).toBeCloseTo(timestamp, 1000 * 60)
+
+    // await page.locator('[data-test="dashboard-apply"]').click();
+    // await page.locator('[data-test="chart-renderer"] canvas').click({
+    //   position: {
+    //     x: 753,
+    //     y: 200,
+    //   },
+    // });
+    // await page.locator('[data-test="dashboard-panel-save"]').click();
+    // await page.locator('[data-test="dashboard-panel-name"]').click();
+    // await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
+    // await page.waitForTimeout(2000);
+    // await page.locator('[data-test="dashboard-panel-save"]').click();
+    // await page.waitForTimeout(2000);
+    // await page
+    //   .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
+    //   .click();
+    // await page.locator('[data-test="dashboard-delete-panel"]').click();
+    // await page.locator('[data-test="confirm-button"]').click();
+    // await page
+    //   .locator("#q-notify div")
+    //   .filter({ hasText: "check_circlePanel deleted" })
+    //   .nth(3)
+    //   .click();
+  });
+
+
+
+  
 });

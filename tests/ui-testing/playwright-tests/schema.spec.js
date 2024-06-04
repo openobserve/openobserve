@@ -73,16 +73,9 @@ test.describe("Schema testcases", () => {
       force: true,
     });
     // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
-    // await search.hits.FIXME_should("be.an", "array");
+    await expect.poll(async () => (await search).status()).toBe(200); 
   }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
-
-  //   console.log("--logData--", logData);
-  // });
+ 
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(5000)
@@ -94,7 +87,6 @@ test.describe("Schema testcases", () => {
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await selectStreamAndStreamTypeForLogs(page,logData.Stream);
     await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
  
   test('stream schema settings updated to be displayed under logs', async ({ page }) => {
@@ -192,13 +184,10 @@ test.describe("Schema testcases", () => {
   await page.waitForTimeout(2000);
   await page.locator('button').filter({ hasText: 'close' }).click()
   await page.waitForTimeout(1000);
-  // await page.getByPlaceholder('Search Stream').click();
-  // await page.getByPlaceholder('Search Stream').fill('e2e_automate');
   await page.getByRole('button', { name: 'Stream Detail' }).first().click();
   await page.locator('[data-test="tab-schemaFields"]').click();
   await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
   await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
-  // await page.locator('[data-test="schema-stream-delete-oooo-field-fts-key-checkbox"]').click();
   await page.locator('[data-test="schema-add-field-button"]').click();
   await page.locator('[data-test="schema-update-settings-button"]').click();
 
