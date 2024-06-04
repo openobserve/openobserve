@@ -853,7 +853,7 @@ export default defineComponent({
           // enable sql mode
           searchObj.meta.sqlMode = true;
           dashboardPanelData.data.queries[0].customQuery = true;
-          // searchObj.data.query = addHistogramToQuery(searchObj.data.query);
+          // searchObj.data.query = await addHistogramToQuery(searchObj.data.query);
 
           dashboardPanelData.data.queries[0].fields.stream_type =
             searchObj.data.stream.streamType ?? "logs";

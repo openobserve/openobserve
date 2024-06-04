@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn-toggle
           class="q-ml-xs no-outline q-pa-none no-border"
           v-model="searchObj.meta.logsVisualizeToggle"
-          style="margin-left: 5px; border-radius: 4px;"
+          style="margin-left: 5px; border-radius: 4px"
           no-caps
           padding="5px"
           size="sm"
@@ -2340,6 +2340,14 @@ export default defineComponent({
         }
       }
       return filtered;
+    };
+
+    const regionFilterMethod = (node, filter) => {
+      const filt = filter.toLowerCase();
+      return node.label && node.label.toLowerCase().indexOf(filt) > -1;
+    };
+    const resetRegionFilter = () => {
+      regionFilter.value = "";
     };
 
     const handleRegionsSelection = (item, isSelected) => {

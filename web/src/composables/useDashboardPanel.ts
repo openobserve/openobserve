@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, watch } from "vue";
+import { reactive, computed, watch, onBeforeMount } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
-import { Parser } from "node-sql-parser/build/mysql";
 
 const colors = [
   "#5960b2",
@@ -33,8 +32,7 @@ const colors = [
   "#546570",
   "#c4ccd3",
 ];
-
-const parser = new Parser();
+let parser: any;
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
@@ -1449,6 +1447,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
+  onBeforeMount(async () => {
+    await importSqlParser();
+    updateQueryValue();
+  });
+
+  const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
+
   const sqlchart = () => {
     // STEP 1: first check if there is at least 1 field selected
     if (
@@ -1498,6 +1507,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         switch (field?.aggregationFunction) {
           case "count-distinct":
             selector += `count(distinct(${field?.column}))`;
+            break;
+          case "p50":
+            selector += `approx_percentile_cont(${field?.column}, 0.5)`;
+            break;
+          case "p90":
+            selector += `approx_percentile_cont(${field?.column}, 0.9)`;
+            break;
+          case "p95":
+            selector += `approx_percentile_cont(${field?.column}, 0.95)`;
+            break;
+          case "p99":
+            selector += `approx_percentile_cont(${field?.column}, 0.99)`;
             break;
           case "histogram": {
             // if inteval is not null, then use it
@@ -1632,12 +1653,26 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     if (query) {
       if (weight) {
-        const weightField = weight.aggregationFunction
-          ? weight.aggregationFunction == "count-distinct"
-            ? `count(distinct(${weight.column}))`
-            : `${weight.aggregationFunction}(${weight.column})`
-          : `${weight.column}`;
-        query += `, ${weightField} as ${weight.alias}`;
+        switch (weight?.aggregationFunction) {
+          case "p50":
+            query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
+            break;
+          case "p90":
+            query += `, approx_percentile_cont(${weight.column}, 0.9) as ${weight.alias}`;
+            break;
+          case "p95":
+            query += `, approx_percentile_cont(${weight.column}, 0.95) as ${weight.alias}`;
+            break;
+          case "p99":
+            query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
+            break;
+          case "count-distinct":
+            query += `, count(distinct(${weight.column})) as ${weight.alias}`;
+            break;
+          default:
+            query += `, ${weight.aggregationFunction}(${weight.column}) as ${weight.alias}`;
+            break;
+        }
       }
       query += ` FROM "${
         dashboardPanelData.data.queries[
@@ -1756,9 +1791,33 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     if (value) {
-      selectFields.push(
-        `${value.aggregationFunction}(${value.column}) as ${value.alias}`
-      );
+      switch (value?.aggregationFunction) {
+        case "p50":
+          selectFields.push(
+            `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`
+          );
+          break;
+        case "p90":
+          selectFields.push(
+            `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`
+          );
+          break;
+        case "p95":
+          selectFields.push(
+            `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`
+          );
+          break;
+        case "p99":
+          selectFields.push(
+            `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`
+          );
+          break;
+        default:
+          selectFields.push(
+            `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+          );
+          break;
+      }
     }
 
     // Adding the selected fields to the query
@@ -2039,7 +2098,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               .fields.x.length
           ) {
             errors.push(
-              `${currentXLabel} field is not allowed for Metric chart`
+              `${currentXLabel.value} field is not allowed for Metric chart`
             );
           }
 
@@ -2204,7 +2263,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           errors.push(
             ...aggregationFunctionError.map(
               (it: any) =>
-                `${currentYLabel}: ${it.column}: Aggregation function required`
+                `${currentYLabel.value}: ${it.column}: Aggregation function required`
             )
           );
         }
@@ -2221,7 +2280,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         errors.push(
           ...labelError.map(
-            (it: any) => `${currentYLabel}: ${it.column}: Label required`
+            (it: any) => `${currentYLabel.value}: ${it.column}: Label required`
           )
         );
       }
@@ -2381,11 +2440,41 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // Get the parsed query
       try {
-        dashboardPanelData.meta.parsedQuery = parser.astify(
+        let currentQuery =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].query
-        );
+          ].query;
+
+        // replace variables with dummy values to verify query is correct or not
+        if (/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:csv}/g,
+            "1,2"
+          );
+        }
+        if (/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:singlequote}/g,
+            "'1','2'"
+          );
+        }
+        if (/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:doublequote}/g,
+            '"1","2"'
+          );
+        }
+        if (/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(
+            /\${[a-zA-Z0-9_-]+:pipe}/g,
+            "1|2"
+          );
+        }
+        if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
+          currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10");
+        }
+
+        dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
       } catch (e) {
         // exit as there is an invalid query
         dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
@@ -2487,7 +2576,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queryType == "sql"
       ) {
         // Call the updateQueryValue function
-        updateQueryValue();
+        if (parser) updateQueryValue();
       } else {
         // auto query mode selected
         // remove the custom fields from the list

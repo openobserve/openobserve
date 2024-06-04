@@ -193,23 +193,11 @@ export default defineComponent({
       removeQuery,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
-    let parser: any;
 
     const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
       usePromqlSuggestions();
 
     const queryEditorRef = ref(null);
-
-    onBeforeMount(async () => {
-      await importSqlParser();
-      updateQueryValue();
-    });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
 
     const addTab = () => {
       addQuery();
