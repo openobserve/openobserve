@@ -484,6 +484,7 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
 pub fn concat_batches(
     schema: Arc<Schema>,
     mut batches: Vec<RecordBatch>,
+    less_memory_mode: bool,
 ) -> Result<RecordBatch, ArrowError> {
     // When schema is empty, sum the number of the rows of all batches
     if schema.fields().is_empty() {
@@ -492,25 +493,29 @@ pub fn concat_batches(
         options.row_count = Some(num_rows);
         return RecordBatch::try_new_with_options(schema.clone(), vec![], &options);
     }
-
     if batches.is_empty() {
         return Ok(RecordBatch::new_empty(schema.clone()));
     }
+
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
-        // let array = arrow::compute::concat(
-        //     &batches.iter()
-        //         .map(|batch| batch.column(i).as_ref())
-        //         .collect::<Vec<_>>(),
-        // )?;
-        let mut array = Vec::with_capacity(batches.len());
-        for batch in &mut batches {
-            let i = i - arrays.len();
-            let column = batch.remove_column(i);
-            array.push(column);
-        }
-        let array = arrow::compute::concat(&array.iter().map(|c| c.as_ref()).collect::<Vec<_>>())?;
+        let array = if less_memory_mode {
+            let mut new_batches = Vec::with_capacity(batches.len());
+            for batch in &mut batches {
+                let i = i - arrays.len();
+                let column = batch.remove_column(i);
+                new_batches.push(column);
+            }
+            arrow::compute::concat(&new_batches.iter().map(|c| c.as_ref()).collect::<Vec<_>>())?
+        } else {
+            arrow::compute::concat(
+                &batches
+                    .iter()
+                    .map(|batch| batch.column(i).as_ref())
+                    .collect::<Vec<_>>(),
+            )?
+        };
         arrays.push(array);
     }
     RecordBatch::try_new(schema.clone(), arrays)
