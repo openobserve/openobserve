@@ -568,7 +568,11 @@ pub struct Common {
     pub usage_reporting_creds: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
-    #[env_config(name = "ZO_USAGE_PUBLISH_INTERVAL",  help = "duration in seconds after last reporting usage will be published " default = 600)]
+    #[env_config(
+        name = "ZO_USAGE_PUBLISH_INTERVAL",
+        help = "duration in seconds after last reporting usage will be published",
+        default = 600
+    )]
     // in seconds
     pub usage_publish_interval: i64,
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
