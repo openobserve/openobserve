@@ -189,8 +189,9 @@ export const isGivenFieldInOrderBy = async (
   return null;
 };
 
-export const addHistogramToQuery = (query: any) => {
-  const parser = new Parser();
+export const addHistogramToQuery = async (query: any) => {
+  await importSqlParser();
+
   try {
     const ast: any = parser.astify(query); // Parse the SQL query
 
@@ -228,8 +229,9 @@ export const addHistogramToQuery = (query: any) => {
   }
 };
 
-export const removeHistogramFromQuery = (query: any) => {
-  const parser = new Parser();
+export const removeHistogramFromQuery = async (query: any) => {
+  await importSqlParser();
+
   try {
     const ast: any = parser.astify(query); // Parse the SQL query
 
