@@ -127,7 +127,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             .parse()
             .unwrap_or_default();
         let key = WriterKey::new(org_id, stream_type);
-        let memtable = memtable::MemTable::new();
+        let mut memtable = memtable::MemTable::new();
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,
             Err(e) => {
@@ -192,7 +192,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
                     .context(InferJsonSchemaSnafu)?;
             let infer_schema = Arc::new(infer_schema);
             entry.schema_key = infer_schema.hash_key().into();
-            memtable.write(infer_schema, entry).await?;
+            memtable.write(infer_schema, entry)?;
         }
         log::warn!(
             "replay wal file: {:?}, entries: {}, records: {}",

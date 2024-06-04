@@ -13,21 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 
-use arrow_schema::Schema;
 use config::metrics;
 use futures::future::join_all;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::{fs, sync::Semaphore, task};
+use tokio::{sync::Semaphore, task};
 
 use crate::{
-    entry::{PersistStat, RecordBatchEntry},
+    entry::PersistStat,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
+    ReadRecordBatchEntry,
 };
 
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
@@ -45,12 +45,12 @@ pub async fn read_from_immutable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
+) -> Result<Vec<ReadRecordBatchEntry>> {
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());
     for (_, i) in r.iter() {
         if org_id == i.key.org_id.as_ref() && stream_type == i.key.stream_type.as_ref() {
-            batches.extend(i.memtable.read(stream_name, time_range).await?);
+            batches.extend(i.memtable.read(stream_name, time_range)?);
         }
     }
     Ok(batches)
@@ -65,13 +65,12 @@ impl Immutable {
         }
     }
 
-    pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
+    pub(crate) fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
         let mut persist_stat = PersistStat::default();
         // 1. dump memtable to disk
-        let (schema_size, paths) = self
-            .memtable
-            .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)
-            .await?;
+        let (schema_size, paths) =
+            self.memtable
+                .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)?;
         persist_stat.arrow_size += schema_size;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");
@@ -80,25 +79,17 @@ impl Immutable {
             .map(|(p, ..)| p.to_string_lossy())
             .collect::<Vec<_>>()
             .join("\n");
-        fs::write(&done_path, lock_data.as_bytes())
-            .await
-            .context(WriteDataSnafu)?;
+        fs::write(&done_path, lock_data.as_bytes()).context(WriteDataSnafu)?;
         // 3. delete wal file
-        fs::remove_file(wal_path)
-            .await
-            .context(DeleteFileSnafu { path: wal_path })?;
+        fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
         // 4. rename the tmp files to parquet files
         for (path, stat) in paths {
             persist_stat += stat;
             let parquet_path = path.with_extension("parquet");
-            fs::rename(&path, &parquet_path)
-                .await
-                .context(RenameFileSnafu { path: &path })?;
+            fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
         }
         // 5. delete the lock file
-        fs::remove_file(&done_path)
-            .await
-            .context(DeleteFileSnafu { path: &done_path })?;
+        fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
         Ok(persist_stat)
     }
 }
@@ -135,7 +126,7 @@ pub(crate) async fn persist() -> Result<()> {
                 // persist entry to local disk
                 let immutable = immutable.clone();
                 drop(r);
-                let ret = immutable.persist(&path).await;
+                let ret = immutable.persist(&path);
                 drop(permit);
                 ret.map(|stat| Some((path, stat)))
             });

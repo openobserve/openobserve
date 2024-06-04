@@ -23,12 +23,17 @@ mod stream;
 mod wal;
 mod writer;
 
+use std::sync::Arc;
+
+use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
 use tokio::time;
 pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+
+pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
     Lazy::new(Default::default);

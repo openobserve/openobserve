@@ -30,12 +30,12 @@ use tokio::sync::{Mutex, RwLock};
 use wal::Writer as WalWriter;
 
 use crate::{
-    entry::{Entry, RecordBatchEntry},
+    entry::Entry,
     errors::*,
-    immutable,
-    immutable::IMMUTABLES,
+    immutable::{self, IMMUTABLES},
     memtable::MemTable,
     rwmap::RwMap,
+    ReadRecordBatchEntry,
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
@@ -88,7 +88,7 @@ pub async fn read_from_memtable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
+) -> Result<Vec<ReadRecordBatchEntry>> {
     let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
     let writer_num = if cfg.common.feature_per_thread_lock {
@@ -243,8 +243,8 @@ impl Writer {
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             drop(wal);
             // write into memtable
-            let mem = self.memtable.read().await;
-            mem.write(schema, entry).await?;
+            let mut mem = self.memtable.write().await;
+            mem.write(schema, entry)?;
             drop(mem);
         }
 
@@ -282,9 +282,9 @@ impl Writer {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
+    ) -> Result<Vec<ReadRecordBatchEntry>> {
         let memtable = self.memtable.read().await;
-        memtable.read(stream_name, time_range).await
+        memtable.read(stream_name, time_range)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old

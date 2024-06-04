@@ -13,29 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::{create_dir_all, OpenOptions},
+    io::Write,
+    path::PathBuf,
+    sync::Arc,
+};
 
 use arrow_schema::Schema;
 use config::{
     meta::stream::FileMeta,
     metrics,
     utils::{
-        parquet::{generate_filename_with_time_range, new_parquet_writer},
+        parquet::{generate_filename_with_time_range, new_parquet_writer_std},
         schema_ext::SchemaExt,
     },
 };
+use hashbrown::HashMap;
 use snafu::ResultExt;
-use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
-    rwmap::RwMap,
+    ReadRecordBatchEntry,
 };
 
 pub(crate) struct Partition {
     schema: Arc<Schema>,
-    files: RwMap<Arc<str>, PartitionFile>, // key: hour, val: files
+    files: HashMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
 impl Partition {
@@ -45,32 +50,27 @@ impl Partition {
             .add(schema.size() as i64);
         Self {
             schema,
-            files: RwMap::default(),
+            files: HashMap::default(),
         }
     }
 
-    pub(crate) async fn write(&self, entry: Entry) -> Result<usize> {
-        let mut rw = self.files.write().await;
-        let partition = rw
+    pub(crate) fn write(&mut self, entry: Entry) -> Result<usize> {
+        let partition = self
+            .files
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
         partition.write(self.schema.clone(), entry)
     }
 
-    pub(crate) async fn read(
-        &self,
-        time_range: Option<(i64, i64)>,
-    ) -> Result<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)> {
-        let r = self.files.read().await;
-        let mut batches = Vec::with_capacity(r.len());
-        for file in r.values() {
+    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<ReadRecordBatchEntry> {
+        let mut batches = Vec::with_capacity(self.files.len());
+        for file in self.files.values() {
             batches.extend(file.read(time_range)?);
         }
-        drop(r);
         Ok((self.schema.clone(), batches))
     }
 
-    pub(crate) async fn persist(
+    pub(crate) fn persist(
         &self,
         thread_id: usize,
         org_id: &str,
@@ -85,9 +85,8 @@ impl Partition {
         path.push(stream_type);
         path.push(stream_name);
         path.push(thread_id.to_string());
-        let r = self.files.read().await;
-        let mut paths = Vec::with_capacity(r.len());
-        for (hour, data) in r.iter() {
+        let mut paths = Vec::with_capacity(self.files.len());
+        for (hour, data) in self.files.iter() {
             if data.data.is_empty() {
                 continue;
             }
@@ -121,7 +120,8 @@ impl Partition {
                     (vec![], vec![])
                 };
             let mut buf_parquet = Vec::new();
-            let mut writer = new_parquet_writer(
+
+            let mut writer = new_parquet_writer_std(
                 &mut buf_parquet,
                 &self.schema,
                 &bloom_filter_fields,
@@ -132,10 +132,9 @@ impl Partition {
                 persist_stat.arrow_size += batch.data_arrow_size;
                 writer
                     .write(&batch.data)
-                    .await
                     .context(WriteParquetRecordBatchSnafu)?;
             }
-            writer.close().await.context(WriteParquetRecordBatchSnafu)?;
+            writer.close().context(WriteParquetRecordBatchSnafu)?;
             file_meta.compressed_size = buf_parquet.len() as i64;
 
             // write into local file
@@ -151,26 +150,24 @@ impl Partition {
                 .write(true)
                 .truncate(true)
                 .open(&path)
-                .await
                 .context(CreateFileSnafu { path: path.clone() })?;
             f.write_all(&buf_parquet)
-                .await
                 .context(WriteFileSnafu { path: path.clone() })?;
 
             // set parquet metadata cache
-            let mut file_key = path.clone();
-            file_key.set_extension("parquet");
-            let file_key = file_key
-                .strip_prefix(base_path.clone())
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/")
-                .trim_start_matches('/')
-                .to_string();
-            super::WAL_PARQUET_METADATA
-                .write()
-                .await
-                .insert(file_key, file_meta);
+            // let mut file_key = path.clone();
+            // file_key.set_extension("parquet");
+            // let file_key = file_key
+            //     .strip_prefix(base_path.clone())
+            //     .unwrap()
+            //     .to_string_lossy()
+            //     .replace('\\', "/")
+            //     .trim_start_matches('/')
+            //     .to_string();
+            // super::WAL_PARQUET_METADATA
+            //     .write()
+            //     .await
+            //     .insert(file_key, file_meta);
 
             // update metrics
             metrics::INGEST_WAL_USED_BYTES
