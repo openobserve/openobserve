@@ -685,7 +685,7 @@ pub async fn merge_files(
 
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone(), true).await
     } else {
         datafusion::exec::merge_parquet_files(
             tmp_dir.name(),
@@ -1032,6 +1032,7 @@ pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
     mut schema: Arc<Schema>,
+    strict_memory_mode: bool,
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
@@ -1073,21 +1074,24 @@ pub async fn merge_parquet_files(
         .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
-    let mut concated_record_batch = concat_batches(schema.clone(), record_batches)?;
+    let mut concated_record_batch =
+        concat_batches(schema.clone(), record_batches, strict_memory_mode)?;
 
     // 3. delete all the null columns
-    let num_rows = concated_record_batch.num_rows();
-    let mut null_columns = Vec::new();
-    for idx in 0..schema.fields().len() {
-        if concated_record_batch.column(idx).null_count() == num_rows {
-            null_columns.push(idx);
+    if strict_memory_mode {
+        let num_rows = concated_record_batch.num_rows();
+        let mut null_columns = Vec::new();
+        for idx in 0..schema.fields().len() {
+            if concated_record_batch.column(idx).null_count() == num_rows {
+                null_columns.push(idx);
+            }
         }
-    }
-    if !null_columns.is_empty() {
-        for (deleted_num, idx) in null_columns.into_iter().enumerate() {
-            concated_record_batch.remove_column(idx - deleted_num);
+        if !null_columns.is_empty() {
+            for (deleted_num, idx) in null_columns.into_iter().enumerate() {
+                concated_record_batch.remove_column(idx - deleted_num);
+            }
+            schema = concated_record_batch.schema().clone();
         }
-        schema = concated_record_batch.schema().clone();
     }
 
     // 4. sort concatenated record batch by timestamp col in desc order
@@ -1109,18 +1113,21 @@ pub async fn merge_parquet_files(
         None,
     )?;
 
-    // let sorted_columns = concated_record_batch
-    //     .columns()
-    //     .into_iter()
-    //     .map(|c| arrow::compute::take(c, &sort_indices, None))
-    //     .collect::<std::result::Result<Vec<_>, _>>()?;
     let batch_columns_len = concated_record_batch.columns().len();
     let mut sorted_columns = Vec::with_capacity(batch_columns_len);
-    for i in 0..batch_columns_len {
-        let i = i - sorted_columns.len();
-        let sorted_column =
-            arrow::compute::take(&concated_record_batch.remove_column(i), &sort_indices, None)?;
-        sorted_columns.push(sorted_column);
+    if strict_memory_mode {
+        for i in 0..batch_columns_len {
+            let i = i - sorted_columns.len();
+            let sorted_column =
+                arrow::compute::take(&concated_record_batch.remove_column(i), &sort_indices, None)?;
+            sorted_columns.push(sorted_column);
+        }
+    } else {
+        sorted_columns = concated_record_batch
+            .columns()
+            .iter()
+            .map(|c| arrow::compute::take(c, &sort_indices, None))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
     }
     drop(concated_record_batch);
 
