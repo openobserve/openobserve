@@ -249,12 +249,6 @@ pub async fn eval_top(
             )));
         }
     };
-    // order the data by HASH_VALUE
-    // let mut data_index: FxIndexMap<String, usize> = Default::default();
-    // for (i, item) in data.iter().enumerate() {
-    //     let key = item.labels.get_value(HASH_LABEL);
-    //     data_index.insert(key, i);
-    // }
 
     let mut score_values: FxIndexMap<Signature, Vec<TopItem>> = Default::default();
     match modifier {
