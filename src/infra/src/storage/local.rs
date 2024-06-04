@@ -214,7 +214,8 @@ impl ObjectStore for Local {
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        let prefix = format_key(prefix.unwrap().as_ref(), self.with_prefix);
+        let key = prefix.map(|p| p.as_ref());
+        let prefix = format_key(key.unwrap_or(""), self.with_prefix);
         self.client.list(Some(&prefix.into()))
     }
 

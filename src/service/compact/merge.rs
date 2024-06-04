@@ -29,7 +29,7 @@ use config::{
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::format_recordbatch_by_schema,
+        record_batch_ext::{concat_batches, format_recordbatch_by_schema},
     },
     FILE_EXT_PARQUET,
 };
@@ -502,15 +502,20 @@ pub async fn merge_files(
     }
 
     let mut new_file_size = 0;
+    let mut new_compressed_file_size = 0;
     let mut total_records = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     let cfg = get_config();
     for file in files_with_size.iter() {
-        if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
+        if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
+            || new_compressed_file_size + file.meta.compressed_size
+                > cfg.compact.max_file_size as i64
+        {
             break;
         }
         new_file_size += file.meta.original_size;
+        new_compressed_file_size += file.meta.compressed_size;
         total_records += file.meta.records;
         new_file_list.push(file.clone());
         // metrics
@@ -530,8 +535,10 @@ pub async fn merge_files(
 
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
-    for file in &new_file_list {
-        log::info!("[COMPACT:{thread_id}] merge small file: {}", &file.key);
+    let mut fi = 0;
+    for file in new_file_list.iter() {
+        fi += 1;
+        log::info!("[COMPACT:{thread_id}:{fi}] merge small file: {}", &file.key);
         let data = match storage::get(&file.key).await {
             Ok(body) => body,
             Err(err) => {
@@ -589,7 +596,7 @@ pub async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_latest).unwrap();
     let full_text_search_fields = get_stream_setting_fts_fields(&schema_latest).unwrap();
     if cfg.common.widening_schema_evolution && schema_versions.len() > 1 {
-        for file in &new_file_list {
+        for file in new_file_list.iter() {
             // get the schema version of the file
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
@@ -631,7 +638,7 @@ pub async fn merge_files(
             // do the convert
             let mut buf = Vec::new();
             let file_tmp_dir = cache::tmpfs::Directory::default();
-            let file_data = storage::get(&file.key).await?;
+            let file_data = tmp_dir.get(&file.key)?;
             if file_data.is_empty() {
                 // delete file from file list
                 log::warn!("found invalid file: {}", file.key);
@@ -689,8 +696,7 @@ pub async fn merge_files(
         .await
     };
     let (new_schema, new_batches) = merge_result.map_err(|e| {
-        let files = tmp_dir.list("all").unwrap();
-        let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
+        let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
         log::error!(
             "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
             e,
@@ -1025,14 +1031,14 @@ pub fn generate_inverted_idx_recordbatch(
 pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
-    schema: Arc<Schema>,
+    mut schema: Arc<Schema>,
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
     // 1. get record batches from tmpfs
     let temp_files = infra::cache::tmpfs::list(trace_id, "parquet").map_err(|e| {
         log::error!(
-            "[INGESTER:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
+            "[MERGE:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
             e
         );
         DataFusionError::Execution(e.to_string())
@@ -1042,16 +1048,16 @@ pub async fn merge_parquet_files(
     for file in temp_files {
         let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
             log::error!(
-                "[INGESTER:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
+                "[MERGE:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
                 e
             );
             DataFusionError::Execution(e.to_string())
         })?;
 
         let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
-            log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
+            log::error!("[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error");
             log::error!(
-                "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
+                "[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
                 file.location,
                 e
             );
@@ -1067,15 +1073,30 @@ pub async fn merge_parquet_files(
         .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
-    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
+    let mut concated_record_batch = concat_batches(schema.clone(), record_batches)?;
 
-    // 3. sort concatenated record batch by timestamp col in desc order
+    // 3. delete all the null columns
+    let num_rows = concated_record_batch.num_rows();
+    let mut null_columns = Vec::new();
+    for idx in 0..schema.fields().len() {
+        if concated_record_batch.column(idx).null_count() == num_rows {
+            null_columns.push(idx);
+        }
+    }
+    if !null_columns.is_empty() {
+        for (deleted_num, idx) in null_columns.into_iter().enumerate() {
+            concated_record_batch.remove_column(idx - deleted_num);
+        }
+        schema = concated_record_batch.schema().clone();
+    }
+
+    // 4. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
-        concatenated_record_batch
+        concated_record_batch
             .column_by_name(&get_config().common.column_timestamp)
             .ok_or_else(|| {
                 log::error!(
-                    "[INGESTER:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
+                    "[MERGE:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
                 );
                 DataFusionError::Execution(
                     "No _timestamp column found in merged record batch".to_string(),
@@ -1088,17 +1109,26 @@ pub async fn merge_parquet_files(
         None,
     )?;
 
-    let sorted_columns = concatenated_record_batch
-        .columns()
-        .iter()
-        .map(|c| arrow::compute::take(c, &sort_indices, None))
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+    // let sorted_columns = concated_record_batch
+    //     .columns()
+    //     .into_iter()
+    //     .map(|c| arrow::compute::take(c, &sort_indices, None))
+    //     .collect::<std::result::Result<Vec<_>, _>>()?;
+    let batch_columns_len = concated_record_batch.columns().len();
+    let mut sorted_columns = Vec::with_capacity(batch_columns_len);
+    for i in 0..batch_columns_len {
+        let i = i - sorted_columns.len();
+        let sorted_column =
+            arrow::compute::take(&concated_record_batch.remove_column(i), &sort_indices, None)?;
+        sorted_columns.push(sorted_column);
+    }
+    drop(concated_record_batch);
 
     let final_record_batch = RecordBatch::try_new(schema.clone(), sorted_columns)?;
     let schema = final_record_batch.schema();
 
     log::info!(
-        "merge_parquet_files took {} ms",
+        "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
