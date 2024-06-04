@@ -1113,18 +1113,21 @@ pub async fn merge_parquet_files(
         None,
     )?;
 
-    // let sorted_columns = concated_record_batch
-    //     .columns()
-    //     .into_iter()
-    //     .map(|c| arrow::compute::take(c, &sort_indices, None))
-    //     .collect::<std::result::Result<Vec<_>, _>>()?;
     let batch_columns_len = concated_record_batch.columns().len();
     let mut sorted_columns = Vec::with_capacity(batch_columns_len);
-    for i in 0..batch_columns_len {
-        let i = i - sorted_columns.len();
-        let sorted_column =
-            arrow::compute::take(&concated_record_batch.remove_column(i), &sort_indices, None)?;
-        sorted_columns.push(sorted_column);
+    if strict_memory_mode {
+        for i in 0..batch_columns_len {
+            let i = i - sorted_columns.len();
+            let sorted_column =
+                arrow::compute::take(&concated_record_batch.remove_column(i), &sort_indices, None)?;
+            sorted_columns.push(sorted_column);
+        }
+    } else {
+        sorted_columns = concated_record_batch
+            .columns()
+            .iter()
+            .map(|c| arrow::compute::take(c, &sort_indices, None))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
     }
     drop(concated_record_batch);
 
