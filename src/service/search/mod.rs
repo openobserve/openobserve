@@ -20,7 +20,8 @@ use config::{
     get_config, ider,
     meta::{
         search,
-        stream::{FileKey, StreamType}, usage::{RequestStats, UsageType},
+        stream::{FileKey, StreamType},
+        usage::{RequestStats, UsageType},
     },
     utils::str::find,
 };
@@ -33,8 +34,6 @@ use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
 use regex::Regex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use super::usage::report_request_usage_stats;
-
 #[cfg(feature = "enterprise")]
 use {
     hashbrown::HashSet,
@@ -45,6 +44,7 @@ use {
 #[cfg(not(feature = "enterprise"))]
 use {std::sync::Arc, tokio::sync::Mutex};
 
+use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
@@ -158,7 +158,7 @@ pub async fn search(
                     search::SearchEventType::Other => (false, None),
                 },
                 None => (false, None),
-            }; 
+            };
 
             if report_usage {
                 let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
@@ -190,7 +190,8 @@ pub async fn search(
                 )
                 .await;
             }
-            Ok(res)},
+            Ok(res)
+        }
         Err(e) => Err(e),
     }
 }
