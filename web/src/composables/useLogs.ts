@@ -658,17 +658,20 @@ const useLogs = () => {
           return false;
         }
 
-        if (parsedSQL.orderby == null) {
-          // showErrorNotification("Order by clause is required in SQL mode");
-          notificationMsg.value = "Order by clause is required in SQL mode";
-          return false;
-        }
+        // if (
+        //   hasTimeStampColumn(parsedSQL.columns) &&
+        //   parsedSQL.orderby == null
+        // ) {
+        //   // showErrorNotification("Order by clause is required in SQL mode");
+        //   notificationMsg.value = "Order by clause is required in SQL mode";
+        //   return false;
+        // }
 
-        if (!hasTimeStampColumn(parsedSQL.columns)) {
-          // showErrorNotification("Timestamp column is required in SQL mode");
-          notificationMsg.value = "Timestamp column is required in SQL mode";
-          return false;
-        }
+        // if (!hasTimeStampColumn(parsedSQL.columns)) {
+        //   // showErrorNotification("Timestamp column is required in SQL mode");
+        //   notificationMsg.value = "Timestamp column is required in SQL mode";
+        //   return false;
+        // }
 
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
@@ -2167,24 +2170,34 @@ const useLogs = () => {
       }
       searchObj.data.stream.selectedFields = selectedFields;
 
-      searchObj.data.resultGrid.columns.push({
-        name: "@timestamp",
-        field: (row: any) =>
-          timestampToTimezoneDate(
-            row[store.state.zoConfig.timestamp_column] / 1000,
-            store.state.timezone,
-            "yyyy-MM-dd HH:mm:ss.SSS"
-          ),
-        prop: (row: any) =>
-          timestampToTimezoneDate(
-            row[store.state.zoConfig.timestamp_column] / 1000,
-            store.state.timezone,
-            "yyyy-MM-dd HH:mm:ss.SSS"
-          ),
-        label: t("search.timestamp") + ` (${store.state.timezone})`,
-        align: "left",
-        sortable: true,
-      });
+      const parsedSQL: any = fnParsedSQL();
+      if (
+        (searchObj.meta.sqlMode == true &&
+          parsedSQL.hasOwnProperty("columns") &&
+          hasTimeStampColumn(parsedSQL.columns)) ||
+        searchObj.data.stream.selectedFields.includes(
+          store.state.zoConfig.timestamp_column
+        )
+      ) {
+        searchObj.data.resultGrid.columns.push({
+          name: "@timestamp",
+          field: (row: any) =>
+            timestampToTimezoneDate(
+              row[store.state.zoConfig.timestamp_column] / 1000,
+              store.state.timezone,
+              "yyyy-MM-dd HH:mm:ss.SSS"
+            ),
+          prop: (row: any) =>
+            timestampToTimezoneDate(
+              row[store.state.zoConfig.timestamp_column] / 1000,
+              store.state.timezone,
+              "yyyy-MM-dd HH:mm:ss.SSS"
+            ),
+          label: t("search.timestamp") + ` (${store.state.timezone})`,
+          align: "left",
+          sortable: true,
+        });
+      }
       if (searchObj.data.stream.selectedFields.length == 0) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
         if (searchObj.data.stream.selectedFields.length == 0) {
@@ -2766,7 +2779,7 @@ const useLogs = () => {
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
         ? queryStr
-        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
 
     if (searchObj.data.stream.selectedStreamFields.length == 0) {

@@ -285,7 +285,7 @@ test.describe("Logs UI testcases", () => {
       page.locator(".search-list > :nth-child(1) > .text-left")
     ).toBeVisible();
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-table-column-0-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="close-dialog"]').click({
       force: true,
@@ -529,10 +529,10 @@ test.describe("Logs UI testcases", () => {
 
   test('should display search around in histogram mode', async ({ page }) => {
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(2000);
-    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
     
@@ -548,7 +548,7 @@ test.describe("Logs UI testcases", () => {
     await page.locator('[data-test="log-table-column-3-source"]').getByText('{"_timestamp":').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(1000);
-    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
     
@@ -557,10 +557,10 @@ test.describe("Logs UI testcases", () => {
   test('should display search around in SQL mode', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
-    await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(2000)
-    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
     
@@ -575,12 +575,12 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(2000);
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-table-column-2-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
     await page.waitForTimeout(2000);
-    const element = await page.locator('[data-test="log-table-column-2-\\@timestamp"]');
+    const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
-    await expect(page.locator('[data-test="log-table-column-1-@timestamp"]')).toBeVisible();
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
 });

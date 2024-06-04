@@ -131,9 +131,9 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should add timestamp to editor save this view and switch", async ({ page }) => {await page.waitForTimeout(
-    1000);await page.locator(
-    '[data-test="log-table-column-1-@timestamp"] > .flex > .ellipsis').click();await page.locator(
-    ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click();await page.locator(
+    1000);await page.locator('[data-test="log-table-column-0-source"] > .flex > .ellipsis').click();
+    
+    await page.locator(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click();await page.locator(
     '[data-test="log-details-include-field-btn"]').click();await page.locator(
     '[data-test="close-dialog"] > .q-btn__content').click();await page.locator(
     '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)').click();await page.locator(
@@ -151,8 +151,8 @@ test.describe("Logs Queries testcases", () => {
   await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
   await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
   await page.getByTitle('e2etimestamp').click();
-  await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
-  await page.locator('[data-test="logs-search-bar-delete-e2etimestamp-saved-view-btn"]').getByText('delete').click();
+  // await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
+  await page.getByText('delete').click();
   await page.locator('[data-test="confirm-button"]').click();
 
 });
@@ -180,13 +180,12 @@ test("should redirect to logs after clicking on stream explorer via stream page"
     await page.waitForTimeout(3000);
     await page.waitForSelector(':text("streamslogsnavigate")');
     await page.click(':text("streamslogsnavigate")');
-    // await page.getByText('streamslogsnavigate').click();
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('streamslogsnavigate');
+  await page.getByTitle('streamslogsnavigate').click();
+  await page.getByText('delete').click();
+  await page.locator('[data-test="confirm-button"]').click();
 
-    await page.locator('[data-test="logs-search-bar-delete-streamslogsnavigate-saved-view-btn"]').getByText('delete').click();
-    await page.locator('[data-test="confirm-button"]').click();
   });
 
 
@@ -250,7 +249,7 @@ test("should redirect to logs after clicking on stream explorer via stream page"
     await page.keyboard.type("match_all('code')");
     await page.waitForTimeout(2000);
     await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({sforce: true });
-    await expect(page.locator('[data-test="log-table-column-1-@timestamp"]')).toBeVisible();
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
   
 test("should change stream settings and click on search stream", async ({ page }) => {
@@ -268,7 +267,7 @@ test("should change stream settings and click on search stream", async ({ page }
     await page.locator(".col-auto > .q-btn > .q-btn__content").click({ force: true });
     await page.waitForTimeout(3000);
     await page.locator("[title=\"Explore\"]").first().click({ force: true });
-    await expect(page.locator('[data-test="log-table-column-0-@timestamp"]')).toBeVisible();
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
 
   test("should display error if blank spaces added under stream name and clicked create stream ", async ({ page }) => {
