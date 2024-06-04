@@ -345,7 +345,10 @@ async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
 
 async fn publish_existing_usage() {
     let mut usages = USAGE_DATA.write().await;
-    log::info!("publishing usage reports,len: {}", usages.len());
+    log::debug!("publishing usage reports,len: {}", usages.len());
+    if usages.is_empty() {
+        return;
+    }
 
     let curr_usages = std::mem::take(&mut *usages);
     // release the write lock
@@ -356,7 +359,11 @@ async fn publish_existing_usage() {
 
 async fn publish_existing_triggers_usage() {
     let mut usages = TRIGGERS_USAGE_DATA.write().await;
-    log::info!("publishing triggers usage reports,len: {}", usages.len());
+    log::debug!("publishing triggers usage reports,len: {}", usages.len());
+
+    if usages.is_empty() {
+        return;
+    }
 
     let curr_usages = std::mem::take(&mut *usages);
     // release the write lock
@@ -375,7 +382,7 @@ pub async fn run() {
     ));
     usage_interval.tick().await; // trigger the first run
     loop {
-        log::info!("Usage ingestion loop running");
+        log::debug!("Usage ingestion loop running");
         usage_interval.tick().await;
         publish_existing_usage().await;
         publish_existing_triggers_usage().await;
