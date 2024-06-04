@@ -556,17 +556,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_hash_for_pass() {
-        let pass1 = get_hash("ankur123", "openobserve");
+        let pass1 = get_hash("Pass#123", "openobserve");
         let time = chrono::Utc::now().timestamp();
         let pass2 = get_hash(&format!("{}{}", &pass1, time), "openobserve");
-        let pass3 = get_hash(&format!("{}{}", &pass2, 600), "openobserve");
+        let exp_in = 600;
+        let pass3 = get_hash(&format!("{}{}", &pass2, exp_in), "openobserve");
         println!("time: {}", time);
         println!("pass3: {}", pass3);
-        let user_pass = format!("{}:{}", "best.ankur@gmail.com", pass3);
+
+        let user_pass = format!("{}:{}", "b@b.com", pass3);
         let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
         println!(
             "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
-            time, 600, auth
+            time, exp_in, auth
         );
     }
 }

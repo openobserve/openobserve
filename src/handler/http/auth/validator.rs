@@ -60,7 +60,7 @@ pub async fn validator(
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        validate_credentials_ext(user_id, password, req.request().path(), auth_token).await
+        validate_credentials_ext(user_id, password, path, auth_token).await
     } else {
         validate_credentials(user_id, password.trim(), path).await
     } {
