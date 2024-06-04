@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
-const { utcToZonedTime, format } = require('date-fns-tz');
+import { toZonedTime } from "date-fns-tz";
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
@@ -826,13 +826,12 @@ test.describe("Sanity testcases", () => {
     );
   });
 
-
   test("should create and delete dashboard table ", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_tabledashboard";
     const headers = getHeaders();
     const ingestionUrl = getIngestionUrl(orgId, streamName);
-    const timestamp = Date.now() - 10 * 60 * 1000; // 10 minutes before
+    const timestamp = parseInt(Date.now() / 10000) * 10000 - 10 * 60 * 1000; // 10 minutes before
     // First payload
     const payload1 = [
       {
@@ -886,13 +885,15 @@ test.describe("Sanity testcases", () => {
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
-    const zonedTime = utcToZonedTime(new Date(timestamp), 'UTC');
-    const displayedTimestamp = format(zonedTime, 'yyyy-MM-dd HH:mm:ss', { timeZone: 'UTC' });
-    console.log(displayedTimestamp);
-  
-    const timeCell = await page.getByRole('cell', { name: displayedTimestamp }).textContent();
-    console.log(timeCell);
-  
+    // NOTE: pass selected timezone
+    const zonedTime = toZonedTime(new Date(timestamp), "asia/calcutta");
+
+    const displayedTimestamp = formatDate(zonedTime);
+
+    const timeCell = await page
+      .getByRole('cell', { name: displayedTimestamp })
+      .textContent();
+
     expect(timeCell).toBe(displayedTimestamp); // Directly compare the formatted timestamps
 
   //  const displayedTimestamp = formatDate (utcToZonedTime(new Date(timestamp), 'UTC'))
