@@ -229,9 +229,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                      :options="['=', '!=', 'IN']"
+                      :options="[
+                        '=',
+                        '!=',
+                        '>=',
+                        '<=',
+                        '>',
+                        '<',
+                        'IN',
+                        'Contains',
+                        'Not Contains',
+                        'Is Null',
+                        'Is Not Null',
+                      ]"
                     />
                     <CommonAutoComplete
+                      v-if="
+                        !['Is Null', 'Is Not Null'].includes(
+                          filter.operator
+                        )
+                      "
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
                       searchRegex="(?:^|[^$])\$?(\w+)"
