@@ -243,7 +243,7 @@ impl Writer {
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             drop(wal);
             // write into memtable
-            let mem = self.memtable.read().await;
+            let mem = self.memtable.write().await;
             mem.write(schema, entry).await?;
             drop(mem);
         }

@@ -164,6 +164,11 @@ impl super::Db for PostgresDb {
         let mut tx = pool.begin().await?;
         let lock_key = format!("get_for_update_{}", key);
         let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
+        let lock_id = if lock_id > i64::MAX as u64 {
+            (lock_id >> 1) as i64
+        } else {
+            lock_id as i64
+        };
         let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {

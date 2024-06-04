@@ -53,7 +53,7 @@ use crate::{
     common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
-        compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
+        compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files_v1},
         db,
         schema::generate_schema_for_defined_schema_fields,
         search::datafusion::{
@@ -593,7 +593,7 @@ async fn merge_files(
         )
         .await
     } else if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema.clone()).await
+        merge_parquet_files_v1(thread_id, tmp_dir.name(), schema.clone()).await
     } else {
         merge_parquet_files_by_datafusion(tmp_dir.name(), stream_type, &stream_name, schema.clone())
             .await
