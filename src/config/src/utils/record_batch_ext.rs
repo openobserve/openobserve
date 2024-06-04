@@ -484,7 +484,7 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
 pub fn concat_batches(
     schema: Arc<Schema>,
     mut batches: Vec<RecordBatch>,
-    strict_memory_mode: bool,
+    less_memory_mode: bool,
 ) -> Result<RecordBatch, ArrowError> {
     // When schema is empty, sum the number of the rows of all batches
     if schema.fields().is_empty() {
@@ -500,7 +500,7 @@ pub fn concat_batches(
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
-        let array = if strict_memory_mode {
+        let array = if less_memory_mode {
             let mut new_batches = Vec::with_capacity(batches.len());
             for batch in &mut batches {
                 let i = i - arrays.len();
