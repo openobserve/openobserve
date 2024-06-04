@@ -33,7 +33,7 @@ use crate::{
 };
 
 pub(crate) struct MemTable {
-    streams: HashMap<Arc<str>, Arc<Stream>>, // key: schema name, val: stream
+    streams: HashMap<Arc<str>, Stream>, // key: schema name, val: stream
     json_bytes_written: AtomicU64,
     arrow_bytes_written: AtomicU64,
 }
@@ -49,16 +49,13 @@ impl MemTable {
     }
 
     pub(crate) fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let partitions = self.streams.get(&entry.stream).cloned();
-        let mut partitions = match partitions {
+        let partitions = match self.streams.get_mut(&entry.stream) {
             Some(v) => v,
             None => self
                 .streams
                 .entry(entry.stream.clone())
-                .or_insert_with(|| Arc::new(Stream::new()))
-                .clone(),
+                .or_insert_with(Stream::new),
         };
-        let partitions = Arc::get_mut(&mut partitions).unwrap();
         let json_size = entry.data_size;
         let arrow_size = partitions.write(schema, entry)?;
         self.json_bytes_written
@@ -79,7 +76,7 @@ impl MemTable {
         stream.read(time_range)
     }
 
-    pub(crate) fn persist(
+    pub(crate) async fn persist(
         &self,
         thread_id: usize,
         org_id: &str,
@@ -88,8 +85,9 @@ impl MemTable {
         let mut schema_size = 0;
         let mut paths = Vec::with_capacity(self.streams.len());
         for (stream_name, stream) in self.streams.iter() {
-            let (part_schema_size, partitions) =
-                stream.persist(thread_id, org_id, stream_type, stream_name)?;
+            let (part_schema_size, partitions) = stream
+                .persist(thread_id, org_id, stream_type, stream_name)
+                .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
         }

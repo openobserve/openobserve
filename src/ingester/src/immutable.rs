@@ -25,13 +25,12 @@ use crate::{
     entry::PersistStat,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
     memtable::MemTable,
-    rwmap::RwIndexMap,
+    rwmap::RwMap,
     writer::WriterKey,
     ReadRecordBatchEntry,
 };
 
-pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
-    Lazy::new(RwIndexMap::default);
+pub(crate) static IMMUTABLES: Lazy<RwMap<PathBuf, Arc<Immutable>>> = Lazy::new(RwMap::default);
 
 #[warn(dead_code)]
 pub(crate) struct Immutable {
@@ -65,12 +64,13 @@ impl Immutable {
         }
     }
 
-    pub(crate) fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
+    pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
         let mut persist_stat = PersistStat::default();
         // 1. dump memtable to disk
-        let (schema_size, paths) =
-            self.memtable
-                .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)?;
+        let (schema_size, paths) = self
+            .memtable
+            .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)
+            .await?;
         persist_stat.arrow_size += schema_size;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");
@@ -126,7 +126,7 @@ pub(crate) async fn persist() -> Result<()> {
                 // persist entry to local disk
                 let immutable = immutable.clone();
                 drop(r);
-                let ret = immutable.persist(&path);
+                let ret = immutable.persist(&path).await;
                 drop(permit);
                 ret.map(|stat| Some((path, stat)))
             });

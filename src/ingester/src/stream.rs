@@ -27,7 +27,7 @@ use crate::{
 };
 
 pub(crate) struct Stream {
-    partitions: HashMap<Arc<str>, Arc<Partition>>, // key: schema hash, val: partitions
+    partitions: HashMap<Arc<str>, Partition>, // key: schema hash, val: partitions
 }
 
 impl Stream {
@@ -39,18 +39,15 @@ impl Stream {
 
     pub(crate) fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
         let mut arrow_size = 0;
-        let partition = self.partitions.get(&entry.stream).cloned();
-        let mut partition = match partition {
+        let partition = match self.partitions.get_mut(&entry.stream) {
             Some(v) => v,
             None => {
                 arrow_size += schema.size();
                 self.partitions
                     .entry(entry.schema_key.clone())
-                    .or_insert_with(|| Arc::new(Partition::new(schema)))
-                    .clone()
+                    .or_insert_with(|| Partition::new(schema))
             }
         };
-        let partition = Arc::get_mut(&mut partition).unwrap();
         arrow_size += partition.write(entry)?;
         Ok(arrow_size)
     }
@@ -63,7 +60,7 @@ impl Stream {
         Ok(batches)
     }
 
-    pub(crate) fn persist(
+    pub(crate) async fn persist(
         &self,
         thread_id: usize,
         org_id: &str,
@@ -73,8 +70,9 @@ impl Stream {
         let mut schema_size = 0;
         let mut paths = Vec::new();
         for (_, partition) in self.partitions.iter() {
-            let (part_schema_size, partitions) =
-                partition.persist(thread_id, org_id, stream_type, stream_name)?;
+            let (part_schema_size, partitions) = partition
+                .persist(thread_id, org_id, stream_type, stream_name)
+                .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
         }

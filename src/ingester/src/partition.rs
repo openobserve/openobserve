@@ -13,24 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    fs::{create_dir_all, OpenOptions},
-    io::Write,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{
     meta::stream::FileMeta,
     metrics,
     utils::{
-        parquet::{generate_filename_with_time_range, new_parquet_writer_std},
+        parquet::{generate_filename_with_time_range, new_parquet_writer},
         schema_ext::SchemaExt,
     },
 };
 use hashbrown::HashMap;
 use snafu::ResultExt;
+use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
@@ -70,7 +66,7 @@ impl Partition {
         Ok((self.schema.clone(), batches))
     }
 
-    pub(crate) fn persist(
+    pub(crate) async fn persist(
         &self,
         thread_id: usize,
         org_id: &str,
@@ -120,8 +116,7 @@ impl Partition {
                     (vec![], vec![])
                 };
             let mut buf_parquet = Vec::new();
-
-            let mut writer = new_parquet_writer_std(
+            let mut writer = new_parquet_writer(
                 &mut buf_parquet,
                 &self.schema,
                 &bloom_filter_fields,
@@ -132,9 +127,10 @@ impl Partition {
                 persist_stat.arrow_size += batch.data_arrow_size;
                 writer
                     .write(&batch.data)
+                    .await
                     .context(WriteParquetRecordBatchSnafu)?;
             }
-            writer.close().context(WriteParquetRecordBatchSnafu)?;
+            writer.close().await.context(WriteParquetRecordBatchSnafu)?;
             file_meta.compressed_size = buf_parquet.len() as i64;
 
             // write into local file
@@ -150,24 +146,26 @@ impl Partition {
                 .write(true)
                 .truncate(true)
                 .open(&path)
+                .await
                 .context(CreateFileSnafu { path: path.clone() })?;
             f.write_all(&buf_parquet)
+                .await
                 .context(WriteFileSnafu { path: path.clone() })?;
 
             // set parquet metadata cache
-            // let mut file_key = path.clone();
-            // file_key.set_extension("parquet");
-            // let file_key = file_key
-            //     .strip_prefix(base_path.clone())
-            //     .unwrap()
-            //     .to_string_lossy()
-            //     .replace('\\', "/")
-            //     .trim_start_matches('/')
-            //     .to_string();
-            // super::WAL_PARQUET_METADATA
-            //     .write()
-            //     .await
-            //     .insert(file_key, file_meta);
+            let mut file_key = path.clone();
+            file_key.set_extension("parquet");
+            let file_key = file_key
+                .strip_prefix(base_path.clone())
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/")
+                .trim_start_matches('/')
+                .to_string();
+            super::WAL_PARQUET_METADATA
+                .write()
+                .await
+                .insert(file_key, file_meta);
 
             // update metrics
             metrics::INGEST_WAL_USED_BYTES
