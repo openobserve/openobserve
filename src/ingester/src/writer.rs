@@ -190,7 +190,11 @@ impl Writer {
         } else {
             Vec::new()
         };
+        let start = std::time::Instant::now();
         let mut w = self.writer.write();
+        metrics::INGEST_MEMTABLE_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(start.elapsed().as_millis() as f64);
         if self.check_wal_threshold(w.wal.size(), entry_bytes.len())
             || self.check_mem_threshold(w.memtable.size(), entry.data_size)
         {
