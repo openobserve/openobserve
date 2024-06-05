@@ -625,16 +625,17 @@ export default defineComponent({
       deleteUserEmail = props.row.email;
     };
 
-    const deleteUser = () => {
+    const deleteUser = async () => {
       usersService
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
-        .then((res: any) => {
+        .then(async (res: any) => {
           if (res.data.code == 200) {
             $q.notify({
               color: "positive",
               message: "User deleted successfully.",
             });
-            getOrgMembers();
+            await getOrgMembers();
+            updateUserActions();
           }
         })
         .catch((err: any) => {
