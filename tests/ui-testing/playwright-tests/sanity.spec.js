@@ -900,6 +900,15 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
     await page.waitForTimeout(2000);
 
+    // // Change timezone to Asia/Calcutta
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="datetime-timezone-select"]').click();
+    await page
+      .locator('[data-test="datetime-timezone-select"]')
+      .fill("Asia/Calcutta");
+      await page.getByText("Asia/Calcutta", { exact: true }).click();
+      await page.waitForTimeout(200);
+
     // NOTE: pass selected timezone
     const calcuttaTime = toZonedTime(new Date(timestamp), "Asia/Calcutta");
     const displayedTimestampCalcutta = formatDate(calcuttaTime);
@@ -913,11 +922,12 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(1000);
     // Change timezone to Europe/Zurich
     await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
     await page
       .locator('[data-test="datetime-timezone-select"]')
       .fill("Europe/Zurich");
-    await page.getByText("Europe/Zurich").click();
+    await page.getByText("Europe/Zurich", { exact: true }).click();
     await page.waitForTimeout(200);
 
     // Convert the timestamp to the required format in Europe/Zurich
