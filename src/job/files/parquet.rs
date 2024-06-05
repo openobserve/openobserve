@@ -32,8 +32,7 @@ use config::{
         file::scan_files_with_channel,
         json,
         parquet::{
-            read_metadata_from_file, read_recordbatch_from_bytes, read_schema_from_file,
-            write_recordbatch_to_parquet,
+            read_metadata_from_file, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
         schema_ext::SchemaExt,
     },
@@ -303,10 +302,7 @@ async fn move_files(
             return Err(e.into());
         }
     };
-
-    // get group file schema
-    let group_schema = read_schema_from_file(&wal_dir.join(&files.first().unwrap().key)).await?;
-    let group_schema_field_num = group_schema.fields().len();
+    let stream_fields_num = latest_schema.fields().len();
 
     // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
@@ -325,7 +321,7 @@ async fn move_files(
             cfg.compact.max_file_size as i64,
         )
         && (cfg.limit.file_move_fields_limit == 0
-            || group_schema_field_num < cfg.limit.file_move_fields_limit)
+            || stream_fields_num < cfg.limit.file_move_fields_limit)
     {
         let mut has_expired_files = false;
         // not enough files to upload, check if some files are too old
@@ -368,22 +364,15 @@ async fn move_files(
         // yield to other tasks
         tokio::task::yield_now().await;
         // merge file and get the big file key
-        let (new_file_name, new_file_meta, new_file_list) = match merge_files(
-            thread_id,
-            latest_schema.clone(),
-            group_schema_field_num,
-            &wal_dir,
-            &files_with_size,
-        )
-        .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("[INGESTER:JOB] merge files failed: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
-        };
+        let (new_file_name, new_file_meta, new_file_list) =
+            match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!("[INGESTER:JOB] merge files failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
         if new_file_name.is_empty() {
             if new_file_list.is_empty() {
                 // no file need to merge
@@ -469,7 +458,6 @@ async fn move_files(
 async fn merge_files(
     thread_id: usize,
     latest_schema: Arc<Schema>,
-    group_schema_field_num: usize,
     wal_dir: &Path,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
@@ -485,11 +473,12 @@ async fn merge_files(
     let mut max_ts = i64::MIN;
     let mut total_records = 0;
 
+    let stream_fields_num = latest_schema.fields().len();
     for file in files_with_size.iter() {
         if new_file_size > 0
             && ((new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64)
                 || (cfg.limit.file_move_fields_limit > 0
-                    && group_schema_field_num > cfg.limit.file_move_fields_limit))
+                    && stream_fields_num >= cfg.limit.file_move_fields_limit))
         {
             break;
         }
