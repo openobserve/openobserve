@@ -6,6 +6,7 @@ import { toZonedTime } from "date-fns-tz";
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
+const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -826,7 +827,16 @@ test.describe("Sanity testcases", () => {
     );
   });
 
-  test("should create and delete dashboard table ", async ({ page }) => {
+  const formatDate = (date) => {
+    const year = String(date.getFullYear());
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+  test("should compare time displayed in table dashboard after changing timezone and then delete it ", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_tabledashboard";
     const headers = getHeaders();
@@ -853,7 +863,7 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(5000);
     await page.locator('[data-test="add-dashboard-name"]').click();
 
-    await page.locator('[data-test="add-dashboard-name"]').fill("tabledash");
+    await page.locator('[data-test="add-dashboard-name"]').fill(dashboardName);
     await page.locator('[data-test="dashboard-add-submit"]').click();
     await page.waitForTimeout(2000);
     await page
@@ -862,74 +872,80 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(3000);
     await page.locator('[data-test="selected-chart-table-item"] img').click();
     await page.locator('[data-test="index-dropdown-stream"]').click();
-    await page.locator('[data-test="index-dropdown-stream"]').fill('e2e_tabledashboard');
-    await page.getByRole('option', { name: 'e2e_tabledashboard' }).click();
+    await page
+      .locator('[data-test="index-dropdown-stream"]')
+      .fill("e2e_tabledashboard");
+    await page.getByRole("option", { name: "e2e_tabledashboard" }).click();
     await page.waitForTimeout(5000);
-   
-    await page.locator('[data-test="field-list-item-logs-e2e_tabledashboard-e2e"] [data-test="dashboard-add-y-data"]').click();
-    await page.locator('[data-test="field-list-item-logs-e2e_tabledashboard-job"] [data-test="dashboard-add-y-data"]').click();
-    await page.locator('[data-test="field-list-item-logs-e2e_tabledashboard-_timestamp"] [data-test="dashboard-add-x-data"]').click();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_tabledashboard-e2e"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_tabledashboard-job"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_tabledashboard-_timestamp"] [data-test="dashboard-add-x-data"]'
+      )
+      .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-   await page.locator('[data-test="dashboard-panel-name"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
-     await page.waitForTimeout(2000);
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="dashboard-panel-save"]').click();
     await page.waitForTimeout(2000);
-    const formatDate = (date) => {
-      const year = String(date.getFullYear());
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    };
 
     // NOTE: pass selected timezone
-    const zonedTime = toZonedTime(new Date(timestamp), "asia/calcutta");
+    const calcuttaTime = toZonedTime(new Date(timestamp), "Asia/Calcutta");
+    const displayedTimestampCalcutta = formatDate(calcuttaTime);
+    console.log(displayedTimestampCalcutta);
 
-    const displayedTimestamp = formatDate(zonedTime);
-
-    const timeCell = await page
-      .getByRole('cell', { name: displayedTimestamp })
+    // Verify the displayed time in Asia/Calcutta
+    const timeCellCalcutta = await page
+      .getByRole("cell", { name: displayedTimestampCalcutta })
       .textContent();
+    expect(timeCellCalcutta).toBe(displayedTimestampCalcutta);
 
-    expect(timeCell).toBe(displayedTimestamp); // Directly compare the formatted timestamps
+    // Change timezone to Europe/Zurich
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="datetime-timezone-select"]').click();
+    await page
+      .locator('[data-test="datetime-timezone-select"]')
+      .fill("Europe/Zurich");
+    await page.getByText("Europe/Zurich").click();
 
-  //  const displayedTimestamp = formatDate (utcToZonedTime(new Date(timestamp), 'UTC'))
-  // console.log(displayedTimestamp)
-  //   const timeCell = await page.getByRole('cell', { name: new RegExp(timestamp.toString().slice(0, 10)) }).textContent();
-  //   console.log(timeCell)
-  // // const displayedTimestamp = formatDate (utcToZonedTime(new Date(timeCell), 'UTC'))
-  // // console.log(displayedTimestamp)
-  // expect(displayedTimestamp).toBeCloseTo(timestamp, 1000 * 60)
+    // Convert the timestamp to the required format in Europe/Zurich
+    const zurichTime = toZonedTime(new Date(timestamp), "Europe/Zurich");
+    const displayedTimestampZurich = formatDate(zurichTime);
+    console.log(displayedTimestampZurich);
 
-    // await page.locator('[data-test="dashboard-apply"]').click();
-    // await page.locator('[data-test="chart-renderer"] canvas').click({
-    //   position: {
-    //     x: 753,
-    //     y: 200,
-    //   },
-    // });
-    // await page.locator('[data-test="dashboard-panel-save"]').click();
-    // await page.locator('[data-test="dashboard-panel-name"]').click();
-    // await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
-    // await page.waitForTimeout(2000);
-    // await page.locator('[data-test="dashboard-panel-save"]').click();
-    // await page.waitForTimeout(2000);
-    // await page
-    //   .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
-    //   .click();
-    // await page.locator('[data-test="dashboard-delete-panel"]').click();
-    // await page.locator('[data-test="confirm-button"]').click();
-    // await page
-    //   .locator("#q-notify div")
-    //   .filter({ hasText: "check_circlePanel deleted" })
-    //   .nth(3)
-    //   .click();
+    // Verify the displayed time in Europe/Zurich
+    const timeCellZurich = await page
+      .getByRole("cell", { name: displayedTimestampZurich })
+      .textContent();
+    expect(timeCellZurich).toBe(displayedTimestampZurich);
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-delete-panel"]').click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page
+      .locator("#q-notify div")
+      .filter({ hasText: "check_circlePanel deleted" })
+      .nth(3)
+      .click();
+    await page.locator('[data-test="dashboard-back-btn"]');
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await page
+      .getByRole("row", { name: dashboardName })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
   });
-
-
-
-  
 });
