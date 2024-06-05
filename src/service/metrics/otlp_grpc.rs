@@ -644,6 +644,18 @@ fn process_hist_data_point(
     sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(sum_rec);
 
+    // add min record
+    let mut min_rec = rec.clone();
+    min_rec[VALUE_LABEL] = data_point.min.into();
+    min_rec[NAME_LABEL] = format!("{}_min", min_rec[NAME_LABEL].as_str().unwrap()).into();
+    bucket_recs.push(min_rec);
+
+    // add max record
+    let mut max_rec = rec.clone();
+    max_rec[VALUE_LABEL] = data_point.min.into();
+    max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
+    bucket_recs.push(max_rec);
+
     // add bucket records
     let len = data_point.bucket_counts.len();
     for i in 0..len {

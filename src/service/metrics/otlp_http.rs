@@ -248,7 +248,7 @@ pub async fn metrics_json_handler(
                         }
                     };
 
-                    let metadata = prom::Metadata {
+                    let mut metadata = prom::Metadata {
                         metric_family_name: metric_name.to_owned(),
                         metric_type: MetricType::Unknown,
                         help: metric
@@ -263,33 +263,23 @@ pub async fn metrics_json_handler(
 
                     let records = if metric.get("sum").is_some() {
                         let sum = metric.get("sum").unwrap().as_object().unwrap();
-                        process_sum(&mut rec, sum, &mut metadata.clone(), &mut prom_meta)
+                        process_sum(&mut rec, sum, &mut metadata, &mut prom_meta)
                     } else if metric.get("histogram").is_some() {
                         let histogram = metric.get("histogram").unwrap().as_object().unwrap();
-                        process_histogram(
-                            &mut rec,
-                            histogram,
-                            &mut metadata.clone(),
-                            &mut prom_meta,
-                        )
+                        process_histogram(&mut rec, histogram, &mut metadata, &mut prom_meta)
                     } else if metric.get("summary").is_some() {
                         let summary = metric.get("summary").unwrap().as_object().unwrap();
-                        process_summary(&rec, summary, &mut metadata.clone(), &mut prom_meta)
+                        process_summary(&rec, summary, &mut metadata, &mut prom_meta)
                     } else if metric.get("gauge").is_some() {
                         let gauge = metric.get("gauge").unwrap().as_object().unwrap();
-                        process_gauge(&mut rec, gauge, &mut metadata.clone(), &mut prom_meta)
+                        process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta)
                     } else if metric.get("exponentialHistogram").is_some() {
                         let exp = metric
                             .get("exponentialHistogram")
                             .unwrap()
                             .as_object()
                             .unwrap();
-                        process_exponential_histogram(
-                            &mut rec,
-                            exp,
-                            &mut metadata.clone(),
-                            &mut prom_meta,
-                        )
+                        process_exponential_histogram(&mut rec, exp, &mut metadata, &mut prom_meta)
                     } else {
                         continue;
                     };
@@ -816,17 +806,13 @@ fn process_hist_data_point(
     }
     process_exemplars(rec, data_point);
 
-    // add count record
-    let mut count_rec = rec.clone();
-    count_rec[VALUE_LABEL] = json::get_float_value(data_point.get("count").unwrap()).into();
-    count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(count_rec);
-
-    // add sum record
-    let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = json::get_float_value(data_point.get("sum").unwrap()).into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(sum_rec);
+    // add 4 types of record
+    for stream in ["count", "sum", "min", "max"] {
+        let mut new_rec = rec.clone();
+        new_rec[VALUE_LABEL] = json::get_float_value(data_point.get(stream).unwrap()).into();
+        new_rec[NAME_LABEL] = format!("{}_{stream}", new_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(new_rec);
+    }
 
     // add bucket records
     let buckets = data_point.get("bucketCounts").unwrap().as_array().unwrap();
