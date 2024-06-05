@@ -875,7 +875,7 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="index-dropdown-stream"]')
       .fill("e2e_tabledashboard");
-    await page.getByRole("option", { name: "e2e_tabledashboard" }).click();
+    await page.getByRole("option", { name: "e2e_tabledashboard" }).click({force:true});
     await page.waitForTimeout(5000);
 
     await page
@@ -904,13 +904,13 @@ test.describe("Sanity testcases", () => {
     const calcuttaTime = toZonedTime(new Date(timestamp), "Asia/Calcutta");
     const displayedTimestampCalcutta = formatDate(calcuttaTime);
     console.log(displayedTimestampCalcutta);
-
+    await page.waitForTimeout(2000);
     // Verify the displayed time in Asia/Calcutta
     const timeCellCalcutta = await page
       .getByRole("cell", { name: displayedTimestampCalcutta })
       .textContent();
     expect(timeCellCalcutta).toBe(displayedTimestampCalcutta);
-
+    await page.waitForTimeout(1000);
     // Change timezone to Europe/Zurich
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
@@ -918,6 +918,7 @@ test.describe("Sanity testcases", () => {
       .locator('[data-test="datetime-timezone-select"]')
       .fill("Europe/Zurich");
     await page.getByText("Europe/Zurich").click();
+    await page.waitForTimeout(200);
 
     // Convert the timestamp to the required format in Europe/Zurich
     const zurichTime = toZonedTime(new Date(timestamp), "Europe/Zurich");
