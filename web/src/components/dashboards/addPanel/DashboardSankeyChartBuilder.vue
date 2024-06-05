@@ -919,28 +919,31 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
-    const dashboardVariablesFilterItems = (index: any) =>
-      (props.dashboardData?.variables?.list ?? []).map((it: any) => {
-        let value;
-        if (
-          ["Contains", "Not Contains"].includes(
+    const dashboardVariablesFilterItems = computed(
+      () => (index: number) =>
+        (props.dashboardData?.variables?.list ?? []).map((it: any) => {
+          let value;
+          const operator =
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.filter[index].operator
-          )
-        ) {
-          value = "$" + it.name;
-        } else {
-          value = it.multiSelect
-            ? "(" + "$" + "{" + it.name + "}" + ")"
-            : "'" + "$" + it.name + "'";
-        }
+            ].fields.filter[index].operator;
 
-        return {
-          label: it.name,
-          value: value,
-        };
-      });
+          if (operator === "Contains" || operator === "Not Contains") {
+            value = it.multiSelect
+              ? "(" + "$" + "{" + it.name + "}" + ")"
+              : "$" + it.name;
+          } else {
+            value = it.multiSelect
+              ? "(" + "$" + "{" + it.name + "}" + ")"
+              : "'" + "$" + it.name + "'";
+          }
+
+          return {
+            label: it.name,
+            value: value,
+          };
+        })
+    );
 
     return {
       t,
