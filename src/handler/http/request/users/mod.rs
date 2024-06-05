@@ -24,7 +24,6 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     get_config,
     utils::{base64, json},
-    get_config
 };
 use strum::IntoEnumIterator;
 
