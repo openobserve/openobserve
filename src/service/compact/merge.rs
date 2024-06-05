@@ -1158,7 +1158,11 @@ pub async fn merge_parquet_files_v2(
         .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
-    let mut concated_record_batch = concat_batches(schema.clone(), record_batches, true)?;
+    let mut concated_record_batch = concat_batches(
+        schema.clone(),
+        record_batches,
+        get_config().compact.fast_mode,
+    )?;
 
     // 3. delete all the null columns
     let num_rows = concated_record_batch.num_rows();

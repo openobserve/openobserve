@@ -812,6 +812,8 @@ pub struct Compact {
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
     pub data_retention_history: bool,
+    #[env_config(name = "ZO_COMPACT_FAST_MODE", default = false)]
+    pub fast_mode: bool,
 }
 
 #[derive(EnvConfig)]
