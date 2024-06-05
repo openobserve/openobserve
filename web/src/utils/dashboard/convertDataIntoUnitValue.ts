@@ -8,6 +8,7 @@ const units: any = {
     { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
   ],
   seconds: [
+    { unit: "ns", divisor: 0.000000001 },
     { unit: "μs", divisor: 0.000001 },
     { unit: "ms", divisor: 0.001 },
     { unit: "s", divisor: 1 },
@@ -18,6 +19,7 @@ const units: any = {
     { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
   ],
   microseconds: [
+    { unit: "ns", divisor: 0.001 },
     { unit: "μs", divisor: 1 },
     { unit: "ms", divisor: 1000 },
     { unit: "s", divisor: 1000000 },
@@ -28,6 +30,7 @@ const units: any = {
     { unit: "Y", divisor: 31536000 * 1000000 }, // Assuming 365 days in a year
   ],
   milliseconds: [
+    { unit: "ns", divisor: 0.000001 },
     { unit: "μs", divisor: 0.001 },
     { unit: "ms", divisor: 1 },
     { unit: "s", divisor: 1000 },
@@ -36,6 +39,17 @@ const units: any = {
     { unit: "D", divisor: 86400 * 1000 },
     { unit: "M", divisor: 2592000 * 1000 }, // Assuming 30 days in a month
     { unit: "Y", divisor: 31536000 * 1000 }, // Assuming 365 days in a year
+  ],
+  nanoseconds: [
+    { unit: "ns", divisor: 1 },
+    { unit: "μs", divisor: 1000 },
+    { unit: "ms", divisor: 1000000 },
+    { unit: "s", divisor: 1000000000 },
+    { unit: "m", divisor: 60 * 1000000000 },
+    { unit: "h", divisor: 3600 * 1000000000 },
+    { unit: "D", divisor: 86400 * 1000000000 },
+    { unit: "M", divisor: 2592000 * 1000000000 }, // Assuming 30 days in a month
+    { unit: "Y", divisor: 31536000 * 1000000000 }, // Assuming 365 days in a year
   ],
   bps: [
     { unit: "B/s", divisor: 1 },
@@ -88,6 +102,7 @@ export const getUnitValue = (
     case "seconds":
     case "microseconds":
     case "milliseconds":
+    case "nanoseconds":
     case "kilobytes":
     case "bps":
     case "megabytes": {
