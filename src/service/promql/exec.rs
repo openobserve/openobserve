@@ -86,8 +86,7 @@ impl Query {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let mut engine = super::Engine::new(ctx.clone(), self.start);
-            let expr = expr.clone();
+            let mut engine = super::Engine::new(ctx, self.start);
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
                 value = Value::Sample(Sample::new(self.end, val));
@@ -108,14 +107,13 @@ impl Query {
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
             let mut engine = super::Engine::new(ctx.clone(), time);
-            let expr = expr.clone();
-            let task = (time, engine.exec(&expr).await);
+            let task = (time, engine.exec(&expr).await?);
             tasks.push(task);
         }
 
         for task in tasks {
             let (time, result) = task;
-            let (result, result_type_exec) = result?;
+            let (result, result_type_exec) = result;
             if result_type.is_none() && result_type_exec.is_some() {
                 result_type = result_type_exec;
             }
