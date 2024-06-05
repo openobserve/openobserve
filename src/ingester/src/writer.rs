@@ -226,16 +226,12 @@ impl Writer {
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
 
-            let thread_id = self.thread_id;
-            let key = self.key.clone();
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
+            let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
             tokio::task::spawn(async move {
                 log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
-                IMMUTABLES.write().await.insert(
-                    path,
-                    Arc::new(Immutable::new(thread_id, key.clone(), old_mem)),
-                );
+                IMMUTABLES.write().await.insert(path, table);
                 log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
             });
         }
@@ -261,12 +257,10 @@ impl Writer {
         let old_mem = std::mem::replace(&mut w.memtable, new_mem);
         drop(w);
 
-        let thread_id = self.thread_id;
-        let key = self.key.clone();
-        IMMUTABLES
-            .write()
-            .await
-            .insert(path, Arc::new(Immutable::new(thread_id, key, old_mem)));
+        let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
+        tokio::task::spawn(async move {
+            IMMUTABLES.write().await.insert(path, table);
+        });
         Ok(())
     }
 
