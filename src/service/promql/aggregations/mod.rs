@@ -22,7 +22,7 @@ use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
 use crate::{
-    common::meta::prom::{HASH_LABEL, NAME_LABEL},
+    common::meta::prom::NAME_LABEL,
     service::promql::{
         value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
         Engine,
@@ -249,19 +249,12 @@ pub async fn eval_top(
             )));
         }
     };
-    // order the data by HASH_VALUE
-    let mut data_index: FxIndexMap<String, usize> = Default::default();
-    for (i, item) in data.iter().enumerate() {
-        let key = item.labels.get_value(HASH_LABEL);
-        data_index.insert(key, i);
-    }
 
     let mut score_values: FxIndexMap<Signature, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {
             LabelModifier::Include(labels) => {
-                for i in data_index.values() {
-                    let item = &data[*i];
+                for (i, item) in data.iter().enumerate() {
                     let sum_labels = labels_to_include(&labels.labels, &item.labels);
                     if item.sample.value.is_nan() {
                         continue;
@@ -269,14 +262,13 @@ pub async fn eval_top(
                     let signature = sum_labels.signature();
                     let value = score_values.entry(signature).or_default();
                     value.push(TopItem {
-                        index: *i,
+                        index: i,
                         value: item.sample.value,
                     });
                 }
             }
             LabelModifier::Exclude(labels) => {
-                for i in data_index.values() {
-                    let item = &data[*i];
+                for (i, item) in data.iter().enumerate() {
                     let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
                     if item.sample.value.is_nan() {
                         continue;
@@ -284,15 +276,14 @@ pub async fn eval_top(
                     let signature = sum_labels.signature();
                     let value = score_values.entry(signature).or_default();
                     value.push(TopItem {
-                        index: *i,
+                        index: i,
                         value: item.sample.value,
                     });
                 }
             }
         },
         None => {
-            for i in data_index.values() {
-                let item = &data[*i];
+            for (i, item) in data.iter().enumerate() {
                 let sum_labels = Labels::default();
                 if item.sample.value.is_nan() {
                     continue;
@@ -300,7 +291,7 @@ pub async fn eval_top(
                 let signature = sum_labels.signature();
                 let value = score_values.entry(signature).or_default();
                 value.push(TopItem {
-                    index: *i,
+                    index: i,
                     value: item.sample.value,
                 });
             }
