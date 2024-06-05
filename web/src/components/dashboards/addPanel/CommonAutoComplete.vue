@@ -1,19 +1,19 @@
 <template>
-  <div class="relative" style="margin-top: 5px;">
+  <div class="relative" style="margin-top: 5px">
     <q-input
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
       dense
       filled
       :label="label"
-      style="width: 100%;"
+      style="width: 100%"
       @focus="showOptions = true"
       @blur="hideOptions"
       v-bind="$attrs"
     >
-    <template v-if="hasSlot('label')" v-slot:label>
-      <slot name="label"></slot>
-    </template>
+      <template v-if="hasSlot('label')" v-slot:label>
+        <slot name="label"></slot>
+      </template>
     </q-input>
     <div
       class="options-container"
@@ -39,7 +39,6 @@ import { ref, toRef, defineComponent, watch } from "vue";
 import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
 import { useSlots } from "vue";
-import { toRefs } from "vue";
 
 export default defineComponent({
   name: "CommonAutoComplete",
@@ -73,22 +72,25 @@ export default defineComponent({
 
     watch(
       () => props.modelValue,
-      () => {
-        inputValue.value = props.modelValue;
+      (newValue) => {
+        inputValue.value = newValue;
       }
     );
 
+    watch(inputValue, (newValue) => {
+      fieldsFilterFn(newValue);
+    });
     // when q-input's model value updated, update the model value which will be synced back to input value
     const onModelValueChanged = (value) => {
       emit("update:modelValue", value);
       fieldsFilterFn(value);
     };
 
-    const { items } = toRefs(props);
+    const itemsRef = toRef(props, "items");
 
     // apply filter on label
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSearchInputUsingRegex(items, "label", props.searchRegex);
+      useSearchInputUsingRegex(itemsRef, "label", props.searchRegex);
 
     const hideOptions = () => {
       showOptions.value = false;
