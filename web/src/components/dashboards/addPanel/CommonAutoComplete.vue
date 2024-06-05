@@ -6,10 +6,10 @@
       dense
       filled
       :label="label"
-      style="width: 100%"
       @focus="showOptions = true"
       @blur="hideOptions"
       v-bind="$attrs"
+      style="width: 100%"
     >
       <template v-if="hasSlot('label')" v-slot:label>
         <slot name="label"></slot>

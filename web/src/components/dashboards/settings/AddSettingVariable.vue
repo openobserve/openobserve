@@ -187,16 +187,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-tooltip>
                   </q-icon>
                 </div>
-                <div class="row items-center">
+                <div class="row items-center" style="width: 100%">
                   <div
                     class="row no-wrap items-center q-mb-xs"
+                    style="width: 100%"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
                     <q-select
                       filled
                       outlined
+                      emit-value
                       dense
+                      hide-selected
+                      fill-input
                       v-model="filter.name"
                       :display-value="filter.name ? filter.name : ''"
                       :options="fieldsFilteredOptions"
@@ -211,7 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="filter.name ? '' : 'Select Field'"
                       class="textbox col no-case q-ml-sm"
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                    >
+                      style="max-width: 41%; width: 41%"
+                      ><q-tooltip v-if="filter.name">
+                        {{ filter.name }}
+                      </q-tooltip>
                       <template v-slot:no-option>
                         <q-item>
                           <q-item-section class="text-italic text-grey"
@@ -225,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       v-model="filter.operator"
                       :display-value="filter.operator ? filter.operator : ''"
-                      style="width: auto"
+                      style="width: 18%"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
@@ -245,19 +252,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <CommonAutoComplete
                       v-if="
-                        !['Is Null', 'Is Not Null'].includes(
-                          filter.operator
-                        )
+                        !['Is Null', 'Is Not Null'].includes(filter.operator)
                       "
                       v-model="filter.value"
                       :items="dashboardVariablesFilterItems"
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
-                      style="
-                        margin-top: none !important;
-                        width: auto !important;
-                      "
+                      style="margin-top: none !important; width: 41% !important"
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <q-btn
