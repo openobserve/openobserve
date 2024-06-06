@@ -186,11 +186,7 @@ impl Writer {
         } else {
             Vec::new()
         };
-        let start = std::time::Instant::now();
         let mut wal = self.wal.lock();
-        metrics::INGEST_MEMTABLE_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(start.elapsed().as_millis() as f64);
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(self.mem.read().size(), entry.data_size)
         {
@@ -241,8 +237,13 @@ impl Writer {
         if !check_ttl {
             // write into wal
             wal.write(&entry_bytes, false).context(WalSnafu)?;
+            drop(wal);
             // write into memtable
+            let start = std::time::Instant::now();
             let mut mem = self.mem.write();
+            metrics::INGEST_MEMTABLE_LOCK_TIME
+                .with_label_values(&[&self.key.org_id])
+                .observe(start.elapsed().as_millis() as f64);
             mem.write(schema, entry)?;
             drop(mem);
         }
