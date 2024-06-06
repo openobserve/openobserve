@@ -601,6 +601,7 @@
     "seconds": "Seconds (s)",
     "microseconds": "Microseconds (μs)",
     "milliseconds": "Milliseconds (ms)",
+    "nanoseconds": "Nanoseconds (ns)",
     "percent1": "Percent (0.0-1.0)",
     "percent": "Percent (0-100)",
     "custom": "Custom",
