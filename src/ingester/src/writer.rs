@@ -25,7 +25,7 @@ use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{get_config, metrics};
 use once_cell::sync::Lazy;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use snafu::ResultExt;
 use wal::Writer as WalWriter;
 
@@ -57,8 +57,12 @@ pub struct Writer {
     key: WriterKey,
     next_seq: AtomicU64,
     created_at: AtomicI64,
-    wal: Arc<Mutex<WalWriter>>,
-    mem: Arc<RwLock<MemTable>>,
+    writer: Arc<RwLock<WriterInner>>,
+}
+
+struct WriterInner {
+    wal: WalWriter,
+    memtable: MemTable,
 }
 
 // check total memory size
@@ -157,8 +161,8 @@ impl Writer {
             key: key.clone(),
             next_seq,
             created_at: AtomicI64::new(now),
-            wal: Arc::new(Mutex::new(
-                WalWriter::new(
+            writer: Arc::new(RwLock::new(WriterInner {
+                wal: WalWriter::new(
                     wal_dir,
                     &key.org_id,
                     &key.stream_type,
@@ -166,8 +170,8 @@ impl Writer {
                     cfg.limit.max_file_size_on_disk as u64,
                 )
                 .expect("wal file create error"),
-            )),
-            mem: Arc::new(RwLock::new(MemTable::new())),
+                memtable: MemTable::new(),
+            })),
         }
     }
 
@@ -186,13 +190,17 @@ impl Writer {
         } else {
             Vec::new()
         };
-        let mut wal = self.wal.lock();
-        if self.check_wal_threshold(wal.size(), entry_bytes.len())
-            || self.check_mem_threshold(self.mem.read().size(), entry.data_size)
+        let start = std::time::Instant::now();
+        let mut w = self.writer.write();
+        metrics::INGEST_MEMTABLE_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(start.elapsed().as_millis() as f64);
+        if self.check_wal_threshold(w.wal.size(), entry_bytes.len())
+            || self.check_mem_threshold(w.memtable.size(), entry.data_size)
         {
             let cfg = get_config();
             // sync wal before rotation
-            wal.sync().context(WalSnafu)?;
+            w.wal.sync().context(WalSnafu)?;
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -213,13 +221,11 @@ impl Writer {
                 cfg.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
-            let old_wal = std::mem::replace(&mut *wal, new_wal);
+            let old_wal = std::mem::replace(&mut w.wal, new_wal);
 
             // rotation memtable
             let new_mem = MemTable::new();
-            let mut mem = self.mem.write();
-            let old_mem = std::mem::replace(&mut *mem, new_mem);
-            drop(mem);
+            let old_mem = std::mem::replace(&mut w.memtable, new_mem);
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
@@ -236,16 +242,9 @@ impl Writer {
 
         if !check_ttl {
             // write into wal
-            wal.write(&entry_bytes, false).context(WalSnafu)?;
-            drop(wal);
+            w.wal.write(&entry_bytes, false).context(WalSnafu)?;
             // write into memtable
-            let start = std::time::Instant::now();
-            let mut mem = self.mem.write();
-            metrics::INGEST_MEMTABLE_LOCK_TIME
-                .with_label_values(&[&self.key.org_id])
-                .observe(start.elapsed().as_millis() as f64);
-            mem.write(schema, entry)?;
-            drop(mem);
+            w.memtable.write(schema, entry)?;
         }
 
         Ok(())
@@ -253,16 +252,14 @@ impl Writer {
 
     pub async fn close(&self) -> Result<()> {
         // rotation wal
-        let wal = self.wal.lock();
-        wal.sync().context(WalSnafu)?;
-        let path = wal.path().clone();
-        drop(wal);
+        let mut w = self.writer.write();
+        w.wal.sync().context(WalSnafu)?;
+        let path = w.wal.path().clone();
 
         // rotation memtable
-        let mut mem = self.mem.write();
         let new_mem = MemTable::new();
-        let old_mem = std::mem::replace(&mut *mem, new_mem);
-        drop(mem);
+        let old_mem = std::mem::replace(&mut w.memtable, new_mem);
+        drop(w);
 
         let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
         tokio::task::spawn(async move {
@@ -272,8 +269,8 @@ impl Writer {
     }
 
     pub fn sync(&self) -> Result<()> {
-        let wal = self.wal.lock();
-        wal.sync().context(WalSnafu)
+        let w = self.writer.read();
+        w.wal.sync().context(WalSnafu)
     }
 
     pub fn read(
@@ -281,8 +278,8 @@ impl Writer {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<ReadRecordBatchEntry>> {
-        let mem = self.mem.read();
-        mem.read(stream_name, time_range)
+        let w = self.writer.read();
+        w.memtable.read(stream_name, time_range)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
