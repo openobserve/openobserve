@@ -69,6 +69,23 @@ export const addLabelToSQlQuery = async (
 ) => {
   await importSqlParser();
 
+  switch (operator) {
+    case "Contains":
+      operator = "LIKE";
+      value = "%" + value + "%";
+      break;
+    case "Not Contains":
+      operator = "NOT LIKE";
+      value = "%" + value + "%";
+      break;
+    case "Is Null":
+      operator = "IS NULL";
+      break;
+    case "Is Not Null":
+      operator = "IS NOT NULL";
+      break;
+  }
+
   const ast: any = parser.astify(originalQuery);
 
   let query = "";
