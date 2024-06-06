@@ -17,14 +17,13 @@ use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::metrics;
-use futures::future::join_all;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::{fs, sync::Semaphore, task};
+use tokio::{fs, sync::mpsc};
 
 use crate::{
     entry::{PersistStat, RecordBatchEntry},
-    errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
+    errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioMpscSendSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
@@ -103,7 +102,7 @@ impl Immutable {
     }
 }
 
-pub(crate) async fn persist() -> Result<()> {
+pub(crate) async fn persist(tx: mpsc::Sender<PathBuf>) -> Result<()> {
     let r = IMMUTABLES.read().await;
     let n = r.len();
     let mut paths = Vec::with_capacity(n);
@@ -114,68 +113,55 @@ pub(crate) async fn persist() -> Result<()> {
         paths.push(item.0.clone());
     }
     drop(r);
-
-    let mut tasks = Vec::with_capacity(paths.len());
-    let semaphore = Arc::new(Semaphore::new(
-        config::get_config().limit.mem_dump_thread_num,
-    ));
     for path in paths {
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: task::JoinHandle<Result<Option<(PathBuf, PersistStat)>>> =
-            task::spawn(async move {
-                let r = IMMUTABLES.read().await;
-                let Some(immutable) = r.get(&path) else {
-                    drop(permit);
-                    return Ok(None);
-                };
-                log::info!(
-                    "[INGESTER:WAL] start persist file: {}",
-                    path.to_string_lossy(),
-                );
-                // persist entry to local disk
-                let immutable = immutable.clone();
-                drop(r);
-                let ret = immutable.persist(&path).await;
-                drop(permit);
-                ret.map(|stat| Some((path, stat)))
-            });
-        tasks.push(task);
+        tx.send(path).await.context(TokioMpscSendSnafu)?;
     }
 
-    // remove entry from IMMUTABLES
-    let tasks = join_all(tasks).await;
-    for task in tasks {
-        match task.context(TokioJoinSnafu {})? {
-            Err(e) => {
-                log::error!("[INGESTER:WAL] persist error: {}", e);
-            }
-            Ok(None) => {}
-            Ok(Some((path, stat))) => {
-                log::info!(
-                    "[INGESTER:WAL] done  persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}",
-                    path.to_string_lossy(),
-                    stat.json_size,
-                    stat.arrow_size,
-                    stat.file_num,
-                    stat.batch_num,
-                );
-                // remove entry
-                let mut rw = IMMUTABLES.write().await;
-                rw.remove(&path);
-                drop(rw);
-                // update metrics
-                metrics::INGEST_MEMTABLE_BYTES
-                    .with_label_values(&[])
-                    .sub(stat.json_size);
-                metrics::INGEST_MEMTABLE_ARROW_BYTES
-                    .with_label_values(&[])
-                    .sub(stat.arrow_size as i64);
-                metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
-            }
-        }
-    }
     let mut rw = IMMUTABLES.write().await;
     rw.shrink_to_fit();
+
+    Ok(())
+}
+
+pub(crate) async fn persist_table(thread_id: usize, path: PathBuf) -> Result<()> {
+    let start = std::time::Instant::now();
+    let r = IMMUTABLES.read().await;
+    let Some(immutable) = r.get(&path) else {
+        return Ok(());
+    };
+    let immutable = immutable.clone();
+    drop(r);
+
+    log::info!(
+        "[INGESTER:MEM:{thread_id}] starts persist file: {}",
+        path.to_string_lossy(),
+    );
+
+    // persist entry to local disk
+    let stat = immutable.persist(&path).await?;
+    log::info!(
+        "[INGESTER:MEM:{thread_id}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+        path.to_string_lossy(),
+        stat.json_size,
+        stat.arrow_size,
+        stat.file_num,
+        stat.batch_num,
+        start.elapsed().as_millis(),
+    );
+
+    // remove entry
+    let mut rw = IMMUTABLES.write().await;
+    rw.remove(&path);
+    drop(rw);
+
+    // update metrics
+    metrics::INGEST_MEMTABLE_BYTES
+        .with_label_values(&[])
+        .sub(stat.json_size);
+    metrics::INGEST_MEMTABLE_ARROW_BYTES
+        .with_label_values(&[])
+        .sub(stat.arrow_size as i64);
+    metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
 
     Ok(())
 }

@@ -23,11 +23,16 @@ mod stream;
 mod wal;
 mod writer;
 
+use std::{path::PathBuf, sync::Arc};
+
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
-use tokio::time;
+use tokio::{
+    sync::{mpsc, Mutex},
+    time,
+};
 pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
 
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
@@ -39,22 +44,6 @@ pub async fn init() -> errors::Result<()> {
 
     // replay wal files to create immutable
     wal::replay_wal_files().await?;
-
-    // start a job to dump immutable data to disk
-    tokio::task::spawn(async move {
-        loop {
-            time::sleep(time::Duration::from_secs(
-                config::get_config().limit.mem_persist_interval,
-            ))
-            .await;
-            // persist immutable data to disk
-            if let Err(e) = immutable::persist().await {
-                log::error!("immutable persist error: {}", e);
-            }
-            // shrink metadata cache
-            WAL_PARQUET_METADATA.write().await.shrink_to_fit();
-        }
-    });
 
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
@@ -70,5 +59,57 @@ pub async fn init() -> errors::Result<()> {
         }
     });
 
+    // start a job to flush memtable to immutable
+    tokio::task::spawn(async move {
+        if let Err(e) = run().await {
+            log::error!("immutable persist error: {}", e);
+        }
+    });
+    Ok(())
+}
+
+async fn run() -> errors::Result<()> {
+    // start persidt worker
+    let cfg = config::get_config();
+    let (tx, rx) = mpsc::channel::<PathBuf>(cfg.limit.mem_dump_thread_num);
+    let rx = Arc::new(Mutex::new(rx));
+    for thread_id in 0..cfg.limit.mem_dump_thread_num {
+        let rx = rx.clone();
+        tokio::spawn(async move {
+            loop {
+                let ret = rx.lock().await.recv().await;
+                match ret {
+                    None => {
+                        log::debug!("[INGESTER:MEM] Receiving memtable channel is closed");
+                        break;
+                    }
+                    Some(path) => {
+                        if let Err(e) = immutable::persist_table(thread_id, path).await {
+                            log::error!("[INGESTER:MEM:{thread_id}] Error persist memtable: {e}");
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // start a job to dump immutable data to disk
+    loop {
+        if config::cluster::is_offline() {
+            break;
+        }
+        time::sleep(time::Duration::from_secs(
+            config::get_config().limit.mem_persist_interval,
+        ))
+        .await;
+        // persist immutable data to disk
+        if let Err(e) = immutable::persist(tx.clone()).await {
+            log::error!("immutable persist error: {}", e);
+        }
+        // shrink metadata cache
+        WAL_PARQUET_METADATA.write().await.shrink_to_fit();
+    }
+
+    log::info!("[INGESTER:MEM] immutable persist is stopped");
     Ok(())
 }

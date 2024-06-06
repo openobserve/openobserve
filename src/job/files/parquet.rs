@@ -82,10 +82,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     }
                     Some((prefix, files)) => {
                         if let Err(e) = move_files(thread_id, &prefix, files).await {
-                            log::error!(
-                                "[INGESTER:JOB] Error moving parquet files to remote: {}",
-                                e
-                            );
+                            log::error!("[INGESTER:JOB] Error moving parquet files to remote: {e}");
                         }
                     }
                 }
