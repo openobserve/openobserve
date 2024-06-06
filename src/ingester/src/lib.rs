@@ -94,14 +94,15 @@ async fn run() -> errors::Result<()> {
     }
 
     // start a job to dump immutable data to disk
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+        config::get_config().limit.mem_persist_interval,
+    ));
+    interval.tick().await; // the first tick is immediate
     loop {
         if config::cluster::is_offline() {
             break;
         }
-        time::sleep(time::Duration::from_secs(
-            config::get_config().limit.mem_persist_interval,
-        ))
-        .await;
+        interval.tick().await;
         // persist immutable data to disk
         if let Err(e) = immutable::persist(tx.clone()).await {
             log::error!("immutable persist error: {}", e);
