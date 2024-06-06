@@ -69,6 +69,8 @@ export const addLabelToSQlQuery = async (
 ) => {
   await importSqlParser();
 
+  let condition: any;
+
   switch (operator) {
     case "Contains":
       operator = "LIKE";
@@ -86,12 +88,21 @@ export const addLabelToSQlQuery = async (
       break;
   }
 
-  const ast: any = parser.astify(originalQuery);
-
-  let query = "";
-  if (!ast.where) {
-    // If there is no WHERE clause, create a new one
-    const newWhereClause = {
+  // Construct condition based on operator
+  condition = operator === "IS NULL" || operator === "IS NOT NULL" ?
+    {
+      type: "binary_expr",
+      operator: operator,
+      left: {
+        type: "column_ref",
+        table: null,
+        column: label,
+      },
+      right: {
+        type: "",
+      },
+    } :
+    {
       type: "binary_expr",
       operator: operator,
       left: {
@@ -104,6 +115,13 @@ export const addLabelToSQlQuery = async (
         value: value,
       },
     };
+
+  const ast: any = parser.astify(originalQuery);
+
+  let query = "";
+  if (!ast.where) {
+    // If there is no WHERE clause, create a new one
+    const newWhereClause = condition;
 
     const newAst = {
       ...ast,
@@ -122,19 +140,7 @@ export const addLabelToSQlQuery = async (
         // parentheses: true,
         ...ast.where,
       },
-      right: {
-        type: "binary_expr",
-        operator: operator,
-        left: {
-          type: "column_ref",
-          table: null,
-          column: label,
-        },
-        right: {
-          type: "string",
-          value: value,
-        },
-      },
+      right: condition,
     };
 
     const newAst = {
