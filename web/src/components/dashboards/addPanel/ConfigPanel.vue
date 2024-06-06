@@ -889,12 +889,16 @@ export default defineComponent({
         value: "seconds",
       },
       {
+        label: t("dashboard.milliseconds"),
+        value: "milliseconds",
+      },
+      {
         label: t("dashboard.microseconds"),
         value: "microseconds",
       },
       {
-        label: t("dashboard.milliseconds"),
-        value: "milliseconds",
+        label: t("dashboard.nanoseconds"),
+        value: "nanoseconds",
       },
       {
         label: t("dashboard.percent1"),
