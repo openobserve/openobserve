@@ -215,7 +215,11 @@ export default defineComponent({
 
     watch(
       () => histogramInterval.value,
-      () => {
+      async () => {
+        // import sql parser if not imported
+        if (!parser) {
+          await importSqlParser();
+        }
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
           const ast: any = parser.astify(query?.query);
