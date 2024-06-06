@@ -5,15 +5,17 @@ export const useSearchInputUsingRegex = (
   searchKey: string,
   searchRegex: string
 ) => {
-  const filteredOptions = ref(options.value);
+  const filteredOptions = ref([...options.value]);
 
   watch(options, (newValue) => {
-    filteredOptions.value = newValue;
+    if (!filteredOptions.value.length) {
+      filteredOptions.value = [...newValue];
+    }
   });
 
   const filterFn = (val: any) => {
     if (val === "") {
-      filteredOptions.value = options.value;
+      filteredOptions.value = [...options.value];
       return;
     }
 

@@ -774,7 +774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 dashboardPanelData.layout.currentQueryIndex
                               ].fields.filter[index].value
                             "
-                            :items="dashboardVariablesFilterItems"
+                            :items="dashboardVariablesFilterItems(index)"
                             searchRegex="(?:^|[^$])\$?(\w+)"
                             :rules="[(val: any) => val?.length > 0 || 'Required']"
                           ></CommonAutoComplete>
@@ -1333,14 +1333,32 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const dashboardVariablesFilterItems = computed(() =>
-      (props.dashboardData?.variables?.list ?? []).map((it: any) => ({
-        label: it.name,
-        value: it.multiSelect
-          ? "(" + "$" + "{" + it.name + "}" + ")"
-          : "'" + "$" + it.name + "'",
-      }))
+    const dashboardVariablesFilterItems = computed(
+      () => (index: number) =>
+        (props.dashboardData?.variables?.list ?? []).map((it: any) => {
+          let value;
+          const operator =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.filter[index].operator;
+
+          if (operator === "Contains" || operator === "Not Contains") {
+            value = it.multiSelect
+              ? "(" + "$" + "{" + it.name + "}" + ")"
+              : "$" + it.name;
+          } else {
+            value = it.multiSelect
+              ? "(" + "$" + "{" + it.name + "}" + ")"
+              : "'" + "$" + it.name + "'";
+          }
+
+          return {
+            label: it.name,
+            value: value,
+          };
+        })
     );
+
     return {
       showXAxis,
       t,
