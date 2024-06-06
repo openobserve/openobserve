@@ -333,7 +333,7 @@ pub async fn get_presigned_url(
         basic_auth.user_id(),
         basic_auth.password().unwrap(),
         password_ext_salt,
-        &cfg.common.base_uri,
+        &cfg.common.web_url,
         query.exp_in as i64,
         time,
     );
@@ -390,7 +390,6 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             if Utc::now().timestamp() - req_ts > expires_in {
                 return unauthorized_error(resp);
             }
-            println!("Is the token set {}", s);
             format!("q_auth {}", s)
         } else if let Some(auth_header) = _req.headers().get("Authorization") {
             match auth_header.to_str() {
@@ -403,10 +402,6 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             return unauthorized_error(resp);
         };
 
-        log::info!(
-            "Auth header before fetching user from token: {}",
-            auth_header
-        );
         if let Some((name, password)) =
             o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
         {

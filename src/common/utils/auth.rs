@@ -352,21 +352,33 @@ impl FromRequest for AuthExtractor {
             )
         };
 
+        let auth_ext_cookie = |req: &HttpRequest| -> String {
+            req.cookie("auth_ext")
+                .map(|cookie| cookie.value().to_string())
+                .unwrap_or_default()
+        };
+
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
             let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
-            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
-                access_token
-            } else if access_token.starts_with("session") {
-                let session_key = access_token.strip_prefix("session ").unwrap().to_string();
-                match USER_SESSIONS.get(&session_key) {
-                    Some(token) => {
-                        format!("Bearer {}", *token)
-                    }
-                    None => access_token,
-                }
+            if access_token.is_empty() {
+                // If cookie was set but access token is still empty
+                // we check auth_ext cookie to get the token.
+                auth_ext_cookie(req)
             } else {
-                format!("Bearer {}", access_token)
+                if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                    access_token
+                } else if access_token.starts_with("session") {
+                    let session_key = access_token.strip_prefix("session ").unwrap().to_string();
+                    match USER_SESSIONS.get(&session_key) {
+                        Some(token) => {
+                            format!("Bearer {}", *token)
+                        }
+                        None => access_token,
+                    }
+                } else {
+                    format!("Bearer {}", access_token)
+                }
             }
         } else if let Some(cookie) = req.cookie("auth_ext") {
             cookie.value().to_string()

@@ -161,7 +161,8 @@ pub async fn update_user(
 
     let mut old_role = None;
     let mut new_role = None;
-
+    let conf = get_config();
+    let password_ext_salt = conf.auth.ext_auth_salt.as_str();
     if existing_user.is_ok() {
         let mut new_user;
         let mut is_updated = false;
@@ -201,7 +202,11 @@ pub async fn update_user(
                         &user.clone().old_password.unwrap(),
                         &local_user.salt,
                     )) {
-                        new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
+                        let new_pass = user.new_password.unwrap();
+
+                        new_user.password = get_hash(&new_pass, &local_user.salt);
+                        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                        log::info!("Password self updated for user: {}", email);
                         is_updated = true;
                     } else {
                         message =
@@ -214,7 +219,12 @@ pub async fn update_user(
                     && user.new_password.is_some()
                     && !local_user.is_external
                 {
-                    new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
+                    let new_pass = user.new_password.unwrap();
+
+                    new_user.password = get_hash(&new_pass, &local_user.salt);
+                    new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                    log::info!("Password by root updated for user: {}", email);
+
                     is_updated = true;
                 } else {
                     message = "You are not authorised to change the password"
@@ -247,6 +257,7 @@ pub async fn update_user(
                     match user {
                         Ok(mut db_user) => {
                             db_user.password = new_user.password;
+                            db_user.password_ext = new_user.password_ext;
                             db_user.first_name = new_user.first_name;
                             db_user.last_name = new_user.last_name;
                             if is_org_updated {

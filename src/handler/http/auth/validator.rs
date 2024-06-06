@@ -291,8 +291,6 @@ pub async fn validate_credentials_ext(
         ),
         password_ext_salt,
     );
-    println!("In password is {}", in_password);
-    println!("Hashed password is {}", hashed_pass);
     if !hashed_pass.eq(&in_password) {
         return Ok(TokenValidationResponse::default());
     }
@@ -346,7 +344,7 @@ async fn validate_user_from_db(
                 let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                 Ok(resp)
             } else if user.password_ext.is_some() && req_time.is_some() {
-                log::info!("Validating user for query params");
+                log::debug!("Validating user for query params");
                 let hashed_pass = get_hash(
                     &format!(
                         "{}{}",
@@ -391,7 +389,6 @@ pub async fn validate_user_for_query_params(
     req_time: Option<&String>,
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
-    log::info!("Validating user for query params");
     let db_user = db::user::get_db_user(user_id).await;
     let config = get_config();
     validate_user_from_db(
