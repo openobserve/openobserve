@@ -148,11 +148,13 @@ pub(crate) async fn persist_table(thread_id: usize, path: PathBuf) -> Result<()>
     drop(r);
 
     log::info!(
-        "[INGESTER:MEM:{thread_id}] starts persist file: {}",
+        "[INGESTER:MEM:{thread_id}] starts persist file: {}, took: {} ms",
         path.to_string_lossy(),
+        start.elapsed().as_millis(),
     );
 
     // persist entry to local disk
+    let start = std::time::Instant::now();
     let ret = immutable.persist(&path).await;
     PROCESSING_TABLES.write().await.remove(&path);
     let stat = match ret {
