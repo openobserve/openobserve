@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, sync::Arc};
 
 use actix_web::{
     cookie,
@@ -28,7 +28,7 @@ use config::{
     get_config, get_instance_id,
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
-    QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -553,54 +553,48 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     }
 }
 
+fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
+    cookie_name: &'a str,
+    token_struct: &T,
+    conf: &Arc<Config>,
+) -> Cookie<'a> {
+    let tokens = json::to_string(token_struct).unwrap();
+    let mut auth_cookie = Cookie::new(cookie_name, tokens);
+    auth_cookie.set_expires(
+        cookie::time::OffsetDateTime::now_utc()
+            + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
+    );
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if conf.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(SameSite::None);
+    }
+    auth_cookie
+}
+
 #[get("/logout")]
 async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     // remove the session
     let conf = get_config();
-    let auth_cookie = if let Some(cookie) = req.cookie("auth_tokens") {
+    if let Some(cookie) = req.cookie("auth_tokens") {
         let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
+
         if access_token.starts_with("session") {
             crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
                 .await;
         }
-
-        let tokens = json::to_string(&AuthTokens::default()).unwrap();
-        let mut auth_cookie = Cookie::new("auth_tokens", tokens);
-        auth_cookie.set_expires(
-            cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
-        );
-        auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(conf.auth.cookie_secure_only);
-        auth_cookie.set_path("/");
-        if conf.auth.cookie_same_site_lax {
-            auth_cookie.set_same_site(SameSite::Lax);
-        } else {
-            auth_cookie.set_same_site(SameSite::None);
-        }
-        auth_cookie
-    } else {
-        let tokens = json::to_string(&AuthTokensExt::default()).unwrap();
-        let mut auth_cookie = Cookie::new("auth_ext", tokens);
-        auth_cookie.set_expires(
-            cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
-        );
-        auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(conf.auth.cookie_secure_only);
-        auth_cookie.set_path("/");
-        if conf.auth.cookie_same_site_lax {
-            auth_cookie.set_same_site(SameSite::Lax);
-        } else {
-            auth_cookie.set_same_site(SameSite::None);
-        }
-        auth_cookie
     };
+    let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
+    let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
 
     HttpResponse::Ok()
         .append_header((header::LOCATION, "/"))
         .cookie(auth_cookie)
+        .cookie(auth_ext_cookie)
         .finish()
 }
 
