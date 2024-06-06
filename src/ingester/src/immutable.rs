@@ -17,9 +17,13 @@ use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::metrics;
+use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::{fs, sync::mpsc};
+use tokio::{
+    fs,
+    sync::{mpsc, RwLock},
+};
 
 use crate::{
     entry::{PersistStat, RecordBatchEntry},
@@ -31,6 +35,9 @@ use crate::{
 
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
     Lazy::new(RwIndexMap::default);
+
+static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
 
 #[warn(dead_code)]
 pub(crate) struct Immutable {
@@ -114,11 +121,19 @@ pub(crate) async fn persist(tx: mpsc::Sender<PathBuf>) -> Result<()> {
     }
     drop(r);
     for path in paths {
-        tx.send(path).await.context(TokioMpscSendSnafu)?;
+        // check if the file is processing
+        if PROCESSING_TABLES.read().await.contains(&path) {
+            continue;
+        }
+        tx.send(path.clone()).await.context(TokioMpscSendSnafu)?;
+        PROCESSING_TABLES.write().await.insert(path);
     }
 
     let mut rw = IMMUTABLES.write().await;
     rw.shrink_to_fit();
+    drop(rw);
+
+    PROCESSING_TABLES.write().await.shrink_to_fit();
 
     Ok(())
 }
@@ -138,7 +153,12 @@ pub(crate) async fn persist_table(thread_id: usize, path: PathBuf) -> Result<()>
     );
 
     // persist entry to local disk
-    let stat = immutable.persist(&path).await?;
+    let ret = immutable.persist(&path).await;
+    PROCESSING_TABLES.write().await.remove(&path);
+    let stat = match ret {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     log::info!(
         "[INGESTER:MEM:{thread_id}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
         path.to_string_lossy(),
