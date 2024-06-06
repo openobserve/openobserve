@@ -446,7 +446,7 @@ pub async fn handle_grpc_request(
             ])
             .inc();
     }
-    if let Err(e) = writer.sync().await {
+    if let Err(e) = writer.sync() {
         log::error!("ingestion error while syncing writer: {}", e);
     }
 

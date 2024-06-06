@@ -743,7 +743,7 @@ pub(crate) async fn generate_index_on_ingester(
     }
     let writer = ingester::get_writer(0, org_id, &StreamType::Index.to_string()).await;
     let _ = crate::service::ingestion::write_file(&writer, stream_name, data_buf).await;
-    if let Err(e) = writer.sync().await {
+    if let Err(e) = writer.sync() {
         log::error!("ingestion error while syncing writer: {}", e);
     }
     log::info!("[INGESTER:JOB] Written index wal file successfully");

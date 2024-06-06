@@ -432,7 +432,7 @@ pub async fn remote_write(
         )
         .await;
     }
-    if let Err(e) = writer.sync().await {
+    if let Err(e) = writer.sync() {
         log::error!("ingestion error while syncing writer: {}", e);
     }
 

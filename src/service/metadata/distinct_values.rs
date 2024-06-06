@@ -248,7 +248,7 @@ impl Metadata for DistinctValues {
 
             let writer = ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string()).await;
             _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
-            if let Err(e) = writer.sync().await {
+            if let Err(e) = writer.sync() {
                 log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);
             }
         }

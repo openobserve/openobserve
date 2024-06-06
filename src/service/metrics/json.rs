@@ -309,7 +309,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         )
         .await;
     }
-    if let Err(e) = writer.sync().await {
+    if let Err(e) = writer.sync() {
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
