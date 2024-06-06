@@ -22,7 +22,7 @@ use config::{
     cluster, get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamPartition, StreamType},
-        usage::UsageType,
+        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
@@ -103,57 +103,16 @@ pub async fn handle_trace_request(
         );
     }
 
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
-
+    let cfg = get_config();
     let traces_stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
-
-    let stream_schema = stream_schema_exists(
-        org_id,
-        &traces_stream_name,
-        StreamType::Traces,
-        &mut traces_schema_map,
-    )
-    .await;
-
-    let cfg = get_config();
-
-    let mut partition_keys: Vec<StreamPartition> = vec![];
-    let mut partition_time_level =
-        PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
-    if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Traces,
-            &traces_stream_name,
-        )
-        .await;
-        partition_keys = partition_det.partition_keys;
-        partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
-    }
-    if partition_keys.is_empty() {
-        partition_keys.push(StreamPartition::new("service_name"));
-    }
-
-    // Start get stream alerts
-    crate::service::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: traces_stream_name.to_owned().into(),
-            stream_type: StreamType::Traces,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
-    // End get stream alert
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     // Start Register Transforms for stream
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Traces,
@@ -161,17 +120,10 @@ pub async fn handle_trace_request(
     );
     // End Register Transforms for stream
 
-    let mut trigger: Option<TriggerAlertData> = None;
-
-    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-        .timestamp_micros();
-    let mut partial_success = ExportTracePartialSuccess::default();
-
-    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
-    let mut trace_index = Vec::with_capacity(res_spans.len());
+    let mut json_data = Vec::with_capacity(res_spans.len());
+    let mut partial_success = ExportTracePartialSuccess::default();
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let resource = res_span.resource.unwrap();
@@ -244,7 +196,11 @@ pub async fn handle_trace_request(
                     })
                 }
 
-                let timestamp = start_time / 1000;
+                let timestamp = (start_time / 1000) as i64;
+                if timestamp < min_ts {
+                    partial_success.rejected_spans += 1;
+                    continue;
+                }
 
                 let local_val = Span {
                     trace_id: trace_id.clone(),
@@ -271,6 +227,7 @@ pub async fn handle_trace_request(
                     std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                 })?;
 
+                // Start row based transform
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_functions(
                         &local_trans,
@@ -284,132 +241,46 @@ pub async fn handle_trace_request(
                         std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                     })?;
                 }
-                // End row based transform */
+                // End row based transform
+
                 // get json object
                 let mut record_val = match value.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(""),
                 };
 
+                // add timestamp
                 record_val.insert(
                     cfg.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
-
-                // get distinct_value item
-                for field in DISTINCT_FIELDS.iter() {
-                    if let Some(val) = record_val.get(field) {
-                        if let Some(val) = val.as_str() {
-                            let (filter_name, filter_value) = if field == "operation_name" {
-                                ("service_name".to_string(), service_name.clone())
-                            } else {
-                                ("".to_string(), "".to_string())
-                            };
-                            distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                                stream_type: StreamType::Traces,
-                                stream_name: traces_stream_name.to_string(),
-                                field_name: field.to_string(),
-                                field_value: val.to_string(),
-                                filter_name,
-                                filter_value,
-                            }));
-                        }
-                    }
-                }
-
-                // build trace metadata
-                trace_index.push(MetadataItem::TraceListIndexer(TraceListItem {
-                    stream_name: traces_stream_name.to_string(),
-                    service_name: service_name.clone(),
-                    trace_id,
-                    _timestamp: start_time / 1000,
-                }));
-
-                // check schema
-                let _ = check_for_schema(
-                    org_id,
-                    &traces_stream_name,
-                    StreamType::Traces,
-                    &mut traces_schema_map,
-                    vec![&record_val],
-                    timestamp.try_into().unwrap(),
-                )
-                .await;
-
-                if trigger.is_none() && !stream_alerts_map.is_empty() {
-                    // Start check for alert trigger
-                    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
-                    if let Some(alerts) = stream_alerts_map.get(&key) {
-                        let mut trigger_alerts: TriggerAlertData = Vec::new();
-                        for alert in alerts {
-                            if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
-                                trigger_alerts.push((alert.clone(), v));
-                            }
-                        }
-                        trigger = Some(trigger_alerts);
-                    }
-                    // End check for alert trigger
-                }
-
-                // get hour key
-                let rec_schema = traces_schema_map
-                    .get(&traces_stream_name)
-                    .unwrap()
-                    .schema()
-                    .clone()
-                    .with_metadata(HashMap::new());
-                let schema_key = rec_schema.hash_key();
-                let hour_key = super::ingestion::get_wal_time_key(
-                    timestamp.try_into().unwrap(),
-                    &partition_keys,
-                    partition_time_level,
-                    &record_val,
-                    Some(&schema_key),
-                );
-
-                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                    schema_key,
-                    schema: Arc::new(rec_schema),
-                    records: vec![],
-                    records_size: 0,
-                });
-                // let record_val = record_val.to_owned();
-                let record_val = json::Value::Object(record_val);
-                let record_size = json::estimate_json_bytes(&record_val);
-                hour_buf.records.push(Arc::new(record_val));
-                hour_buf.records_size += record_size;
-
-                if timestamp < min_ts.try_into().unwrap() {
-                    partial_success.rejected_spans += 1;
-                    continue;
-                }
+                json_data.push((timestamp, record_val));
             }
         }
     }
 
-    // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
-    let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
+    // if no data, fast return
+    if json_data.is_empty() {
+        return format_response(partial_success);
     }
 
+    let mut req_stats = match write_traces(
+        thread_id,
+        org_id,
+        &traces_stream_name,
+        &service_name,
+        json_data,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error while writing traces: {}", e);
+            return format_response(partial_success);
+        }
+    };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
-
-    // send distinct_values
-    if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
-    }
-
-    // send trace metadata
-    if !trace_index.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
-    }
 
     let ep = if is_grpc {
         "/grpc/export/traces"
@@ -446,9 +317,21 @@ pub async fn handle_trace_request(
     )
     .await;
 
-    // only one trigger per request, as it updates etcd
-    evaluate_trigger(trigger).await;
+    format_response(partial_success)
+}
 
+fn get_span_status(status: Option<Status>) -> String {
+    match status {
+        Some(v) => match v.code() {
+            StatusCode::Ok => "OK".to_string(),
+            StatusCode::Error => "ERROR".to_string(),
+            StatusCode::Unset => "UNSET".to_string(),
+        },
+        None => "".to_string(),
+    }
+}
+
+fn format_response(mut partial_success: ExportTracePartialSuccess) -> Result<HttpResponse, Error> {
     let res = ExportTraceServiceResponse {
         partial_success: if partial_success.rejected_spans > 0 {
             partial_success.error_message =
@@ -461,20 +344,182 @@ pub async fn handle_trace_request(
     };
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
-
-    return Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type("application/x-protobuf")
-        .body(out));
+        .body(out))
 }
 
-fn get_span_status(status: Option<Status>) -> String {
-    match status {
-        Some(v) => match v.code() {
-            StatusCode::Ok => "OK".to_string(),
-            StatusCode::Error => "ERROR".to_string(),
-            StatusCode::Unset => "UNSET".to_string(),
-        },
-        None => "".to_string(),
+async fn write_traces(
+    thread_id: usize,
+    org_id: &str,
+    stream_name: &str,
+    service_name: &str,
+    json_data: Vec<(i64, json::Map<String, json::Value>)>,
+) -> Result<RequestStats, Error> {
+    let cfg = get_config();
+    // get schema and stream settings
+    let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
+    let stream_schema = stream_schema_exists(
+        org_id,
+        stream_name,
+        StreamType::Traces,
+        &mut traces_schema_map,
+    )
+    .await;
+
+    let mut partition_keys: Vec<StreamPartition> = vec![];
+    let mut partition_time_level =
+        PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str());
+    if stream_schema.has_partition_keys {
+        let partition_det = crate::service::ingestion::get_stream_partition_keys(
+            org_id,
+            &StreamType::Traces,
+            stream_name,
+        )
+        .await;
+        partition_keys = partition_det.partition_keys;
+        partition_time_level =
+            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
+    if partition_keys.is_empty() {
+        partition_keys.push(StreamPartition::new("service_name"));
+    }
+
+    // Start get stream alerts
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    let mut trigger: Option<TriggerAlertData> = None;
+    crate::service::ingestion::get_stream_alerts(
+        &[StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: stream_name.to_owned().into(),
+            stream_type: StreamType::Traces,
+        }],
+        &mut stream_alerts_map,
+    )
+    .await;
+    // End get stream alert
+
+    // Start check for schema
+    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
+    let _ = check_for_schema(
+        org_id,
+        stream_name,
+        StreamType::Traces,
+        &mut traces_schema_map,
+        json_data.iter().map(|(_, v)| v).collect(),
+        *min_timestamp,
+    )
+    .await;
+    let record_schema = traces_schema_map
+        .get(stream_name)
+        .unwrap()
+        .schema()
+        .clone()
+        .with_metadata(HashMap::new());
+    let record_schema = Arc::new(record_schema);
+    let schema_key = record_schema.hash_key();
+
+    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
+    let mut trace_index_values = Vec::with_capacity(json_data.len());
+
+    // Start write data
+    for (timestamp, record_val) in json_data {
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = record_val.get(field) {
+                if let Some(val) = val.as_str() {
+                    let (filter_name, filter_value) = if field == "operation_name" {
+                        ("service_name".to_string(), service_name.to_string())
+                    } else {
+                        ("".to_string(), "".to_string())
+                    };
+                    distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                        stream_type: StreamType::Traces,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.to_string(),
+                        filter_name,
+                        filter_value,
+                    }));
+                }
+            }
+        }
+
+        // build trace metadata
+        let trace_id = record_val
+            .get("trace_id")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        trace_index_values.push(MetadataItem::TraceListIndexer(TraceListItem {
+            _timestamp: timestamp,
+            stream_name: stream_name.to_string(),
+            service_name: service_name.to_string(),
+            trace_id,
+        }));
+
+        // Start check for alert trigger
+        if trigger.is_none() && !stream_alerts_map.is_empty() {
+            let key = format!("{}/{}/{}", &org_id, StreamType::Traces, stream_name);
+            if let Some(alerts) = stream_alerts_map.get(&key) {
+                let mut trigger_alerts: TriggerAlertData = Vec::new();
+                for alert in alerts {
+                    if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
+                        trigger_alerts.push((alert.clone(), v));
+                    }
+                }
+                trigger = Some(trigger_alerts);
+            }
+        }
+        // End check for alert trigger
+
+        // get hour key
+        let hour_key = super::ingestion::get_wal_time_key(
+            timestamp,
+            &partition_keys,
+            partition_time_level,
+            &record_val,
+            Some(&schema_key),
+        );
+
+        let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema_key: schema_key.clone(),
+            schema: record_schema.clone(),
+            records: vec![],
+            records_size: 0,
+        });
+        let record_val = json::Value::Object(record_val);
+        let record_size = json::estimate_json_bytes(&record_val);
+        hour_buf.records.push(Arc::new(record_val));
+        hour_buf.records_size += record_size;
+    }
+
+    // write data to wal
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
+    let req_stats = write_file(&writer, stream_name, data_buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
+    // send trace metadata
+    if !trace_index_values.is_empty() {
+        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await {
+            log::error!("Error while writing trace_index values: {}", e);
+        }
+    }
+
+    // only one trigger per request
+    evaluate_trigger(trigger).await;
+
+    Ok(req_stats)
 }

@@ -55,10 +55,10 @@ pub struct TraceListIndex {
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub struct TraceListItem {
+    pub _timestamp: i64,
     pub stream_name: String,
     pub service_name: String,
     pub trace_id: String,
-    pub _timestamp: u64,
 }
 
 impl Metadata for TraceListIndex {
