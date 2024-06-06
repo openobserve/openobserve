@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-md q-my-sm scroll" style="width: 35vw">
+        <div class="q-mx-md q-my-sm scroll" style="width: 50vw">
           <q-tab-panels
             v-model="activeTab"
             animated
