@@ -690,6 +690,10 @@ pub struct Limit {
     pub file_move_fields_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
+    #[env_config(name = "ZO_FILE_MERGE_THREAD_NUM", default = 0)]
+    pub file_merge_thread_num: usize,
+    #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
+    pub mem_dump_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
@@ -1050,6 +1054,14 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num;
+    }
+    // HACK for file_merge_thread_num equal to CPU core
+    if cfg.limit.file_merge_thread_num == 0 {
+        cfg.limit.file_merge_thread_num = cpu_num;
+    }
+    // HACK for mem_dump_thread_num equal to CPU core
+    if cfg.limit.mem_dump_thread_num == 0 {
+        cfg.limit.mem_dump_thread_num = cpu_num;
     }
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;

@@ -301,7 +301,7 @@ pub async fn merge_by_stream(
     let mut stream_stats = StreamStats::default();
 
     // use mutiple threads to merge
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut tasks = Vec::with_capacity(partition_files_with_size.len());
     for (prefix, files_with_size) in partition_files_with_size.into_iter() {
         let org_id = org_id.to_string();

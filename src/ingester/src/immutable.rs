@@ -117,7 +117,7 @@ pub(crate) async fn persist() -> Result<()> {
 
     let mut tasks = Vec::with_capacity(paths.len());
     let semaphore = Arc::new(Semaphore::new(
-        config::get_config().limit.file_move_thread_num,
+        config::get_config().limit.mem_dump_thread_num,
     ));
     for path in paths {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
