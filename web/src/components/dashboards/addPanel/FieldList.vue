@@ -135,14 +135,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         ]"
         :rows="data.currentFieldsList"
+        v-model:pagination="pagination"
         row-key="column"
         :filter="dashboardPanelData.meta.stream.filterField"
         :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
         hide-header
-        hide-bottom
         virtual-scroll
         id="fieldList"
+        :rows-per-page-options="[]"
+        :hide-bottom="
+          (!store.state.zoConfig.user_defined_schemas_enabled ||
+            dashboardPanelData.meta.stream.userDefinedSchema.length == 0) &&
+          dashboardPanelData.meta.stream.selectedStreamFields != undefined &&
+          (dashboardPanelData.meta.stream.selectedStreamFields.length <=
+            pagination.rowsPerPage ||
+            dashboardPanelData.meta.stream.selectedStreamFields.length == 0)
+        "
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
@@ -618,6 +626,11 @@ export default defineComponent({
       },
     ];
 
+    const pagination = ref({
+      page: 1,
+      rowsPerPage: 10000,
+    });
+
     // custom query fields length
     // will be updated when filter is applied
     const customQueryFieldsLength = ref(0);
@@ -657,9 +670,6 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-
-  const { updateFieldKeywords } = useSqlSuggestions();
-
 
     const metricsIconMapping: any = {
       Summary: "description",
@@ -742,21 +752,22 @@ export default defineComponent({
         if (fields) {
           try {
             // get schema of that field using getstream
-            const fieldWithSchema: any = await getStreamFields.execute(
-              fields.name,
-              fields.stream_type,
-              true
-            );
+            // const fieldWithSchema: any = await getStreamFields.execute(
+            //   fields.name,
+            //   fields.stream_type,
+            //   true
+            // );
 
-            // below line required for pass by reference
-            // if we don't set blank, then same object from cache is being set
-            // and that doesn't call the watchers,
-            // so it will not be updated when we switch to different chart types
-            // which doesn't have field list and coming back to field list
-            dashboardPanelData.meta.stream.selectedStreamFields = [];
-            // assign the schema
-            dashboardPanelData.meta.stream.selectedStreamFields =
-              fieldWithSchema?.schema ?? [];
+            // // below line required for pass by reference
+            // // if we don't set blank, then same object from cache is being set
+            // // and that doesn't call the watchers,
+            // // so it will not be updated when we switch to different chart types
+            // // which doesn't have field list and coming back to field list
+            // dashboardPanelData.meta.stream.selectedStreamFields = [];
+            // // assign the schema
+            // dashboardPanelData.meta.stream.selectedStreamFields =
+            //   fieldWithSchema?.schema ?? [];
+            await extractFields();
           } catch (error: any) {
             showErrorNotification(
               error?.message ?? "Failed to get stream fields"
@@ -834,13 +845,26 @@ export default defineComponent({
       () => [
         dashboardPanelData.meta.stream.selectedStreamFields,
         dashboardPanelData.meta.stream.customQueryFields,
+        dashboardPanelData.meta.stream.userDefinedSchema,
+        dashboardPanelData.meta.stream.useUserDefinedSchemas,
       ],
       () => {
         data.currentFieldsList = [];
-        data.currentFieldsList = [
-          ...dashboardPanelData.meta.stream.customQueryFields,
-          ...dashboardPanelData.meta.stream.selectedStreamFields,
-        ];
+        // if user defined schema is enabled, use user defined schema
+        // else use selectedStreamFields
+        if (dashboardPanelData.meta.stream.useUserDefinedSchemas) {
+          data.currentFieldsList = [
+            ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.userDefinedSchema,
+            ...dashboardPanelData.meta.stream.selectedStreamFields,
+          ];
+        } else {
+          data.currentFieldsList = [
+            ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.selectedStreamFields,
+            ...dashboardPanelData.meta.stream.userDefinedSchema,
+          ];
+        }
 
         // set the custom query fields length
         customQueryFieldsLength.value =
@@ -974,15 +998,9 @@ export default defineComponent({
     async function extractFields() {
       try {
         dashboardPanelData.meta.stream.selectedStreamFields = [];
-        dashboardPanelData.meta.stream.interestingFieldList = [];
         const schemaFields: any = [];
-        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
-          const timestampField = store.state.zoConfig.timestamp_column;
-          const schemaInterestingFields: string[] = [];
-          const schemaMaps: any = [];
-          let fieldObj: any = {};
-          const localInterestingFields: any = useLocalInterestingFields();
 
+        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
           for (const stream of dashboardPanelData.meta.stream.streamResults) {
             if (
               dashboardPanelData.data.queries[
@@ -1001,14 +1019,6 @@ export default defineComponent({
                 stream.schema = streamSchema;
               }
 
-              let environmentInterestingFields = [];
-              if (
-                store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
-              ) {
-                environmentInterestingFields =
-                  store.state?.zoConfig?.default_quick_mode_fields;
-              }
-
               if (
                 stream.settings.hasOwnProperty("defined_schema_fields") &&
                 stream.settings.defined_schema_fields.length > 0
@@ -1018,167 +1028,56 @@ export default defineComponent({
                 dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
               }
 
-              dashboardPanelData.meta.stream.interestingFieldList =
-                localInterestingFields.value != null &&
-                localInterestingFields.value[
-                  store.state.selectedOrganization.identifier +
-                    "_" +
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.stream
-                ] !== undefined &&
-                localInterestingFields.value[
-                  store.state.selectedOrganization.identifier +
-                    "_" +
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.stream
-                ].length > 0
-                  ? localInterestingFields.value[
-                      store.state.selectedOrganization.identifier +
-                        "_" +
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.stream
-                    ]
-                  : environmentInterestingFields.length > 0
-                  ? [...environmentInterestingFields]
-                  : [...schemaInterestingFields];
-
               // create a schema field mapping based on field name to avoind iteration over object.
               // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
               for (const field of stream.schema) {
-                fieldObj = {
-                  ...field,
-                  ftsKey:
-                    stream.settings.full_text_search_keys.indexOf > -1
-                      ? true
-                      : false,
-                  isSchemaField: true,
-                  showValues: field.name !== timestampField,
-                  isInterestingField:
-                    dashboardPanelData.meta.stream.interestingFieldList.includes(
-                      field.name
-                    )
-                      ? true
-                      : false,
-                };
                 if (
                   store.state.zoConfig.user_defined_schemas_enabled &&
-                  dashboardPanelData.meta.meta.useUserDefinedSchemas ==
+                  dashboardPanelData.meta.stream.useUserDefinedSchemas ==
                     "user_defined_schema" &&
                   stream.settings.hasOwnProperty("defined_schema_fields") &&
                   stream.settings.defined_schema_fields.length > 0
                 ) {
+                  console.log(
+                    "Abhay: user defined schema: ",
+                    stream.settings.defined_schema_fields,
+                    field.name
+                  );
                   if (
                     stream.settings.defined_schema_fields.includes(field.name)
                   ) {
-                    schemaMaps.push(fieldObj);
-                    schemaFields.push(field.name);
-                  }
-
-                  if (
-                    schemaMaps.length ==
-                    stream.settings.defined_schema_fields.length
-                  ) {
-                    break;
+                    // schemaMaps.push(fieldObj);
+                    schemaFields.push(field);
                   }
                 } else {
-                  schemaMaps.push(fieldObj);
-                  schemaFields.push(field.name);
+                  // schemaMaps.push(fieldObj);
+                  schemaFields.push(field);
                 }
               }
 
-              // check for user defined schema is false then only consider checking new fields from result set
-              // if (
-              //   searchObj.data.queryResults.hasOwnProperty("hits") &&
-              //   searchObj.data.queryResults?.hits.length > 0 &&
-              //   (!store.state.zoConfig.user_defined_schemas_enabled ||
-              //     searchObj.meta.useUserDefinedSchemas != "user_defined_schema")
-              // ) {
-              //   // Find the index of the record with max attributes
-              //   const maxAttributesIndex =
-              //     searchObj.data.queryResults.hits.reduce(
-              //       (
-              //         maxIndex: string | number,
-              //         obj: {},
-              //         currentIndex: any,
-              //         array: { [x: string]: {} }
-              //       ) => {
-              //         const numAttributes = Object.keys(obj).length;
-              //         const maxNumAttributes = Object.keys(
-              //           array[maxIndex]
-              //         ).length;
-              //         return numAttributes > maxNumAttributes
-              //           ? currentIndex
-              //           : maxIndex;
-              //       },
-              //       0
-              //     );
-              //   const recordwithMaxAttribute =
-              //     searchObj.data.queryResults.hits[maxAttributesIndex];
+              console.log("Abhay: schemaFields ", schemaFields);
 
-              //   // Object.keys(recordwithMaxAttribute).forEach((key) => {
-              //   for (const key of Object.keys(recordwithMaxAttribute)) {
-              //     if (!schemaFields.includes(key)) {
-              //       fieldObj = {
-              //         name: key,
-              //         type: "Utf8",
-              //         ftsKey: false,
-              //         isSchemaField: false,
-              //         showValues: false,
-              //         isInterestingField:
-              //         dashboardPanelData.meta.stream.interestingFieldList.includes(key)
-              //             ? true
-              //             : false,
-              //       };
-              //       schemaMaps.push(fieldObj);
-              //       schemaFields.push(key);
-              //     }
-              //   }
-              // }
-
-              // cross verify list of interesting fields belowgs to selected stream fields
-              for (
-                let i =
-                  dashboardPanelData.meta.stream.interestingFieldList.length -
-                  1;
-                i >= 0;
-                i--
+              if (
+                store.state.zoConfig.user_defined_schemas_enabled &&
+                dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+                  "user_defined_schema" &&
+                stream.settings.hasOwnProperty("defined_schema_fields") &&
+                stream.settings.defined_schema_fields.length > 0
               ) {
-                const fieldName =
-                  dashboardPanelData.meta.stream.interestingFieldList[i];
-                if (!schemaFields.includes(fieldName)) {
-                  dashboardPanelData.meta.stream.interestingFieldList.splice(
-                    i,
-                    1
-                  );
-                }
-              }
+                dashboardPanelData.meta.stream.userDefinedSchema =
+                  schemaFields ?? [];
 
-              let localFields: any = {};
-              if (localInterestingFields.value != null) {
-                localFields = localInterestingFields.value;
+                dashboardPanelData.meta.stream.selectedStreamFields = [];
+              } else {
+                dashboardPanelData.meta.stream.userDefinedSchema = [];
+
+                dashboardPanelData.meta.stream.selectedStreamFields =
+                  schemaFields;
               }
-              localFields[
-                store.state.selectedOrganization.identifier +
-                  "_" +
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields.stream
-              ] = dashboardPanelData.meta.stream.interestingFieldList;
-              useLocalInterestingFields(localFields);
-              dashboardPanelData.meta.stream.userDefinedSchema =
-                stream.settings.defined_schema_fields || [];
             }
           }
 
-          dashboardPanelData.meta.stream.selectedStreamFields = schemaMaps;
-          if (
-            dashboardPanelData.meta.stream.selectedStreamFields != undefined &&
-            dashboardPanelData.meta.stream.selectedStreamFields.length
-          )
-            updateFieldKeywords(dashboardPanelData.meta.stream.selectedStreamFields);
+          // dashboardPanelData.meta.stream.selectedStreamFields = schemaMaps;
         }
       } catch (e: any) {
         console.log("Error while extracting fields");
@@ -1231,6 +1130,13 @@ export default defineComponent({
       customQueryFieldsLength,
       toggleSchema,
       userDefinedSchemaBtnGroupOption,
+      pagination,
+      pagesNumber: computed(() => {
+        return Math.ceil(
+          dashboardPanelData.meta.stream.selectedStreamFields.length /
+            pagination.value.rowsPerPage
+        );
+      }),
     };
   },
 });
@@ -1479,5 +1385,25 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+
+.schema-field-toggle .q-btn {
+  padding: 5px !important;
+}
+
+.schema-field-toggle {
+  border: 1px solid light-grey;
+  border-radius: 5px;
+  line-height: 10px;
+}
+
+.q-table__bottom {
+  padding: 0px !important;
+}
+
+.pagination-field-count {
+  line-height: 32px;
+  font-weight: 700;
+  font-size: 13px;
 }
 </style>
