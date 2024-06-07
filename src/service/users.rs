@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::{ider, utils::rand::generate_random_string};
+use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
@@ -41,6 +41,7 @@ pub async fn post_user(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+    let cfg = get_config();
     if is_root_user(initiator_id)
         || (initiator_user.is_ok()
             && initiator_user.as_ref().unwrap().is_some()
@@ -54,6 +55,7 @@ pub async fn post_user(
         if existing_user.is_err() {
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
+            let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let user = usr_req.to_new_dbuser(
@@ -63,8 +65,9 @@ pub async fn post_user(
                 token,
                 rum_token,
                 usr_req.is_external,
+                password_ext,
             );
-            db::user::set(user).await.unwrap();
+            db::user::set(&user).await.unwrap();
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
@@ -138,7 +141,7 @@ pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
             org.rum_token = Some(rum_token);
         };
     }
-    db::user::set(db_user).await
+    db::user::set(&db_user).await
 }
 
 pub async fn update_user(
@@ -158,7 +161,8 @@ pub async fn update_user(
 
     let mut old_role = None;
     let mut new_role = None;
-
+    let conf = get_config();
+    let password_ext_salt = conf.auth.ext_auth_salt.as_str();
     if existing_user.is_ok() {
         let mut new_user;
         let mut is_updated = false;
@@ -198,7 +202,11 @@ pub async fn update_user(
                         &user.clone().old_password.unwrap(),
                         &local_user.salt,
                     )) {
-                        new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
+                        let new_pass = user.new_password.unwrap();
+
+                        new_user.password = get_hash(&new_pass, &local_user.salt);
+                        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                        log::info!("Password self updated for user: {}", email);
                         is_updated = true;
                     } else {
                         message =
@@ -211,7 +219,12 @@ pub async fn update_user(
                     && user.new_password.is_some()
                     && !local_user.is_external
                 {
-                    new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
+                    let new_pass = user.new_password.unwrap();
+
+                    new_user.password = get_hash(&new_pass, &local_user.salt);
+                    new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                    log::info!("Password by root updated for user: {}", email);
+
                     is_updated = true;
                 } else {
                     message = "You are not authorised to change the password"
@@ -244,6 +257,7 @@ pub async fn update_user(
                     match user {
                         Ok(mut db_user) => {
                             db_user.password = new_user.password;
+                            db_user.password_ext = new_user.password_ext;
                             db_user.first_name = new_user.first_name;
                             db_user.last_name = new_user.last_name;
                             if is_org_updated {
@@ -268,7 +282,7 @@ pub async fn update_user(
                                 db_user.organizations = new_orgs;
                             }
 
-                            db::user::set(db_user).await.unwrap();
+                            db::user::set(&db_user).await.unwrap();
 
                             #[cfg(feature = "enterprise")]
                             {
@@ -393,7 +407,7 @@ pub async fn add_user_to_org(
                 orgs
             };
             db_user.organizations = new_orgs;
-            db::user::set(db_user).await.unwrap();
+            db::user::set(&db_user).await.unwrap();
 
             // Update OFGA
             #[cfg(feature = "enterprise")]
@@ -570,7 +584,7 @@ pub async fn remove_user_from_org(
                         }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                         user.organizations = orgs;
-                        let resp = db::user::set(user).await;
+                        let resp = db::user::set(&user).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
                             USERS.remove(&format!("{org_id}/{email_id}"));
@@ -654,8 +668,10 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+    let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&usr_req.password, &salt);
+    let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
     let user = usr_req.to_new_dbuser(
@@ -665,8 +681,9 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
         token,
         rum_token,
         usr_req.is_external,
+        password_ext,
     );
-    db::user::set(user).await.unwrap();
+    db::user::set(&user).await.unwrap();
     Ok(())
 }
 
@@ -690,6 +707,7 @@ mod tests {
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
                 is_external: false,
+                password_ext: Some("pass#123".to_string()),
             },
         );
     }

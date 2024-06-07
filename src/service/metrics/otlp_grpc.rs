@@ -652,7 +652,7 @@ fn process_hist_data_point(
 
     // add max record
     let mut max_rec = rec.clone();
-    max_rec[VALUE_LABEL] = data_point.min.into();
+    max_rec[VALUE_LABEL] = data_point.max.into();
     max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(max_rec);
 
