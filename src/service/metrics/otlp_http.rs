@@ -809,7 +809,10 @@ fn process_hist_data_point(
     // add 4 types of record
     for stream in ["count", "sum", "min", "max"] {
         let mut new_rec = rec.clone();
-        new_rec[VALUE_LABEL] = json::get_float_value(data_point.get(stream).unwrap()).into();
+        new_rec[VALUE_LABEL] = match data_point.get(stream) {
+            Some(val) => json::get_float_value(val).into(),
+            None => None::<f64>.into(),
+        };
         new_rec[NAME_LABEL] = format!("{}_{stream}", new_rec[NAME_LABEL].as_str().unwrap()).into();
         bucket_recs.push(new_rec);
     }
@@ -1102,5 +1105,69 @@ fn get_metric_value(val: &json::Value) -> f64 {
         val.get("doubleValue").unwrap().as_f64().unwrap()
     } else {
         0.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_process_hist_data_point() {
+        let cases = vec![
+            json!({
+                "attributes": [
+                    {"key": "attr1", "value": {"vk1": "vv1"}},
+                    {"key": "attr2", "value": {"vk2": "vv2"}}
+                ],
+                "timeUnixNano": 1620000000000i64,
+                "startTimeUnixNano": 1610000000000i64,
+                "count": 10,
+                "sum": 100,
+                "min": 1,
+                "max": 10,
+                "bucketCounts": [1, 2, 3],
+                "explicitBounds": [0.1, 0.2, 0.3]
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+            json!({
+                "attributes": [],
+                "timeUnixNano": 1620000000000i64,
+                "bucketCounts": [1],
+                "explicitBounds": [0.1]
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+            json!({
+                "attributes": [],
+                "timeUnixNano": 0,
+                "bucketCounts": [],
+                "explicitBounds": []
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        ];
+
+        let result = cases
+            .iter()
+            .map(|dp| process_hist_data_point(&mut json!({"__name__": "test"}), dp))
+            .collect::<Vec<_>>();
+        // first case's 4 types record values
+        assert_eq!(result[0][0]["value"], json!(10.0));
+        assert_eq!(result[0][1]["value"], json!(100.0));
+        assert_eq!(result[0][2]["value"], json!(1.0));
+        assert_eq!(result[0][3]["value"], json!(10.0));
+
+        let expected_lens = vec![7, 5, 4];
+        assert_eq!(
+            result.iter().map(Vec::len).collect::<Vec<_>>(),
+            expected_lens
+        );
     }
 }
