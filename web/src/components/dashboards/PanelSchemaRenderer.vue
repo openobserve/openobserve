@@ -652,6 +652,14 @@ export default defineComponent({
         // also, if value is an array, then last value will be taken
         const drilldownVariables: any = {};
 
+        // selected start time and end time
+        drilldownVariables.start_time = new Date(
+          selectedTimeObj.value.start_time.toISOString()
+        ).getTime();
+        drilldownVariables.end_time = new Date(
+          selectedTimeObj.value.end_time.toISOString()
+        ).getTime();
+
         // if chart type is 'table' then we need to pass the table name
         if (panelSchema.value.type == "table") {
           const fields: any = {};
