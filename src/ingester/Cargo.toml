@@ -26,6 +26,7 @@ serde_json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
 async-walkdir.workspace = true
+futures-locks = "0.7.1"
 
 [[bin]]
 name = "wal-reader"

@@ -230,7 +230,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
     write_file(&writer, stream_name, buf).await;
-    if let Err(e) = writer.sync() {
+    if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
 

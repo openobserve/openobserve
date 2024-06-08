@@ -24,9 +24,10 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{get_config, metrics};
+use futures::lock::Mutex;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
 use snafu::ResultExt;
+use tokio::sync::RwLock;
 use wal::Writer as WalWriter;
 
 use crate::{
@@ -55,14 +56,10 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 pub struct Writer {
     thread_id: usize,
     key: WriterKey,
+    wal: Arc<Mutex<WalWriter>>,
+    memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
-    writer: Arc<RwLock<WriterInner>>,
-}
-
-struct WriterInner {
-    wal: WalWriter,
-    memtable: MemTable,
 }
 
 // check total memory size
@@ -106,7 +103,7 @@ pub async fn read_from_memtable(
         let Some(r) = w.get(&key) else {
             continue;
         };
-        if let Ok(batch) = r.read(stream_name, time_range) {
+        if let Ok(batch) = r.read(stream_name, time_range).await {
             batches.extend(batch);
         }
     }
@@ -159,10 +156,8 @@ impl Writer {
         Self {
             thread_id,
             key: key.clone(),
-            next_seq,
-            created_at: AtomicI64::new(now),
-            writer: Arc::new(RwLock::new(WriterInner {
-                wal: WalWriter::new(
+            wal: Arc::new(Mutex::new(
+                WalWriter::new(
                     wal_dir,
                     &key.org_id,
                     &key.stream_type,
@@ -170,8 +165,10 @@ impl Writer {
                     cfg.limit.max_file_size_on_disk as u64,
                 )
                 .expect("wal file create error"),
-                memtable: MemTable::new(),
-            })),
+            )),
+            memtable: Arc::new(RwLock::new(MemTable::new())),
+            next_seq,
+            created_at: AtomicI64::new(now),
         }
     }
 
@@ -190,17 +187,18 @@ impl Writer {
         } else {
             Vec::new()
         };
+        let mut wal = self.wal.lock().await;
         let start = std::time::Instant::now();
-        let mut w = self.writer.write();
+        let mut mem = self.memtable.write().await;
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(start.elapsed().as_millis() as f64);
-        if self.check_wal_threshold(w.wal.size(), entry_bytes.len())
-            || self.check_mem_threshold(w.memtable.size(), entry.data_size)
+        if self.check_wal_threshold(wal.size(), entry_bytes.len())
+            || self.check_mem_threshold(mem.size(), entry.data_size)
         {
             let cfg = get_config();
             // sync wal before rotation
-            w.wal.sync().context(WalSnafu)?;
+            wal.sync().context(WalSnafu)?;
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -221,11 +219,11 @@ impl Writer {
                 cfg.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
-            let old_wal = std::mem::replace(&mut w.wal, new_wal);
+            let old_wal = std::mem::replace(&mut *wal, new_wal);
 
             // rotation memtable
             let new_mem = MemTable::new();
-            let old_mem = std::mem::replace(&mut w.memtable, new_mem);
+            let old_mem = std::mem::replace(&mut *mem, new_mem);
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
@@ -242,9 +240,9 @@ impl Writer {
 
         if !check_ttl {
             // write into wal
-            w.wal.write(&entry_bytes, false).context(WalSnafu)?;
+            wal.write(&entry_bytes, false).context(WalSnafu)?;
             // write into memtable
-            w.memtable.write(schema, entry)?;
+            mem.write(schema, entry)?;
         }
 
         Ok(())
@@ -252,34 +250,34 @@ impl Writer {
 
     pub async fn close(&self) -> Result<()> {
         // rotation wal
-        let mut w = self.writer.write();
-        w.wal.sync().context(WalSnafu)?;
-        let path = w.wal.path().clone();
+        let wal = self.wal.lock().await;
+        wal.sync().context(WalSnafu)?;
+        let path = wal.path().clone();
+        drop(wal);
 
         // rotation memtable
+        let mut mem = self.memtable.write().await;
         let new_mem = MemTable::new();
-        let old_mem = std::mem::replace(&mut w.memtable, new_mem);
-        drop(w);
+        let old_mem = std::mem::replace(&mut *mem, new_mem);
+        drop(mem);
 
         let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
-        tokio::task::spawn(async move {
-            IMMUTABLES.write().await.insert(path, table);
-        });
+        IMMUTABLES.write().await.insert(path, table);
         Ok(())
     }
 
-    pub fn sync(&self) -> Result<()> {
-        let w = self.writer.read();
-        w.wal.sync().context(WalSnafu)
+    pub async fn sync(&self) -> Result<()> {
+        let wal = self.wal.lock().await;
+        wal.sync().context(WalSnafu)
     }
 
-    pub fn read(
+    pub async fn read(
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<ReadRecordBatchEntry>> {
-        let w = self.writer.read();
-        w.memtable.read(stream_name, time_range)
+        let memtable = self.memtable.read().await;
+        memtable.read(stream_name, time_range)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
