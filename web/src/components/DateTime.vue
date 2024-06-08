@@ -401,7 +401,7 @@ export default defineComponent({
         resetTime("", "");
 
         let startTime = (new Date().getTime() - 900000) * 1000;
-        let endTime = new Date().getTime();
+        let endTime = new Date().getTime() * 1000;
 
         if (props.defaultAbsoluteTime?.startTime) {
           startTime =
