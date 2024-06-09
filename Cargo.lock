@@ -4257,7 +4257,6 @@ dependencies = [
  "itertools 0.12.1",
  "log",
  "once_cell",
- "parking_lot",
  "parquet",
  "serde",
  "serde_json",

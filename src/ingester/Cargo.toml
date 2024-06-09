@@ -10,23 +10,22 @@ infra.workspace = true
 wal.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
+async-walkdir.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
 futures.workspace = true
+futures-locks.workspace = true
 hashbrown.workspace = true
 indexmap.workspace = true
 itertools.workspace = true
 log.workspace = true
 once_cell.workspace = true
-parking_lot.workspace = true
 parquet.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
-async-walkdir.workspace = true
-futures-locks = "0.7.1"
 
 [[bin]]
 name = "wal-reader"
