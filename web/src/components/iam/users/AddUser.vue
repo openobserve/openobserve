@@ -164,7 +164,11 @@ import {
   getImageURL,
   useLocalCurrentUser,
   useLocalUserInfo,
+  getLogoutURL,
+  invlidateLoginData,
 } from "@/utils/zincutils";
+import config from "@/aws-exports";
+
 
 const defaultValue: any = () => {
   return {
@@ -289,9 +293,20 @@ export default defineComponent({
   },
   methods: {
     signout() {
+      if (config.isEnterprise == "true") {
+        invlidateLoginData();
+      }
+
+      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
+
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
+
+      if (config.isCloud == "true") {
+        window.location.href = logoutURL;
+      }
+
       this.$router.push("/logout");
     },
     onSubmit() {
