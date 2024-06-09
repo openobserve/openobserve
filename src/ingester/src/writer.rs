@@ -22,9 +22,9 @@ use std::{
 };
 
 use arrow_schema::Schema;
-use async_lock::{Mutex, RwLock};
 use chrono::{Duration, Utc};
 use config::{get_config, metrics};
+use futures_locks::{Mutex, RwLock};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use wal::Writer as WalWriter;
