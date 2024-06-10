@@ -2282,19 +2282,13 @@ const useLogs = () => {
             searchObj.data.stream.interestingFieldList =
               localInterestingFields.value != null &&
               localInterestingFields.value[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream.value
+                searchObj.organizationIdetifier + "_" + stream.name
               ] !== undefined &&
               localInterestingFields.value[
-                searchObj.organizationIdetifier +
-                  "_" +
-                  searchObj.data.stream.selectedStream.value
+                searchObj.organizationIdetifier + "_" + stream.name
               ].length > 0
                 ? localInterestingFields.value[
-                    searchObj.organizationIdetifier +
-                      "_" +
-                      searchObj.data.stream.selectedStream.value
+                    searchObj.organizationIdetifier + "_" + stream.name
                   ]
                 : environmentInterestingFields.length > 0
                 ? [...environmentInterestingFields]
@@ -2539,7 +2533,7 @@ const useLogs = () => {
       }
 
       const parsedSQL: any = fnParsedSQL();
-      
+
       if (searchObj.data.stream.selectedFields.length == 0) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
 

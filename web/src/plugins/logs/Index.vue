@@ -356,7 +356,7 @@ export default defineComponent({
             button: "Get Less Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.value,
+            stream_name: this.searchObj.data.stream.selectedStream.join(","),
             page: "Search Logs",
           });
         }
@@ -588,7 +588,7 @@ export default defineComponent({
 
             if (searchObj.data.stream.selectedStreamFields.length == 0) {
               const streamData: any = getStream(
-                searchObj.data.stream.selectedStream.value,
+                searchObj.data.stream.selectedStream[0],
                 searchObj.data.stream.streamType || "logs",
                 true
               );
