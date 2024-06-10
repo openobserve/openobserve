@@ -1103,8 +1103,8 @@ const useLogs = () => {
               // searchObj.data.queryResults.total = res.data.records;
               // const partitions = res.data.partitions;
 
-              searchObj.data.queryResults.partitionDetail.partitions =
-                partitions;
+              // searchObj.data.queryResults.partitionDetail.partitions =
+              //   partitions;
 
               // let pageObject: any = [];
               // partitions.forEach((item: any, index: number) => {
