@@ -99,6 +99,7 @@ pub async fn report_request_usage_stats(
             cached_ratio: None,
             compressed_size: None,
             search_type: stats.search_type,
+            trace_id: None,
         });
     };
 
@@ -129,6 +130,7 @@ pub async fn report_request_usage_stats(
         cached_ratio: stats.cached_ratio,
         compressed_size: None,
         search_type: stats.search_type,
+        trace_id: stats.trace_id,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;

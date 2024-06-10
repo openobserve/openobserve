@@ -279,7 +279,7 @@ pub async fn search(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
-            res.set_trace_id(trace_id);
+            res.set_trace_id(trace_id.clone());
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
             let req_stats = RequestStats {
@@ -292,6 +292,7 @@ pub async fn search(
                 max_ts: Some(req.query.end_time),
                 cached_ratio: Some(res.cached_ratio),
                 search_type,
+                trace_id: Some(trace_id),
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
@@ -710,6 +711,7 @@ pub async fn around(
         min_ts: Some(around_start_time),
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
+        trace_id: Some(trace_id),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1143,6 +1145,7 @@ async fn values_v1(
         max_ts: Some(end_time),
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
+        trace_id: Some(trace_id),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1369,6 +1372,7 @@ async fn values_v2(
         max_ts: Some(end_time),
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
+        trace_id: Some(trace_id),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

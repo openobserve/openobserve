@@ -178,6 +178,7 @@ pub async fn search(
                     max_ts: Some(req_query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    trace_id: Some(trace_id),
                     ..Default::default()
                 };
                 report_request_usage_stats(

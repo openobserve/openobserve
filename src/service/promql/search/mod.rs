@@ -111,7 +111,7 @@ async fn search_in_cluster(
     let trace_id = ider::uuid();
     let job_id = trace_id[0..6].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
-        trace_id,
+        trace_id: trace_id.clone(),
         job: job_id,
         stage: 0,
         partition: 0,
@@ -287,6 +287,7 @@ async fn search_in_cluster(
         user_email: Some(user_email.to_string()),
         min_ts: Some(start),
         max_ts: Some(end),
+        trace_id: Some(trace_id),
         ..Default::default()
     };
 
