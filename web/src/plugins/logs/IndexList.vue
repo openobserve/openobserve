@@ -1499,4 +1499,5 @@ $streamSelectorHeight: 44px;
   white-space: nowrap !important;
   max-height: 40px !important;
 }
+
 </style>
