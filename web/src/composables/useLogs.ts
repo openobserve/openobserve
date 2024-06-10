@@ -919,9 +919,14 @@ const useLogs = () => {
                 }
               }
 
+              let queryFieldList: string = "";
+              if (listOfFields.length > 0) {
+                queryFieldList = "," + listOfFields.join(",");
+              }
+
               finalQuery = finalQuery.replace(
                 "[FIELD_LIST]",
-                `'${item}' as _stream_name,` + listOfFields.join(",")
+                `'${item}' as _stream_name` + queryFieldList
               );
 
               // finalHistogramQuery = finalHistogramQuery.replace(
@@ -2805,9 +2810,14 @@ const useLogs = () => {
             }
           }
 
+          let queryFieldList: string = "";
+          if (listOfFields.length > 0) {
+            queryFieldList = "," + listOfFields.join(",");
+          }
+
           finalQuery = finalQuery.replace(
             "[FIELD_LIST]",
-            `'${item}' as _stream_name,` + listOfFields.join(",")
+            `'${item}' as _stream_name` + queryFieldList
           );
           sqlContext.push(b64EncodeUnicode(finalQuery));
         });
