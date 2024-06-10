@@ -103,10 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="searchObj.data.stream.expandGroupRowsFieldCount[props.row.group] > 0"
                 :name="
                   searchObj.data.stream.expandGroupRows[props.row.group]
-                    ? 'expand_less'
-                    : 'expand_more'
-                "
-                size="25px"
                 class="float-right"
               ></q-icon>
             </q-td>
