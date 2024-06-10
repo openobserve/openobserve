@@ -1435,7 +1435,7 @@ $streamSelectorHeight: 44px;
 }
 </style>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .field-table {
   .q-table__bottom {
     padding: 5px !important;
@@ -1453,9 +1453,6 @@ $streamSelectorHeight: 44px;
   overflow: hidden !important;
   white-space: nowrap !important;
   max-height: 40px !important;
-  
-  span, .q-field__input {
-    margin-top: -12px;
-  }
 }
+
 </style>

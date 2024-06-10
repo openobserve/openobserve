@@ -1032,7 +1032,7 @@ $navbarHeight: 64px;
   }
 
   .search-result-container {
-    position: fixed;
+    position: relative;
     width: 100%;
   }
 }
