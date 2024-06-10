@@ -792,6 +792,12 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_DROP_NULLS_COLS_DURING_INGESTION",
+        help = "drop cols with null value during ingestion",
+        default = true
+    )]
+    pub drop_null_cols_during_ingestion: bool,
 }
 
 #[derive(EnvConfig)]

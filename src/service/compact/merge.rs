@@ -1032,7 +1032,7 @@ pub fn generate_inverted_idx_recordbatch(
 pub async fn merge_parquet_files_v1(
     thread_id: usize,
     trace_id: &str,
-    schema: Arc<Schema>,
+    mut schema: Arc<Schema>,
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
@@ -1074,9 +1074,26 @@ pub async fn merge_parquet_files_v1(
         .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
-    let concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
+    let mut concatenated_record_batch = arrow::compute::concat_batches(&schema, &record_batches)?;
 
-    // 3. sort concatenated record batch by timestamp col in desc order
+    if get_config().limit.drop_null_cols_during_ingestion {
+        // 3. delete all the null columns
+        let num_rows = concatenated_record_batch.num_rows();
+        let mut null_columns = Vec::new();
+        for idx in 0..schema.fields().len() {
+            if concatenated_record_batch.column(idx).null_count() == num_rows {
+                null_columns.push(idx);
+            }
+        }
+        if !null_columns.is_empty() {
+            for (deleted_num, idx) in null_columns.into_iter().enumerate() {
+                concatenated_record_batch.remove_column(idx - deleted_num);
+            }
+            schema = concatenated_record_batch.schema().clone();
+        }
+    }
+
+    // 4. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
         concatenated_record_batch
             .column_by_name(&get_config().common.column_timestamp)
