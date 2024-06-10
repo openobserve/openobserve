@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    hash::{DefaultHasher, Hash, Hasher},
     path::PathBuf,
     sync::{
         atomic::{AtomicI64, AtomicU64, Ordering},
@@ -80,6 +81,27 @@ pub async fn get_writer(thread_id: usize, org_id: &str, stream_type: &str) -> Ar
     let w = rw
         .entry(key.clone())
         .or_insert_with(|| Arc::new(Writer::new(thread_id, key)));
+    w.clone()
+}
+
+/// Get a writer for a given org_id and stream_type
+pub async fn get_hashed_writer(
+    _thread_id: usize,
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> Arc<Writer> {
+    let num = get_config().limit.http_worker_num as u64;
+    let mut hasher = DefaultHasher::new();
+    stream_name.hash(&mut hasher);
+    let hash = hasher.finish();
+    let new_thread_id = (hash % num) as usize;
+
+    let key = WriterKey::new(org_id, stream_type);
+    let mut rw = WRITERS[new_thread_id].write().await;
+    let w = rw
+        .entry(key.clone())
+        .or_insert_with(|| Arc::new(Writer::new(new_thread_id, key)));
     w.clone()
 }
 

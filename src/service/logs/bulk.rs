@@ -471,9 +471,16 @@ pub async fn ingest(
 
     // write data to wal
     let time = start.elapsed().as_secs_f64();
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+
     for (stream_name, mut stream_data) in stream_data_map {
         // check if we are allowed to ingest
+        let writer = ingester::get_hashed_writer(
+            thread_id,
+            org_id,
+            &StreamType::Logs.to_string(),
+            &stream_name,
+        )
+        .await;
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
@@ -515,9 +522,9 @@ pub async fn ingest(
             fns_length as u16,
         )
         .await;
-    }
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
+        if let Err(e) = writer.sync().await {
+            log::error!("ingestion error while syncing writer: {}", e);
+        }
     }
 
     // only one trigger per request, as it updates etcd

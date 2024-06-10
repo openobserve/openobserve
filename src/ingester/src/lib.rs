@@ -33,7 +33,9 @@ use tokio::{
     sync::{mpsc, Mutex},
     time,
 };
-pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+pub use writer::{
+    check_memtable_size, flush_all, get_hashed_writer, get_writer, read_from_memtable, Writer,
+};
 
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
     Lazy::new(Default::default);
