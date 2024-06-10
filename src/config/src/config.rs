@@ -266,6 +266,21 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
     blocked_streams
 });
 
+pub static STREAM_WITH_MEMTABLE_BUCKET_MAP: Lazy<HashMap<String, usize>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    let streams: Vec<String> = get_config()
+        .common
+        .streams_with_individual_mem_tables
+        .split(',')
+        .map(|x| x.to_string())
+        .collect();
+    let num_mem_tables = get_config().limit.num_mem_tables as usize;
+    for (index, stream) in streams.iter().enumerate() {
+        map.insert(stream.clone(), num_mem_tables + index);
+    }
+    map
+});
+
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
@@ -653,6 +668,8 @@ pub struct Common {
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
     pub allow_user_defined_schemas: bool,
+    #[env_config(name = "ZO_STREAMS_WITH_MEM_TABLE", help="streams name for which dedicated mem table will be used as comma separated values " default = "")]
+    pub streams_with_individual_mem_tables: String,
 }
 
 #[derive(EnvConfig)]
@@ -798,6 +815,14 @@ pub struct Limit {
         default = true
     )]
     pub drop_null_cols_during_ingestion: bool,
+    #[env_config(name = "ZO_MEM_TABLE_NUM", help = "number of memtables", default = 0)]
+    pub num_mem_tables: usize,
+    #[env_config(
+        name = "ZO_MAX_STREAM_MEM_TABLE_NUM",
+        help = "maximum number streams with individual memtables",
+        default = 100
+    )]
+    pub max_streams_with_individual_memtables: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1086,6 +1111,10 @@ pub fn init() -> Config {
 
     if cfg.limit.consistent_hash_vnodes == 0 {
         cfg.limit.consistent_hash_vnodes = 3;
+    }
+
+    if cfg.limit.num_mem_tables == 0 {
+        cfg.limit.num_mem_tables = cpu_num;
     }
 
     // check common config
