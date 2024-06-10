@@ -1064,20 +1064,6 @@ export default defineComponent({
         }
       }
 
-      field.isInterestingField = !isInterestingField;
-
-      const localInterestingFields: any = useLocalInterestingFields();
-      let localFields: any = {};
-      if (localInterestingFields.value != null) {
-        localFields = localInterestingFields.value;
-        localFields[
-          searchObj.organizationIdetifier +
-            "_" +
-            searchObj.data.stream.selectedStream.value
-        ] = searchObj.data.stream.interestingFieldList;
-        useLocalInterestingFields(localFields);
-      }
-
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
     };
 
