@@ -107,7 +107,7 @@ test.describe("Schema testcases", () => {
     await page.locator('button').filter({ hasText: 'close' }).click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="log-table-column-0-source"] [data-test="table-row-expand-menu"]').click();
+    await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.getByText('{ arrow_drop_down_all:{"code').click();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
@@ -123,7 +123,7 @@ test.describe("Schema testcases", () => {
     await ingestion(page);
     await page.waitForTimeout(5000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
-    await page.locator('[data-test="log-table-column-0-source"] [data-test="table-row-expand-menu"]').click();
+    await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.getByText('{ arrow_drop_down_timestamp:').click();
  
   })
