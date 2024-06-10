@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
-                @get:traceDetails="getTraceDetails"
                 @shareLink="copyTracesUrl"
               />
             </div>
@@ -758,7 +757,7 @@ export default defineComponent({
         let filter = searchObj.data.editorValue.trim();
 
         let duration = "";
-        if (durationFilter.max) {
+        if (searchObj.meta.filterType === "basic" && durationFilter.max) {
           duration += ` duration >= ${
             durationFilter.min * 1000
           } AND duration <= ${durationFilter.max * 1000}`;
@@ -797,8 +796,6 @@ export default defineComponent({
 
             //update grid columns
             updateGridColumns();
-
-            if (router.currentRoute.value.query.trace_id) openTraceDetails();
 
             // dismiss();
           })
