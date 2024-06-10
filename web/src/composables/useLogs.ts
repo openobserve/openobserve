@@ -3213,7 +3213,10 @@ const useLogs = () => {
         searchObj.data.stream.streamType || "logs",
         true
       );
-      searchObj.data.stream.selectedStreamFields.push(streamData.schema);
+
+      if (streamData.schema != undefined) {
+        searchObj.data.stream.selectedStreamFields.push(streamData.schema);
+      }
     }
 
     if (
