@@ -76,6 +76,8 @@ pub struct UsageData {
     pub num_records: i64,
     pub stream_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
@@ -225,6 +227,8 @@ pub struct RequestStats {
     pub user_email: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -239,6 +243,7 @@ impl Default for RequestStats {
             max_ts: None,
             user_email: None,
             search_type: None,
+            trace_id: None,
         }
     }
 }
@@ -256,6 +261,7 @@ impl From<FileMeta> for RequestStats {
             max_ts: Some(meta.max_ts),
             user_email: None,
             search_type: None,
+            trace_id: None,
         }
     }
 }
