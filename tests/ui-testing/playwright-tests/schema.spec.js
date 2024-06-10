@@ -143,11 +143,13 @@ test.describe("Schema testcases", () => {
     await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click()
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
     await page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
-    await page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
+    await page.getByText(streamName).click();
+    // await page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
     await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_automate');
-    await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
+    // await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
+    await page.getByText('e2e_automate').click();
     await page.waitForTimeout(4000);
     await page.waitForSelector('text=Loading...', { state: 'hidden' });
     await page.getByTitle('_timestamp').click();
