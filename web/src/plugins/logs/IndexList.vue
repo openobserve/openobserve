@@ -98,20 +98,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="field_list bg-grey-3"
               style="line-height: 28px; padding-left: 10px"
             >
-              {{ props.row.name }} ({{
-                searchObj.data.stream.expandGroupRowsFieldCount[
-                  props.row.group
-                ]
-              }})
+              {{ props.row.name }}
               <q-icon
-                v-if="
-                  searchObj.data.stream.expandGroupRowsFieldCount[
-                    props.row.group
-                  ] > 0
-                "
                 :name="
-                  searchObj.data.stream.expandGroupRows[props.row.group]"
-                class="float-right"></q-icon>
+                  searchObj.data.stream.expandGroupRows[props.row.group]
+                    ? 'expand_less'
+                    : 'expand_more'
+                "
+                size="25px"
+                class="float-right"
+              ></q-icon>
             </q-td>
           </q-tr>
           <q-tr
@@ -476,9 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%"
-class="text-bold"
-style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
