@@ -1280,10 +1280,12 @@ const useLogs = () => {
         (searchObj.data.queryResults.aggs !== undefined &&
           searchObj.data.resultGrid.currentPage == 1 &&
           searchObj.meta.showHistogram == true &&
+          searchObj.data.stream.selectedStream.length <= 1 &&
           (!searchObj.meta.sqlMode ||
             (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
         (searchObj.loadingHistogram == false &&
           searchObj.meta.showHistogram == true &&
+          searchObj.data.stream.selectedStream.length <= 1 &&
           searchObj.meta.sqlMode == false &&
           searchObj.data.resultGrid.currentPage == 1)
       ) {
@@ -1594,11 +1596,13 @@ const useLogs = () => {
             searchObj.data.resultGrid.currentPage == 1 &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
+            searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
               (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
+            searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
           await getHistogramQueryData(searchObj.data.histogramQuery);
@@ -1614,7 +1618,7 @@ const useLogs = () => {
             },
             errorCode: 0,
             errorMsg:
-              "Histogram is not available for aggregation/limit queries.",
+              "Histogram is not available for limit queries.",
             errorDetail: "",
           };
         } else {
@@ -1630,6 +1634,22 @@ const useLogs = () => {
                 } milliseconds to complete`
               );
             }, 0);
+          }
+
+          if(searchObj.data.stream.selectedStream.length > 1) {
+            searchObj.data.histogram = {
+              xData: [],
+              yData: [],
+              chartParams: {
+                title: getHistogramTitle(),
+                unparsed_x_data: [],
+                timezone: "",
+              },
+              errorCode: 0,
+              errorMsg:
+                "Histogram is not available for multi stream search.",
+              errorDetail: "",
+            };
           }
         }
       } else {
@@ -2043,90 +2063,106 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
-        searchObjDebug["histogramStartTime"] = performance.now();
-        searchObj.data.histogram.errorMsg = "";
-        searchObj.data.histogram.errorCode = 0;
-        searchObj.data.histogram.errorDetail = "";
-        searchObj.loadingHistogram = true;
-        queryReq.query.size = -1;
-        const parsedSQL: any = fnParsedSQL();
-
-        // let hasAggregationFlag = false;
-        // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        //   hasAggregationFlag = hasAggregation(parsedSQL?.columns);
-        //   if (hasAggregationFlag) {
-        //     queryReq.query.track_total_hits = true;
-        //   }
-        // }
-
-        searchService
-          .search(
-            {
-              org_identifier: searchObj.organizationIdetifier,
-              query: queryReq,
-              page_type: searchObj.data.stream.streamType,
+        if (searchObj.data.stream.selectedStream.length > 1) {
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: getHistogramTitle(),
+              unparsed_x_data: [],
+              timezone: "",
             },
-            "UI"
-          )
-          .then(async (res) => {
-            searchObjDebug["histogramProcessingStartTime"] = performance.now();
-            searchObj.loading = false;
-            searchObj.data.queryResults.aggs = res.data.hits;
-            searchObj.data.queryResults.scan_size = res.data.scan_size;
-            searchObj.data.queryResults.took += res.data.took;
-            // if (hasAggregationFlag) {
-            //   searchObj.data.queryResults.total = res.data.total;
-            // }
-            await generateHistogramData();
+            errorCode: 0,
+            errorMsg:
+              "Histogram is not available for multi stream search.",
+            errorDetail: "",
+          };
+        } else {
+          searchObjDebug["histogramStartTime"] = performance.now();
+          searchObj.data.histogram.errorMsg = "";
+          searchObj.data.histogram.errorCode = 0;
+          searchObj.data.histogram.errorDetail = "";
+          searchObj.loadingHistogram = true;
+          queryReq.query.size = -1;
+          const parsedSQL: any = fnParsedSQL();
 
-            let regeratePaginationFlag = false;
-            if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
-              regeratePaginationFlag = true;
-            }
-            // if total records in partition is greate than recordsPerPage then we need to update pagination
-            // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-            refreshPartitionPagination(regeratePaginationFlag);
+          // let hasAggregationFlag = false;
+          // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+          //   hasAggregationFlag = hasAggregation(parsedSQL?.columns);
+          //   if (hasAggregationFlag) {
+          //     queryReq.query.track_total_hits = true;
+          //   }
+          // }
 
-            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
-            searchObj.loadingHistogram = false;
+          searchService
+            .search(
+              {
+                org_identifier: searchObj.organizationIdetifier,
+                query: queryReq,
+                page_type: searchObj.data.stream.streamType,
+              },
+              "UI"
+            )
+            .then(async (res) => {
+              searchObjDebug["histogramProcessingStartTime"] = performance.now();
+              searchObj.loading = false;
+              searchObj.data.queryResults.aggs = res.data.hits;
+              searchObj.data.queryResults.scan_size = res.data.scan_size;
+              searchObj.data.queryResults.took += res.data.took;
+              // if (hasAggregationFlag) {
+              //   searchObj.data.queryResults.total = res.data.total;
+              // }
+              await generateHistogramData();
 
-            searchObjDebug["histogramProcessingEndTime"] = performance.now();
-            searchObjDebug["histogramEndTime"] = performance.now();
-            console.log(
-              `Histogram processing after data received took ${
-                searchObjDebug["histogramProcessingEndTime"] -
-                searchObjDebug["histogramProcessingStartTime"]
-              } milliseconds to complete`
-            );
-            console.log(
-              `Entire Histogram took ${
-                searchObjDebug["histogramEndTime"] -
-                searchObjDebug["histogramStartTime"]
-              } milliseconds to complete`
-            );
-            console.log("=================== End Debug ===================");
-            dismiss();
-            resolve(true);
-          })
-          .catch((err) => {
-            searchObj.loadingHistogram = false;
-            if (err.response != undefined) {
-              searchObj.data.histogram.errorMsg = err.response.data.error;
-            } else {
-              searchObj.data.histogram.errorMsg = err.message;
-            }
+              let regeratePaginationFlag = false;
+              if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
+                regeratePaginationFlag = true;
+              }
+              // if total records in partition is greate than recordsPerPage then we need to update pagination
+              // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+              refreshPartitionPagination(regeratePaginationFlag);
 
-            const customMessage = logsErrorMessage(err?.response?.data.code);
-            searchObj.data.histogram.errorCode = err?.response?.data.code;
-            searchObj.data.histogram.errorDetail =
-              err?.response?.data?.error_detail;
+              //searchObj.data.histogram.chartParams.title = getHistogramTitle();
+              searchObj.loadingHistogram = false;
 
-            if (customMessage != "") {
-              searchObj.data.histogram.errorMsg = t(customMessage);
-            }
+              searchObjDebug["histogramProcessingEndTime"] = performance.now();
+              searchObjDebug["histogramEndTime"] = performance.now();
+              console.log(
+                `Histogram processing after data received took ${
+                  searchObjDebug["histogramProcessingEndTime"] -
+                  searchObjDebug["histogramProcessingStartTime"]
+                } milliseconds to complete`
+              );
+              console.log(
+                `Entire Histogram took ${
+                  searchObjDebug["histogramEndTime"] -
+                  searchObjDebug["histogramStartTime"]
+                } milliseconds to complete`
+              );
+              console.log("=================== End Debug ===================");
+              dismiss();
+              resolve(true);
+            })
+            .catch((err) => {
+              searchObj.loadingHistogram = false;
+              if (err.response != undefined) {
+                searchObj.data.histogram.errorMsg = err.response.data.error;
+              } else {
+                searchObj.data.histogram.errorMsg = err.message;
+              }
 
-            reject(false);
-          });
+              const customMessage = logsErrorMessage(err?.response?.data.code);
+              searchObj.data.histogram.errorCode = err?.response?.data.code;
+              searchObj.data.histogram.errorDetail =
+                err?.response?.data?.error_detail;
+
+              if (customMessage != "") {
+                searchObj.data.histogram.errorMsg = t(customMessage);
+              }
+
+              reject(false);
+            });
+        }
       } catch (e: any) {
         dismiss();
         searchObj.data.histogram.errorMsg = e.message;
