@@ -2599,7 +2599,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 #logsQueryEditor,
 #fnEditor {
   height: 100% !important;

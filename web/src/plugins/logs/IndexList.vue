@@ -1198,7 +1198,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 $streamSelectorHeight: 44px;
 
 .logs-index-menu {
@@ -1392,7 +1392,7 @@ $streamSelectorHeight: 44px;
 }
 </style>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .index-table {
   .q-table {
     width: 100%;

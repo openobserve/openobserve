@@ -1094,7 +1094,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 $navbarHeight: 64px;
 
 .logPage {

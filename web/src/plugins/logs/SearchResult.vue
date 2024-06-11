@@ -981,7 +981,7 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .search-list {
   .copy-log-btn {
     .q-btn .q-icon {
