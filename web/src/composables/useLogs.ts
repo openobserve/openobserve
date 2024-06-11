@@ -2536,7 +2536,6 @@ const useLogs = () => {
 
       if (searchObj.data.stream.selectedFields.length == 0) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
-
         if (
           (searchObj.meta.sqlMode == true &&
             parsedSQL.hasOwnProperty("columns") &&
