@@ -26,7 +26,7 @@ use config::metrics;
 use hashbrown::HashMap;
 
 use crate::{
-    entry::{Entry, PersistStat},
+    entry::{Entry, PersistStat, RecordBatchEntry},
     errors::Result,
     stream::Stream,
     ReadRecordBatchEntry,
@@ -48,7 +48,12 @@ impl MemTable {
         }
     }
 
-    pub(crate) fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
+    pub(crate) fn write(
+        &mut self,
+        schema: Arc<Schema>,
+        entry: Entry,
+        batch: Option<Arc<RecordBatchEntry>>,
+    ) -> Result<()> {
         let partitions = match self.streams.get_mut(&entry.stream) {
             Some(v) => v,
             None => self
@@ -57,7 +62,7 @@ impl MemTable {
                 .or_insert_with(Stream::new),
         };
         let json_size = entry.data_size;
-        let arrow_size = partitions.write(schema, entry)?;
+        let arrow_size = partitions.write(schema, entry, batch)?;
         self.json_bytes_written
             .fetch_add(json_size as u64, Ordering::SeqCst);
         self.arrow_bytes_written

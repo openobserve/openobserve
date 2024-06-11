@@ -50,12 +50,16 @@ impl Partition {
         }
     }
 
-    pub(crate) fn write(&mut self, entry: Entry) -> Result<usize> {
+    pub(crate) fn write(
+        &mut self,
+        entry: Entry,
+        batch: Option<Arc<RecordBatchEntry>>,
+    ) -> Result<usize> {
         let partition = self
             .files
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
-        partition.write(self.schema.clone(), entry)
+        partition.write(batch)
     }
 
     pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<ReadRecordBatchEntry> {
@@ -190,10 +194,11 @@ impl PartitionFile {
         Self { data: Vec::new() }
     }
 
-    fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
-        let Some(batch) = entry.into_batch(schema)? else {
+    fn write(&mut self, batch: Option<Arc<RecordBatchEntry>>) -> Result<usize> {
+        let Some(batch) = batch else {
             return Ok(0);
         };
+        let json_size = batch.data_json_size;
         let arrow_size = batch.data_arrow_size;
         self.data.push(batch);
         metrics::INGEST_MEMTABLE_ARROW_BYTES
@@ -201,7 +206,7 @@ impl PartitionFile {
             .add(arrow_size as i64);
         metrics::INGEST_MEMTABLE_BYTES
             .with_label_values(&[])
-            .add(entry.data_size as i64);
+            .add(json_size as i64);
         Ok(arrow_size)
     }
 

@@ -24,9 +24,9 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{get_config, metrics};
-use futures_locks::{Mutex, RwLock};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
+use tokio::sync::{Mutex, RwLock};
 use wal::Writer as WalWriter;
 
 use crate::{
@@ -181,10 +181,12 @@ impl Writer {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
         }
-        let entry_bytes = if !check_ttl {
-            entry.into_bytes()?
+        let (entry_bytes, entry_batch) = if !check_ttl {
+            let bytes = entry.into_bytes()?;
+            let batch = entry.into_batch(schema.clone())?;
+            (bytes, batch)
         } else {
-            Vec::new()
+            (Vec::new(), None)
         };
         let mut wal = self.wal.lock().await;
         let start = std::time::Instant::now();
@@ -230,18 +232,16 @@ impl Writer {
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
             let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
-            tokio::task::spawn(async move {
-                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
-                IMMUTABLES.write().await.insert(path, table);
-                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
-            });
+            log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
+            IMMUTABLES.write().await.insert(path, table);
+            log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
         }
 
         if !check_ttl {
             // write into wal
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             // write into memtable
-            mem.write(schema, entry)?;
+            mem.write(schema, entry, entry_batch)?;
         }
 
         Ok(())

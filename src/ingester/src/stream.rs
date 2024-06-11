@@ -20,7 +20,7 @@ use config::utils::schema_ext::SchemaExt;
 use hashbrown::HashMap;
 
 use crate::{
-    entry::{Entry, PersistStat},
+    entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
     partition::Partition,
     ReadRecordBatchEntry,
@@ -37,7 +37,12 @@ impl Stream {
         }
     }
 
-    pub(crate) fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
+    pub(crate) fn write(
+        &mut self,
+        schema: Arc<Schema>,
+        entry: Entry,
+        batch: Option<Arc<RecordBatchEntry>>,
+    ) -> Result<usize> {
         let mut arrow_size = 0;
         let partition = match self.partitions.get_mut(&entry.stream) {
             Some(v) => v,
@@ -48,7 +53,7 @@ impl Stream {
                     .or_insert_with(|| Partition::new(schema))
             }
         };
-        arrow_size += partition.write(entry)?;
+        arrow_size += partition.write(entry, batch)?;
         Ok(arrow_size)
     }
 
