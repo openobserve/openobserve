@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::utils::schema_ext::SchemaExt;
-use hashbrown::HashMap;
 
 use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
@@ -27,13 +26,13 @@ use crate::{
 };
 
 pub(crate) struct Stream {
-    partitions: HashMap<Arc<str>, Partition>, // key: schema hash, val: partitions
+    partitions: BTreeMap<Arc<str>, Partition>, // key: schema hash, val: partitions
 }
 
 impl Stream {
     pub(crate) fn new() -> Self {
         Self {
-            partitions: HashMap::default(),
+            partitions: BTreeMap::default(),
         }
     }
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{
@@ -24,7 +24,6 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
-use hashbrown::HashMap;
 use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
@@ -36,7 +35,7 @@ use crate::{
 
 pub(crate) struct Partition {
     schema: Arc<Schema>,
-    files: HashMap<Arc<str>, PartitionFile>, // key: hour, val: files
+    files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
 impl Partition {
@@ -46,7 +45,7 @@ impl Partition {
             .add(schema.size() as i64);
         Self {
             schema,
-            files: HashMap::default(),
+            files: BTreeMap::default(),
         }
     }
 
