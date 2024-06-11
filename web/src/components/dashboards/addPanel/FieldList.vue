@@ -855,7 +855,9 @@ export default defineComponent({
 
         if (
           store.state.zoConfig.user_defined_schemas_enabled &&
-          dashboardPanelData.meta.stream.userDefinedSchema.length > 0
+          dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+          dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+            "user_defined_schema"
         ) {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
