@@ -2522,9 +2522,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
         // if the query contains '*' allow to select all fields
         if (selectAll) {
-          dashboardPanelData.meta.stream.customQueryFields = [
-            ...dashboardPanelData.meta.stream.selectedStreamFields,
-          ];
+          // if userdefined fields are selected, add them to the custom query fields
+          // else allow all fields to be selected
+          if (
+            store.state.zoConfig.user_defined_schemas_enabled &&
+            dashboardPanelData.meta.stream.userDefinedSchema.length > 0
+          ) {
+            dashboardPanelData.meta.stream.customQueryFields = [
+              ...dashboardPanelData.meta.stream.userDefinedSchema,
+            ];
+          } else {
+            dashboardPanelData.meta.stream.customQueryFields = [
+              ...dashboardPanelData.meta.stream.selectedStreamFields,
+            ];
+          }
         }
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);

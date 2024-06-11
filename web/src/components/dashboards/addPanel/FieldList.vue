@@ -852,17 +852,19 @@ export default defineComponent({
         data.currentFieldsList = [];
         // if user defined schema is enabled, use user defined schema
         // else use selectedStreamFields
-        if (dashboardPanelData.meta.stream.useUserDefinedSchemas) {
+
+        if (
+          store.state.zoConfig.user_defined_schemas_enabled &&
+          dashboardPanelData.meta.stream.userDefinedSchema.length > 0
+        ) {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
             ...dashboardPanelData.meta.stream.userDefinedSchema,
-            ...dashboardPanelData.meta.stream.selectedStreamFields,
           ];
         } else {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
             ...dashboardPanelData.meta.stream.selectedStreamFields,
-            ...dashboardPanelData.meta.stream.userDefinedSchema,
           ];
         }
 
@@ -999,6 +1001,7 @@ export default defineComponent({
       try {
         dashboardPanelData.meta.stream.selectedStreamFields = [];
         const schemaFields: any = [];
+        let userDefineSchemaSettings: any = [];
 
         if (dashboardPanelData.meta.stream.streamResults.length > 0) {
           for (const stream of dashboardPanelData.meta.stream.streamResults) {
@@ -1033,51 +1036,27 @@ export default defineComponent({
               for (const field of stream.schema) {
                 if (
                   store.state.zoConfig.user_defined_schemas_enabled &&
-                  dashboardPanelData.meta.stream.useUserDefinedSchemas ==
-                    "user_defined_schema" &&
                   stream.settings.hasOwnProperty("defined_schema_fields") &&
                   stream.settings.defined_schema_fields.length > 0
                 ) {
-                  console.log(
-                    "Abhay: user defined schema: ",
-                    stream.settings.defined_schema_fields,
-                    field.name
-                  );
                   if (
                     stream.settings.defined_schema_fields.includes(field.name)
                   ) {
-                    // schemaMaps.push(fieldObj);
-                    schemaFields.push(field);
+                    // push as a user defined schema
+                    userDefineSchemaSettings.push(field);
                   }
+                  schemaFields.push(field);
                 } else {
-                  // schemaMaps.push(fieldObj);
                   schemaFields.push(field);
                 }
               }
 
-              console.log("Abhay: schemaFields ", schemaFields);
-
-              if (
-                store.state.zoConfig.user_defined_schemas_enabled &&
-                dashboardPanelData.meta.stream.useUserDefinedSchemas ==
-                  "user_defined_schema" &&
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
-                stream.settings.defined_schema_fields.length > 0
-              ) {
-                dashboardPanelData.meta.stream.userDefinedSchema =
-                  schemaFields ?? [];
-
-                dashboardPanelData.meta.stream.selectedStreamFields = [];
-              } else {
-                dashboardPanelData.meta.stream.userDefinedSchema = [];
-
-                dashboardPanelData.meta.stream.selectedStreamFields =
-                  schemaFields;
-              }
+              dashboardPanelData.meta.stream.selectedStreamFields =
+                schemaFields ?? [];
+              dashboardPanelData.meta.stream.userDefinedSchema =
+                userDefineSchemaSettings ?? [];
             }
           }
-
-          // dashboardPanelData.meta.stream.selectedStreamFields = schemaMaps;
         }
       } catch (e: any) {
         console.log("Error while extracting fields");
@@ -1405,5 +1384,9 @@ export default defineComponent({
   line-height: 32px;
   font-weight: 700;
   font-size: 13px;
+}
+
+.q-table__bottom .q-table__control {
+  min-height: 80px !important;
 }
 </style>
