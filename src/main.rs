@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::max,
-    collections::HashMap,
-    net::SocketAddr,
-    str::FromStr,
-    sync::{
-        atomic::{AtomicU16, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{cmp::max, collections::HashMap, net::SocketAddr, str::FromStr, time::Duration};
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
@@ -389,7 +379,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
-    let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
@@ -403,15 +392,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     let server = HttpServer::new(move || {
         let cfg = get_config();
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
-            thread_id.fetch_add(1, Ordering::SeqCst);
-        }
-        log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
-            haddr,
-            local_id
-        );
+        log::info!("starting HTTP server at: {}", haddr);
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
             let client = awc::Client::builder()
@@ -445,7 +426,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id%10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
@@ -478,7 +458,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
-    let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
@@ -492,15 +471,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
     let server = HttpServer::new(move || {
         let cfg = get_config();
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
-            thread_id.fetch_add(1, Ordering::SeqCst);
-        }
-        log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
-            haddr,
-            local_id
-        );
+        log::info!("starting HTTP server at: {}", haddr);
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
             let client = awc::Client::builder()
@@ -534,7 +505,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id%10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,

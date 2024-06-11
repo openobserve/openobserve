@@ -23,7 +23,10 @@ use std::{
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
-use config::{get_config, metrics};
+use config::{
+    get_config, metrics,
+    utils::hash::{gxhash, Sum64},
+};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
@@ -40,11 +43,7 @@ use crate::{
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     let cfg = get_config();
-    let writer_num = if cfg.common.feature_per_thread_lock {
-        cfg.limit.http_worker_num
-    } else {
-        1
-    };
+    let writer_num = cfg.limit.mem_table_bucket_num;
     let mut writers = Vec::with_capacity(writer_num);
     for _ in 0..writer_num {
         writers.push(RwMap::default());
@@ -53,7 +52,7 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 });
 
 pub struct Writer {
-    thread_id: usize,
+    idx: usize,
     key: WriterKey,
     wal: Arc<Mutex<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
@@ -74,12 +73,14 @@ pub fn check_memtable_size() -> Result<()> {
 }
 
 /// Get a writer for a given org_id and stream_type
-pub async fn get_writer(thread_id: usize, org_id: &str, stream_type: &str) -> Arc<Writer> {
+pub async fn get_writer(org_id: &str, stream_type: &str, stream_name: &str) -> Arc<Writer> {
     let key = WriterKey::new(org_id, stream_type);
-    let mut rw = WRITERS[thread_id].write().await;
+    let hash_id = gxhash::new().sum64(stream_name);
+    let idx = hash_id as usize % WRITERS.len();
+    let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())
-        .or_insert_with(|| Arc::new(Writer::new(thread_id, key)));
+        .or_insert_with(|| Arc::new(Writer::new(idx, key)));
     w.clone()
 }
 
@@ -89,24 +90,14 @@ pub async fn read_from_memtable(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<ReadRecordBatchEntry>> {
-    let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
-    let writer_num = if cfg.common.feature_per_thread_lock {
-        cfg.limit.http_worker_num
-    } else {
-        1
+    let hash_id = gxhash::new().sum64(stream_name);
+    let idx = hash_id as usize % WRITERS.len();
+    let w = WRITERS[idx].read().await;
+    let Some(r) = w.get(&key) else {
+        return Ok(Vec::new());
     };
-    let mut batches = Vec::with_capacity(writer_num);
-    for i in 0..writer_num {
-        let w = WRITERS[i].read().await;
-        let Some(r) = w.get(&key) else {
-            continue;
-        };
-        if let Ok(batch) = r.read(stream_name, time_range).await {
-            batches.extend(batch);
-        }
-    }
-    Ok(batches)
+    r.read(stream_name, time_range).await
 }
 
 pub async fn check_ttl() -> Result<()> {
@@ -137,14 +128,14 @@ pub async fn flush_all() -> Result<()> {
 }
 
 impl Writer {
-    pub(crate) fn new(thread_id: usize, key: WriterKey) -> Self {
+    pub(crate) fn new(idx: usize, key: WriterKey) -> Self {
         let now = Utc::now().timestamp_micros();
         let cfg = get_config();
         let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
             .join("logs")
-            .join(thread_id.to_string());
+            .join(idx.to_string());
         log::info!(
             "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
             wal_dir.display().to_string(),
@@ -153,7 +144,7 @@ impl Writer {
             wal_id
         );
         Self {
-            thread_id,
+            idx,
             key: key.clone(),
             wal: Arc::new(Mutex::new(
                 WalWriter::new(
@@ -204,7 +195,7 @@ impl Writer {
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
                 .join("logs")
-                .join(self.thread_id.to_string());
+                .join(self.idx.to_string());
             log::info!(
                 "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
                 wal_dir.display().to_string(),
@@ -231,7 +222,7 @@ impl Writer {
 
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
-            let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
+            let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
             log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
             IMMUTABLES.write().await.insert(path, table);
             log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
@@ -260,7 +251,7 @@ impl Writer {
         let old_mem = std::mem::replace(&mut *mem, new_mem);
         drop(mem);
 
-        let table = Arc::new(Immutable::new(self.thread_id, self.key.clone(), old_mem));
+        let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
         IMMUTABLES.write().await.insert(path, table);
         Ok(())
     }

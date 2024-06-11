@@ -71,7 +71,7 @@ impl Partition {
 
     pub(crate) async fn persist(
         &self,
-        thread_id: usize,
+        idx: usize,
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
@@ -83,7 +83,7 @@ impl Partition {
         path.push(org_id);
         path.push(stream_type);
         path.push(stream_name);
-        path.push(thread_id.to_string());
+        path.push(idx.to_string());
         let mut paths = Vec::with_capacity(self.files.len());
         for (hour, data) in self.files.iter() {
             if data.data.is_empty() {

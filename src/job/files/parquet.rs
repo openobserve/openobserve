@@ -741,7 +741,7 @@ pub(crate) async fn generate_index_on_ingester(
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-    let writer = ingester::get_writer(0, org_id, &StreamType::Index.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Index.to_string(), stream_name).await;
     let _ = crate::service::ingestion::write_file(&writer, stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

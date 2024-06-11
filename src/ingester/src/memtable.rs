@@ -83,7 +83,7 @@ impl MemTable {
 
     pub(crate) async fn persist(
         &self,
-        thread_id: usize,
+        idx: usize,
         org_id: &str,
         stream_type: &str,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
@@ -91,7 +91,7 @@ impl MemTable {
         let mut paths = Vec::with_capacity(self.streams.len());
         for (stream_name, stream) in self.streams.iter() {
             let (part_schema_size, partitions) = stream
-                .persist(thread_id, org_id, stream_type, stream_name)
+                .persist(idx, org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

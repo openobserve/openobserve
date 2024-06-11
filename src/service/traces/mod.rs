@@ -68,7 +68,6 @@ const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_ti
 
 pub async fn handle_trace_request(
     org_id: &str,
-    thread_id: usize,
     request: ExportTraceServiceRequest,
     is_grpc: bool,
     in_stream_name: Option<&str>,
@@ -264,21 +263,14 @@ pub async fn handle_trace_request(
         return format_response(partial_success);
     }
 
-    let mut req_stats = match write_traces(
-        thread_id,
-        org_id,
-        &traces_stream_name,
-        &service_name,
-        json_data,
-    )
-    .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error while writing traces: {}", e);
-            return format_response(partial_success);
-        }
-    };
+    let mut req_stats =
+        match write_traces(org_id, &traces_stream_name, &service_name, json_data).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error while writing traces: {}", e);
+                return format_response(partial_success);
+            }
+        };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
@@ -351,7 +343,6 @@ fn format_response(mut partial_success: ExportTracePartialSuccess) -> Result<Htt
 }
 
 async fn write_traces(
-    thread_id: usize,
     org_id: &str,
     stream_name: &str,
     service_name: &str,
@@ -498,7 +489,7 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Traces.to_string(), stream_name).await;
     let req_stats = write_file(&writer, stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

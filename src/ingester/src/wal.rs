@@ -123,7 +123,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
         let file_columns = file_str.split('/').collect::<Vec<_>>();
         let stream_type = file_columns[file_columns.len() - 2];
         let org_id = file_columns[file_columns.len() - 3];
-        let thread_id: usize = file_columns[file_columns.len() - 4]
+        let idx: usize = file_columns[file_columns.len() - 4]
             .parse()
             .unwrap_or_default();
         let key = WriterKey::new(org_id, stream_type);
@@ -204,7 +204,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
 
         immutable::IMMUTABLES.write().await.insert(
             wal_file.to_owned(),
-            Arc::new(immutable::Immutable::new(thread_id, key, memtable)),
+            Arc::new(immutable::Immutable::new(idx, key, memtable)),
         );
     }
 

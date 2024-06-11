@@ -40,17 +40,15 @@ use crate::{
 
 pub async fn traces_proto(
     org_id: &str,
-    thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
-    super::handle_trace_request(org_id, thread_id, request, false, in_stream_name).await
+    super::handle_trace_request(org_id, request, false, in_stream_name).await
 }
 
 pub async fn traces_json(
     org_id: &str,
-    thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
@@ -299,21 +297,14 @@ pub async fn traces_json(
         return format_response(partial_success);
     }
 
-    let mut req_stats = match super::write_traces(
-        thread_id,
-        org_id,
-        &traces_stream_name,
-        &service_name,
-        json_data,
-    )
-    .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error while writing traces: {}", e);
-            return format_response(partial_success);
-        }
-    };
+    let mut req_stats =
+        match super::write_traces(org_id, &traces_stream_name, &service_name, json_data).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error while writing traces: {}", e);
+                return format_response(partial_success);
+            }
+        };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
