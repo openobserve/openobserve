@@ -77,8 +77,6 @@ export const convertSQLData = async (
       : [];
   };
 
-  // console.log("convertSQLData", searchQueryData);
-
   const missingValue = () => {
     // Get the interval in minutes
     const interval = histogramInterval.value.map(
@@ -91,136 +89,84 @@ export const convertSQLData = async (
       (panelSchema.type === "area-stacked" ||
         panelSchema.type === "line" ||
         panelSchema.type === "area") &&
-      interval
+      interval &&
+      metadata.queries
     ) {
-      if (metadata.queries) {
-        const metaDataStartTime = metadata.queries.map(
-          (it: any) => it.startTime
-        );
-        const startTime = new Date(parseInt(metaDataStartTime[0] / 1000));
-        // console.log("Start time: ", startTime);
+      const metaDataStartTime = metadata.queries.map((it: any) => it.startTime);
+      const startTime = new Date(parseInt(metaDataStartTime[0] / 1000));
+      const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
+      const binnedDate = dateBin(interval, startTime, origin);
+      // Convert interval to minutes
+      const intervalMinutes = interval / 60;
+      let currentTime = binnedDate;
+      // Find the time-based key in the data object
+      let timeBasedKey: any = null;
+      const searchQueryDataFirstEntry = searchQueryData[0][0];
+      const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
 
-        const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
-        const binnedDate = dateBin(interval, startTime, origin);
-        // console.log("Binned date: ", binnedDate);
-
-        // Convert interval to minutes
-        const intervalMinutes = interval / 60;
-        // console.log("Interval in minutes:", intervalMinutes);
-
-        let currentTime = binnedDate;
-
-        // Find the time-based key in the data object
-        let timeBasedKey = null;
-        // console.log("searchQueryData: -------", searchQueryData);
-
-        for (const key of [
-          ...getXAxisKeys(),
-          ...getYAxisKeys(),
-          ...getZAxisKeys(),
-        ]) {
-          // console.log("Checking key: ", key);
-          // console.log(
-          //   "First data entry value for key: ",
-          //   searchQueryData[0][0][key]
-          // );
-
-          if (isTimeSeries([searchQueryData[0][0][key]])) {
-            // console.log("Key identified as time-based: ", key);
-            timeBasedKey = key;
-            break;
-          }
+      for (const key of keys) {
+        if (isTimeSeries([searchQueryDataFirstEntry[key]])) {
+          timeBasedKey = key;
+          break;
         }
-
-        // If a time-based key is found, proceed with further processing
-        if (timeBasedKey) {
-          // console.log("Time-based key found: ", timeBasedKey);
-          const metaDataEndTime = metadata.queries.map((it: any) => it.endTime);
-          let endTime = new Date(parseInt(metaDataEndTime[0] / 1000));
-          // console.log("Original endTime: ", endTime);
-
-          const xAxisKeys = getXAxisKeys().filter(
-            (key: any) => key !== timeBasedKey
-          );
-          const uniqueXAxisValues = [
-            ...new Set(searchQueryData[0].map((d: any) => d[xAxisKeys[0]])),
-          ];
-          // console.log("Unique x-axis values: ", uniqueXAxisValues);
-
-          while (currentTime.getTime() <= endTime.getTime()) {
-            const currentFormattedTime = format(
-              utcToZonedTime(currentTime, "UTC"),
-              "yyyy-MM-dd'T'HH:mm:ss"
-            );
-            // console.log("Current formatted time: ", currentFormattedTime);
-
-            uniqueXAxisValues.forEach((xAxisValue) => {
-              const currentData = searchQueryData[0].find((d: any) => {
-                // const dataTime = format(
-                //   utcToZonedTime(d[timeBasedKey], "UTC"),
-                //   "yyyy-MM-dd'T'HH:mm:ss"
-                // );
-
-                return (
-                  d[timeBasedKey] === currentFormattedTime &&
-                  d[xAxisKeys[0]] === xAxisValue
-                );
-              });
-
-              if (currentData) {
-                // console.log(
-                //   "Data found for current time interval: ",
-                //   currentData
-                // );
-                filledData.push(currentData);
-              } else {
-                // console.log(
-                //   "No data found for current time interval and x-axis value. Adding null entry."
-                // );
-                // Create a null entry with the same structure as the original data
-                const nullEntry: any = {};
-                for (const key of [
-                  ...getXAxisKeys(),
-                  ...getYAxisKeys(),
-                  ...getZAxisKeys(),
-                  timeBasedKey, // Include the time-based key as well
-                ]) {
-                  nullEntry[key] =
-                    key === timeBasedKey
-                      ? currentFormattedTime
-                      : key === xAxisKeys[0]
-                      ? xAxisValue
-                      : 0;
-                }
-                filledData.push(nullEntry);
-              }
-            });
-
-            // Log current time before increment
-            // console.log("Current time before increment: ", currentTime);
-
-            // Increment the current time by the interval
-            currentTime = new Date(
-              currentTime.getTime() + intervalMinutes * 60000
-            );
-
-            // Log current time after increment
-            // console.log("Current time after increment: ", currentTime);
-          }
-
-          // console.log("Filled data: ", filledData);
-          return filledData;
-        }
-      } else {
-        return JSON.parse(JSON.stringify(searchQueryData[0]));
       }
-    } else {
-      return JSON.parse(JSON.stringify(searchQueryData[0]));
+
+      // If a time-based key is found, proceed with further processing
+      if (timeBasedKey) {
+        const metaDataEndTime = metadata.queries.map((it: any) => it.endTime);
+        let endTime = new Date(parseInt(metaDataEndTime[0] / 1000));
+        const xAxisKeys = getXAxisKeys().filter(
+          (key: any) => key !== timeBasedKey
+        );
+        const uniqueXAxisValues = [
+          ...new Set(searchQueryData[0].map((d: any) => d[xAxisKeys[0]])),
+        ];
+
+        const searchDataMap = new Map();
+        searchQueryData[0].forEach((d: any) => {
+          const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
+          searchDataMap.set(key, d);
+        });
+
+        while (currentTime.getTime() <= endTime.getTime()) {
+          const currentFormattedTime = format(
+            utcToZonedTime(currentTime, "UTC"),
+            "yyyy-MM-dd'T'HH:mm:ss"
+          );
+
+          uniqueXAxisValues.forEach((xAxisValue) => {
+            const key = `${currentFormattedTime}-${xAxisValue}`;
+            const currentData = searchDataMap.get(key);
+
+            if (currentData) {
+              filledData.push(currentData);
+            } else {
+              const nullEntry: any = {};
+              for (const key of keys) {
+                nullEntry[key] =
+                  key === timeBasedKey
+                    ? currentFormattedTime
+                    : key === xAxisKeys[0]
+                    ? xAxisValue
+                    : 0;
+              }
+              filledData.push(nullEntry);
+            }
+          });
+
+          // Increment the current time by the interval
+          currentTime = new Date(
+            currentTime.getTime() + intervalMinutes * 60000
+          );
+        }
+
+        return filledData;
+      }
     }
+    return JSON.parse(JSON.stringify(searchQueryData[0]));
   };
 
   const missingValueData = missingValue();
-  // console.log("Missing value data: ", missingValueData);
 
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
