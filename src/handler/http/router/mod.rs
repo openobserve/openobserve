@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::rc::Rc;
+use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
 use actix_web::{
@@ -158,27 +158,39 @@ async fn audit_middleware(
 /// This is a very trivial proxy to overcome the cors errors while
 /// session-replay in rrweb.
 pub fn get_proxy_routes(cfg: &mut web::ServiceConfig) {
-    let auth = HttpAuthentication::with_fn(validator_proxy_url);
+    let enable_authentication_on_route = true;
+    get_proxy_routes_inner(cfg, enable_authentication_on_route)
+}
+
+pub fn get_proxy_routes_inner(cfg: &mut web::ServiceConfig, enable_validator: bool) {
     let cors = Cors::default()
         .allow_any_origin()
         .allow_any_method()
         .allow_any_header();
 
-    cfg.service(
-        web::resource("/proxy/{org_id}/{target_url:.*}")
-            .wrap(auth)
-            .wrap(cors)
-            .route(web::get().to(proxy)),
-    );
+    if enable_validator {
+        let auth = HttpAuthentication::with_fn(validator_proxy_url);
+        cfg.service(
+            web::resource("/proxy/{org_id}/{target_url:.*}")
+                .wrap(auth)
+                .wrap(cors)
+                .route(web::get().to(proxy)),
+        );
+    } else {
+        cfg.service(
+            web::resource("/proxy/{org_id}/{target_url:.*}")
+                .wrap(cors)
+                .route(web::get().to(proxy)),
+        );
+    };
 }
-
 async fn proxy(
     path: web::Path<PathParamProxyURL>,
     req: HttpRequest,
 ) -> actix_web::Result<HttpResponse> {
-    let client = awc::Client::new();
-    let method = req.method().clone();
-    let mut forwarded_resp = client
+    let client = reqwest::Client::new();
+    let method = reqwest::Method::from_str(req.method().as_str()).unwrap();
+    let forwarded_resp = client
         .request(method, &path.target_url)
         .send()
         .await
@@ -187,7 +199,7 @@ async fn proxy(
         })?;
 
     let status = forwarded_resp.status().as_u16();
-    let body = forwarded_resp.body().await.map_err(|e| {
+    let body = forwarded_resp.bytes().await.map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
     })?;
 
@@ -502,4 +514,27 @@ pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
             .service(rum::ingest::sessionreplay)
             .service(rum::ingest::data),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use actix_web::{
+        test::{call_service, init_service, TestRequest},
+        App,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_proxy_routes() {
+        let mut app =
+            init_service(App::new().configure(|cfg| get_proxy_routes_inner(cfg, false))).await;
+
+        // Test GET request to /proxy/{org_id}/{target_url}
+        let req = TestRequest::get()
+            .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
+            .to_request();
+        let resp = call_service(&mut app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+    }
 }
