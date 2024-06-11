@@ -1449,13 +1449,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   onBeforeMount(async () => {
     await importSqlParser();
-    updateQueryValue();
   });
 
   const importSqlParser = async () => {
     const useSqlParser: any = await import("@/composables/useParser");
     const { sqlParser }: any = useSqlParser.default();
     parser = await sqlParser();
+
+    updateQueryValue();
   };
 
   const sqlchart = () => {
@@ -2526,7 +2527,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           // else allow all fields to be selected
           if (
             store.state.zoConfig.user_defined_schemas_enabled &&
-            dashboardPanelData.meta.stream.userDefinedSchema.length > 0
+            dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+            dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+              "user_defined_schema"
           ) {
             dashboardPanelData.meta.stream.customQueryFields = [
               ...dashboardPanelData.meta.stream.userDefinedSchema,
