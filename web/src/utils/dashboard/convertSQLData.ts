@@ -77,93 +77,122 @@ export const convertSQLData = async (
       : [];
   };
 
+  const missValueRefTrue = panelSchema.config?.connect_zeros;
   const missingValue = () => {
+    console.time("totalTime");
+
     // Get the interval in minutes
+    console.time("interval");
     const interval = histogramInterval.value.map(
       (it: any) => it.histogram_interval
     )[0];
-    let filledData: any = [];
-
-    // Check if panel type and interval are valid
+    console.timeEnd("interval");
+    console.log("missValueRefTrue ", missValueRefTrue);
+    
     if (
-      (panelSchema.type === "area-stacked" ||
-        panelSchema.type === "line" ||
-        panelSchema.type === "area") &&
-      interval &&
-      metadata.queries
+      !interval ||
+      !metadata.queries ||
+      !["area-stacked", "line", "area"].includes(panelSchema.type) ||
+      !missValueRefTrue
     ) {
-      const metaDataStartTime = metadata.queries.map((it: any) => it.startTime);
-      const startTime = new Date(parseInt(metaDataStartTime[0] / 1000));
-      const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
-      const binnedDate = dateBin(interval, startTime, origin);
-      // Convert interval to minutes
-      const intervalMinutes = interval / 60;
-      let currentTime = binnedDate;
-      // Find the time-based key in the data object
-      let timeBasedKey: any = null;
-      const searchQueryDataFirstEntry = searchQueryData[0][0];
-      const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
-
-      for (const key of keys) {
-        if (isTimeSeries([searchQueryDataFirstEntry[key]])) {
-          timeBasedKey = key;
-          break;
-        }
-      }
-
-      // If a time-based key is found, proceed with further processing
-      if (timeBasedKey) {
-        const metaDataEndTime = metadata.queries.map((it: any) => it.endTime);
-        let endTime = new Date(parseInt(metaDataEndTime[0] / 1000));
-        const xAxisKeys = getXAxisKeys().filter(
-          (key: any) => key !== timeBasedKey
-        );
-        const uniqueXAxisValues = [
-          ...new Set(searchQueryData[0].map((d: any) => d[xAxisKeys[0]])),
-        ];
-
-        const searchDataMap = new Map();
-        searchQueryData[0].forEach((d: any) => {
-          const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
-          searchDataMap.set(key, d);
-        });
-
-        while (currentTime.getTime() <= endTime.getTime()) {
-          const currentFormattedTime = format(
-            utcToZonedTime(currentTime, "UTC"),
-            "yyyy-MM-dd'T'HH:mm:ss"
-          );
-
-          uniqueXAxisValues.forEach((xAxisValue) => {
-            const key = `${currentFormattedTime}-${xAxisValue}`;
-            const currentData = searchDataMap.get(key);
-
-            if (currentData) {
-              filledData.push(currentData);
-            } else {
-              const nullEntry: any = {};
-              for (const key of keys) {
-                nullEntry[key] =
-                  key === timeBasedKey
-                    ? currentFormattedTime
-                    : key === xAxisKeys[0]
-                    ? xAxisValue
-                    : 0;
-              }
-              filledData.push(nullEntry);
-            }
-          });
-
-          // Increment the current time by the interval
-          currentTime = new Date(
-            currentTime.getTime() + intervalMinutes * 60000
-          );
-        }
-
-        return filledData;
-      }
+      return JSON.parse(JSON.stringify(searchQueryData[0]));
     }
-    return JSON.parse(JSON.stringify(searchQueryData[0]));
+
+    // Extract and process metaDataStartTime
+    console.time("metaDataStartTime");
+    const metaDataStartTime = metadata.queries[0].startTime.toString();
+    const startTime = new Date(parseInt(metaDataStartTime) / 1000);
+    console.timeEnd("metaDataStartTime");
+
+    // Calculate the binnedDate
+    console.time("origin");
+    const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
+    console.timeEnd("origin");
+    console.time("binnedDate");
+    const binnedDate = dateBin(interval, startTime, origin);
+    console.timeEnd("binnedDate");
+
+    // Convert interval to milliseconds
+    console.time("intervalMillis");
+    const intervalMillis = interval * 1000;
+    console.timeEnd("intervalMillis");
+
+    // Identify the time-based key
+    console.time("searchQueryDataFirstEntry");
+    const searchQueryDataFirstEntry = searchQueryData[0][0];
+    console.timeEnd("searchQueryDataFirstEntry");
+
+    console.time("keys");
+    const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
+    let timeBasedKey = keys.find((key) =>
+      isTimeSeries([searchQueryDataFirstEntry[key]])
+    );
+    console.timeEnd("keys");
+
+    if (!timeBasedKey) {
+      return JSON.parse(JSON.stringify(searchQueryData[0]));
+    }
+
+    // Extract and process metaDataEndTime
+    console.time("metaDataEndTime");
+    const metaDataEndTime = metadata.queries[0].endTime.toString();
+    const endTime = new Date(parseInt(metaDataEndTime) / 1000);
+    console.timeEnd("metaDataEndTime");
+
+    console.time("xAxisKeys");
+    const xAxisKeys = getXAxisKeys().filter((key: any) => key !== timeBasedKey);
+    console.timeEnd("xAxisKeys");
+
+    // Create a set of unique xAxis values
+    console.time("uniqueXAxisValues");
+    const uniqueXAxisValues = new Set(
+      searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
+    );
+    console.timeEnd("uniqueXAxisValues");
+
+    // Create a map of existing data
+    console.time("fillData");
+    const searchDataMap = new Map();
+    searchQueryData[0].forEach((d: any) => {
+      const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
+      searchDataMap.set(key, d);
+    });
+    console.timeEnd("fillData");
+
+    const filledData: any = [];
+    console.time("while loop");
+    let currentTime = binnedDate;
+
+    while (currentTime <= endTime) {
+      const currentFormattedTime = format(
+        utcToZonedTime(currentTime, "UTC"),
+        "yyyy-MM-dd'T'HH:mm:ss"
+      );
+
+      uniqueXAxisValues.forEach((xAxisValue) => {
+        const key = `${currentFormattedTime}-${xAxisValue}`;
+        const currentData = searchDataMap.get(key);
+        if (currentData) {
+          filledData.push(currentData);
+        } else {
+          const nullEntry = {
+            [timeBasedKey]: currentFormattedTime,
+            [xAxisKeys[0]]: xAxisValue,
+          };
+          keys.forEach((key) => {
+            if (key !== timeBasedKey && key !== xAxisKeys[0])
+              nullEntry[key] = 0;
+          });
+          filledData.push(nullEntry);
+        }
+      });
+
+      currentTime = new Date(currentTime.getTime() + intervalMillis);
+    }
+    console.timeEnd("while loop");
+
+    console.timeEnd("totalTime");
+    return filledData;
   };
 
   const missingValueData = missingValue();

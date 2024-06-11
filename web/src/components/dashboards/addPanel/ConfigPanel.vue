@@ -557,7 +557,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+      <q-toggle
+        v-if="
+          ['area', 'line', 'area-stacked'].includes(
+            dashboardPanelData.data.type
+          )
+        "
+        v-model="dashboardPanelData.data.config.connect_zeros"
+        label="Connect null values"
+        data-test="dashboard-config-connect-null-values"
+      />
 
+      <div class="space"></div>
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
         outlined
@@ -786,6 +797,11 @@ export default defineComponent({
       // by default, use connect_nulls as false
       if (!dashboardPanelData.data.config.connect_nulls) {
         dashboardPanelData.data.config.connect_nulls = false;
+      }
+
+      // by default, use connect_zeros as false
+      if (!dashboardPanelData.data.config.connect_zeros) {
+        dashboardPanelData.data.config.connect_zeros = true;
       }
 
       // by default, use wrap_table_cells as false
