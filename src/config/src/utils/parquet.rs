@@ -19,10 +19,7 @@ use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
-    arrow::{
-        arrow_reader::ArrowReaderMetadata, ArrowWriter, AsyncArrowWriter,
-        ParquetRecordBatchStreamBuilder,
-    },
+    arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
@@ -36,37 +33,6 @@ pub fn new_parquet_writer<'a>(
     full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
-    let writer_props = config_parquet_writer(
-        schema,
-        bloom_filter_fields,
-        full_text_search_fields,
-        metadata,
-    );
-    AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
-}
-
-pub fn new_parquet_writer_std<'a>(
-    buf: &'a mut Vec<u8>,
-    schema: &'a Arc<Schema>,
-    bloom_filter_fields: &'a [String],
-    full_text_search_fields: &'a [String],
-    metadata: &'a FileMeta,
-) -> ArrowWriter<&'a mut Vec<u8>> {
-    let writer_props = config_parquet_writer(
-        schema,
-        bloom_filter_fields,
-        full_text_search_fields,
-        metadata,
-    );
-    ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
-}
-
-fn config_parquet_writer(
-    schema: &Arc<Schema>,
-    bloom_filter_fields: &[String],
-    full_text_search_fields: &[String],
-    metadata: &FileMeta,
-) -> WriterProperties {
     let cfg = get_config();
     let row_group_size = if cfg.limit.parquet_max_row_group_size > 0 {
         cfg.limit.parquet_max_row_group_size
@@ -135,7 +101,8 @@ fn config_parquet_writer(
                 .set_column_bloom_filter_enabled(field.into(), true); // take the field ownership
         }
     }
-    writer_props.build()
+    let writer_props = writer_props.build();
+    AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
 
 pub async fn write_recordbatch_to_parquet(
