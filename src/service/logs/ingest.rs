@@ -31,6 +31,7 @@ use config::{
 use flate2::read::GzDecoder;
 use infra::schema::SchemaCache;
 use vrl::compiler::runtime::Runtime;
+use crate::handler::http::request::logs::ingest::KafkaIngestionResponse;
 
 use crate::{
     common::meta::{
@@ -139,6 +140,10 @@ pub async fn ingest(
             "/api/org/ingest/logs/_kinesis",
             IngestionData::KinesisFH(req),
         ),
+        IngestionRequest::Kafka(req) => {
+            let kafka_value: json::Value = serde_json::from_str(&req.value)?;
+            ("/api/org/ingest/logs/_kafka", IngestionData::Kafka(req))
+        }
     };
 
     for ret in data.iter() {
@@ -293,6 +298,8 @@ pub async fn ingest(
     ))
 }
 
+
+
 pub fn apply_functions<'a>(
     item: json::Value,
     local_trans: &[StreamTransform],
@@ -380,6 +387,10 @@ impl<'a> Iterator for IngestionDataIter<'a> {
                 Some(e) => Some(Err(IngestionError::AWSError(e.clone()))),
                 None => iter.next().map(Ok),
             },
+            IngestionDataIter::Kafka(iter, err) => match err {
+                Some(e) => Some(Err(IngestionError::KafkaError(e.clone()))),
+                None => iter.next().map(Ok),
+            },
         }
     }
 }
@@ -446,9 +457,31 @@ impl<'a> IngestionData<'a> {
                 }
                 return IngestionDataIter::KinesisFH(events.into_iter(), None);
             }
+            IngestionData::Kafka(request) => {
+                let data = &request.value;
+                let request_id = &request.key;
+                let req_timestamp = Utc::now().timestamp_millis(); // Assuming current time if no timestamp
+
+                match decode_and_decompress(data) {
+                    Ok(decompressed_data) => {
+                        let value: json::Value = json::from_str(&decompressed_data).unwrap();
+                        IngestionDataIter::Kafka(vec![value].into_iter(), None)
+                    }
+                    Err(e) => IngestionDataIter::Kafka(
+                        vec![].into_iter(),
+                        Some(KafkaIngestionResponse {
+                            request_id: request_id.to_string(),
+                            error_message: Some(e.to_string()),
+                            timestamp: req_timestamp,
+                        }),
+                    ),
+                }
+            }
         }
     }
 }
+
+
 
 pub fn decode_and_decompress(encoded_data: &str) -> Result<String, Box<dyn std::error::Error>> {
     let decoded_data = config::utils::base64::decode_raw(encoded_data)?;
