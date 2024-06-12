@@ -855,11 +855,11 @@ export default defineComponent({
           dashboardPanelData.data.queries[0].customQuery = true;
           // searchObj.data.query = await addHistogramToQuery(searchObj.data.query);
 
-          // dashboardPanelData.data.queries[0].fields.stream_type =
-          // searchObj.data.stream.streamType ?? "logs";
-          // dashboardPanelData.data.queries[0].fields.stream =
-          // searchObj.data.stream.selectedStream.value ?? "default";
-          // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+          dashboardPanelData.data.queries[0].fields.stream_type =
+            searchObj.data.stream.streamType ?? "logs";
+          dashboardPanelData.data.queries[0].fields.stream =
+            searchObj.data.stream.selectedStream.value ?? "default";
+          dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
         }
       }
     );

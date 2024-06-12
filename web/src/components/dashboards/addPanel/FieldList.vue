@@ -843,6 +843,7 @@ export default defineComponent({
     // update the current list fields if any of the lists changes
     watch(
       () => [
+        store.state.zoConfig.user_defined_schemas_enabled,
         dashboardPanelData.meta.stream.selectedStreamFields,
         dashboardPanelData.meta.stream.customQueryFields,
         dashboardPanelData.meta.stream.userDefinedSchema,
