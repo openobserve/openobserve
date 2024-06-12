@@ -174,8 +174,6 @@ export const convertSQLData = async (
         if (currentData) {
           filledData.push(currentData);
         } else {
-          console.log("missValueRefTrue----------", missValueRefTrue);
-
           const nullEntry = {
             [timeBasedKey]: currentFormattedTime,
             [xAxisKeys[0]]: xAxisValue,
@@ -185,7 +183,6 @@ export const convertSQLData = async (
               nullEntry[key] =
                 missValueRefTrue === undefined ? null : missValueRefTrue;
           });
-          console.log("nullEntry", nullEntry);
 
           filledData.push(nullEntry);
         }
