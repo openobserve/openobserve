@@ -1966,6 +1966,7 @@ const useLogs = () => {
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
               if (streamSchema == undefined) {
+                searchObj.loadingStream = false;
                 searchObj.data.errorMsg = t("search.noFieldFound");
                 throw new Error(searchObj.data.errorMsg);
                 return;
