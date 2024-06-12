@@ -51,7 +51,6 @@ pub fn new_parquet_writer<'a>(
         .set_compression(Compression::ZSTD(Default::default()))
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
-        .set_bloom_filter_fpp(DEFAULT_BLOOM_FILTER_FPP)
         .set_column_dictionary_enabled(
             cfg.common.column_timestamp.as_str().into(),
             false,
@@ -104,8 +103,9 @@ pub fn new_parquet_writer<'a>(
         };
         for field in fields {
             if metadata.records > 0 {
-                writer_props =
-                    writer_props.set_column_bloom_filter_ndv(field.as_str().into(), num_rows);
+                writer_props = writer_props
+                    .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
+                    .set_column_bloom_filter_ndv(field.as_str().into(), num_rows);
             }
             writer_props = writer_props
                 .set_column_dictionary_enabled(field.as_str().into(), false)
