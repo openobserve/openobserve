@@ -77,7 +77,7 @@ export const convertSQLData = async (
       : [];
   };
 
-  const missValueRefTrue = panelSchema.config?.no_value_replacement;
+  const noValueConfigOption = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
     const interval = resultMetaData.value.map(
@@ -155,7 +155,7 @@ export const convertSQLData = async (
           keys.forEach((key) => {
             if (key !== timeBasedKey && key !== xAxisKeys[0])
               nullEntry[key] =
-                missValueRefTrue === undefined ? null : missValueRefTrue;
+                noValueConfigOption === undefined ? null : noValueConfigOption;
           });
 
           filledData.push(nullEntry);
