@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         use-input
         fill-input
         multiple
+        use-chips
         emit-value
         map-options
         @filter="filterStreamFn"
