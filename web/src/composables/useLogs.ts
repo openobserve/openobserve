@@ -2615,9 +2615,6 @@ const useLogs = () => {
         // searchObj.data.stream.selectedFields.forEach((field: any) => {
         for (const field of searchObj.data.stream.selectedFields) {
           if (
-            (searchObj.meta.sqlMode == true &&
-              parsedSQL.hasOwnProperty("columns") &&
-              field == store.state.zoConfig.timestamp_column) ||
             field == store.state.zoConfig.timestamp_column
           ) {
             searchObj.data.resultGrid.columns.unshift({
