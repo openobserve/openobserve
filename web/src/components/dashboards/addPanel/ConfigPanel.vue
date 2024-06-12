@@ -589,7 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 anchor="top middle"
                 self="bottom middle"
               >
-                What to show when there is no value
+                What to display when a value is missing
               </q-tooltip>
             </div>
           </div>
