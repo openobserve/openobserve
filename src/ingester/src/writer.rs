@@ -179,12 +179,17 @@ impl Writer {
         } else {
             (Vec::new(), None)
         };
-        let mut wal = self.wal.lock().await;
         let start = std::time::Instant::now();
+        let mut wal = self.wal.lock().await;
+        let wal_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(wal_lock_time);
         let mut mem = self.memtable.write().await;
+        let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
-            .observe(start.elapsed().as_millis() as f64);
+            .observe(mem_lock_time);
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
             || self.check_mem_threshold(mem.size(), entry.data_size)
         {
