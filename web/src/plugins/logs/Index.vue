@@ -856,9 +856,9 @@ export default defineComponent({
           // searchObj.data.query = await addHistogramToQuery(searchObj.data.query);
 
           // dashboardPanelData.data.queries[0].fields.stream_type =
-            // searchObj.data.stream.streamType ?? "logs";
+          // searchObj.data.stream.streamType ?? "logs";
           // dashboardPanelData.data.queries[0].fields.stream =
-            // searchObj.data.stream.selectedStream.value ?? "default";
+          // searchObj.data.stream.selectedStream.value ?? "default";
           // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
         }
       }
@@ -1094,7 +1094,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 $navbarHeight: 64px;
 
 .logPage {
@@ -1147,6 +1147,7 @@ $navbarHeight: 64px;
   }
 
   .logs-horizontal-splitter {
+    border: 1px solid var(--q-color-grey-3);
     .q-splitter__panel {
       z-index: auto !important;
     }
