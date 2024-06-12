@@ -2616,9 +2616,7 @@ const useLogs = () => {
       } else {
         // searchObj.data.stream.selectedFields.forEach((field: any) => {
         for (const field of searchObj.data.stream.selectedFields) {
-          if (
-            field == store.state.zoConfig.timestamp_column
-          ) {
+          if (field == store.state.zoConfig.timestamp_column) {
             searchObj.data.resultGrid.columns.unshift({
               name: "@timestamp",
               field: (row: any) =>
@@ -3230,7 +3228,7 @@ const useLogs = () => {
   };
 
   const onStreamChange = async (queryStr: string) => {
-    try{
+    try {
       searchObj.loadingStream = true;
       searchObj.data.queryResults = {
         hits: [],
