@@ -107,8 +107,8 @@ export const convertSQLData = async (
     const searchQueryDataFirstEntry = searchQueryData[0][0];
 
     const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
-    let timeBasedKey = keys.find((key) =>
-      isTimeSeries([searchQueryDataFirstEntry[key]])
+    let timeBasedKey = keys?.find((key) =>
+      isTimeSeries([searchQueryDataFirstEntry?.[key]])
     );
 
     if (!timeBasedKey) {
@@ -128,7 +128,7 @@ export const convertSQLData = async (
 
     // Create a map of existing data
     const searchDataMap = new Map();
-    searchQueryData[0].forEach((d: any) => {
+    searchQueryData[0]?.forEach((d: any) => {
       const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
       searchDataMap.set(key, d);
     });
