@@ -2413,7 +2413,10 @@ const useLogs = () => {
               }
             }
 
-            if (commonSchemaFields.length == 0) {
+            if (
+              searchObj.data.stream.selectedStream.length > 1 &&
+              commonSchemaFields.length == 0
+            ) {
               commonSchemaMaps.unshift({
                 name: "Common Group Fields",
                 label: true,
