@@ -111,8 +111,8 @@ export const getUserInfo = (loginString: string) => {
         if (parts.length === 3) {
           try {
             // Attempt to parse the token as a JWT
-            const header = JSON.parse(atob(parts[0]));
-            const payload = JSON.parse(atob(parts[1]));
+            const header = JSON.parse(b64DecodeUnicode(parts[0]) || "");
+            const payload = JSON.parse(b64DecodeUnicode(parts[1]) || "");
             const signature = parts[2];
             payload["family_name"] = payload["name"];
             payload["given_name"] = "";
