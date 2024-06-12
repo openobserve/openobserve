@@ -87,6 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="tab.folderId"
               content-class="tab_content full-width"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
+              @mouseenter="hoverFolder(tab.folderId)"
+              @mouseleave="unhoverFolder"
             >
               <div class="full-width row justify-between no-wrap">
                 <span
@@ -98,23 +100,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="tab.name"
                   >{{ tab.name }}</span
                 >
-                <div>
+                <div
+                  v-if="hoveredFolder === tab.folderId"
+                  class="hover-actions"
+                >
                   <q-icon
-                    v-if="index"
-                    :name="outlinedEdit"
+                    name="more_vert"
                     class="q-ml-sm"
-                    @click.stop="editFolder(tab.folderId)"
+                    @click.stop="toggleActions"
                     style="cursor: pointer; justify-self: end"
-                    data-test="dashboard-edit-folder-icon"
+                    data-test="dashboard-more-icon"
                   />
-                  <q-icon
-                    v-if="index"
-                    :name="outlinedDelete"
-                    class="q-ml-sm"
-                    @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                    style="cursor: pointer; justify-self: end"
-                    data-test="dashboard-delete-folder-icon"
-                  />
+                  <div v-if="showActions" class="action-icons">
+                    <q-icon
+                      :name="outlinedEdit"
+                      class="q-ml-sm"
+                      @click.stop="editFolder(tab.folderId)"
+                      style="cursor: pointer; justify-self: end"
+                      data-test="dashboard-edit-folder-icon"
+                    />
+                    <q-icon
+                      :name="outlinedDelete"
+                      class="q-ml-sm"
+                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                      style="cursor: pointer; justify-self: end"
+                      data-test="dashboard-delete-folder-icon"
+                    />
+                  </div>
                 </div>
               </div>
             </q-tab>
@@ -483,6 +495,20 @@ export default defineComponent({
       },
       { deep: true }
     );
+    const hoveredFolder = ref(null);
+    const showActions = ref(false);
+    
+    const hoverFolder = (folderId) => {
+      hoveredFolder.value = folderId;
+    };
+
+    const unhoverFolder = () => {
+      hoveredFolder.value = null;
+    };
+
+    const toggleActions = () => {
+      showActions.value = !showActions.value;
+    };
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -735,6 +761,11 @@ export default defineComponent({
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
       handleDashboardMoved,
+      hoverFolder,
+      hoveredFolder,
+      unhoverFolder,
+      toggleActions,
+      showActions,
     };
   },
   methods: {
@@ -762,6 +793,15 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.hover-actions {
+  display: flex;
+  align-items: center;
+}
+
+.action-icons {
+  display: flex;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
