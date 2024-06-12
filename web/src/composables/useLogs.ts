@@ -1617,8 +1617,7 @@ const useLogs = () => {
               timezone: "",
             },
             errorCode: 0,
-            errorMsg:
-              "Histogram is not available for limit queries.",
+            errorMsg: "Histogram is not available for limit queries.",
             errorDetail: "",
           };
         } else {
@@ -1636,7 +1635,7 @@ const useLogs = () => {
             }, 0);
           }
 
-          if(searchObj.data.stream.selectedStream.length > 1) {
+          if (searchObj.data.stream.selectedStream.length > 1) {
             searchObj.data.histogram = {
               xData: [],
               yData: [],
@@ -1646,8 +1645,7 @@ const useLogs = () => {
                 timezone: "",
               },
               errorCode: 0,
-              errorMsg:
-                "Histogram is not available for multi stream search.",
+              errorMsg: "Histogram is not available for multi stream search.",
               errorDetail: "",
             };
           }
@@ -2073,8 +2071,7 @@ const useLogs = () => {
               timezone: "",
             },
             errorCode: 0,
-            errorMsg:
-              "Histogram is not available for multi stream search.",
+            errorMsg: "Histogram is not available for multi stream search.",
             errorDetail: "",
           };
         } else {
@@ -2104,7 +2101,8 @@ const useLogs = () => {
               "UI"
             )
             .then(async (res) => {
-              searchObjDebug["histogramProcessingStartTime"] = performance.now();
+              searchObjDebug["histogramProcessingStartTime"] =
+                performance.now();
               searchObj.loading = false;
               searchObj.data.queryResults.aggs = res.data.hits;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
@@ -2115,7 +2113,9 @@ const useLogs = () => {
               await generateHistogramData();
 
               let regeratePaginationFlag = false;
-              if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
+              if (
+                res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage
+              ) {
                 regeratePaginationFlag = true;
               }
               // if total records in partition is greate than recordsPerPage then we need to update pagination
@@ -2374,7 +2374,7 @@ const useLogs = () => {
                     schemaFields.splice(schemaFieldsIndex, 1);
                     schemaMaps.splice(schemaFieldsIndex, 1);
                   } else if (commonSchemaFieldsIndex > -1) {
-                    commonSchemaFields[commonSchemaFieldsIndex].streams.push(
+                    commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                       stream.name
                     );
                   } else {
@@ -2403,7 +2403,7 @@ const useLogs = () => {
                   schemaFields.splice(schemaFieldsIndex, 1);
                   schemaMaps.splice(schemaFieldsIndex, 1);
                 } else if (commonSchemaFieldsIndex > -1) {
-                  commonSchemaFields[commonSchemaFieldsIndex].streams.push(
+                  commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                     stream.name
                   );
                 } else {
@@ -2413,7 +2413,7 @@ const useLogs = () => {
               }
             }
 
-            if (commonSchemaFields.length > 0) {
+            if (commonSchemaFields.length == 0) {
               commonSchemaMaps.unshift({
                 name: "Common Group Fields",
                 label: true,
@@ -2575,7 +2575,9 @@ const useLogs = () => {
         if (
           (searchObj.meta.sqlMode == true &&
             parsedSQL.hasOwnProperty("columns") &&
-            searchObj.data.queryResults?.hits[0].hasOwnProperty(store.state.zoConfig.timestamp_column)) ||
+            searchObj.data.queryResults?.hits[0].hasOwnProperty(
+              store.state.zoConfig.timestamp_column
+            )) ||
           searchObj.meta.sqlMode == false ||
           searchObj.data.stream.selectedFields.includes(
             store.state.zoConfig.timestamp_column
@@ -3228,103 +3230,109 @@ const useLogs = () => {
   };
 
   const onStreamChange = async (queryStr: string) => {
-    searchObj.loadingStream = true;
-    searchObj.data.queryResults = {
-      hits: [],
-    };
-    searchObj.data.stream.selectedStreamFields = [];
-
-    let query = searchObj.meta.sqlMode
-      ? queryStr != ""
-        ? queryStr
-        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-            ","
-          )}"`
-      : "";
-
-    searchObj.data.stream.selectedStreamFields = [];
-    for (const stream of searchObj.data.stream.selectedStream) {
-      const streamData: any = await getStream(
-        stream,
-        searchObj.data.stream.streamType || "logs",
-        true
-      );
-
-      if (streamData.schema != undefined) {
-        searchObj.data.stream.selectedStreamFields.push(streamData.schema);
-      }
-    }
-
-    if (
-      searchObj.data.stream.selectedStreamFields == undefined ||
-      searchObj.data.stream.selectedStreamFields.length == 0
-    ) {
-      searchObj.loadingStream = false;
-      searchObj.data.stream.selectedStreamFields = [];
-      searchObj.data.errorMsg = t("search.noFieldFound");
-      return;
-    }
-
-    const streamFieldNames: any =
-      searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
-
-    for (
-      let i = searchObj.data.stream.interestingFieldList.length - 1;
-      i >= 0;
-      i--
-    ) {
-      const fieldName = searchObj.data.stream.interestingFieldList[i];
-      if (!streamFieldNames.includes(fieldName)) {
-        searchObj.data.stream.interestingFieldList.splice(i, 1);
-      }
-    }
-
-    if (queryStr == "") {
-      if (
-        searchObj.data.stream.interestingFieldList.length > 0 &&
-        searchObj.meta.quickMode
-      ) {
-        query = query.replace(
-          "[FIELD_LIST]",
-          searchObj.data.stream.interestingFieldList.join(",")
-        );
-      } else {
-        query = query.replace("[FIELD_LIST]", "*");
-      }
-    }
-
-    searchObj.data.editorValue = query;
-    searchObj.data.query = query;
-    searchObj.data.tempFunctionContent = "";
-    searchObj.meta.searchApplied = false;
-
-    if (searchObj.data.stream.selectedStream.length > 1) {
-      searchObj.meta.showHistogram = false;
-    }
-
-    if (store.state.zoConfig.query_on_stream_selection == false) {
-      handleQueryData();
-    } else {
-      searchObj.data.stream.selectedStreamFields = [];
+    try{
+      searchObj.loadingStream = true;
       searchObj.data.queryResults = {
         hits: [],
       };
-      searchObj.data.sortedQueryResults = [];
-      searchObj.data.histogram = {
-        xData: [],
-        yData: [],
-        chartParams: {
-          title: "",
-          unparsed_x_data: [],
-          timezone: "",
-        },
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
+      searchObj.data.stream.selectedStreamFields = [];
 
-      extractFields();
+      let query = searchObj.meta.sqlMode
+        ? queryStr != ""
+          ? queryStr
+          : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
+              ","
+            )}"`
+        : "";
+
+      searchObj.data.stream.selectedStreamFields = [];
+      for (const stream of searchObj.data.stream.selectedStream) {
+        const streamData: any = await getStream(
+          stream,
+          searchObj.data.stream.streamType || "logs",
+          true
+        );
+
+        if (streamData.schema != undefined) {
+          searchObj.data.stream.selectedStreamFields.push(streamData.schema);
+        }
+      }
+
+      if (
+        searchObj.data.stream.selectedStreamFields == undefined ||
+        searchObj.data.stream.selectedStreamFields.length == 0
+      ) {
+        searchObj.loadingStream = false;
+        searchObj.data.errorMsg = t("search.noFieldFound");
+        return;
+      }
+      const streamFieldNames: any = [];
+      searchObj.data.stream.selectedStreamFields.forEach((subArray: any) => {
+        subArray.forEach((item) => {
+          streamFieldNames.push(item.name);
+        });
+      });
+
+      for (
+        let i = searchObj.data.stream.interestingFieldList.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const fieldName = searchObj.data.stream.interestingFieldList[i];
+        if (!streamFieldNames.includes(fieldName)) {
+          searchObj.data.stream.interestingFieldList.splice(i, 1);
+        }
+      }
+
+      if (queryStr == "") {
+        if (
+          searchObj.data.stream.interestingFieldList.length > 0 &&
+          searchObj.meta.quickMode
+        ) {
+          query = query.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(",")
+          );
+        } else {
+          query = query.replace("[FIELD_LIST]", "*");
+        }
+      }
+
+      searchObj.data.editorValue = query;
+      searchObj.data.query = query;
+      searchObj.data.tempFunctionContent = "";
+      searchObj.meta.searchApplied = false;
+
+      if (searchObj.data.stream.selectedStream.length > 1) {
+        searchObj.meta.showHistogram = false;
+      }
+
+      if (store.state.zoConfig.query_on_stream_selection == false) {
+        handleQueryData();
+      } else {
+        searchObj.data.stream.selectedStreamFields = [];
+        searchObj.data.queryResults = {
+          hits: [],
+        };
+        searchObj.data.sortedQueryResults = [];
+        searchObj.data.histogram = {
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorCode: 0,
+          errorMsg: "",
+          errorDetail: "",
+        };
+        extractFields();
+        searchObj.loadingStream = false;
+      }
+    } catch (e: any) {
       searchObj.loadingStream = false;
+      console.log("Error while getting stream data", e);
     }
   };
 
