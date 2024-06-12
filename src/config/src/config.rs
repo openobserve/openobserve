@@ -155,6 +155,28 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    let streams: Vec<String> = get_config()
+        .common
+        .mem_table_individual_streams
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect();
+    let num_mem_tables = get_config().limit.mem_table_bucket_num;
+    for (idx, stream) in streams.into_iter().enumerate() {
+        map.insert(stream, num_mem_tables + idx);
+    }
+    map
+});
+
 static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
@@ -667,6 +689,12 @@ pub struct Common {
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
     pub allow_user_defined_schemas: bool,
+    #[env_config(
+        name = "ZO_MEM_TABLE_STREAMS",
+        default = "",
+        help = "Streams for which dedicated MemTable will be used as comma separated values"
+    )]
+    pub mem_table_individual_streams: String,
 }
 
 #[derive(EnvConfig)]

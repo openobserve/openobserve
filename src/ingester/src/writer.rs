@@ -26,6 +26,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config, metrics,
     utils::hash::{gxhash, Sum64},
+    MEM_TABLE_INDIVIDUAL_STREAMS,
 };
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
@@ -43,7 +44,7 @@ use crate::{
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     let cfg = get_config();
-    let writer_num = cfg.limit.mem_table_bucket_num;
+    let writer_num = cfg.limit.mem_table_bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
     let mut writers = Vec::with_capacity(writer_num);
     for _ in 0..writer_num {
         writers.push(RwMap::default());
@@ -74,9 +75,13 @@ pub fn check_memtable_size() -> Result<()> {
 
 /// Get a writer for a given org_id and stream_type
 pub async fn get_writer(org_id: &str, stream_type: &str, stream_name: &str) -> Arc<Writer> {
+    let idx = if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
+        *idx
+    } else {
+        let hash_id = gxhash::new().sum64(stream_name);
+        hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
+    };
     let key = WriterKey::new(org_id, stream_type);
-    let hash_id = gxhash::new().sum64(stream_name);
-    let idx = hash_id as usize % WRITERS.len();
     let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())
