@@ -43,6 +43,8 @@ pub struct Engine {
     ctx: Arc<super::exec::Query>,
     /// The time boundaries for the evaluation.
     time: i64,
+    /// Only select necessary columns.
+    agg_columns: HashSet<String>,
     result_type: Option<String>,
 }
 
@@ -51,13 +53,81 @@ impl Engine {
         Self {
             ctx,
             time,
+            agg_columns: HashSet::new(),
             result_type: None,
         }
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
+        // _ = self.extract_columns_from_prom_expr(prom_expr)?;
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
+    }
+
+    pub fn extract_columns_from_prom_expr(&mut self, prom_expr: &PromExpr) -> Result<()> {
+        match prom_expr {
+            PromExpr::Aggregate(AggregateExpr {
+                op: _,
+                expr,
+                param,
+                modifier,
+            }) => {
+                self.extract_columns_from_prom_expr(expr)?;
+                if let Some(expr) = param {
+                    self.extract_columns_from_prom_expr(expr)?;
+                }
+                if let Some(label_modifier) = modifier {
+                    match label_modifier {
+                        LabelModifier::Include(labels) => {
+                            self.agg_columns.extend(labels.labels.iter().cloned());
+                        }
+                        LabelModifier::Exclude(labels) => {
+                            self.agg_columns.extend(labels.labels.iter().cloned());
+                        }
+                    }
+                }
+                Ok(())
+            }
+            PromExpr::Unary(UnaryExpr { expr }) => self.extract_columns_from_prom_expr(expr),
+            PromExpr::Binary(expr) => {
+                self.extract_columns_from_prom_expr(&expr.lhs)?;
+                self.extract_columns_from_prom_expr(&expr.rhs)
+            }
+            PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
+            PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
+            PromExpr::VectorSelector(selector) => Ok(self.agg_columns.extend(
+                selector
+                    .matchers
+                    .matchers
+                    .iter()
+                    .map(|mat| mat.name.to_owned()),
+            )),
+            PromExpr::MatrixSelector(MatrixSelector {
+                vs: selector,
+                range: _,
+            }) => Ok(self.agg_columns.extend(
+                selector
+                    .matchers
+                    .matchers
+                    .iter()
+                    .map(|mat| mat.name.to_owned()),
+            )),
+            PromExpr::Call(Call { func: _, args }) => {
+                _ = args
+                    .args
+                    .iter()
+                    .map(|expr| self.extract_columns_from_prom_expr(expr))
+                    .collect::<Vec<_>>();
+                Ok(())
+            }
+            PromExpr::Extension(expr) => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Extension: {:?}",
+                    expr
+                )));
+            }
+            _ => Ok(()),
+        }
     }
 
     #[async_recursion]
@@ -68,7 +138,15 @@ impl Engine {
                 expr,
                 param,
                 modifier,
-            }) => self.aggregate_exprs(op, expr, param, modifier).await?,
+            }) => {
+                self.agg_columns.extend(vec![
+                    HASH_LABEL.to_string(),
+                    config::get_config().common.column_timestamp.clone(),
+                    VALUE_LABEL.to_string(),
+                ]);
+                _ = self.extract_columns_from_prom_expr(prom_expr)?;
+                self.aggregate_exprs(op, expr, param, modifier).await?
+            }
 
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
@@ -432,8 +510,9 @@ impl Engine {
         let mut tasks = Vec::new();
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
+            let columns = &self.agg_columns;
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
+                selector_load_data_from_datafusion(ctx, schema, selector, start, end, columns).await
             });
             tasks.push(task);
             // update stats
@@ -912,6 +991,7 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
+    columns: &HashSet<String>,
 ) -> Result<HashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
     let table = match ctx.table(table_name).await {
@@ -957,6 +1037,34 @@ async fn selector_load_data_from_datafusion(
             }
         }
     }
+
+    if !columns.is_empty() {
+        let agg_columns = Vec::from_iter(columns.iter().cloned().filter_map(|name| {
+            if schema.column_with_name(&name).is_some() {
+                Some(col(name))
+            } else {
+                None
+            }
+        }));
+        // agg_columns.extend(
+        //     vec![
+        //         HASH_LABEL.to_string(),
+        //         config::get_config().common.column_timestamp.clone(),
+        //         VALUE_LABEL.to_string(),
+        //     ]
+        //     .into_iter()
+        //     .filter(|name| !columns.contains(name))
+        //     .map(|name| col(name)),
+        // );
+        df_group = match df_group.select(agg_columns) {
+            Ok(df) => df,
+            Err(e) => {
+                log::error!("Selecting cols error: {:?}", e);
+                return Ok(HashMap::default());
+            }
+        }
+    }
+
     let batches = df_group
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
