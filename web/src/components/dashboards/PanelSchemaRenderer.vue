@@ -242,7 +242,7 @@ export default defineComponent({
       searchType,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, histogramInterval } = usePanelDataLoader(
+    let { data, loading, errorDetail, metadata, resultMetaData } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
@@ -293,7 +293,7 @@ export default defineComponent({
               store,
               chartPanelRef,
               hoveredSeriesState,
-              histogramInterval,
+              resultMetaData,
               metadata.value
             );
 

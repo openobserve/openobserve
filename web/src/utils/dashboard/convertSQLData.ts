@@ -39,7 +39,7 @@ export const convertSQLData = async (
   store: any,
   chartPanelRef: any,
   hoveredSeriesState: any,
-  histogramInterval: any,
+  resultMetaData: any,
   metadata: any
 ) => {
   // console.time("convertSQLData");
@@ -80,7 +80,7 @@ export const convertSQLData = async (
   const missValueRefTrue = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
-    const interval = histogramInterval.value.map(
+    const interval = resultMetaData.value.map(
       (it: any) => it.histogram_interval
     )[0];
 

@@ -52,7 +52,7 @@ export const usePanelDataLoader = (
     loading: false,
     errorDetail: "",
     metadata: {},
-    histogramInterval: [] as any,
+    resultMetaData: [] as any,
   });
 
   // observer for checking if panel is visible on the screen
@@ -348,7 +348,7 @@ export const usePanelDataLoader = (
           queries: sqlqueryResults.map((it) => it?.metadata),
         };
 
-        state.histogramInterval = sqlqueryResults.map(
+        state.resultMetaData = sqlqueryResults.map(
           (it) => it?.resultMetaData
         );
 

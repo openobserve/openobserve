@@ -31,7 +31,7 @@ export const convertPanelData = async (
   store: any,
   chartPanelRef: any,
   hoveredSeriesState: any,
-  histogramInterval: any,
+  resultMetaData: any,
   metadata: any
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
@@ -76,7 +76,7 @@ export const convertPanelData = async (
             store,
             chartPanelRef,
             hoveredSeriesState,
-            histogramInterval,
+            resultMetaData,
             metadata
           )),
         };
