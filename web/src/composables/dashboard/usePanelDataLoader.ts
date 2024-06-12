@@ -324,39 +324,7 @@ export const usePanelDataLoader = (
                 // state.data = res.data.hits;
                 state.errorDetail = "";
                 // console.log("API response received");
-                // console.log(
-                //   "logaData: res.data.histogram_interval",
-                //   res.data.histogram_interval
-                // );
-                // if (res.data.histogram_interval) {
-                //   const interval = res.data.histogram_interval;
-                //   console.log(
-                //     "logaData: metadata interval",
-                //     res.data.histogram_interval
-                //   );
 
-                //   console.log(
-                //     "logaData: metadata startTime timestamp",
-                //     metadata.startTime
-                //   );
-
-                //   const startTime = new Date(
-                //     parseInt(metadata.startTime / 1000)
-                //   );
-                //   console.log("logaData: metadata startTime", startTime);
-                //   const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
-                //   console.log("logaData: metadata origin", origin);
-
-                //   // dateBin(interval, startTime, origin);
-                //   const binnedDate = dateBin(interval, startTime, origin);
-                //   console.log(
-                //     "Binned date: ",
-                //     format(
-                //       utcToZonedTime(binnedDate, "UTC"),
-                //       "yyyy-MM-dd'T'HH:mm:ss'Z'"
-                //     )
-                //   );
-                // }
                 return {
                   result: res.data.hits,
                   metadata: metadata,
@@ -379,15 +347,10 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: sqlqueryResults.map((it) => it?.metadata),
         };
-        // console.log("sqlqueryResults", sqlqueryResults);
 
         state.histogramInterval = sqlqueryResults.map(
           (it) => it?.resultMetaData
         );
-        // console.log(
-        //   "logaData: state.histogramInterval",
-        //   state.histogramInterval
-        // );
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);

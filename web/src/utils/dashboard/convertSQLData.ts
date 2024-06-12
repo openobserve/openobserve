@@ -79,15 +79,10 @@ export const convertSQLData = async (
 
   const missValueRefTrue = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
-    console.time("totalTime");
-
     // Get the interval in minutes
-    console.time("interval");
     const interval = histogramInterval.value.map(
       (it: any) => it.histogram_interval
     )[0];
-    console.timeEnd("interval");
-    console.log("missValueRefTrue ", missValueRefTrue);
 
     if (
       !interval ||
@@ -98,68 +93,47 @@ export const convertSQLData = async (
     }
 
     // Extract and process metaDataStartTime
-    console.time("metaDataStartTime");
     const metaDataStartTime = metadata.queries[0].startTime.toString();
     const startTime = new Date(parseInt(metaDataStartTime) / 1000);
-    console.timeEnd("metaDataStartTime");
 
     // Calculate the binnedDate
-    console.time("origin");
     const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
-    console.timeEnd("origin");
-    console.time("binnedDate");
     const binnedDate = dateBin(interval, startTime, origin);
-    console.timeEnd("binnedDate");
 
     // Convert interval to milliseconds
-    console.time("intervalMillis");
     const intervalMillis = interval * 1000;
-    console.timeEnd("intervalMillis");
 
     // Identify the time-based key
-    console.time("searchQueryDataFirstEntry");
     const searchQueryDataFirstEntry = searchQueryData[0][0];
-    console.timeEnd("searchQueryDataFirstEntry");
 
-    console.time("keys");
     const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
     let timeBasedKey = keys.find((key) =>
       isTimeSeries([searchQueryDataFirstEntry[key]])
     );
-    console.timeEnd("keys");
 
     if (!timeBasedKey) {
       return JSON.parse(JSON.stringify(searchQueryData[0]));
     }
 
     // Extract and process metaDataEndTime
-    console.time("metaDataEndTime");
     const metaDataEndTime = metadata.queries[0].endTime.toString();
     const endTime = new Date(parseInt(metaDataEndTime) / 1000);
-    console.timeEnd("metaDataEndTime");
 
-    console.time("xAxisKeys");
     const xAxisKeys = getXAxisKeys().filter((key: any) => key !== timeBasedKey);
-    console.timeEnd("xAxisKeys");
 
     // Create a set of unique xAxis values
-    console.time("uniqueXAxisValues");
     const uniqueXAxisValues = new Set(
       searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
     );
-    console.timeEnd("uniqueXAxisValues");
 
     // Create a map of existing data
-    console.time("fillData");
     const searchDataMap = new Map();
     searchQueryData[0].forEach((d: any) => {
       const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
       searchDataMap.set(key, d);
     });
-    console.timeEnd("fillData");
 
     const filledData: any = [];
-    console.time("while loop");
     let currentTime = binnedDate;
 
     while (currentTime <= endTime) {
@@ -190,14 +164,11 @@ export const convertSQLData = async (
 
       currentTime = new Date(currentTime.getTime() + intervalMillis);
     }
-    console.timeEnd("while loop");
 
-    console.timeEnd("totalTime");
     return filledData;
   };
 
   const missingValueData = missingValue();
-  console.log("missingValueData", missingValueData);
 
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
