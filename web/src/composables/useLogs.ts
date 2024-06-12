@@ -3269,7 +3269,7 @@ const useLogs = () => {
       }
       const streamFieldNames: any = [];
       searchObj.data.stream.selectedStreamFields.forEach((subArray: any) => {
-        subArray.forEach((item) => {
+        subArray.forEach((item: any) => {
           streamFieldNames.push(item.name);
         });
       });
