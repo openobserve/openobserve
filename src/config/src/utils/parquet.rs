@@ -49,8 +49,6 @@ pub fn new_parquet_writer<'a>(
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
         .set_compression(Compression::ZSTD(Default::default()))
-        .set_dictionary_enabled(true)
-        .set_encoding(Encoding::PLAIN)
         .set_column_dictionary_enabled(
             cfg.common.column_timestamp.as_str().into(),
             false,
@@ -103,7 +101,6 @@ pub fn new_parquet_writer<'a>(
         };
         for field in fields {
             writer_props = writer_props
-                .set_column_dictionary_enabled(field.as_str().into(), false)
                 .set_column_bloom_filter_enabled(field.as_str().into(), true)
                 .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
                 .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
