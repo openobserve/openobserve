@@ -1046,16 +1046,6 @@ async fn selector_load_data_from_datafusion(
                 None
             }
         }));
-        // agg_columns.extend(
-        //     vec![
-        //         HASH_LABEL.to_string(),
-        //         config::get_config().common.column_timestamp.clone(),
-        //         VALUE_LABEL.to_string(),
-        //     ]
-        //     .into_iter()
-        //     .filter(|name| !columns.contains(name))
-        //     .map(|name| col(name)),
-        // );
         df_group = match df_group.select(agg_columns) {
             Ok(df) => df,
             Err(e) => {
