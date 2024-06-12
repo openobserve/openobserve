@@ -52,15 +52,13 @@ use crate::{
 /// - in_stream_name: stream to write data in
 /// - body: incoming payload
 /// - extend_json: a hashmap of string -> string values which should be extended in each json row
-/// - thread_id: a unique thread-id associated with this process
 pub async fn ingest_with_keys(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
     extend_json: &HashMap<String, serde_json::Value>,
-    thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
-    ingest_inner(org_id, in_stream_name, body, extend_json, thread_id).await
+    ingest_inner(org_id, in_stream_name, body, extend_json).await
 }
 
 async fn ingest_inner(
@@ -68,7 +66,6 @@ async fn ingest_inner(
     in_stream_name: &str,
     body: web::Bytes,
     extend_json: &HashMap<String, serde_json::Value>,
-    thread_id: usize,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
@@ -231,7 +228,7 @@ async fn ingest_inner(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
     let mut req_stats = write_file(&writer, stream_name, buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

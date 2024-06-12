@@ -123,11 +123,11 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
         let file_columns = file_str.split('/').collect::<Vec<_>>();
         let stream_type = file_columns[file_columns.len() - 2];
         let org_id = file_columns[file_columns.len() - 3];
-        let thread_id: usize = file_columns[file_columns.len() - 4]
+        let idx: usize = file_columns[file_columns.len() - 4]
             .parse()
             .unwrap_or_default();
         let key = WriterKey::new(org_id, stream_type);
-        let memtable = memtable::MemTable::new();
+        let mut memtable = memtable::MemTable::new();
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,
             Err(e) => {
@@ -192,7 +192,8 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
                     .context(InferJsonSchemaSnafu)?;
             let infer_schema = Arc::new(infer_schema);
             entry.schema_key = infer_schema.hash_key().into();
-            memtable.write(infer_schema, entry).await?;
+            let batch = entry.into_batch(infer_schema.clone())?;
+            memtable.write(infer_schema, entry, batch)?;
         }
         log::warn!(
             "replay wal file: {:?}, entries: {}, records: {}",
@@ -203,7 +204,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
 
         immutable::IMMUTABLES.write().await.insert(
             wal_file.to_owned(),
-            Arc::new(immutable::Immutable::new(thread_id, key, memtable)),
+            Arc::new(immutable::Immutable::new(idx, key, memtable)),
         );
     }
 

@@ -53,7 +53,6 @@ impl TraceService for TraceServer {
 
         let resp = handle_trace_request(
             org_id.unwrap().to_str().unwrap(),
-            0,
             in_req,
             true,
             in_stream_name,
