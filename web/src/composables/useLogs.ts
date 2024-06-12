@@ -2156,6 +2156,7 @@ const useLogs = () => {
         } milliseconds to complete`
       );
     } catch (e: any) {
+      searchObj.loadingStream = false;
       console.log("Error while extracting fields");
     }
   }
@@ -2274,6 +2275,7 @@ const useLogs = () => {
       extractFTSFields();
       evaluateWrapContentFlag();
     } catch (e: any) {
+      searchObj.loadingStream = false;
       console.log("Error while updating grid columns");
     }
   };
@@ -2837,9 +2839,11 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields.length == 0
     ) {
       searchObj.loadingStream = false;
+      searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.errorMsg = t("search.noFieldFound");
       return;
     }
+
     const streamFieldNames: any =
       searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
 
@@ -2893,6 +2897,7 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
+
       extractFields();
       searchObj.loadingStream = false;
     }
