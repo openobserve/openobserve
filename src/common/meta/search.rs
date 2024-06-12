@@ -19,3 +19,14 @@ pub struct QueryDelta {
     pub delta_end_time: i64,
     pub delta_removed_hits: bool,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct CachedQueryResponse {
+    pub cached_response: Response,
+    pub deltas: Vec<QueryDelta>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct QueryDelta {
+    pub delta_start_time: i64,
+    pub delta_end_time: i64,
+}
