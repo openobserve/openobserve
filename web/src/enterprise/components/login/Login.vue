@@ -177,6 +177,8 @@ export default defineComponent({
     const d = new Date();
     this.userInfo =
       sessionUserInfo !== null ? JSON.parse(sessionUserInfo) : null;
+    console.log("config.isEnterprise", config.isEnterprise);
+    console.log("this.userInfo", this.userInfo);
     if (
       (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) ||
       config.isEnterprise === "true"
@@ -187,29 +189,7 @@ export default defineComponent({
       });
       this.getDefaultOrganization();
     } else {
-      this.store.dispatch("login", {
-        loginState: true,
-        userInfo: this.userInfo,
-      });
-
-      //analytics
-      const userId = this.userInfo.email;
-      segment.identify(
-        "Log In",
-        {
-          email: userId,
-          name: this.userInfo.given_name + " " + this.userInfo.family_name,
-          firstName: this.userInfo.given_name,
-          lastName: this.userInfo.family_name,
-        },
-        { originalTimestamp: moment.utc().format() }
-      );
-
-      openobserveRum.setUser({
-        name: this.userInfo.given_name + " " + this.userInfo.family_name,
-        email: this.userInfo.email,
-      });
-      this.getDefaultOrganization();
+      this.VerifyAndCreateUser();
     }
   },
   methods: {
