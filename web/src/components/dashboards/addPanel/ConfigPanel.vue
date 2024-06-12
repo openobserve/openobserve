@@ -557,15 +557,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
-      <q-toggle
+
+      <q-input
         v-if="
           ['area', 'line', 'area-stacked'].includes(
             dashboardPanelData.data.type
           )
         "
-        v-model="dashboardPanelData.data.config.connect_zeros"
-        label="Connect null values"
-        data-test="dashboard-config-connect-null-values"
+        v-model="dashboardPanelData.data.config.no_value_replacement"
+        label="No Value Replacement"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        filled
+        dense
+        label-slot
+        data-test="dashboard-config-no-value-replacement"
       />
 
       <div class="space"></div>
@@ -799,9 +807,9 @@ export default defineComponent({
         dashboardPanelData.data.config.connect_nulls = false;
       }
 
-      // by default, use connect_zeros as false
-      if (!dashboardPanelData.data.config.connect_zeros) {
-        dashboardPanelData.data.config.connect_zeros = true;
+      // by default, use no_value_replacement as empty string
+      if (!dashboardPanelData.data.config.no_value_replacement) {
+        dashboardPanelData.data.config.no_value_replacement = "";
       }
 
       // by default, use wrap_table_cells as false

@@ -77,7 +77,7 @@ export const convertSQLData = async (
       : [];
   };
 
-  const missValueRefTrue = panelSchema.config?.connect_zeros;
+  const missValueRefTrue = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     console.time("totalTime");
 
@@ -88,12 +88,11 @@ export const convertSQLData = async (
     )[0];
     console.timeEnd("interval");
     console.log("missValueRefTrue ", missValueRefTrue);
-    
+
     if (
       !interval ||
       !metadata.queries ||
-      !["area-stacked", "line", "area"].includes(panelSchema.type) ||
-      !missValueRefTrue
+      !["area-stacked", "line", "area"].includes(panelSchema.type)
     ) {
       return JSON.parse(JSON.stringify(searchQueryData[0]));
     }
@@ -175,14 +174,19 @@ export const convertSQLData = async (
         if (currentData) {
           filledData.push(currentData);
         } else {
+          console.log("missValueRefTrue----------", missValueRefTrue);
+
           const nullEntry = {
             [timeBasedKey]: currentFormattedTime,
             [xAxisKeys[0]]: xAxisValue,
           };
           keys.forEach((key) => {
             if (key !== timeBasedKey && key !== xAxisKeys[0])
-              nullEntry[key] = 0;
+              nullEntry[key] =
+                missValueRefTrue === undefined ? null : missValueRefTrue;
           });
+          console.log("nullEntry", nullEntry);
+
           filledData.push(nullEntry);
         }
       });
@@ -196,6 +200,7 @@ export const convertSQLData = async (
   };
 
   const missingValueData = missingValue();
+  console.log("missingValueData", missingValueData);
 
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
