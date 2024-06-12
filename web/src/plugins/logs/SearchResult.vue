@@ -138,10 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :style="{
           wordBreak: 'break-word',
-          height:
-            !searchObj.meta.showHistogram
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
+          height: !searchObj.meta.showHistogram
+            ? 'calc(100% - 40px)'
+            : 'calc(100% - 140px)',
         }"
       >
         <template v-slot:before>
@@ -981,7 +980,7 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .search-list {
   .copy-log-btn {
     .q-btn .q-icon {

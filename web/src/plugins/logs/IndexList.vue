@@ -1201,7 +1201,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 $streamSelectorHeight: 44px;
 
 .logs-index-menu {
@@ -1263,6 +1263,7 @@ $streamSelectorHeight: 44px;
     }
 
     .q-table__top {
+      padding: 0 !important;
       border-bottom: unset;
     }
   }
@@ -1395,38 +1396,64 @@ $streamSelectorHeight: 44px;
 }
 </style>
 
-<style lang="scss" scoped>
-.index-table {
-  .q-table {
-    width: 100%;
-    table-layout: fixed;
+<style lang="scss">
+.logs-index-menu {
+  .index-table {
+    .q-table {
+      width: 100%;
+      table-layout: fixed;
 
-    .q-expansion-item {
-      .q-item {
-        display: flex;
-        align-items: center;
-        padding: 0;
-        height: 25px !important;
-        min-height: 25px !important;
-      }
-
-      .q-item__section--avatar {
-        min-width: 12px;
-        max-width: 12px;
-        margin-right: 8px;
-      }
-
-      .filter-values-container {
+      .q-expansion-item {
         .q-item {
-          padding-left: 4px;
+          display: flex;
+          align-items: center;
+          padding: 0;
+          height: 25px !important;
+          min-height: 25px !important;
+        }
 
-          .q-focus-helper {
-            background: none !important;
+        .q-item__section--avatar {
+          min-width: 12px;
+          max-width: 12px;
+          margin-right: 8px;
+        }
+
+        .filter-values-container {
+          .q-item {
+            padding-left: 4px;
+
+            .q-focus-helper {
+              background: none !important;
+            }
+          }
+        }
+
+        .q-item-type {
+          &:hover {
+            .field_overlay {
+              visibility: visible;
+
+              .q-icon {
+                opacity: 1;
+              }
+            }
+          }
+        }
+
+        .field-expansion-icon {
+          img {
+            width: 12px;
+            height: 12px;
+          }
+
+          .q-icon {
+            font-size: 18px;
+            color: #808080;
           }
         }
       }
 
-      .q-item-type {
+      .field-container {
         &:hover {
           .field_overlay {
             visibility: visible;
@@ -1438,70 +1465,44 @@ $streamSelectorHeight: 44px;
         }
       }
 
-      .field-expansion-icon {
-        img {
-          width: 12px;
-          height: 12px;
-        }
+      .field_list {
+        &.selected {
+          .q-expansion-item {
+            background-color: rgba(89, 96, 178, 0.3);
+          }
 
-        .q-icon {
-          font-size: 18px;
-          color: #808080;
-        }
-      }
-    }
-
-    .field-container {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
-
-          .q-icon {
-            opacity: 1;
+          .field_overlay {
+            // background-color: #ffffff;
           }
         }
       }
     }
 
-    .field_list {
-      &.selected {
-        .q-expansion-item {
-          background-color: rgba(89, 96, 178, 0.3);
-        }
+    .schema-field-toggle {
+      border: 1px solid light-grey;
+      border-radius: 5px;
+      line-height: 10px;
+    }
 
-        .field_overlay {
-          // background-color: #ffffff;
-        }
-      }
+    .q-table__bottom {
+      padding: 0px !important;
+    }
+
+    .pagination-field-count {
+      line-height: 32px;
+      font-weight: 700;
+      font-size: 13px;
     }
   }
 
-  .schema-field-toggle {
-    border: 1px solid light-grey;
-    border-radius: 5px;
-    line-height: 10px;
-  }
+  .field-table {
+    .q-table__bottom {
+      padding: 5px !important;
+    }
 
-  .q-table__bottom {
-    padding: 0px !important;
-  }
-
-  .pagination-field-count {
-    line-height: 32px;
-    font-weight: 700;
-    font-size: 13px;
-  }
-}
-</style>
-
-<style lang="scss" scoped>
-.field-table {
-  .q-table__bottom {
-    padding: 5px !important;
-  }
-
-  .schema-field-toggle .q-btn {
-    padding: 5px !important;
+    .schema-field-toggle .q-btn {
+      padding: 5px !important;
+    }
   }
 }
 
