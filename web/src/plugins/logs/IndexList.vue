@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         use-input
         fill-input
         multiple
-        use-chips
         emit-value
         map-options
         @filter="filterStreamFn"
@@ -1153,10 +1152,6 @@ $streamSelectorHeight: 44px;
         padding-top: 0px !important;
       }
     }
-
-    &__native :first-of-type {
-      padding-top: 0.25rem;
-    }
   }
 
   .index-table {
@@ -1443,5 +1438,4 @@ $streamSelectorHeight: 44px;
   white-space: nowrap !important;
   max-height: 40px !important;
 }
-
 </style>
