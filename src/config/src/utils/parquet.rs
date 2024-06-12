@@ -76,9 +76,12 @@ pub fn new_parquet_writer<'a>(
         writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
     }
     // Bloom filter stored by row_group, so if the num_rows can limit to row_group_size
-    // in thelink, it says that the optimal number of NDV is 1000, here we use rg_size / 100
+    // in thelink, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
-    let num_rows = max(8, min(metadata.records as u64, row_group_size as u64) / 100);
+    let num_rows = max(
+        8,
+        min(metadata.records as u64, row_group_size as u64) / cfg.common.bloom_filter_ndv_ratio,
+    );
     if cfg.common.bloom_filter_enabled {
         // if bloom_filter_on_all_fields is true, then use all string fields
         let fields = if cfg.common.bloom_filter_on_all_fields {

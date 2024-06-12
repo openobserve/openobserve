@@ -523,6 +523,12 @@ pub struct Common {
     pub bloom_filter_on_all_fields: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_NDV_RATIO",
+        default = 100,
+        help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
+    )]
+    pub bloom_filter_ndv_ratio: u64,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -1218,6 +1224,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.inverted_index_split_chars.is_empty() {
         cfg.common.inverted_index_split_chars = " ;,".to_string();
+    }
+
+    // check bloom filter ndv ratio
+    if cfg.common.bloom_filter_ndv_ratio == 0 {
+        cfg.common.bloom_filter_ndv_ratio = 100;
     }
     Ok(())
 }
