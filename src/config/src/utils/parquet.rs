@@ -79,7 +79,7 @@ pub fn new_parquet_writer<'a>(
     // in thelink, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
     let num_rows = max(
-        8,
+        4,
         min(metadata.records as u64, row_group_size as u64) / cfg.common.bloom_filter_ndv_ratio,
     );
     if cfg.common.bloom_filter_enabled {

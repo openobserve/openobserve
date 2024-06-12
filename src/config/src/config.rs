@@ -721,7 +721,11 @@ pub struct Limit {
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
-    #[env_config(name = "ZO_MEM_TABLE_BUCKET_NUM", default = 0)] // default is 1
+    #[env_config(
+        name = "ZO_MEM_TABLE_BUCKET_NUM",
+        default = 0,
+        help = "MemTable bucket num, default is 1"
+    )] // default is 1
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
     pub mem_persist_interval: u64,
