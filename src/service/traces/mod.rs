@@ -416,7 +416,7 @@ async fn write_traces(
     // Start write data
     for (timestamp, record_val) in json_data {
         // get service_name
-        let service_name = record_val.get("service_name").unwrap().as_str().unwrap();
+        let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {
             if let Some(val) = record_val.get(field) {
