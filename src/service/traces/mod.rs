@@ -263,14 +263,13 @@ pub async fn handle_trace_request(
         return format_response(partial_success);
     }
 
-    let mut req_stats =
-        match write_traces(org_id, &traces_stream_name, &service_name, json_data).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Error while writing traces: {}", e);
-                return format_response(partial_success);
-            }
-        };
+    let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error while writing traces: {}", e);
+            return format_response(partial_success);
+        }
+    };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
@@ -345,7 +344,6 @@ fn format_response(mut partial_success: ExportTracePartialSuccess) -> Result<Htt
 async fn write_traces(
     org_id: &str,
     stream_name: &str,
-    service_name: &str,
     json_data: Vec<(i64, json::Map<String, json::Value>)>,
 ) -> Result<RequestStats, Error> {
     let cfg = get_config();
@@ -417,6 +415,8 @@ async fn write_traces(
 
     // Start write data
     for (timestamp, record_val) in json_data {
+        // get service_name
+        let service_name = record_val.get("service_name").unwrap().as_str().unwrap();
         // get distinct_value item
         for field in DISTINCT_FIELDS.iter() {
             if let Some(val) = record_val.get(field) {

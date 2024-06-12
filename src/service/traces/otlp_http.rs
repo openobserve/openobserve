@@ -297,14 +297,13 @@ pub async fn traces_json(
         return format_response(partial_success);
     }
 
-    let mut req_stats =
-        match super::write_traces(org_id, &traces_stream_name, &service_name, json_data).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Error while writing traces: {}", e);
-                return format_response(partial_success);
-            }
-        };
+    let mut req_stats = match super::write_traces(org_id, &traces_stream_name, json_data).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error while writing traces: {}", e);
+            return format_response(partial_success);
+        }
+    };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
