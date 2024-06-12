@@ -20,6 +20,7 @@ use std::{
 
 use actix_web::http;
 use arrow_schema::DataType;
+use arrow_schema::Schema;
 use chrono::{Duration, Local, TimeZone, Utc};
 use config::{
     get_config, ider,
@@ -48,6 +49,7 @@ use crate::{
     },
     service::{db, search as SearchService},
 };
+use crate::common::meta::alerts::ConditionList;
 
 pub mod alert_manager;
 pub mod destinations;
@@ -330,13 +332,8 @@ impl QueryCondition {
             return Ok(None);
         }
         let conditions = self.conditions.as_ref().unwrap();
-        if conditions.is_empty() {
+        if !conditions.evaluate(row).await {
             return Ok(None);
-        }
-        for condition in conditions.iter() {
-            if !condition.evaluate(row).await {
-                return Ok(None);
-            }
         }
         Ok(Some(vec![row.to_owned()]))
     }
@@ -490,6 +487,87 @@ impl QueryCondition {
     }
 }
 
+impl ConditionList {
+    #[async_recursion::async_recursion]
+    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+        match self {
+            ConditionList::OrNode(conditions) => {
+                let mut eval = false;
+                for condition in conditions {
+                    eval = eval || condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::AndNode(conditions) => {
+                let mut eval = false;
+                for condition in conditions {
+                    eval = eval && condition.evaluate(row).await
+                }
+                eval
+            }
+            ConditionList::NotNode(node) => {
+                !node.evaluate(row).await
+            }
+            ConditionList::EndNode(node) => {
+                node.evaluate(row).await
+            }
+        }
+    }
+
+    /// Returns end nodes of the condition list
+    #[async_recursion::async_recursion]
+    pub async fn len(&self) -> u32 {
+        match self {
+            ConditionList::OrNode(conditions) |
+            ConditionList::AndNode(conditions) => {
+                let mut count = 0;
+                for condition in conditions.iter() {
+                    count += condition.len().await
+                }
+                count
+            }
+            ConditionList::NotNode(inner) => inner.len().await,
+            ConditionList::EndNode(_) => 1
+        }
+    }
+
+    /// Converts Condition list to SQL query as per schema validation
+    #[async_recursion::async_recursion]
+    pub async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
+        match self {
+            ConditionList::OrNode(conditions) => {
+                let mut cond_sql_list = Vec::new();
+                for condition in conditions.iter() {
+                    cond_sql_list.push(condition.to_sql(schema).await?);
+                }
+                Ok(cond_sql_list.join(" OR "))
+            }
+            ConditionList::AndNode(conditions) => {
+                let mut cond_sql_list = Vec::new();
+                for condition in conditions.iter() {
+                    cond_sql_list.push(condition.to_sql(schema).await?);
+                }
+                Ok(cond_sql_list.join(" AND "))
+            }
+            ConditionList::NotNode(inner) => {
+                Ok(format!("NOT ({})", inner.to_sql(schema).await?))
+            }
+            ConditionList::EndNode(node) => {
+                let data_type = match schema.field_with_name(&node.column) {
+                    Ok(field) => field.data_type(),
+                    Err(_) => {
+                        return Err(anyhow::anyhow!(
+                            "Column {} not found",
+                            &node.column,
+                        ));
+                    }
+                };
+                build_expr(node, "", data_type)
+            }
+        }
+    }
+}
+
 impl Condition {
     pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         let val = match row.get(&self.column) {
@@ -556,8 +634,10 @@ impl Condition {
     }
 }
 
-async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, anyhow::Error> {
+async fn build_sql(alert: &Alert, conditions: &ConditionList) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
+    #[allow(unused_doc_comments)]
+    /**
     let mut wheres = Vec::with_capacity(conditions.len());
     for cond in conditions.iter() {
         let data_type = match schema.field_with_name(&cond.column) {
@@ -578,6 +658,9 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
     } else {
         String::new()
     };
+    **/
+    let where_sql = conditions.to_sql(&schema).await
+    .map_err(|err| err.context(format!("on stream {}", &alert.stream_name)))?;
     if alert.query_condition.aggregation.is_none() {
         return Ok(format!(
             "SELECT * FROM \"{}\" {}",
@@ -1210,7 +1293,7 @@ async fn process_dest_template(
         }
     }
 
-    resp
+    dbg!(resp)
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue) {
