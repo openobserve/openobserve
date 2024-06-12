@@ -2188,7 +2188,7 @@ const useLogs = () => {
         if (
           (searchObj.meta.sqlMode == true &&
             parsedSQL.hasOwnProperty("columns") &&
-            hasTimeStampColumn(parsedSQL.columns)) ||
+            searchObj.data.queryResults?.hits[0].hasOwnProperty(store.state.zoConfig.timestamp_column)) ||
           searchObj.meta.sqlMode == false ||
           searchObj.data.stream.selectedFields.includes(
             store.state.zoConfig.timestamp_column
@@ -2230,7 +2230,7 @@ const useLogs = () => {
           if (
             (searchObj.meta.sqlMode == true &&
               parsedSQL.hasOwnProperty("columns") &&
-              hasTimeStampColumn(parsedSQL.columns)) ||
+              field == store.state.zoConfig.timestamp_column) ||
             field == store.state.zoConfig.timestamp_column
           ) {
             searchObj.data.resultGrid.columns.unshift({
