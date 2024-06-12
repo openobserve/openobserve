@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         use-input
         fill-input
         multiple
+        use-chips
         emit-value
         map-options
         @filter="filterStreamFn"
@@ -721,17 +722,19 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
-    watch(
-      () => {
-        searchObj.data.stream.streamLists.length;
-        store.state.organizationData.streams;
-      },
-      () => {
-        streamOptions.value =
-          searchObj.data.stream.streamLists ||
-          store.state.organizationData.streams;
-      }
-    );
+    //removed this watcher as search stream not working
+    // watch(
+    //   () => {
+    //     searchObj.data.stream.streamLists.length;
+    //     store.state.organizationData.streams;
+    //   },
+    //   () => {
+
+    //     streamOptions.value =
+    //       searchObj.data.stream.streamLists ||
+    //       store.state.organizationData.streams;
+    //   }
+    // );
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
