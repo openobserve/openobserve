@@ -102,14 +102,11 @@ pub fn new_parquet_writer<'a>(
             fields
         };
         for field in fields {
-            if metadata.records > 0 {
-                writer_props = writer_props
-                    .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
-                    .set_column_bloom_filter_ndv(field.as_str().into(), num_rows);
-            }
             writer_props = writer_props
                 .set_column_dictionary_enabled(field.as_str().into(), false)
-                .set_column_bloom_filter_enabled(field.into(), true); // take the field ownership
+                .set_column_bloom_filter_enabled(field.as_str().into(), true)
+                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
+                .set_column_bloom_filter_ndv(field.into(), num_rows); // take the field ownership
         }
     }
     let writer_props = writer_props.build();
