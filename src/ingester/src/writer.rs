@@ -23,28 +23,28 @@ use std::{
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
-use config::{get_config, metrics};
+use config::{
+    get_config, metrics,
+    utils::hash::{gxhash, Sum64},
+    MEM_TABLE_INDIVIDUAL_STREAMS,
+};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
 use wal::Writer as WalWriter;
 
 use crate::{
-    entry::{Entry, RecordBatchEntry},
+    entry::Entry,
     errors::*,
-    immutable,
-    immutable::IMMUTABLES,
+    immutable::{Immutable, IMMUTABLES},
     memtable::MemTable,
     rwmap::RwMap,
+    ReadRecordBatchEntry,
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     let cfg = get_config();
-    let writer_num = if cfg.common.feature_per_thread_lock {
-        cfg.limit.http_worker_num
-    } else {
-        1
-    };
+    let writer_num = cfg.limit.mem_table_bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
     let mut writers = Vec::with_capacity(writer_num);
     for _ in 0..writer_num {
         writers.push(RwMap::default());
@@ -53,7 +53,7 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 });
 
 pub struct Writer {
-    thread_id: usize,
+    idx: usize,
     key: WriterKey,
     wal: Arc<Mutex<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
@@ -74,12 +74,18 @@ pub fn check_memtable_size() -> Result<()> {
 }
 
 /// Get a writer for a given org_id and stream_type
-pub async fn get_writer(thread_id: usize, org_id: &str, stream_type: &str) -> Arc<Writer> {
+pub async fn get_writer(org_id: &str, stream_type: &str, stream_name: &str) -> Arc<Writer> {
+    let idx = if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
+        *idx
+    } else {
+        let hash_id = gxhash::new().sum64(stream_name);
+        hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
+    };
     let key = WriterKey::new(org_id, stream_type);
-    let mut rw = WRITERS[thread_id].write().await;
+    let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())
-        .or_insert_with(|| Arc::new(Writer::new(thread_id, key)));
+        .or_insert_with(|| Arc::new(Writer::new(idx, key)));
     w.clone()
 }
 
@@ -88,25 +94,15 @@ pub async fn read_from_memtable(
     stream_type: &str,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
-    let cfg = get_config();
+) -> Result<Vec<ReadRecordBatchEntry>> {
     let key = WriterKey::new(org_id, stream_type);
-    let writer_num = if cfg.common.feature_per_thread_lock {
-        cfg.limit.http_worker_num
-    } else {
-        1
+    let hash_id = gxhash::new().sum64(stream_name);
+    let idx = hash_id as usize % WRITERS.len();
+    let w = WRITERS[idx].read().await;
+    let Some(r) = w.get(&key) else {
+        return Ok(Vec::new());
     };
-    let mut batches = Vec::with_capacity(writer_num);
-    for i in 0..writer_num {
-        let w = WRITERS[i].read().await;
-        let Some(r) = w.get(&key) else {
-            continue;
-        };
-        if let Ok(batch) = r.read(stream_name, time_range).await {
-            batches.extend(batch);
-        }
-    }
-    Ok(batches)
+    r.read(stream_name, time_range).await
 }
 
 pub async fn check_ttl() -> Result<()> {
@@ -137,14 +133,14 @@ pub async fn flush_all() -> Result<()> {
 }
 
 impl Writer {
-    pub(crate) fn new(thread_id: usize, key: WriterKey) -> Self {
+    pub(crate) fn new(idx: usize, key: WriterKey) -> Self {
         let now = Utc::now().timestamp_micros();
         let cfg = get_config();
         let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
             .join("logs")
-            .join(thread_id.to_string());
+            .join(idx.to_string());
         log::info!(
             "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
             wal_dir.display().to_string(),
@@ -153,7 +149,7 @@ impl Writer {
             wal_id
         );
         Self {
-            thread_id,
+            idx,
             key: key.clone(),
             wal: Arc::new(Mutex::new(
                 WalWriter::new(
@@ -181,14 +177,26 @@ impl Writer {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
         }
-        let entry_bytes = if !check_ttl {
-            entry.into_bytes()?
+        let (entry_bytes, entry_batch) = if !check_ttl {
+            let bytes = entry.into_bytes()?;
+            let batch = entry.into_batch(schema.clone())?;
+            (bytes, batch)
         } else {
-            Vec::new()
+            (Vec::new(), None)
         };
+        let start = std::time::Instant::now();
         let mut wal = self.wal.lock().await;
+        let wal_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(wal_lock_time);
+        let mut mem = self.memtable.write().await;
+        let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
+        metrics::INGEST_MEMTABLE_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(mem_lock_time);
         if self.check_wal_threshold(wal.size(), entry_bytes.len())
-            || self.check_mem_threshold(self.memtable.read().await.size(), entry.data_size)
+            || self.check_mem_threshold(mem.size(), entry.data_size)
         {
             let cfg = get_config();
             // sync wal before rotation
@@ -197,7 +205,7 @@ impl Writer {
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
                 .join("logs")
-                .join(self.thread_id.to_string());
+                .join(self.idx.to_string());
             log::info!(
                 "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
                 wal_dir.display().to_string(),
@@ -216,36 +224,25 @@ impl Writer {
             let old_wal = std::mem::replace(&mut *wal, new_wal);
 
             // rotation memtable
-            let mut mem = self.memtable.write().await;
             let new_mem = MemTable::new();
             let old_mem = std::mem::replace(&mut *mem, new_mem);
-            drop(mem);
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
 
-            let thread_id = self.thread_id;
-            let key = self.key.clone();
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
-            tokio::task::spawn(async move {
-                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
-                IMMUTABLES.write().await.insert(
-                    path,
-                    Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
-                );
-                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
-            });
+            let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
+            log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
+            IMMUTABLES.write().await.insert(path, table);
+            log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
         }
 
         if !check_ttl {
             // write into wal
             wal.write(&entry_bytes, false).context(WalSnafu)?;
-            drop(wal);
             // write into memtable
-            let mem = self.memtable.write().await;
-            mem.write(schema, entry).await?;
-            drop(mem);
+            mem.write(schema, entry, entry_batch)?;
         }
 
         Ok(())
@@ -264,12 +261,8 @@ impl Writer {
         let old_mem = std::mem::replace(&mut *mem, new_mem);
         drop(mem);
 
-        let thread_id = self.thread_id;
-        let key = self.key.clone();
-        IMMUTABLES.write().await.insert(
-            path,
-            Arc::new(immutable::Immutable::new(thread_id, key, old_mem)),
-        );
+        let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
+        IMMUTABLES.write().await.insert(path, table);
         Ok(())
     }
 
@@ -282,9 +275,9 @@ impl Writer {
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
+    ) -> Result<Vec<ReadRecordBatchEntry>> {
         let memtable = self.memtable.read().await;
-        memtable.read(stream_name, time_range).await
+        memtable.read(stream_name, time_range)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
