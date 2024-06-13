@@ -148,6 +148,7 @@ const defaultObject = {
       interestingFieldList: <string[]>[],
       userDefinedSchema: <any>[],
       expandGroupRows: <any>{},
+      expandGroupRowsFieldCount: <any>{},
       filteredField: <any>[],
       missingStreamMultiStreamFilter: <any>[],
     },
@@ -2237,15 +2238,23 @@ const useLogs = () => {
         searchObj.data.stream.expandGroupRows = {
           common: true,
           ...Object.fromEntries(
-            selectedStreamValues.map((stream: any) => [
-              stream,
-              searchObj.data.stream.expandGroupRows[stream] &&
-              selectedStreamValues.length > 1
-                ? searchObj.data.stream.expandGroupRows[stream]
-                : selectedStreamValues.length > 1
-                ? false
-                : true,
-            ])
+            selectedStreamValues
+              .sort()
+              .map((stream: any) => [
+                stream,
+                searchObj.data.stream.expandGroupRows[stream] &&
+                selectedStreamValues.length > 1
+                  ? searchObj.data.stream.expandGroupRows[stream]
+                  : selectedStreamValues.length > 1
+                  ? false
+                  : true,
+              ])
+          ),
+        };
+        searchObj.data.stream.expandGroupRowsFieldCount = {
+          common: 0,
+          ...Object.fromEntries(
+            selectedStreamValues.sort().map((stream: any) => [stream, 0])
           ),
         };
 
@@ -2265,6 +2274,7 @@ const useLogs = () => {
               });
 
               schemaFields.push("dummylabel");
+              // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
             }
 
             userDefineSchemaSettings =
@@ -2332,6 +2342,7 @@ const useLogs = () => {
 
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
+            let UDSFieldCount = 0;
             for (const field of stream.schema) {
               fieldObj = {
                 ...field,
@@ -2367,8 +2378,18 @@ const useLogs = () => {
                     fieldObj.streams.push(
                       ...schemaMaps[schemaFieldsIndex].streams
                     );
+                    searchObj.data.stream.expandGroupRowsFieldCount[
+                      schemaMaps[schemaFieldsIndex].streams[0]
+                    ] =
+                      searchObj.data.stream.expandGroupRowsFieldCount[
+                        schemaMaps[schemaFieldsIndex].streams[0]
+                      ] - 1;
                     commonSchemaMaps.push(fieldObj);
                     commonSchemaFields.push(field.name);
+                    searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+                      searchObj.data.stream.expandGroupRowsFieldCount[
+                        "common"
+                      ] + 1;
 
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
@@ -2377,9 +2398,25 @@ const useLogs = () => {
                     commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                       stream.name
                     );
+                    // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+                    //   searchObj.data.stream.expandGroupRowsFieldCount[
+                    //     "common"
+                    //   ] + 1;
                   } else {
                     schemaMaps.push(fieldObj);
                     schemaFields.push(field.name);
+                    searchObj.data.stream.expandGroupRowsFieldCount[
+                      stream.name
+                    ] =
+                      searchObj.data.stream.expandGroupRowsFieldCount[
+                        stream.name
+                      ] + 1;
+                  }
+
+                  if (UDSFieldCount < userDefineSchemaSettings.length) {
+                    UDSFieldCount++;
+                  } else {
+                    break;
                   }
                 }
 
@@ -2396,8 +2433,18 @@ const useLogs = () => {
                   fieldObj.streams.push(
                     ...schemaMaps[schemaFieldsIndex].streams
                   );
+                  searchObj.data.stream.expandGroupRowsFieldCount[
+                    schemaMaps[schemaFieldsIndex].streams[0]
+                  ] =
+                    searchObj.data.stream.expandGroupRowsFieldCount[
+                      schemaMaps[schemaFieldsIndex].streams[0]
+                    ] - 1;
+
                   commonSchemaMaps.push(fieldObj);
                   commonSchemaFields.push(field.name);
+                  searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+                    searchObj.data.stream.expandGroupRowsFieldCount["common"] +
+                    1;
 
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
@@ -2406,9 +2453,16 @@ const useLogs = () => {
                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                     stream.name
                   );
+                  // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+                  //   searchObj.data.stream.expandGroupRowsFieldCount["common"] +
+                  //   1;
                 } else {
                   schemaMaps.push(fieldObj);
                   schemaFields.push(field.name);
+                  searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
+                    searchObj.data.stream.expandGroupRowsFieldCount[
+                      stream.name
+                    ] + 1;
                 }
               }
             }
@@ -2430,6 +2484,7 @@ const useLogs = () => {
               });
 
               commonSchemaFields.unshift("dummylabel");
+              // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
 
             // check for user defined schema is false then only consider checking new fields from result set

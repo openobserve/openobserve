@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
         :visible-columns="['name']"
-        :rows="searchObj.data.stream.selectedStreamFields"
+        :rows="streamFieldsRows"
         :row-key="(row) => searchObj.data.stream.selectedStream[0] + row.name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
@@ -78,11 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows-per-page-options="[]"
         :hide-bottom="
           (!store.state.zoConfig.user_defined_schemas_enabled ||
-          !searchObj.meta.hasUserDefinedSchemas) &&
-          searchObj.data.stream.selectedStreamFields != undefined &&
-          (searchObj.data.stream.selectedStreamFields.length <=
+            !searchObj.meta.hasUserDefinedSchemas) &&
+            streamFieldsRows != undefined &&
+          (streamFieldsRows.length <=
             pagination.rowsPerPage ||
-            searchObj.data.stream.selectedStreamFields.length == 0)
+            streamFieldsRows.length == 0)
         "
       >
         <template #body-cell-name="props">
@@ -99,8 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="field_list bg-grey-3"
               style="line-height: 28px; padding-left: 10px"
             >
-              {{ props.row.name }}
+              {{ props.row.name }} ({{ searchObj.data.stream.expandGroupRowsFieldCount[props.row.group] }})
               <q-icon
+                v-if="searchObj.data.stream.expandGroupRowsFieldCount[props.row.group] > 0"
                 :name="
                   searchObj.data.stream.expandGroupRows[props.row.group]
                     ? 'expand_less'
@@ -544,7 +545,12 @@ class="text-bold" style="opacity: 0.7">
               class="text-body2"
             >
               Total Fields:
-              {{ searchObj.data.stream.selectedStreamFields.length }}
+              {{
+                searchObj.data.stream.selectedStream.length > 1
+                  ? searchObj.data.stream.selectedStreamFields.length -
+                    (searchObj.data.stream.selectedStream.length + 1)
+                  : searchObj.data.stream.selectedStreamFields.length
+              }}
             </q-tooltip>
             <q-btn
               data-test="logs-page-fields-list-pagination-firstpage-button"
@@ -1039,7 +1045,7 @@ export default defineComponent({
           }
           if (field.streams.length > 0) {
             for (const selectedStream of field.streams) {
-              if(selectedStream != undefined) {
+              if (selectedStream != undefined) {
                 if (
                   localStreamFields[
                     searchObj.organizationIdetifier + "_" + selectedStream
@@ -1113,11 +1119,43 @@ export default defineComponent({
       userDefinedSchemaBtnGroupOption,
       pagination,
       toggleSchema,
-      pagesNumber: computed(() => {
-        return Math.ceil(
-          searchObj.data.stream.selectedStreamFields.length /
-            pagination.value.rowsPerPage
+      streamFieldsRows: computed(() => {
+        let expandKeys = Object.keys(
+          searchObj.data.stream.expandGroupRows
+        ).reverse();
+
+        let startIndex = 0;
+        // Iterate over the keys in reverse order
+        let selectedStreamFields = cloneDeep(
+          searchObj.data.stream.selectedStreamFields
         );
+        let count = 0;
+        // console.log(searchObj.data.stream.selectedStreamFields)
+        // console.log(searchObj.data.stream.expandGroupRows)
+        // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
+        for (let key of expandKeys) {
+          if (searchObj.data.stream.expandGroupRows[key] == false) {
+            startIndex =
+              selectedStreamFields.length -
+              searchObj.data.stream.expandGroupRowsFieldCount[key];
+            if (startIndex > 0) {
+              // console.log("startIndex", startIndex)
+              // console.log("count", count)
+              // console.log("selectedStreamFields", selectedStreamFields.length)
+              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
+              // console.log("========")
+              selectedStreamFields.splice(
+                startIndex-count,
+                searchObj.data.stream.expandGroupRowsFieldCount[key]
+              );
+            }
+          } else {
+            count += searchObj.data.stream.expandGroupRowsFieldCount[key];
+          }
+          count++;
+        }
+        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
+        return selectedStreamFields;
       }),
       formatLargeNumber,
       sortedStreamFields,
