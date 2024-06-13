@@ -79,9 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hide-bottom="
           (!store.state.zoConfig.user_defined_schemas_enabled ||
             !searchObj.meta.hasUserDefinedSchemas) &&
-            streamFieldsRows != undefined &&
-          (streamFieldsRows.length <=
-            pagination.rowsPerPage ||
+          streamFieldsRows != undefined &&
+          (streamFieldsRows.length <= pagination.rowsPerPage ||
             streamFieldsRows.length == 0)
         "
       >
@@ -99,9 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="field_list bg-grey-3"
               style="line-height: 28px; padding-left: 10px"
             >
-              {{ props.row.name }} ({{ searchObj.data.stream.expandGroupRowsFieldCount[props.row.group] }})
+              {{ props.row.name }} ({{
+                searchObj.data.stream.expandGroupRowsFieldCount[
+                  props.row.group
+                ]
+              }})
               <q-icon
-                v-if="searchObj.data.stream.expandGroupRowsFieldCount[props.row.group] > 0"
+                v-if="
+                  searchObj.data.stream.expandGroupRowsFieldCount[
+                    props.row.group
+                  ] > 0
+                "
                 :name="
                   searchObj.data.stream.expandGroupRows[props.row.group]
                 class="float-right"
@@ -994,10 +1001,18 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
+    let selectedFieldsName: any = [];
+    let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
       isInterestingField: boolean
     ) => {
+      if (selectedFieldsName.length == 0) {
+        selectedFieldsName = searchObj.data.stream.selectedStreamFields.map(
+          (item: any) => item.name
+        );
+      }
+      console.log(searchObj.data.stream.selectedStreamFields);
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
@@ -1007,6 +1022,14 @@ export default defineComponent({
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
 
           field.isInterestingField = !isInterestingField;
+          fieldIndex = selectedFieldsName.indexOf(field.name);
+          if (fieldIndex > -1) {
+            searchObj.data.stream.selectedStreamFields[
+              fieldIndex
+            ].isInterestingField = !isInterestingField;
+            fieldIndex = -1;
+          }
+          // searchObj.data.stream.selectedStreamFields[3].isInterestingField = !isInterestingField;
           const localInterestingFields: any = useLocalInterestingFields();
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
@@ -1035,6 +1058,14 @@ export default defineComponent({
           searchObj.data.stream.interestingFieldList.push(field.name);
           const localInterestingFields: any = useLocalInterestingFields();
           field.isInterestingField = !isInterestingField;
+          fieldIndex = selectedFieldsName.indexOf(field.name);
+          if (fieldIndex > -1) {
+            searchObj.data.stream.selectedStreamFields[
+              fieldIndex
+            ].isInterestingField = !isInterestingField;
+            fieldIndex = -1;
+          }
+
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
@@ -1141,7 +1172,7 @@ export default defineComponent({
               // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
               // console.log("========")
               selectedStreamFields.splice(
-                startIndex-count,
+                startIndex - count,
                 searchObj.data.stream.expandGroupRowsFieldCount[key]
               );
             }
