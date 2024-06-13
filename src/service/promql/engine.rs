@@ -132,23 +132,29 @@ impl Engine {
             }
             PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
             PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
-            PromExpr::VectorSelector(selector) => Ok(self.col_filters.0.extend(
-                selector
-                    .matchers
-                    .matchers
-                    .iter()
-                    .map(|mat| mat.name.to_owned()),
-            )),
+            PromExpr::VectorSelector(selector) => {
+                self.col_filters.0.extend(
+                    selector
+                        .matchers
+                        .matchers
+                        .iter()
+                        .map(|mat| mat.name.to_owned()),
+                );
+                Ok(())
+            }
             PromExpr::MatrixSelector(MatrixSelector {
                 vs: selector,
                 range: _,
-            }) => Ok(self.col_filters.0.extend(
-                selector
-                    .matchers
-                    .matchers
-                    .iter()
-                    .map(|mat| mat.name.to_owned()),
-            )),
+            }) => {
+                self.col_filters.0.extend(
+                    selector
+                        .matchers
+                        .matchers
+                        .iter()
+                        .map(|mat| mat.name.to_owned()),
+                );
+                Ok(())
+            }
             PromExpr::Call(Call { func: _, args }) => {
                 _ = args
                     .args
@@ -157,12 +163,10 @@ impl Engine {
                     .collect::<Vec<_>>();
                 Ok(())
             }
-            PromExpr::Extension(expr) => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Extension: {:?}",
-                    expr
-                )));
-            }
+            PromExpr::Extension(expr) => Err(DataFusionError::NotImplemented(format!(
+                "Unsupported Extension: {:?}",
+                expr
+            ))),
             _ => Ok(()),
         }
     }
@@ -1096,7 +1100,7 @@ async fn selector_load_data_from_datafusion(
                     .0
                     .iter()
                     .chain(
-                        vec![
+                        [
                             HASH_LABEL.to_string(),
                             config::get_config().common.column_timestamp.clone(),
                             VALUE_LABEL.to_string(),
@@ -1104,7 +1108,7 @@ async fn selector_load_data_from_datafusion(
                         .iter(),
                     )
                     .filter_map(|incl| {
-                        if schema.column_with_name(&incl).is_some() {
+                        if schema.column_with_name(incl).is_some() {
                             Some(col(incl))
                         } else {
                             None
