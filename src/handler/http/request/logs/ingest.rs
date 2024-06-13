@@ -71,6 +71,7 @@ pub struct KafkaIngestionResponse {
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse, example = json!({"request_id": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "error_message": "error processing request"})),
     )
 )]
+
 #[post("/{org_id}/_bulk")]
 pub async fn bulk(
     org_id: web::Path<String>,
@@ -80,13 +81,6 @@ pub async fn bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-
-    // Check if the request is coming from Kafka
-    if let Some(kafka_message) = in_req.headers().get("Kafka-Message") {
-        let kafka_payload = kafka_message.to_str().unwrap();
-        // Process the Kafka message here
-    }
-    
     Ok(
         match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
             Ok(v) => MetaHttpResponse::json(v),
