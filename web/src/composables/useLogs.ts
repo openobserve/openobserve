@@ -2433,9 +2433,11 @@ const useLogs = () => {
                 );
                 if (schemaFieldsIndex > -1) {
                   fieldObj.group = "common";
-                  fieldObj.streams.push(
-                    ...schemaMaps[schemaFieldsIndex].streams
-                  );
+                  if(schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") && schemaMaps[schemaFieldsIndex].streams.length > 0) {
+                    fieldObj.streams.push(
+                      ...schemaMaps[schemaFieldsIndex].streams
+                    );
+                  }
                   searchObj.data.stream.expandGroupRowsFieldCount[
                     schemaMaps[schemaFieldsIndex].streams[0]
                   ] =
