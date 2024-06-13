@@ -57,6 +57,7 @@ export function convertDashboardSchemaVersion(data: any) {
     return;
   }
   if (!data.version) data = { ...data, version: 1 };
+  console.log("convertDashboardSchemaVersion", data);
   switch (data.version) {
     case 1: {
       // Create a object with key as a panel id and value will be its layout.
@@ -106,6 +107,26 @@ export function convertDashboardSchemaVersion(data: any) {
 
       // update the version
       data.version = 3;
+      break;
+    }
+    case 3: {
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.queries.forEach((queryItem: any) => {
+            queryItem.type = panelItem.type;
+            if (queryItem.fields.x.length > 1 && queryItem.type != "table") {
+              queryItem.breakdown = queryItem.fields.x[1] ?? [];
+            }
+            queryItem.config.unit = panelItem.config.unit;
+            queryItem.config.unit_custom = panelItem.config.unit_custom;
+          });
+          delete panelItem.type;
+          delete panelItem.config.unit;
+          delete panelItem.config.unit_custom;
+        });
+      });
+      // update the version
+      data.version = 4;
       break;
     }
   }
