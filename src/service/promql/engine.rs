@@ -66,7 +66,7 @@ impl Engine {
     pub fn extract_columns_from_prom_expr(&mut self, prom_expr: &PromExpr) -> Result<()> {
         match prom_expr {
             PromExpr::Aggregate(AggregateExpr {
-                op: _,
+                op,
                 expr,
                 param,
                 modifier,
@@ -76,13 +76,20 @@ impl Engine {
                     self.extract_columns_from_prom_expr(expr)?;
                 }
                 if let Some(label_modifier) = modifier {
-                    match label_modifier {
-                        LabelModifier::Include(labels) => {
-                            self.col_filters.0.extend(labels.labels.iter().cloned());
+                    match op.id() {
+                        // topk and bottomk query all columns when with modifiers
+                        token::T_TOPK | token::T_BOTTOMK => {
+                            self.col_filters.0.clear();
+                            self.col_filters.1.clear();
                         }
-                        LabelModifier::Exclude(labels) => {
-                            self.col_filters.1.extend(labels.labels.iter().cloned());
-                        }
+                        _ => match label_modifier {
+                            LabelModifier::Include(labels) => {
+                                self.col_filters.0.extend(labels.labels.iter().cloned());
+                            }
+                            LabelModifier::Exclude(labels) => {
+                                self.col_filters.1.extend(labels.labels.iter().cloned());
+                            }
+                        },
                     }
                 }
                 Ok(())
