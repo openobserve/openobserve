@@ -22,7 +22,7 @@ COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /openobserve/target/release/
 
 # RUN cargo build --release
-RUN RUSTFLAGS='-C target-feature=+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build --profile release-prod --features mimalloc --target x86_64-unknown-linux-gnu
+RUN RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build --profile release-prod --features mimalloc --target x86_64-unknown-linux-gnu
 RUN mv /openobserve/target/x86_64-unknown-linux-gnu/release-prod/openobserve /openobserve/target/release/openobserve
 
 FROM gcr.io/distroless/cc-debian12 as runtime

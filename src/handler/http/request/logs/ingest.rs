@@ -52,23 +52,20 @@ use crate::{
 pub async fn bulk(
     org_id: web::Path<String>,
     body: web::Bytes,
-    thread_id: web::Data<usize>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(
-        match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => {
-                log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
+    Ok(match logs::bulk::ingest(&org_id, body, user_email).await {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => {
+            log::error!("Error processing request {org_id}/_bulk: {:?}", e);
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            ))
+        }
+    })
 }
 
 /// _multi ingestion API
@@ -93,7 +90,6 @@ pub async fn bulk(
 pub async fn multi(
     path: web::Path<(String, String)>,
     body: web::Bytes,
-    thread_id: web::Data<usize>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
@@ -103,7 +99,6 @@ pub async fn multi(
             &org_id,
             &stream_name,
             IngestionRequest::Multi(&body),
-            **thread_id,
             user_email,
         )
         .await
@@ -145,7 +140,6 @@ pub async fn multi(
 pub async fn json(
     path: web::Path<(String, String)>,
     body: web::Bytes,
-    thread_id: web::Data<usize>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
@@ -155,7 +149,6 @@ pub async fn json(
             &org_id,
             &stream_name,
             IngestionRequest::JSON(&body),
-            **thread_id,
             user_email,
         )
         .await
@@ -196,7 +189,6 @@ pub async fn json(
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
 pub async fn handle_kinesis_request(
     path: web::Path<(String, String)>,
-    thread_id: web::Data<usize>,
     post_data: web::Json<KinesisFHRequest>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
@@ -211,7 +203,6 @@ pub async fn handle_kinesis_request(
             &org_id,
             &stream_name,
             IngestionRequest::KinesisFH(&post_data.into_inner()),
-            **thread_id,
             user_email,
         )
         .await
@@ -236,7 +227,6 @@ pub async fn handle_kinesis_request(
 #[post("/{org_id}/{stream_name}/_sub")]
 pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
-    thread_id: web::Data<usize>,
     post_data: web::Json<GCPIngestionRequest>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
@@ -247,7 +237,6 @@ pub async fn handle_gcp_request(
             &org_id,
             &stream_name,
             IngestionRequest::GCP(&post_data.into_inner()),
-            **thread_id,
             user_email,
         )
         .await
@@ -278,7 +267,6 @@ pub async fn handle_gcp_request(
 #[post("/{org_id}/v1/logs")]
 pub async fn otlp_logs_write(
     org_id: web::Path<String>,
-    thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -291,10 +279,10 @@ pub async fn otlp_logs_write(
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");
-        logs_proto_handler(&org_id, **thread_id, body, in_stream_name, user_email).await
+        logs_proto_handler(&org_id, body, in_stream_name, user_email).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         // log::info!("otlp::logs_json_handler");
-        logs_json_handler(&org_id, **thread_id, body, in_stream_name, user_email).await
+        logs_json_handler(&org_id, body, in_stream_name, user_email).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),

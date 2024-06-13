@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::utils::schema_ext::SchemaExt;
@@ -22,63 +22,60 @@ use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
     partition::Partition,
-    rwmap::RwMap,
+    ReadRecordBatchEntry,
 };
 
 pub(crate) struct Stream {
-    partitions: RwMap<Arc<str>, Arc<Partition>>, // key: schema hash, val: partitions
+    partitions: BTreeMap<Arc<str>, Partition>, // key: schema hash, val: partitions
 }
 
 impl Stream {
     pub(crate) fn new() -> Self {
         Self {
-            partitions: RwMap::default(),
+            partitions: BTreeMap::default(),
         }
     }
 
-    pub(crate) async fn write(&self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
+    pub(crate) fn write(
+        &mut self,
+        schema: Arc<Schema>,
+        entry: Entry,
+        batch: Option<Arc<RecordBatchEntry>>,
+    ) -> Result<usize> {
         let mut arrow_size = 0;
-        let partition = self.partitions.read().await.get(&entry.stream).cloned();
-        let partition = match partition {
+        let partition = match self.partitions.get_mut(&entry.stream) {
             Some(v) => v,
             None => {
                 arrow_size += schema.size();
-                let mut w = self.partitions.write().await;
-                w.entry(entry.schema_key.clone())
-                    .or_insert_with(|| Arc::new(Partition::new(schema)))
-                    .clone()
+                self.partitions
+                    .entry(entry.schema_key.clone())
+                    .or_insert_with(|| Partition::new(schema))
             }
         };
-        arrow_size += partition.write(entry).await?;
+        arrow_size += partition.write(entry, batch)?;
         Ok(arrow_size)
     }
 
-    pub(crate) async fn read(
-        &self,
-        time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
-        let r = self.partitions.read().await;
-        let mut batches = Vec::with_capacity(r.len());
-        for partition in r.values() {
-            batches.push(partition.read(time_range).await?);
+    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<Vec<ReadRecordBatchEntry>> {
+        let mut batches = Vec::with_capacity(self.partitions.len());
+        for partition in self.partitions.values() {
+            batches.push(partition.read(time_range)?);
         }
-        drop(r);
         Ok(batches)
     }
 
     pub(crate) async fn persist(
         &self,
-        thread_id: usize,
+        idx: usize,
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::new();
-        let r = self.partitions.read().await;
-        for (_, partition) in r.iter() {
+        for (_, partition) in self.partitions.iter() {
             let (part_schema_size, partitions) = partition
-                .persist(thread_id, org_id, stream_type, stream_name)
+                .persist(idx, org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

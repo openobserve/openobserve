@@ -56,7 +56,6 @@ pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
     mut payload: Multipart,
-    thread_id: usize,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -217,8 +216,12 @@ pub async fn save_enrichment_data(
     );
 
     // write data to wal
-    let writer =
-        ingester::get_writer(thread_id, org_id, &StreamType::EnrichmentTables.to_string()).await;
+    let writer = ingester::get_writer(
+        org_id,
+        &StreamType::EnrichmentTables.to_string(),
+        stream_name,
+    )
+    .await;
     let mut req_stats = write_file(&writer, stream_name, buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

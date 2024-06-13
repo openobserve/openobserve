@@ -65,7 +65,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         }
     };
 
-    let thread_id = 0;
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
@@ -228,7 +227,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     distinct_values.extend(to_add_distinct_values);
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
     write_file(&writer, stream_name, buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

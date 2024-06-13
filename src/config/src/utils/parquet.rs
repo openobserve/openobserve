@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, io::Cursor, path::PathBuf, sync::Arc};
+use std::{
+    cmp::{max, min},
+    io::Cursor,
+    path::PathBuf,
+    sync::Arc,
+};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
@@ -44,8 +49,6 @@ pub fn new_parquet_writer<'a>(
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
         .set_compression(Compression::ZSTD(Default::default()))
-        .set_dictionary_enabled(true)
-        .set_encoding(Encoding::PLAIN)
         .set_column_dictionary_enabled(
             cfg.common.column_timestamp.as_str().into(),
             false,
@@ -69,8 +72,13 @@ pub fn new_parquet_writer<'a>(
     for field in full_text_search_fields.iter() {
         writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
     }
-    // Bloom filter stored by row_group, so if the num_rows can limit to row_group_size
-    let num_rows = min(metadata.records as u64, row_group_size as u64);
+    // Bloom filter stored by row_group, set NDV to reduce the memory usage.
+    // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
+    // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
+    let mut bf_ndv = min(metadata.records as u64, row_group_size as u64);
+    if bf_ndv > 1000 {
+        bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
+    }
     if cfg.common.bloom_filter_enabled {
         // if bloom_filter_on_all_fields is true, then use all string fields
         let fields = if cfg.common.bloom_filter_on_all_fields {
@@ -92,13 +100,10 @@ pub fn new_parquet_writer<'a>(
             fields
         };
         for field in fields {
-            if metadata.records > 0 {
-                writer_props =
-                    writer_props.set_column_bloom_filter_ndv(field.as_str().into(), num_rows);
-            }
             writer_props = writer_props
-                .set_column_dictionary_enabled(field.as_str().into(), false)
-                .set_column_bloom_filter_enabled(field.into(), true); // take the field ownership
+                .set_column_bloom_filter_enabled(field.as_str().into(), true)
+                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
+                .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
         }
     }
     let writer_props = writer_props.build();

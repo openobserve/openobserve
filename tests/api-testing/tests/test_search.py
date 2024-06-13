@@ -463,18 +463,8 @@ def test_e2e_sqlaggregationquery(create_session, base_url):
         resp_get_allsearch.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
     response_data = resp_get_allsearch.json()
-    # result = execute_sql_query(**query_params)
 
-    # # Perform assertions on the result
-    # assert isinstance(result, list)
-    # assert len(result) > 0
 
-    # for entry in result:
-    #     assert "_timestamp" in entry
-    #     assert "log_count" in entry
-    #     # Optionally, assert that "service_name" is present if available
-    #     if "service_name" in entry:
-    #         assert isinstance(entry["service_name"], str)
         
 
 def test_e2e_sqlgroupbytimestamp(create_session, base_url):
@@ -529,7 +519,149 @@ def test_e2e_sqlgroupbytimestampwithk8s(create_session, base_url):
         resp_get_allsearch.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
     response_data = resp_get_allsearch.json()
+
+
+
+def test_e2e_sqlcountaggregationquery(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT COUNT(_timestamp) AS xyz, _timestamp FROM \"stream_pytest_data\" GROUP BY _timestamp ORDER BY _timestamp DESC",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+
+
+    resp_get_countquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_countquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_countquery.status_code} {resp_get_countquery.content}"
+    response_data = resp_get_countquery.json()
+
+
+def test_e2e_sqlmatchquery(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT _timestamp, array_extract(regexp_match(log, '^[^\\]\n]*\\]\\s+(?P<httpMethod>\\w+)(?:[^/\n]*/){4}(?P<catalogApi>\\w+)(?:[^\n]* ){2}(?P<httpStatusCode>[^ ]+)\\s+(?P<apiPayloadSize>[^ ]+)\\s+(?P<responseTime>\\d+)'), 3) AS status FROM \"stream_pytest_data\" ORDER BY _timestamp DESC",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+        }
+
+    resp_get_matchquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_matchquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_matchquery.status_code} {resp_get_matchquery.content}"
+    response_data = resp_get_matchquery.json()
+
+
+def test_e2e_sqlmaxquery(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+  "query": {
+    "sql": "SELECT MAX(_timestamp) as latest_timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'",
+    "start_time": one_min_ago,
+    "end_time": end_time,
+    "from": 0,
+    "size": 250,
+    "quick_mode": False,
+    "sql_mode": "full"
+  }
+}
+    resp_get_maxquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_maxquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_maxquery.status_code} {resp_get_maxquery.content}"
+    response_data = resp_get_maxquery.json()
         
-   
+
+
+def test_e2e_inquery(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+  "query": {
+    "sql": "SELECT * FROM \"e2e_automate\" WHERE kubernetes_container_name IN ('controller', 'ziox') ORDER BY _timestamp DESC",
+    "start_time": one_min_ago,
+    "end_time": end_time,
+    "from": 0,
+    "size": 250,
+    "quick_mode": False,
+    "sql_mode": "full"
+  }
+}
+    resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_inquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
+    response_data = resp_get_inquery.json()
+
+
+def test_e2e_distinctquery(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT DISTINCT kubernetes_container_name, _timestamp FROM \"e2e_automate\" ORDER BY _timestamp",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False,
+            "sql_mode": "full"
+        }
+}
+    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_distinctquery.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+    response_data = resp_get_distinctquery.json()
+        
+
+
+        
 
 
