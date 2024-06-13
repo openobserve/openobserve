@@ -58,7 +58,6 @@ pub async fn usage_ingest(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
-    thread_id: usize,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -203,7 +202,7 @@ pub async fn usage_ingest(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
     let _req_stats = write_file(&writer, stream_name, buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
@@ -247,7 +246,6 @@ pub async fn usage_ingest(
 
 pub async fn handle_grpc_request(
     org_id: &str,
-    thread_id: usize,
     request: ExportLogsServiceRequest,
     is_grpc: bool,
     in_stream_name: Option<&str>,
@@ -503,7 +501,7 @@ pub async fn handle_grpc_request(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
     let mut req_stats = write_file(&writer, stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
@@ -585,7 +583,6 @@ mod tests {
     #[tokio::test]
     async fn test_handle_logs_request() {
         let org_id = "test_org_id";
-        let thread_id = 0;
 
         let log_rec = LogRecord {
             time_unix_nano: 1581452773000000789,
@@ -635,15 +632,8 @@ mod tests {
             resource_logs: vec![res_logs],
         };
 
-        let result = handle_grpc_request(
-            org_id,
-            thread_id,
-            request,
-            true,
-            Some("test_stream"),
-            "a@a.com",
-        )
-        .await;
+        let result =
+            handle_grpc_request(org_id, request, true, Some("test_stream"), "a@a.com").await;
         assert!(result.is_ok());
     }
 }

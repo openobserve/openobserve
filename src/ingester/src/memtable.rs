@@ -23,16 +23,17 @@ use std::{
 
 use arrow_schema::Schema;
 use config::metrics;
+use hashbrown::HashMap;
 
 use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::Result,
-    rwmap::RwMap,
     stream::Stream,
+    ReadRecordBatchEntry,
 };
 
 pub(crate) struct MemTable {
-    streams: RwMap<Arc<str>, Arc<Stream>>, // key: schema name, val: stream
+    streams: HashMap<Arc<str>, Stream>, // key: schema name, val: stream
     json_bytes_written: AtomicU64,
     arrow_bytes_written: AtomicU64,
 }
@@ -41,25 +42,27 @@ impl MemTable {
     pub(crate) fn new() -> Self {
         metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).inc();
         Self {
-            streams: RwMap::default(),
+            streams: HashMap::default(),
             json_bytes_written: AtomicU64::new(0),
             arrow_bytes_written: AtomicU64::new(0),
         }
     }
 
-    pub(crate) async fn write(&self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let partitions = self.streams.read().await.get(&entry.stream).cloned();
-        let partitions = match partitions {
+    pub(crate) fn write(
+        &mut self,
+        schema: Arc<Schema>,
+        entry: Entry,
+        batch: Option<Arc<RecordBatchEntry>>,
+    ) -> Result<()> {
+        let partitions = match self.streams.get_mut(&entry.stream) {
             Some(v) => v,
-            None => {
-                let mut w = self.streams.write().await;
-                w.entry(entry.stream.clone())
-                    .or_insert_with(|| Arc::new(Stream::new()))
-                    .clone()
-            }
+            None => self
+                .streams
+                .entry(entry.stream.clone())
+                .or_insert_with(Stream::new),
         };
         let json_size = entry.data_size;
-        let arrow_size = partitions.write(schema, entry).await?;
+        let arrow_size = partitions.write(schema, entry, batch)?;
         self.json_bytes_written
             .fetch_add(json_size as u64, Ordering::SeqCst);
         self.arrow_bytes_written
@@ -67,30 +70,28 @@ impl MemTable {
         Ok(())
     }
 
-    pub(crate) async fn read(
+    pub(crate) fn read(
         &self,
         stream_name: &str,
         time_range: Option<(i64, i64)>,
-    ) -> Result<Vec<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)>> {
-        let r = self.streams.read().await;
-        let Some(stream) = r.get(stream_name) else {
+    ) -> Result<Vec<ReadRecordBatchEntry>> {
+        let Some(stream) = self.streams.get(stream_name) else {
             return Ok(vec![]);
         };
-        stream.read(time_range).await
+        stream.read(time_range)
     }
 
     pub(crate) async fn persist(
         &self,
-        thread_id: usize,
+        idx: usize,
         org_id: &str,
         stream_type: &str,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
-        let mut paths = Vec::new();
-        let r = self.streams.read().await;
-        for (stream_name, stream) in r.iter() {
+        let mut paths = Vec::with_capacity(self.streams.len());
+        for (stream_name, stream) in self.streams.iter() {
             let (part_schema_size, partitions) = stream
-                .persist(thread_id, org_id, stream_type, stream_name)
+                .persist(idx, org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

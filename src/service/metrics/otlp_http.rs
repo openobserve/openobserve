@@ -58,11 +58,10 @@ const SERVICE: &str = "service";
 
 pub async fn metrics_proto_handler(
     org_id: &str,
-    thread_id: usize,
     body: web::Bytes,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = ExportMetricsServiceRequest::decode(body).expect("Invalid protobuf");
-    match handle_grpc_request(org_id, thread_id, request, false).await {
+    match handle_grpc_request(org_id, request, false).await {
         Ok(res) => Ok(res),
         Err(e) => {
             log::error!("error processing request: {}", e);
@@ -78,7 +77,6 @@ pub async fn metrics_proto_handler(
 
 pub async fn metrics_json_handler(
     org_id: &str,
-    thread_id: usize,
     body: web::Bytes,
 ) -> Result<HttpResponse, std::io::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -473,7 +471,6 @@ pub async fn metrics_json_handler(
 
     // write data to wal
     let time = start.elapsed().as_secs_f64();
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -492,7 +489,12 @@ pub async fn metrics_json_handler(
         }
 
         // write to file
+        let writer =
+            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
+        // if let Err(e) = writer.sync().await {
+        //     log::error!("ingestion error while syncing writer: {}", e);
+        // }
 
         req_stats.response_time += time;
         report_request_usage_stats(
@@ -524,9 +526,6 @@ pub async fn metrics_json_handler(
                 StreamType::Metrics.to_string().as_str(),
             ])
             .inc();
-    }
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd

@@ -837,7 +837,7 @@ const useLogs = () => {
   };
 
   const getQueryPartitions = async (queryReq: any) => {
-    try{
+    try {
       // const queryReq = buildSearch();
       searchObj.data.queryResults.hits = [];
       searchObj.data.histogram = {
@@ -930,7 +930,8 @@ const useLogs = () => {
               // searchObj.data.queryResults.total = res.data.records;
               const partitions = res.data.partitions;
 
-              searchObj.data.queryResults.partitionDetail.partitions = partitions;
+              searchObj.data.queryResults.partitionDetail.partitions =
+                partitions;
 
               let pageObject: any = [];
               // partitions.forEach((item: any, index: number) => {
@@ -1487,11 +1488,14 @@ const useLogs = () => {
 
       queryReq.query.track_total_hits = true;
       searchService
-        .search({
-          org_identifier: searchObj.organizationIdetifier,
-          query: queryReq,
-          page_type: searchObj.data.stream.streamType,
-        },"UI")
+        .search(
+          {
+            org_identifier: searchObj.organizationIdetifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+          },
+          "UI"
+        )
         .then(async (res) => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
@@ -1590,11 +1594,14 @@ const useLogs = () => {
       }
 
       searchService
-        .search({
-          org_identifier: searchObj.organizationIdetifier,
-          query: queryReq,
-          page_type: searchObj.data.stream.streamType,
-        },"UI")
+        .search(
+          {
+            org_identifier: searchObj.organizationIdetifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+          },
+          "UI"
+        )
         .then(async (res) => {
           searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly
@@ -1819,11 +1826,14 @@ const useLogs = () => {
         // }
 
         searchService
-          .search({
-            org_identifier: searchObj.organizationIdetifier,
-            query: queryReq,
-            page_type: searchObj.data.stream.streamType,
-          },"UI")
+          .search(
+            {
+              org_identifier: searchObj.organizationIdetifier,
+              query: queryReq,
+              page_type: searchObj.data.stream.streamType,
+            },
+            "UI"
+          )
           .then(async (res) => {
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
@@ -1956,6 +1966,7 @@ const useLogs = () => {
               const streamData: any = await loadStreamFileds(stream.name);
               const streamSchema: any = streamData.schema;
               if (streamSchema == undefined) {
+                searchObj.loadingStream = false;
                 searchObj.data.errorMsg = t("search.noFieldFound");
                 throw new Error(searchObj.data.errorMsg);
                 return;
@@ -2145,6 +2156,7 @@ const useLogs = () => {
         } milliseconds to complete`
       );
     } catch (e: any) {
+      searchObj.loadingStream = false;
       console.log("Error while extracting fields");
     }
   }
@@ -2171,35 +2183,39 @@ const useLogs = () => {
       searchObj.data.stream.selectedFields = selectedFields;
 
       const parsedSQL: any = fnParsedSQL();
-      if (
-        (searchObj.meta.sqlMode == true &&
-          parsedSQL.hasOwnProperty("columns") &&
-          hasTimeStampColumn(parsedSQL.columns)) ||
-        searchObj.data.stream.selectedFields.includes(
-          store.state.zoConfig.timestamp_column
-        )
-      ) {
-        searchObj.data.resultGrid.columns.push({
-          name: "@timestamp",
-          field: (row: any) =>
-            timestampToTimezoneDate(
-              row[store.state.zoConfig.timestamp_column] / 1000,
-              store.state.timezone,
-              "yyyy-MM-dd HH:mm:ss.SSS"
-            ),
-          prop: (row: any) =>
-            timestampToTimezoneDate(
-              row[store.state.zoConfig.timestamp_column] / 1000,
-              store.state.timezone,
-              "yyyy-MM-dd HH:mm:ss.SSS"
-            ),
-          label: t("search.timestamp") + ` (${store.state.timezone})`,
-          align: "left",
-          sortable: true,
-        });
-      }
+      
       if (searchObj.data.stream.selectedFields.length == 0) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
+
+        if (
+          (searchObj.meta.sqlMode == true &&
+            parsedSQL.hasOwnProperty("columns") &&
+            searchObj.data.queryResults?.hits[0].hasOwnProperty(store.state.zoConfig.timestamp_column)) ||
+          searchObj.meta.sqlMode == false ||
+          searchObj.data.stream.selectedFields.includes(
+            store.state.zoConfig.timestamp_column
+          )
+        ) {
+          searchObj.data.resultGrid.columns.push({
+            name: "@timestamp",
+            field: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS"
+              ),
+            prop: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS"
+              ),
+            label: t("search.timestamp") + ` (${store.state.timezone})`,
+            align: "left",
+            sortable: true,
+          });
+        }
+
         if (searchObj.data.stream.selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
             name: "source",
@@ -2213,26 +2229,53 @@ const useLogs = () => {
       } else {
         // searchObj.data.stream.selectedFields.forEach((field: any) => {
         for (const field of searchObj.data.stream.selectedFields) {
-          searchObj.data.resultGrid.columns.push({
-            name: field,
-            field: (row: { [x: string]: any; source: any }) => {
-              return byString(row, field);
-            },
-            prop: (row: { [x: string]: any; source: any }) => {
-              return byString(row, field);
-            },
-            label: field,
-            align: "left",
-            sortable: true,
-            closable: true,
-            showWrap: true,
-            wrapContent: false,
-          });
+          if (
+            (searchObj.meta.sqlMode == true &&
+              parsedSQL.hasOwnProperty("columns") &&
+              field == store.state.zoConfig.timestamp_column) ||
+            field == store.state.zoConfig.timestamp_column
+          ) {
+            searchObj.data.resultGrid.columns.unshift({
+              name: "@timestamp",
+              field: (row: any) =>
+                timestampToTimezoneDate(
+                  row[store.state.zoConfig.timestamp_column] / 1000,
+                  store.state.timezone,
+                  "yyyy-MM-dd HH:mm:ss.SSS"
+                ),
+              prop: (row: any) =>
+                timestampToTimezoneDate(
+                  row[store.state.zoConfig.timestamp_column] / 1000,
+                  store.state.timezone,
+                  "yyyy-MM-dd HH:mm:ss.SSS"
+                ),
+              label: t("search.timestamp") + ` (${store.state.timezone})`,
+              align: "left",
+              sortable: true,
+            });
+          } else {
+            searchObj.data.resultGrid.columns.push({
+              name: field,
+              field: (row: { [x: string]: any; source: any }) => {
+                return byString(row, field);
+              },
+              prop: (row: { [x: string]: any; source: any }) => {
+                return byString(row, field);
+              },
+              label: field,
+              align: "left",
+              sortable: true,
+              closable: true,
+              showWrap: true,
+              wrapContent: false,
+            });
+          }
         }
       }
       extractFTSFields();
       evaluateWrapContentFlag();
     } catch (e: any) {
+      searchObj.loadingStream = false;
       console.log("Error while updating grid columns");
     }
   };
@@ -2796,9 +2839,11 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields.length == 0
     ) {
       searchObj.loadingStream = false;
+      searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.errorMsg = t("search.noFieldFound");
       return;
     }
+
     const streamFieldNames: any =
       searchObj.data.stream.selectedStreamFields.map((item: any) => item.name);
 
@@ -2852,6 +2897,7 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
+
       extractFields();
       searchObj.loadingStream = false;
     }

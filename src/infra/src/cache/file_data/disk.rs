@@ -164,7 +164,13 @@ impl FileData {
                 self.choose_multi_dir(key.as_str()),
                 key
             );
-            fs::remove_file(&file_path).await?;
+            if let Err(e) = fs::remove_file(&file_path).await {
+                log::error!(
+                    "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                    file_path,
+                    e
+                );
+            }
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
             if columns[0] == "files" {

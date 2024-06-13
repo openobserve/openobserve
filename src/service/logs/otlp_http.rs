@@ -55,21 +55,13 @@ const SERVICE: &str = "service";
 
 pub async fn logs_proto_handler(
     org_id: &str,
-    thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
-    match super::otlp_grpc::handle_grpc_request(
-        org_id,
-        thread_id,
-        request,
-        false,
-        in_stream_name,
-        user_email,
-    )
-    .await
+    match super::otlp_grpc::handle_grpc_request(org_id, request, false, in_stream_name, user_email)
+        .await
     {
         Ok(res) => Ok(res),
         Err(e) => {
@@ -88,7 +80,6 @@ pub async fn logs_proto_handler(
 // otel collector handling json request for logs https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/plog/json.go
 pub async fn logs_json_handler(
     org_id: &str,
-    thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
@@ -438,7 +429,7 @@ pub async fn logs_json_handler(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
     let mut req_stats = write_file(&writer, stream_name, buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

@@ -57,7 +57,7 @@ pub async fn check_for_schema(
     stream_name: &str,
     stream_type: StreamType,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
-    record_val: Vec<&Map<String, Value>>,
+    record_vals: Vec<&Map<String, Value>>,
     record_ts: i64,
 ) -> Result<SchemaEvolution> {
     if !stream_schema_map.contains_key(stream_name) {
@@ -75,7 +75,7 @@ pub async fn check_for_schema(
     }
 
     // get infer schema
-    let value_iter = record_val.into_iter();
+    let value_iter = record_vals.into_iter();
     let inferred_schema = infer_json_schema_from_map(value_iter, stream_type)?;
 
     // fast path

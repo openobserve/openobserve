@@ -32,6 +32,7 @@ impl LogsService for LogsServer {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
+        let start = std::time::Instant::now();
         let (metadata, extensions, message) = request.into_parts();
 
         let cfg = config::get_config();
@@ -60,10 +61,28 @@ impl LogsService for LogsServer {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)
         });
-        client
+        match client
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
+            .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+            .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
             .export(request)
             .await
+        {
+            Ok(res) => {
+                if res.get_ref().partial_success.is_some() {
+                    log::error!(
+                        "[Router:LOGS] export partial_success response: {:?}",
+                        res.get_ref()
+                    );
+                }
+                Ok(res)
+            }
+            Err(e) => {
+                let time = start.elapsed().as_millis() as usize;
+                log::error!("[Router:LOGS] export status: {e}, took: {time} ms");
+                Err(e)
+            }
+        }
     }
 }
