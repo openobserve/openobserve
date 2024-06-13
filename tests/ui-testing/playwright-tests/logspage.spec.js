@@ -139,14 +139,14 @@ test.describe("Logs UI testcases", () => {
     await applyQueryButton(page);
 
 
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a:2');
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page
       .locator('[data-test="table-row-expand-menu"]')
       .first()
       .click({ force: true });
-    await expect(page.locator("text=a:2")).toBeVisible();
+    await expect(page.locator("text=.a=2")).toBeVisible();
     await expect(
       page.locator('[data-test="logs-search-result-logs-table"]')
     ).toBeVisible();

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{
@@ -30,12 +30,12 @@ use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
-    rwmap::RwMap,
+    ReadRecordBatchEntry,
 };
 
 pub(crate) struct Partition {
     schema: Arc<Schema>,
-    files: RwMap<Arc<str>, PartitionFile>, // key: hour, val: files
+    files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
 impl Partition {
@@ -45,34 +45,33 @@ impl Partition {
             .add(schema.size() as i64);
         Self {
             schema,
-            files: RwMap::default(),
+            files: BTreeMap::default(),
         }
     }
 
-    pub(crate) async fn write(&self, entry: Entry) -> Result<usize> {
-        let mut rw = self.files.write().await;
-        let partition = rw
+    pub(crate) fn write(
+        &mut self,
+        entry: Entry,
+        batch: Option<Arc<RecordBatchEntry>>,
+    ) -> Result<usize> {
+        let partition = self
+            .files
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
-        partition.write(self.schema.clone(), entry)
+        partition.write(batch)
     }
 
-    pub(crate) async fn read(
-        &self,
-        time_range: Option<(i64, i64)>,
-    ) -> Result<(Arc<Schema>, Vec<Arc<RecordBatchEntry>>)> {
-        let r = self.files.read().await;
-        let mut batches = Vec::with_capacity(r.len());
-        for file in r.values() {
+    pub(crate) fn read(&self, time_range: Option<(i64, i64)>) -> Result<ReadRecordBatchEntry> {
+        let mut batches = Vec::with_capacity(self.files.len());
+        for file in self.files.values() {
             batches.extend(file.read(time_range)?);
         }
-        drop(r);
         Ok((self.schema.clone(), batches))
     }
 
     pub(crate) async fn persist(
         &self,
-        thread_id: usize,
+        idx: usize,
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
@@ -84,10 +83,9 @@ impl Partition {
         path.push(org_id);
         path.push(stream_type);
         path.push(stream_name);
-        path.push(thread_id.to_string());
-        let r = self.files.read().await;
-        let mut paths = Vec::with_capacity(r.len());
-        for (hour, data) in r.iter() {
+        path.push(idx.to_string());
+        let mut paths = Vec::with_capacity(self.files.len());
+        for (hour, data) in self.files.iter() {
             if data.data.is_empty() {
                 continue;
             }
@@ -195,10 +193,11 @@ impl PartitionFile {
         Self { data: Vec::new() }
     }
 
-    fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
-        let Some(batch) = entry.into_batch(schema)? else {
+    fn write(&mut self, batch: Option<Arc<RecordBatchEntry>>) -> Result<usize> {
+        let Some(batch) = batch else {
             return Ok(0);
         };
+        let json_size = batch.data_json_size;
         let arrow_size = batch.data_arrow_size;
         self.data.push(batch);
         metrics::INGEST_MEMTABLE_ARROW_BYTES
@@ -206,7 +205,7 @@ impl PartitionFile {
             .add(arrow_size as i64);
         metrics::INGEST_MEMTABLE_BYTES
             .with_label_values(&[])
-            .add(entry.data_size as i64);
+            .add(json_size as i64);
         Ok(arrow_size)
     }
 

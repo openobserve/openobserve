@@ -507,10 +507,10 @@ mod tests {
         ];
         // gxhash hash
         let data = [
-            ["test", "node-q-8", "node-c-0"],
-            ["test1", "node-q-9", "node-c-1"],
-            ["test2", "node-q-9", "node-c-8"],
-            ["test3", "node-q-3", "node-c-7"],
+            ["test", "node-q-8", "node-c-8"],
+            ["test1", "node-q-4", "node-c-1"],
+            ["test2", "node-q-0", "node-c-2"],
+            ["test3", "node-q-7", "node-c-3"],
         ];
         for key in data {
             assert_eq!(

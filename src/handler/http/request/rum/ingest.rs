@@ -109,12 +109,11 @@ pub struct View {
 pub async fn data(
     path: web::Path<String>,
     body: web::Bytes,
-    thread_id: web::Data<usize>,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
     let org_id: String = path.into_inner();
     let extend_json = &rum_query_data.data;
-    ingest_multi_json(&org_id, RUM_DATA_STREAM, body, extend_json, **thread_id).await
+    ingest_multi_json(&org_id, RUM_DATA_STREAM, body, extend_json).await
 }
 
 /// Rum log ingestion API
@@ -138,12 +137,11 @@ pub async fn data(
 pub async fn log(
     path: web::Path<String>,
     body: web::Bytes,
-    thread_id: web::Data<usize>,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let extend_json = &rum_query_data.data;
-    ingest_multi_json(&org_id, RUM_LOG_STREAM, body, extend_json, **thread_id).await
+    ingest_multi_json(&org_id, RUM_LOG_STREAM, body, extend_json).await
 }
 
 /// Rum session-replay ingestion API
@@ -167,7 +165,6 @@ pub async fn log(
 pub async fn sessionreplay(
     path: web::Path<String>,
     payload: MultipartForm<SegmentEvent>,
-    thread_id: web::Data<usize>,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
@@ -189,14 +186,7 @@ pub async fn sessionreplay(
 
     let extend_json = &rum_query_data.data;
     let body = json::to_vec(&ingestion_payload).unwrap();
-    ingest_multi_json(
-        &org_id,
-        RUM_SESSION_REPLAY_STREAM,
-        body.into(),
-        extend_json,
-        **thread_id,
-    )
-    .await
+    ingest_multi_json(&org_id, RUM_SESSION_REPLAY_STREAM, body.into(), extend_json).await
 }
 
 async fn ingest_multi_json(
@@ -204,11 +194,9 @@ async fn ingest_multi_json(
     stream_name: &str,
     body: web::Bytes,
     extend_json: &HashMap<String, serde_json::Value>,
-    thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     Ok(
-        match logs::multi::ingest_with_keys(org_id, stream_name, body, extend_json, thread_id).await
-        {
+        match logs::multi::ingest_with_keys(org_id, stream_name, body, extend_json).await {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => MetaHttpResponse::bad_request(e),
         },

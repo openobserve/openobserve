@@ -47,7 +47,6 @@ impl MetricsService for Ingester {
 
         let resp = crate::service::metrics::otlp_grpc::handle_grpc_request(
             org_id.unwrap().to_str().unwrap(),
-            0,
             in_req,
             true,
         )
