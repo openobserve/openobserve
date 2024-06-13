@@ -77,6 +77,15 @@ use tonic::codec::CompressionEncoding;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::Registry;
 
+use rdkafka::config::ClientConfig;
+use rdkafka::consumer::{Consumer, StreamConsumer};
+use rdkafka::message::BorrowedMessage;
+use rdkafka::Message;
+use reqwest::Client;
+use serde_json::Value;
+use std::time::Duration;
+use tokio::time::sleep;
+
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -91,6 +100,15 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+
+    let brokers = "localhost:9092"; 
+    let group_id = "my_consumer_group"; 
+    let topics = vec!["logs"];
+    let api_url = "http://localhost:8080/1/_kafka";  // API endpoint for ingestion(taking org_id as 1)
+
+    let consumer = create_consumer(brokers, group_id, &topics).await;
+    consume_and_send_kafka_messages(consumer, api_url).await;
+
     let cfg = get_config();
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
@@ -282,6 +300,63 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+async fn create_consumer(brokers: &str, group_id: &str, topics: &[&str]) -> StreamConsumer {
+    let consumer: StreamConsumer = ClientConfig::new()
+        .set("bootstrap.servers", brokers)
+        .set("group.id", group_id)
+        .set("auto.offset.reset", "earliest")
+        .create()
+        .expect("Consumer creation failed");
+
+    consumer.subscribe(topics).expect("Can't subscribe to specified topics");
+
+    consumer
+}
+
+async fn consume_and_send_kafka_messages(consumer: StreamConsumer, api_url: &str) {
+    let client = Client::new();
+
+    loop {
+        let mut message_stream = consumer.stream();
+
+        while let Some(result) = message_stream.next().await {
+            match result {
+                Ok(borrowed_message) => {
+                    if let Some(payload) = borrowed_message.payload() {
+                        let log_data: serde_json::Value = serde_json::from_slice(payload).unwrap_or_else(|e| {
+                            eprintln!("Failed to deserialize Kafka message payload: {:?}", e);
+                            serde_json::Value::Null
+                        });
+
+                        if log_data != serde_json::Value::Null {
+                            let response = client.post(api_url)
+                                .json(&log_data)
+                                .send()
+                                .await;
+
+                            match response {
+                                Ok(resp) => {
+                                    if !resp.status().is_success() {
+                                        eprintln!("Failed to send message to API: {:?}", resp.status());
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error sending message to API: {:?}", e);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error while receiving from Kafka: {:?}", e);
+                }
+            }
+        }
+
+        sleep(Duration::from_secs(1)).await; // Avoid tight loop in case of errors
+    }
 }
 
 fn init_common_grpc_server(
