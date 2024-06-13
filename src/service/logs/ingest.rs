@@ -56,7 +56,6 @@ pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
     in_req: IngestionRequest<'_>,
-    thread_id: usize,
     user_email: &str,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
@@ -230,7 +229,7 @@ pub async fn ingest(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
     let mut req_stats = write_file(&writer, stream_name, write_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);

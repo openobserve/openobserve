@@ -17,6 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::utils::hash::Sum64;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -162,12 +163,13 @@ impl super::Db for MysqlDb {
         let (module, key1, key2) = super::parse_key(key);
         let lock_pool = CLIENT.clone();
         let lock_key = format!("get_for_update_{}", key);
+        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
         let lock_sql = format!(
             "SELECT GET_LOCK('{}', {})",
-            lock_key,
+            lock_id,
             config::get_config().limit.meta_transaction_lock_timeout
         );
-        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_key);
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
         let mut lock_tx = lock_pool.begin().await?;
         match sqlx::query_scalar::<_, i64>(&lock_sql)
             .fetch_one(&mut *lock_tx)

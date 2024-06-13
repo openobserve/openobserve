@@ -146,7 +146,7 @@ jobs:
 
       - name: Run cargo build
         if: contains(matrix.file_name, '-simd')
-        run: RUSTFLAGS='-C target-feature=+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
+        run: RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
         if: contains(matrix.arch, 'windows') == false

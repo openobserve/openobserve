@@ -44,24 +44,18 @@ use crate::{
     )
 )]
 #[post("/{org_id}/ingest/metrics/_json")]
-pub async fn json(
-    org_id: web::Path<String>,
-    body: web::Bytes,
-    thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
+pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    Ok(
-        match metrics::json::ingest(&org_id, body, **thread_id).await {
-            Ok(v) => HttpResponse::Ok().json(v),
-            Err(e) => {
-                log::error!("Error processing request {org_id}/metrics: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
-            }
-        },
-    )
+    Ok(match metrics::json::ingest(&org_id, body).await {
+        Ok(v) => HttpResponse::Ok().json(v),
+        Err(e) => {
+            log::error!("Error processing request {org_id}/metrics: {:?}", e);
+            HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            ))
+        }
+    })
 }
 
 /// MetricsIngest
@@ -78,7 +72,6 @@ pub async fn json(
 #[post("/{org_id}/v1/metrics")]
 pub async fn otlp_metrics_write(
     org_id: web::Path<String>,
-    thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -86,10 +79,10 @@ pub async fn otlp_metrics_write(
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::metrics_proto_handler");
-        metrics_proto_handler(&org_id, **thread_id, body).await
+        metrics_proto_handler(&org_id, body).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         // log::info!("otlp::metrics_json_handler");
-        metrics_json_handler(&org_id, **thread_id, body).await
+        metrics_json_handler(&org_id, body).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
