@@ -104,29 +104,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="hoveredFolder === tab.folderId"
                   class="hover-actions"
                 >
-                  <q-icon
-                    name="more_vert"
+                  <q-btn-dropdown
+                    dropdown-icon="more_vert"
+                    dense
+                    flat
+                    no-caps
                     class="q-ml-sm"
                     @click.stop="toggleActions"
                     style="cursor: pointer; justify-self: end"
                     data-test="dashboard-more-icon"
                   />
-                  <div v-if="showActions" class="action-icons">
-                    <q-icon
-                      :name="outlinedEdit"
-                      class="q-ml-sm"
-                      @click.stop="editFolder(tab.folderId)"
-                      style="cursor: pointer; justify-self: end"
-                      data-test="dashboard-edit-folder-icon"
-                    />
-                    <q-icon
-                      :name="outlinedDelete"
-                      class="q-ml-sm"
-                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                      style="cursor: pointer; justify-self: end"
-                      data-test="dashboard-delete-folder-icon"
-                    />
-                  </div>
+                  <q-menu v-model="showActions" class="action-icons">
+                    <q-list dense>
+                      <q-item
+                        clickable
+                        @click.stop="editFolder(tab.folderId)"
+                        data-test="dashboard-edit-folder-icon"
+                        ><q-item-section>
+                          <q-item-label class="q-pa-sm"
+                            >Edit Folder</q-item-label
+                          >
+                        </q-item-section></q-item
+                      >
+                      <q-item
+                        clickable
+                        @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                        data-test="dashboard-delete-folder-icon"
+                        ><q-item-section>
+                          <q-item-label class="q-pa-sm"
+                            >Delete Folder</q-item-label
+                          >
+                        </q-item-section></q-item
+                      >
+                    </q-list>
+                  </q-menu>
                 </div>
               </div>
             </q-tab>
@@ -497,13 +508,13 @@ export default defineComponent({
     );
     const hoveredFolder = ref(null);
     const showActions = ref(false);
-    
+
     const hoverFolder = (folderId) => {
       hoveredFolder.value = folderId;
     };
 
     const unhoverFolder = () => {
-      hoveredFolder.value = null;
+      // hoveredFolder.value = null;
     };
 
     const toggleActions = () => {
@@ -800,6 +811,8 @@ export default defineComponent({
 
 .action-icons {
   display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .q-table {
