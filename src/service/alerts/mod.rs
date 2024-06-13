@@ -639,7 +639,7 @@ impl Condition {
 async fn build_sql(alert: &Alert, conditions: &ConditionList) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
     let where_sql = conditions.to_sql(&schema).await
-    .map_err(|err| err.context(format!("on stream {}", &alert.stream_name)))?;
+    .map_err(|err| anyhow::anyhow!("Error building SQL on stream {}: {}", &alert.stream_name, err))?;
     if alert.query_condition.aggregation.is_none() {
         return Ok(format!(
             "SELECT * FROM \"{}\" WHERE {}",
