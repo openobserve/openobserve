@@ -46,7 +46,7 @@ pub(crate) static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// date_format function for datafusion
+/// arrsort function for datafusion
 pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     log::debug!("Inside arrsort");
     if args.len() != 1 {

@@ -30,10 +30,10 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
-/// The name of the date_format UDF given to DataFusion.
+/// The name of the arr_descending UDF given to DataFusion.
 pub const ARR_DESCENDING_UDF_NAME: &str = "arr_descending";
 
-/// Implementation of date_format
+/// Implementation of arr_descending
 pub(crate) static ARR_DESCENDING_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_DESCENDING_UDF_NAME,
@@ -46,7 +46,7 @@ pub(crate) static ARR_DESCENDING_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// date_format function for datafusion
+/// arr_descending function for datafusion
 pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     log::debug!("Inside arr_descending");
     if args.len() != 1 {
@@ -58,8 +58,8 @@ pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<
     let args = ColumnarValue::values_to_arrays(args)?;
     log::debug!("Got the args: {:#?}", args);
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
+    // 1. cast the argument to Union. This cast MUST be aligned with the signature or this function
+    //    panics!
     let arr_field = as_string_array(&args[0]).expect("cast failed");
 
     // 2. perform the computation
@@ -92,7 +92,7 @@ pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<
                     desc_arrs.append(&mut field1);
                 }
                 let desc_arrs =
-                    json::to_string(&desc_arrs).expect("Failed to stringify descending arrs");
+                    json::to_string(&desc_arrs).expect("Failed to stringify descending array");
                 Some(desc_arrs)
             } else {
                 None

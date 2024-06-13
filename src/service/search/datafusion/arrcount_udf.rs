@@ -28,10 +28,10 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
-/// The name of the date_format UDF given to DataFusion.
+/// The name of the arrcount UDF given to DataFusion.
 pub const ARR_COUNT_UDF_NAME: &str = "arrcount";
 
-/// Implementation of date_format
+/// Implementation of arrcount
 pub(crate) static ARR_COUNT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_COUNT_UDF_NAME,
@@ -44,7 +44,7 @@ pub(crate) static ARR_COUNT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// date_format function for datafusion
+/// arrcount function for datafusion
 pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     log::debug!("Inside arrcount");
     if args.len() != 1 {
@@ -56,8 +56,8 @@ pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     let args = ColumnarValue::values_to_arrays(args)?;
     log::debug!("Got the args: {:#?}", args);
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
+    // 1. cast the argument to Union. This cast MUST be aligned with the signature or this function
+    //    panics!
     let arr_field = as_string_array(&args[0]).expect("cast failed");
 
     // 2. perform the computation
@@ -66,7 +66,7 @@ pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
         .map(|arr_field| {
             match arr_field {
                 // in arrow, any value can be null.
-                // Here we decide to make our UDF to return null when either argument is null.
+                // Here we decide to make our UDF to return 0 when the argument is null.
                 Some(arr_field) => {
                     let arr_field: json::Value =
                         json::from_str(arr_field).expect("Failed to deserialize arrzip field1");
