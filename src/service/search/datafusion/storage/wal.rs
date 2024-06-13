@@ -20,10 +20,9 @@ use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use infra::storage;
 use object_store::{
-    path::Path, GetOptions, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore,
-    PutOptions, PutResult, Result,
+    path::Path, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
 };
-use tokio::io::AsyncWrite;
 
 /// File system for local wal
 #[derive(Debug, Default)]
@@ -99,24 +98,25 @@ impl ObjectStore for FS {
     async fn put_opts(
         &self,
         location: &Path,
-        _bytes: Bytes,
+        _payload: PutPayload,
         _opts: PutOptions,
     ) -> Result<PutResult> {
         log::error!("NotImplemented put_opts: {}", location);
         Err(object_store::Error::NotImplemented {})
     }
 
-    async fn put_multipart(
-        &self,
-        location: &Path,
-    ) -> Result<(MultipartId, Box<dyn AsyncWrite + Unpin + Send>)> {
+    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart: {}", location);
-        Err(object_store::Error::NotImplemented {})
+        Err(object_store::Error::NotImplemented)
     }
 
-    async fn abort_multipart(&self, location: &Path, _multipart_id: &MultipartId) -> Result<()> {
-        log::error!("NotImplemented abort_multipart: {}", location);
-        Err(object_store::Error::NotImplemented {})
+    async fn put_multipart_opts(
+        &self,
+        location: &Path,
+        _opts: PutMultipartOpts,
+    ) -> Result<Box<dyn MultipartUpload>> {
+        log::error!("NotImplemented put_multipart_opts: {}", location);
+        Err(object_store::Error::NotImplemented)
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {
