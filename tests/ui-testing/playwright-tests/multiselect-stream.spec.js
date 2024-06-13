@@ -32,35 +32,6 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
     .click({ force: true });
 };
 
-const getHeaders = () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  return {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-};
-
-const getIngestionUrl = (orgId, streamName) => {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-};
-
-const sendRequest = async (page, url, payload, headers) => {
-  return await page.evaluate(
-    async ({ url, headers, payload }) => {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-      });
-      return await response.json();
-    },
-    { url, headers, payload }
-  );
-};
-
 test.describe("Stream multiselect testcases", () => {
   function removeUTFCharacters(text) {
     return text.replace(/[^\x00-\x7F]/g, " ");
@@ -81,20 +52,37 @@ test.describe("Stream multiselect testcases", () => {
 
     const orgId = process.env["ORGNAME"];
     const streamNames = ["e2e_automate", "e2e_stream1"];
-    const headers = getHeaders();
+    const basicAuthCredentials = Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString("base64");
+
+    const headers = {
+      Authorization: `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
 
     for (const streamName of streamNames) {
-      const ingestionUrl = getIngestionUrl(orgId, streamName);
+      const response = await page.evaluate(
+        async ({ url, headers, orgId, streamName, logsdata }) => {
+          const fetchResponse = await fetch(
+            `${url}/api/${orgId}/${streamName}/_json`,
+            {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify(logsdata),
+            }
+          );
+          return await fetchResponse.json();
+        },
+        {
+          url: process.env.INGESTION_URL,
+          headers: headers,
+          orgId: orgId,
+          streamName: streamName,
+          logsdata: logsdata,
+        }
+      );
 
-      // Payload data
-      const payload = {
-        level: "info",
-        job: "test",
-        log: "test message for openobserve",
-        e2e: "1",
-      };
-
-      const response = await sendRequest(page, ingestionUrl, payload, headers);
       console.log(`Response from ${streamName}:`, response);
     }
 
@@ -107,14 +95,13 @@ test.describe("Stream multiselect testcases", () => {
   });
 
 
+
 async function multistreamselect(page) {
     await page.locator('[data-test="menu-link-\\/-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_stream1');
-    await page.waitForTimeout(4000);
-  await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
-    await page.getByRole('cell', { name: 'Common Group Fields (40)' }).click();
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_stream');
+    await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click();
+    await page.getByRole('cell', { name: 'Common Group Fields (38)' }).click();
     await page.getByRole('cell', { name: 'E2e_automate (13)' }).click();
     await page.getByRole('cell', { name: 'E2e_stream1 (0)' }).click();
     await page.getByRole('cell', { name: 'E2e_stream1 (0)' }).click();
@@ -130,7 +117,7 @@ async function multistreamselect(page) {
   test("should add a function and display it in streams", async ({ page }) => {
 await multistreamselect(page);
 await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.a=2');
-await page.waitForTimeout(1000);
+    await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page
       .locator('[data-test="table-row-expand-menu"]')
