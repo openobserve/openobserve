@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt::Formatter;
 use config::{meta::stream::StreamType, utils::json::Value};
 use hashbrown::HashMap;
-use serde::{Deserialize, Deserializer, Serialize};
-use serde::de::{Error, MapAccess, SeqAccess, Visitor};
-use serde::de::value::MapAccessDeserializer;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod destinations;
@@ -121,102 +118,17 @@ pub struct QueryCondition {
     pub aggregation: Option<Aggregation>,
 }
 
-#[derive(Clone, Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(untagged)]
 pub enum ConditionList {
-    OrNode(Vec<ConditionList>),
-    AndNode(Vec<ConditionList>),
-    NotNode(Box<ConditionList>),
-    EndNode(Condition)
-}
-
-impl<'de> Deserialize<'de> for ConditionList {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        enum Field {
-            Or,
-            And,
-            Not,
-            End,
-        }
-
-        impl<'de> Deserialize<'de> for Field {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-                struct FieldVisitor;
-
-                impl<'de> Visitor<'de> for FieldVisitor {
-                    type Value = Field;
-
-                    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-                        formatter.write_str("'or', 'and', 'not' or a condition expected")
-                    }
-
-                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: Error {
-                        match dbg!(v) {
-                            "or" => Ok(Field::Or),
-                            "and" => Ok(Field::And),
-                            "not" => Ok(Field::Not),
-                            _ => Ok(Field::End),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_identifier(FieldVisitor)
-            }
-        }
-
-        struct ConditionListVisitor;
-
-        impl<'de> Visitor<'de> for ConditionListVisitor {
-            type Value = ConditionList;
-            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-                formatter.write_str("a condition list")
-            }
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: Error {
-                Ok(ConditionList::EndNode(serde_json::from_str::<Condition>(v).map_err(Error::custom)?))
-            }
-
-            fn visit_seq<V>(self, mut seq: V) -> Result<ConditionList, V::Error>
-                where
-                    V: SeqAccess<'de>,
-            {
-                println!("sahi");
-                let mut vec = Vec::new();
-                while let Some(element) = seq.next_element::<Condition>()? {
-                    vec.push(ConditionList::EndNode(element));
-                }
-                Ok(ConditionList::AndNode(vec))
-            }
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error> where A: MapAccess<'de> {
-                if let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Or => {
-                            println!("or");
-                            let values: Vec<ConditionList> = map.next_value()?;
-                            Ok(ConditionList::OrNode(values))
-                        }
-                        Field::And => {
-                            println!("and");
-                            let values: Vec<ConditionList> = dbg!(map.next_value()?);
-                            Ok(ConditionList::AndNode(values))
-                        }
-                        Field::Not => {
-                            println!("not");
-                            let value: ConditionList = map.next_value()?;
-                            Ok(ConditionList::NotNode(Box::new(value)))
-                        }
-                        Field::End => {
-                            println!("end");
-                            let condition: Condition = Condition::deserialize(MapAccessDeserializer::new(map))?;
-                            Ok(ConditionList::EndNode(condition))
-                        },
-                    }
-                } else {
-                    Err(Error::custom("Expected a key"))
-                }
-            }
-        }
-
-        dbg!(deserializer.deserialize_any(ConditionListVisitor))
-    }
+    OrNode{or: Vec<ConditionList>},
+    AndNode{and: Vec<ConditionList>},
+    NotNode{not: Box<ConditionList>},
+    /// This is a variant to handle back compat cases where
+    /// conditions were stored as Vec<Condition> and interpreted
+    /// as a list of conditions joined with AND operator(default)
+    LegacyConditions(Vec<ConditionList>),
+    EndCondition(Condition)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -387,8 +299,8 @@ mod test {
             "ignore_case": false
         }
         ]"#;
-        let condition_list: ConditionList = serde_json::from_str(backcompat_condition_list).unwrap();
-        println!("{:?}", condition_list);
+        let expected_legacy_condition_list: ConditionList = serde_json::from_str(backcompat_condition_list).unwrap();
+        println!("{:?}", legacy_condition_list);
     }
 
     #[test]
@@ -408,7 +320,39 @@ mod test {
             "ignore_case": false
         }
         ]}"#;
-        let condition_list: ConditionList = serde_json::from_str(and_condition_list).unwrap();
+        let expected_and_condition_list: ConditionList = serde_json::from_str(and_condition_list).unwrap();
         println!("{:?}", condition_list);
+    }
+
+    #[test]
+    fn test_deserialize_complex_condition_list() {
+        let complex_condition_list = r#"{
+        "or": [
+            {
+                "and": [
+                    {
+                        "column": "column1",
+                        "operator": "=",
+                        "value": "value1",
+                        "ignore_case": true
+                    },
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error",
+                        "ignore_case": false
+                    }
+                ]
+            },
+            {
+                "column": "column3",
+                "operator": ">",
+                "value": "value3"
+                "ignore_case": false
+            }
+        ]
+        }"#;
+        let expected_complex_condition_list: ConditionList = serde_json::from_str(complex_condition_list).unwrap();
+        println!("{:?}", expected_complex_condition_list);
     }
 }

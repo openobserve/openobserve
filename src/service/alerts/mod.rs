@@ -491,25 +491,25 @@ impl ConditionList {
     #[async_recursion::async_recursion]
     pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         match self {
-            ConditionList::OrNode(conditions) => {
+            ConditionList::OrNode { or: conditions} => {
                 let mut eval = false;
                 for condition in conditions {
                     eval = eval || condition.evaluate(row).await
                 }
                 eval
             }
-            ConditionList::AndNode(conditions) => {
+            ConditionList::AndNode{ and: conditions } | ConditionList::LegacyConditions(conditions) => {
                 let mut eval = false;
                 for condition in conditions {
                     eval = eval && condition.evaluate(row).await
                 }
                 eval
             }
-            ConditionList::NotNode(node) => {
-                !node.evaluate(row).await
+            ConditionList::NotNode{ not: conditions } => {
+                !conditions.evaluate(row).await
             }
-            ConditionList::EndNode(node) => {
-                node.evaluate(row).await
+            ConditionList::EndCondition(condition) => {
+                condition.evaluate(row).await
             }
         }
     }
@@ -518,16 +518,17 @@ impl ConditionList {
     #[async_recursion::async_recursion]
     pub async fn len(&self) -> u32 {
         match self {
-            ConditionList::OrNode(conditions) |
-            ConditionList::AndNode(conditions) => {
+            ConditionList::OrNode{ or: conditions} |
+            ConditionList::LegacyConditions(conditions) |
+            ConditionList::AndNode{ and: conditions} => {
                 let mut count = 0;
                 for condition in conditions.iter() {
                     count += condition.len().await
                 }
                 count
             }
-            ConditionList::NotNode(inner) => inner.len().await,
-            ConditionList::EndNode(_) => 1
+            ConditionList::NotNode{ not: inner } => inner.len().await,
+            ConditionList::EndCondition(_) => 1
         }
     }
 
@@ -535,24 +536,25 @@ impl ConditionList {
     #[async_recursion::async_recursion]
     pub async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
         match self {
-            ConditionList::OrNode(conditions) => {
+            ConditionList::OrNode{or:conditions} => {
                 let mut cond_sql_list = Vec::new();
                 for condition in conditions.iter() {
                     cond_sql_list.push(condition.to_sql(schema).await?);
                 }
-                Ok(cond_sql_list.join(" OR "))
+                Ok(format!("({})",cond_sql_list.join(" OR ")))
             }
-            ConditionList::AndNode(conditions) => {
+            ConditionList::LegacyConditions(conditions) |
+            ConditionList::AndNode{and:conditions} => {
                 let mut cond_sql_list = Vec::new();
                 for condition in conditions.iter() {
                     cond_sql_list.push(condition.to_sql(schema).await?);
                 }
-                Ok(cond_sql_list.join(" AND "))
+                Ok(format!("({})",cond_sql_list.join(" AND ")))
             }
-            ConditionList::NotNode(inner) => {
+            ConditionList::NotNode{not:inner} => {
                 Ok(format!("NOT ({})", inner.to_sql(schema).await?))
             }
-            ConditionList::EndNode(node) => {
+            ConditionList::EndCondition(node) => {
                 let data_type = match schema.field_with_name(&node.column) {
                     Ok(field) => field.data_type(),
                     Err(_) => {
