@@ -109,12 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     props.row.group
                   ] > 0
                 "
-                size="20px"
                 :name="
                   searchObj.data.stream.expandGroupRows[props.row.group]
                     ? 'expand_less'
                     : 'expand_more'
                 "
+                size="20px"
                 class="float-right q-mt-xs"
               ></q-icon>
             </q-td>
