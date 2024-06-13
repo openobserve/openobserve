@@ -2592,7 +2592,7 @@ const useLogs = () => {
       );
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while extracting fields");
+      console.log("Error while extracting fields", e);
     }
   }
 
