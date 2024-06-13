@@ -638,34 +638,11 @@ impl Condition {
 
 async fn build_sql(alert: &Alert, conditions: &ConditionList) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
-    #[allow(unused_doc_comments)]
-    /**
-    let mut wheres = Vec::with_capacity(conditions.len());
-    for cond in conditions.iter() {
-        let data_type = match schema.field_with_name(&cond.column) {
-            Ok(field) => field.data_type(),
-            Err(_) => {
-                return Err(anyhow::anyhow!(
-                    "Column {} not found on stream {}",
-                    &cond.column,
-                    &alert.stream_name
-                ));
-            }
-        };
-        let expr = build_expr(cond, "", data_type)?;
-        wheres.push(expr);
-    }
-    let where_sql = if !wheres.is_empty() {
-        format!("WHERE {}", wheres.join(" AND "))
-    } else {
-        String::new()
-    };
-    **/
     let where_sql = conditions.to_sql(&schema).await
     .map_err(|err| err.context(format!("on stream {}", &alert.stream_name)))?;
     if alert.query_condition.aggregation.is_none() {
         return Ok(format!(
-            "SELECT * FROM \"{}\" {}",
+            "SELECT * FROM \"{}\" WHERE {}",
             alert.stream_name, where_sql
         ));
     }
@@ -1295,7 +1272,7 @@ async fn process_dest_template(
         }
     }
 
-    dbg!(resp)
+    resp
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue) {
