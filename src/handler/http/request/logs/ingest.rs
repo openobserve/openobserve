@@ -82,7 +82,7 @@ pub async fn bulk(
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
-        match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
+        match logs::bulk::ingest(&org_id, body, user_email).await {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request {org_id}/_bulk: {:?}", e);
@@ -129,7 +129,6 @@ pub async fn multi(
             &org_id,
             &stream_name,
             IngestionRequest::Multi(&body),
-            **thread_id,
             user_email,
         )
         .await
@@ -181,7 +180,6 @@ pub async fn json(
             &org_id,
             &stream_name,
             IngestionRequest::JSON(&body),
-            **thread_id,
             user_email,
         )
         .await
@@ -237,7 +235,6 @@ pub async fn handle_kinesis_request(
             &org_id,
             &stream_name,
             IngestionRequest::KinesisFH(&post_data.into_inner()),
-            **thread_id,
             user_email,
         )
         .await
@@ -273,7 +270,6 @@ pub async fn handle_gcp_request(
             &org_id,
             &stream_name,
             IngestionRequest::GCP(&post_data.into_inner()),
-            **thread_id,
             user_email,
         )
         .await
@@ -317,10 +313,10 @@ pub async fn otlp_logs_write(
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");
-        logs_proto_handler(&org_id, **thread_id, body, in_stream_name, user_email).await
+        logs_proto_handler(&org_id, body, in_stream_name, user_email).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         // log::info!("otlp::logs_json_handler");
-        logs_json_handler(&org_id, **thread_id, body, in_stream_name, user_email).await
+        logs_json_handler(&org_id, body, in_stream_name, user_email).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
@@ -349,7 +345,6 @@ pub async fn handle_kafka_request(
             &org_id,
             &topic,
             IngestionRequest::Kafka(&post_data.into_inner()),
-            **thread_id,
             user_email,
         )
         .await
