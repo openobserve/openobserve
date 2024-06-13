@@ -344,7 +344,7 @@ pub async fn handle_kafka_request(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    let request_id = post_data.key.clone(); // Assuming the key can be used as a request ID
+    let request_id = post_data.key.clone(); // the key can be used as a request ID
     let request_time = Utc::now().timestamp_millis();
 
     // Clone the topic to avoid borrowing issues
