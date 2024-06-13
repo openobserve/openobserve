@@ -28,6 +28,8 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
+use crate::service::search::datafusion::stringify_json_value;
+
 /// The name of the arrzip UDF given to DataFusion.
 pub const ARR_ZIP_UDF_NAME: &str = "arrzip";
 
@@ -81,42 +83,8 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
                     {
                         // Field1 and field2 can be of different types
                         zip(field1.iter(), field2.iter()).for_each(|(field1, field2)| {
-                            let field1 = if field1.is_boolean() {
-                                let field1 = field1.as_bool().unwrap();
-                                field1.to_string()
-                            } else if field1.is_f64() {
-                                let field1 = field1.as_f64().unwrap();
-                                field1.to_string()
-                            } else if field1.is_i64() {
-                                let field1 = field1.as_i64().unwrap();
-                                field1.to_string()
-                            } else if field1.is_u64() {
-                                let field1 = field1.as_u64().unwrap();
-                                field1.to_string()
-                            } else if field1.is_string() {
-                                let field1 = field1.as_str().unwrap();
-                                field1.to_string()
-                            } else {
-                                "".to_string()
-                            };
-                            let field2 = if field2.is_boolean() {
-                                let field2 = field2.as_bool().unwrap();
-                                field2.to_string()
-                            } else if field2.is_f64() {
-                                let field2 = field2.as_f64().unwrap();
-                                field2.to_string()
-                            } else if field2.is_i64() {
-                                let field2 = field2.as_i64().unwrap();
-                                field2.to_string()
-                            } else if field2.is_u64() {
-                                let field2 = field2.as_u64().unwrap();
-                                field2.to_string()
-                            } else if field2.is_string() {
-                                let field2 = field2.as_str().unwrap();
-                                field2.to_string()
-                            } else {
-                                "".to_string()
-                            };
+                            let field1 = stringify_json_value(field1);
+                            let field2 = stringify_json_value(field2);
 
                             zipped_arrs.push(format!("{field1}{delim}{field2}"));
                         });

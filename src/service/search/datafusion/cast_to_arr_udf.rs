@@ -29,6 +29,8 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
+use crate::service::search::datafusion::stringify_json_value;
+
 /// The name of the cast_to_arr UDF given to DataFusion.
 pub const CAST_TO_ARR_UDF_NAME: &str = "cast_to_arr";
 
@@ -72,24 +74,7 @@ pub fn cast_to_arr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Col
                 json::from_str(string).expect("Failed to deserialize the field into an array");
             if let json::Value::Array(arr) = arr {
                 arr.iter().for_each(|field| {
-                    let field = if field.is_boolean() {
-                        let field = field.as_bool().unwrap();
-                        field.to_string()
-                    } else if field.is_f64() {
-                        let field = field.as_f64().unwrap();
-                        field.to_string()
-                    } else if field.is_i64() {
-                        let field = field.as_i64().unwrap();
-                        field.to_string()
-                    } else if field.is_u64() {
-                        let field = field.as_u64().unwrap();
-                        field.to_string()
-                    } else if field.is_string() {
-                        let field = field.as_str().unwrap();
-                        field.to_string()
-                    } else {
-                        json::to_string(field).expect("failed to stringify json field")
-                    };
+                    let field = stringify_json_value(field);
                     if !field.is_empty() {
                         list_builder.values().append_value(field);
                     }

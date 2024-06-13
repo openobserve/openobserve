@@ -28,6 +28,8 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
+use crate::service::search::datafusion::stringify_json_value;
+
 /// The name of the arrjoin UDF given to DataFusion.
 pub const SPATH_UDF_NAME: &str = "spath";
 
@@ -86,24 +88,7 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
                         }
                     }
                     if found {
-                        let field = if field.is_boolean() {
-                            let field = field.as_bool().unwrap();
-                            field.to_string()
-                        } else if field.is_f64() {
-                            let field = field.as_f64().unwrap();
-                            field.to_string()
-                        } else if field.is_i64() {
-                            let field = field.as_i64().unwrap();
-                            field.to_string()
-                        } else if field.is_u64() {
-                            let field = field.as_u64().unwrap();
-                            field.to_string()
-                        } else if field.is_string() {
-                            let field = field.as_str().unwrap();
-                            field.to_string()
-                        } else {
-                            json::to_string(&field).expect("failed to stringify json field")
-                        };
+                        let field = stringify_json_value(&field);
                         Some(field)
                     } else {
                         None

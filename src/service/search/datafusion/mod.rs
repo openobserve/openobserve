@@ -15,6 +15,8 @@
 
 use std::str::FromStr;
 
+use config::utils::json;
+
 use crate::common::meta::functions::ZoFunction;
 
 pub mod arr_descending_udf;
@@ -63,6 +65,18 @@ pub const MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
 pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
 /// The name of the not_regex_match UDF given to DataFusion.
 pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
+
+pub fn stringify_json_value(field: &json::Value) -> String {
+    match field {
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => match n.as_f64() {
+            Some(f) => f.to_string(),
+            None => n.as_i64().unwrap().to_string(),
+        },
+        serde_json::Value::String(s) => s.clone(),
+        _ => json::to_string(field).expect("failed to stringify json field"),
+    }
+}
 
 pub const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
     ZoFunction {

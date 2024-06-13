@@ -28,6 +28,8 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
+use crate::service::search::datafusion::stringify_json_value;
+
 /// The name of the arrjoin UDF given to DataFusion.
 pub const ARR_JOIN_UDF_NAME: &str = "arrjoin";
 
@@ -72,26 +74,9 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
                         json::from_str(arr_field1).expect("Failed to deserialize arrzip field1");
                     let mut join_arrs = vec![];
                     if let json::Value::Array(field1) = arr_field1 {
-                        field1.iter().for_each(|field1| {
-                            let field1 = if field1.is_boolean() {
-                                let field1 = field1.as_bool().unwrap();
-                                field1.to_string()
-                            } else if field1.is_f64() {
-                                let field1 = field1.as_f64().unwrap();
-                                field1.to_string()
-                            } else if field1.is_i64() {
-                                let field1 = field1.as_i64().unwrap();
-                                field1.to_string()
-                            } else if field1.is_u64() {
-                                let field1 = field1.as_u64().unwrap();
-                                field1.to_string()
-                            } else if field1.is_string() {
-                                let field1 = field1.as_str().unwrap();
-                                field1.to_string()
-                            } else {
-                                "".to_string()
-                            };
-                            join_arrs.push(field1);
+                        field1.iter().for_each(|field| {
+                            let field = stringify_json_value(field);
+                            join_arrs.push(field);
                         });
                     }
                     let join_arrs = join_arrs.join(delim);
