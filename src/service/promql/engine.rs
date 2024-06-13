@@ -60,9 +60,10 @@ impl Engine {
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
+        // log::warn!("TL: prom_expr: {:?}", prom_expr);
         if matches!(
             prom_expr,
-            PromExpr::Aggregate(_) | PromExpr::Unary(_) | PromExpr::Binary(_)
+            PromExpr::Aggregate(_) | PromExpr::Unary(_) | PromExpr::Binary(_) | PromExpr::Call(_)
         ) {
             // Only filter columns for agg, unary, & binary queries
             self.extract_columns_from_prom_expr(prom_expr)?;
