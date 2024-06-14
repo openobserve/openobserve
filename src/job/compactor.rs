@@ -40,10 +40,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(cfg.limit.file_move_thread_num);
+    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(cfg.limit.file_merge_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
-    for thread_id in 0..cfg.limit.file_move_thread_num {
+    for thread_id in 0..cfg.limit.file_merge_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
             loop {

@@ -16,14 +16,17 @@
 use std::{path::PathBuf, sync::Arc};
 
 use config::metrics;
-use futures::future::join_all;
+use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::{fs, sync::Semaphore, task};
+use tokio::{
+    fs,
+    sync::{mpsc, RwLock},
+};
 
 use crate::{
     entry::PersistStat,
-    errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
+    errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioMpscSendSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
@@ -32,6 +35,9 @@ use crate::{
 
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
     Lazy::new(RwIndexMap::default);
+
+static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
 
 #[warn(dead_code)]
 pub(crate) struct Immutable {
@@ -99,7 +105,7 @@ impl Immutable {
     }
 }
 
-pub(crate) async fn persist() -> Result<()> {
+pub(crate) async fn persist(tx: mpsc::Sender<PathBuf>) -> Result<()> {
     let r = IMMUTABLES.read().await;
     let n = r.len();
     let mut paths = Vec::with_capacity(n);
@@ -110,68 +116,67 @@ pub(crate) async fn persist() -> Result<()> {
         paths.push(item.0.clone());
     }
     drop(r);
-
-    let mut tasks = Vec::with_capacity(paths.len());
-    let semaphore = Arc::new(Semaphore::new(
-        config::get_config().limit.file_move_thread_num,
-    ));
     for path in paths {
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: task::JoinHandle<Result<Option<(PathBuf, PersistStat)>>> =
-            task::spawn(async move {
-                let r = IMMUTABLES.read().await;
-                let Some(immutable) = r.get(&path) else {
-                    drop(permit);
-                    return Ok(None);
-                };
-                log::info!(
-                    "[INGESTER:WAL] start persist file: {}",
-                    path.to_string_lossy(),
-                );
-                // persist entry to local disk
-                let immutable = immutable.clone();
-                drop(r);
-                let ret = immutable.persist(&path).await;
-                drop(permit);
-                ret.map(|stat| Some((path, stat)))
-            });
-        tasks.push(task);
+        // check if the file is processing
+        if PROCESSING_TABLES.read().await.contains(&path) {
+            continue;
+        }
+        tx.send(path.clone()).await.context(TokioMpscSendSnafu)?;
+        PROCESSING_TABLES.write().await.insert(path);
     }
 
-    // remove entry from IMMUTABLES
-    let tasks = join_all(tasks).await;
-    for task in tasks {
-        match task.context(TokioJoinSnafu {})? {
-            Err(e) => {
-                log::error!("[INGESTER:WAL] persist error: {}", e);
-            }
-            Ok(None) => {}
-            Ok(Some((path, stat))) => {
-                log::info!(
-                    "[INGESTER:WAL] done  persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}",
-                    path.to_string_lossy(),
-                    stat.json_size,
-                    stat.arrow_size,
-                    stat.file_num,
-                    stat.batch_num,
-                );
-                // remove entry
-                let mut rw = IMMUTABLES.write().await;
-                rw.remove(&path);
-                drop(rw);
-                // update metrics
-                metrics::INGEST_MEMTABLE_BYTES
-                    .with_label_values(&[])
-                    .sub(stat.json_size);
-                metrics::INGEST_MEMTABLE_ARROW_BYTES
-                    .with_label_values(&[])
-                    .sub(stat.arrow_size as i64);
-                metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
-            }
-        }
-    }
+    IMMUTABLES.write().await.shrink_to_fit();
+    PROCESSING_TABLES.write().await.shrink_to_fit();
+
+    Ok(())
+}
+
+pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
+    let start = std::time::Instant::now();
+    let r = IMMUTABLES.read().await;
+    let Some(immutable) = r.get(&path) else {
+        return Ok(());
+    };
+    let immutable = immutable.clone();
+    drop(r);
+
+    log::info!(
+        "[INGESTER:MEM:{idx}] starts persist file: {}, took: {} ms",
+        path.to_string_lossy(),
+        start.elapsed().as_millis(),
+    );
+
+    // persist entry to local disk
+    let start = std::time::Instant::now();
+    let ret = immutable.persist(&path).await;
+    PROCESSING_TABLES.write().await.remove(&path);
+    let stat = match ret {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+    log::info!(
+        "[INGESTER:MEM:{idx}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+        path.to_string_lossy(),
+        stat.json_size,
+        stat.arrow_size,
+        stat.file_num,
+        stat.batch_num,
+        start.elapsed().as_millis(),
+    );
+
+    // remove entry
     let mut rw = IMMUTABLES.write().await;
-    rw.shrink_to_fit();
+    rw.remove(&path);
+    drop(rw);
+
+    // update metrics
+    metrics::INGEST_MEMTABLE_BYTES
+        .with_label_values(&[])
+        .sub(stat.json_size);
+    metrics::INGEST_MEMTABLE_ARROW_BYTES
+        .with_label_values(&[])
+        .sub(stat.arrow_size as i64);
+    metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
 
     Ok(())
 }
