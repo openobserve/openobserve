@@ -88,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               content-class="tab_content full-width"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
               @mouseenter="hoverFolder(tab.folderId)"
-              @mouseleave="unhoverFolder"
             >
               <div class="full-width row justify-between no-wrap">
                 <span
@@ -515,10 +514,6 @@ export default defineComponent({
       hoveredFolder.value = folderId;
     };
 
-    const unhoverFolder = () => {
-      // hoveredFolder.value = null;
-    };
-
     const toggleActions = () => {
       showActions.value = !showActions.value;
     };
@@ -776,7 +771,6 @@ export default defineComponent({
       handleDashboardMoved,
       hoverFolder,
       hoveredFolder,
-      unhoverFolder,
       toggleActions,
       showActions,
     };
