@@ -130,7 +130,7 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     target: "es2020",
     rollupOptions: {
       plugins: [
