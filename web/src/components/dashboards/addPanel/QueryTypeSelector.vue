@@ -245,7 +245,9 @@ export default defineComponent({
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].query = "";
-          dashboardPanelData.data.type = "line";
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type = "line";
         } else {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex

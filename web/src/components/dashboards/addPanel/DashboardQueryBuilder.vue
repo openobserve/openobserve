@@ -18,18 +18,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="
       !promqlMode &&
-      dashboardPanelData.data.type != 'geomap' &&
-      dashboardPanelData.data.type != 'sankey'
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type != 'geomap' &&
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type != 'sankey'
     "
   >
     <!-- x axis container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{
-          dashboardPanelData.data.type == "table"
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == "table"
             ? t("panel.firstColumn")
-            : dashboardPanelData.data.type == "h-bar" ||
-              dashboardPanelData.data.type == "h-stacked"
+            : dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].type == "h-bar" ||
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].type == "h-stacked"
             ? t("panel.yAxis")
             : t("panel.xAxis")
         }}
@@ -238,10 +248,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{
-          dashboardPanelData.data.type == "table"
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == "table"
             ? t("panel.otherColumn")
-            : dashboardPanelData.data.type == "h-bar" ||
-              dashboardPanelData.data.type == "h-stacked"
+            : dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].type == "h-bar" ||
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].type == "h-stacked"
             ? t("panel.xAxis")
             : t("panel.yAxis")
         }}
@@ -337,7 +353,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ].fields.y[index].aggregationFunction
                           "
                           :options="
-                            dashboardPanelData.data.type == 'heatmap'
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].type == 'heatmap'
                               ? triggerOperatorsWithHistogram
                               : triggerOperators
                           "
@@ -350,7 +368,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <template v-slot:append>
                             <div
-                              v-if="dashboardPanelData.data.type == 'heatmap'"
+                              v-if="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].type == 'heatmap'
+                              "
                             >
                               <q-icon
                                 name="close"
@@ -370,7 +392,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="color-input-wrapper"
                         v-if="
                           !['table', 'pie'].includes(
-                            dashboardPanelData.data.type
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].type
                           )
                         "
                       >
@@ -474,11 +498,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator />
     <!-- z axis container -->
-    <span v-if="dashboardPanelData.data.type === 'heatmap'">
+    <span
+      v-if="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type === 'heatmap'
+      "
+    >
       <div style="display: flex; flex-direction: row" class="q-pl-md">
         <div class="layout-name">
           {{
-            dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type == "heatmap"
+              ? t("panel.zAxis")
+              : ""
           }}
           <q-icon name="info_outline" class="q-ml-xs">
             <q-tooltip>
@@ -584,7 +618,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="color-input-wrapper"
                           v-if="
                             !['table', 'pie'].includes(
-                              dashboardPanelData.data.type
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].type
                             )
                           "
                         >
@@ -1097,7 +1133,11 @@ export default defineComponent({
               ) {
                 let maxAllowedAxisFields;
 
-                switch (dashboardPanelData.data.type) {
+                switch (
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].type
+                ) {
                   case "pie":
                   case "donut":
                   case "heatmap":
@@ -1247,7 +1287,11 @@ export default defineComponent({
     };
 
     const xAxisHint = computed((e: any) => {
-      switch (dashboardPanelData.data.type) {
+      switch (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type
+      ) {
         case "pie":
         case "donut":
           return t("dashboard.oneLabelFieldMessage");
@@ -1269,7 +1313,11 @@ export default defineComponent({
     });
 
     const yAxisHint = computed((e: any) => {
-      switch (dashboardPanelData.data.type) {
+      switch (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type
+      ) {
         case "pie":
         case "donut":
         case "gauge":
@@ -1286,7 +1334,11 @@ export default defineComponent({
     });
 
     const zAxisHint = computed((e: any) => {
-      switch (dashboardPanelData.data.type) {
+      switch (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type
+      ) {
         case "heatmap":
           return "Add 1 field here";
         default:

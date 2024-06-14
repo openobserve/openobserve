@@ -140,6 +140,7 @@ export const convertPromQLData = async (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
+  const panelSchemaChartType = panelSchema.queries[0]?.type;
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -298,7 +299,7 @@ export const convertPromQLData = async (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric", "gauge"].includes(panelSchemaChartType),
       showTitle: false,
       tooltip: {
         show: false,
@@ -324,7 +325,7 @@ export const convertPromQLData = async (
   // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
   let gridDataForGauge: any = {};
 
-  if (panelSchema.type === "gauge") {
+  if (panelSchemaChartType === "gauge") {
     // calculate total length of all metrics
     searchQueryData.forEach((metric: any) => {
       if (metric.result && Array.isArray(metric.result)) {
@@ -344,11 +345,11 @@ export const convertPromQLData = async (
   }
 
   const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
-    panelSchema.type
+    panelSchemaChartType
   );
 
   options.series = searchQueryData.map((it: any, index: number) => {
-    switch (panelSchema.type) {
+    switch (panelSchemaChartType) {
       case "bar":
       case "line":
       case "area":
@@ -411,7 +412,7 @@ export const convertPromQLData = async (
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
           return {
-            ...getPropsByChartTypeForSeries(panelSchema.type),
+            ...getPropsByChartTypeForSeries(panelSchemaChartType),
             min: panelSchema?.queries[index]?.config?.min || 0,
             max: panelSchema?.queries[index]?.config?.max || 100,
 
@@ -548,7 +549,7 @@ export const convertPromQLData = async (
                 panelSchema.config?.decimals
               );
               return {
-                ...getPropsByChartTypeForSeries(panelSchema.type),
+                ...getPropsByChartTypeForSeries(panelSchemaChartType),
                 renderItem: function (params: any) {
                   return {
                     type: "text",
@@ -590,7 +591,7 @@ export const convertPromQLData = async (
               return {
                 name: JSON.stringify(metric.metric),
                 value: metric?.value?.length > 1 ? metric.value[1] : "",
-                ...getPropsByChartTypeForSeries(panelSchema.type),
+                ...getPropsByChartTypeForSeries(panelSchemaChartType),
               };
             });
             return traces;
@@ -611,8 +612,8 @@ export const convertPromQLData = async (
   if (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
-    panelSchema.type != "gauge" &&
-    panelSchema.type != "metric"
+    panelSchemaChartType != "gauge" &&
+    panelSchemaChartType != "metric"
   ) {
     let legendWidth;
 

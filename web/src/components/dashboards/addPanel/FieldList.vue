@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length) ||
-                      dashboardPanelData.data.type == 'geomap'
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap'
                     )
                   "
                 >
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>
                       {{
-                        dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y"
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type != "h-bar" ? "+X" : "+Y"
                       }}
                     </div>
                   </q-btn>
@@ -262,12 +262,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>
                       {{
-                        dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X"
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type != "h-bar" ? "+Y" : "+X"
                       }}
                     </div>
                   </q-btn>
                   <q-btn
-                    v-if="dashboardPanelData.data.type == 'heatmap'"
+                    v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'heatmap'"
                     padding="sm"
                     :disabled="isAddZAxisNotAllowed"
                     @click="addZAxisItem(props.row)"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length)
-                    ) && dashboardPanelData.data.type == 'geomap'
+                    ) && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap'
                   "
                 >
                   <q-btn
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length)
-                    ) && dashboardPanelData.data.type == 'sankey'
+                    ) && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'sankey'
                   "
                 >
                   <q-btn

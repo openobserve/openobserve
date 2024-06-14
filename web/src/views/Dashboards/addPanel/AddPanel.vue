@@ -44,7 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-tutorial-btn"
         ></q-btn>
         <q-btn
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          v-if="
+            !['html', 'markdown'].includes(
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].type
+            )
+          "
           outline
           padding="sm"
           class="q-mr-sm"
@@ -83,7 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="savePanelData.isLoading.value"
         />
         <q-btn
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          v-if="
+            !['html', 'markdown'].includes(
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].type
+            )
+          "
           class="q-ml-md text-bold no-border"
           data-test="dashboard-apply"
           padding="sm lg"
@@ -106,14 +118,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <ChartSelection
-          v-model:selectedChartType="dashboardPanelData.data.type"
+          v-model:selectedChartType="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type
+          "
           @update:selected-chart-type="resetAggregationFunction"
         />
       </div>
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        v-if="
+          !['html', 'markdown'].includes(
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type
+          )
+        "
         class="col"
         style="width: 100%; height: 100%"
       >
@@ -214,7 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div style="flex: 1">
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
+                          :key="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].type
+                          "
                           :panelSchema="chartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="variablesData"
@@ -267,7 +293,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
       <div
-        v-if="dashboardPanelData.data.type == 'html'"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'html'
+        "
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
@@ -279,7 +309,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
       <div
-        v-if="dashboardPanelData.data.type == 'markdown'"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'markdown'
+        "
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
@@ -549,28 +583,39 @@ export default defineComponent({
     });
 
     const currentXLabel = computed(() => {
-      return dashboardPanelData.data.type == "table"
+      return dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type == "table"
         ? "First Column"
-        : dashboardPanelData.data.type == "h-bar"
+        : dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == "h-bar"
         ? "Y-Axis"
         : "X-Axis";
     });
 
     const currentYLabel = computed(() => {
-      return dashboardPanelData.data.type == "table"
+      return dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type == "table"
         ? "Other Columns"
-        : dashboardPanelData.data.type == "h-bar"
+        : dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == "h-bar"
         ? "X-Axis"
         : "Y-Axis";
     });
 
     watch(
-      () => dashboardPanelData.data.type,
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type,
       async () => {
-        // console.time("watch:dashboardPanelData.data.type");
+        // console.time("watch:dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type");
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        // console.timeEnd("watch:dashboardPanelData.data.type");
+        // console.timeEnd("watch:dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type");
       }
     );
 
@@ -709,7 +754,7 @@ export default defineComponent({
       }
 
       //check each query is empty or not for geomap
-      if (dashboardData.data.type == "geomap") {
+      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "geomap") {
         dashboardData.data.queries.map((q: any, index: number) => {
           if (q && q.query == "") {
             errors.push(`Query-${index + 1} is empty`);
@@ -718,14 +763,14 @@ export default defineComponent({
       }
 
       //check content should be empty for html
-      if (dashboardData.data.type == "html") {
+      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "html") {
         if (dashboardData.data.htmlContent.trim() == "") {
           errors.push("Please enter your HTML code");
         }
       }
 
       //check content should be empty for html
-      if (dashboardData.data.type == "markdown") {
+      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "markdown") {
         if (dashboardData.data.markdownContent.trim() == "") {
           errors.push("Please enter your markdown code");
         }
@@ -744,7 +789,13 @@ export default defineComponent({
           "html",
           "markdown",
         ];
-        if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
+        if (
+          !allowedChartTypes.includes(
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type
+          )
+        ) {
           errors.push(
             "Selected chart type is not supported for PromQL. Only line chart is supported."
           );
@@ -782,7 +833,11 @@ export default defineComponent({
         //   errors.push("Query should not be empty")
         // }
       } else {
-        switch (dashboardPanelData.data.type) {
+        switch (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type
+        ) {
           case "donut":
           case "pie": {
             if (
@@ -970,7 +1025,7 @@ export default defineComponent({
         }
 
         // check if aggregation function is selected or not
-        if (!(dashboardData.data.type == "heatmap")) {
+        if (!(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "heatmap")) {
           const aggregationFunctionError = dashboardData.data.queries[
             dashboardData.layout.currentQueryIndex
           ].fields.y.filter(

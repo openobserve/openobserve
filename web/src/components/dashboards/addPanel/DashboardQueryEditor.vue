@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-space />
         <div style="max-width: 600px">
           <q-tabs
-            v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+            v-if="promqlMode || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap'"
             v-model="dashboardPanelData.layout.currentQueryIndex"
             narrow-indicator
             dense
@@ -84,12 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div> -->
         </div>
         <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
+          v-if="!(promqlMode || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap')"
           class="text-subtitle2 text-weight-bold"
           >{{ t("panel.sql") }}</span
         >
         <q-btn
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+          v-if="promqlMode || dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap'"
           round
           flat
           @click.stop="addTab"
@@ -319,9 +319,9 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery
         ) {
-          if (dashboardPanelData.data.type == "geomap") {
+          if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "geomap") {
             query = geoMapChart();
-          } else if (dashboardPanelData.data.type == "sankey") {
+          } else if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "sankey") {
             query = sankeyChartQuery();
           } else {
             query = sqlchart();
@@ -745,7 +745,7 @@ export default defineComponent({
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y.map((it: any) => it?.alias);
 
-      if (dashboardPanelData.data.type == "heatmap") {
+      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "heatmap") {
         query +=
           xAxisAlias.length && yAxisAlias.length
             ? " GROUP BY " +

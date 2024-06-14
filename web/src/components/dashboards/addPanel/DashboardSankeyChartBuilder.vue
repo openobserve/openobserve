@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
+  <div v-if="!promqlMode && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'sankey'">
     <!-- source container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -887,7 +887,7 @@ export default defineComponent({
       cleanupDraggingFields();
     };
     const Hint = computed((e: any) => {
-      switch (dashboardPanelData.data.type) {
+      switch (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type) {
         case "sankey":
           return t("dashboard.oneFieldMessage");
         default:

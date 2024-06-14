@@ -34,9 +34,13 @@ export const convertPanelData = async (
   resultMetaData: any,
   metadata: any
 ) => {
+  console.log("panelSchema---", panelSchema);
+  const panelSchemaChartType = panelSchema.queries?.[0]?.type;
+  console.log("chartType", panelSchemaChartType);
+
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
-  switch (panelSchema.type) {
+  switch (panelSchemaChartType) {
     case "area":
     case "area-stacked":
     case "bar":
@@ -57,7 +61,7 @@ export const convertPanelData = async (
       ) {
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
-          chartType: panelSchema.type,
+          chartType: panelSchemaChartType,
           ...(await convertPromQLData(
             panelSchema,
             data,
@@ -69,7 +73,7 @@ export const convertPanelData = async (
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
-          chartType: panelSchema.type,
+          chartType: panelSchemaChartType,
           ...(await convertSQLData(
             panelSchema,
             data,
@@ -84,19 +88,19 @@ export const convertPanelData = async (
     }
     case "table": {
       return {
-        chartType: panelSchema.type,
+        chartType: panelSchemaChartType,
         ...convertTableData(panelSchema, data, store),
       };
     }
     case "geomap": {
       return {
-        chartType: panelSchema.type,
+        chartType: panelSchemaChartType,
         ...convertMapData(panelSchema, data),
       };
     }
     case "sankey": {
       return {
-        chartType: panelSchema.type,
+        chartType: panelSchemaChartType,
         ...convertSankeyData(panelSchema, data),
       };
     }

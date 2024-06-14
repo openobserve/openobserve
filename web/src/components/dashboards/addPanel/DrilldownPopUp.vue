@@ -567,7 +567,11 @@ export default defineComponent({
           value: "${" + variable.name + "}",
         }));
 
-      if (dashboardPanelData.data.type === "sankey") {
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type === "sankey"
+      ) {
         selectedValues = [
           { label: "Edge Source", value: "${edge.__source}" },
           { label: "Edge Target", value: "${edge.__target}" },
@@ -576,7 +580,11 @@ export default defineComponent({
           { label: "Node Value", value: "${node.__value}" },
           ...variableListName,
         ];
-      } else if (dashboardPanelData.data.type === "table") {
+      } else if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type === "table"
+      ) {
         dashboardPanelData.data.queries.forEach((query: any) => {
           const panelFields = [
             ...query.fields.x,

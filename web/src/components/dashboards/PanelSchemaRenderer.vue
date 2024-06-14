@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
         <GeoMapRenderer
-          v-if="panelSchema.type == 'geomap'"
+          v-if="panelSchemaChartType == 'geomap'"
           :data="
             panelData.chartType == 'geomap'
               ? panelData
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <TableRenderer
-          v-else-if="panelSchema.type == 'table'"
+          v-else-if="panelSchemaChartType == 'table'"
           :data="
             panelData.chartType == 'table'
               ? panelData
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :wrap-cells="panelSchema.config?.wrap_table_cells"
         />
         <div
-          v-else-if="panelSchema.type == 'html'"
+          v-else-if="panelSchemaChartType == 'html'"
           class="col column"
           style="width: 100%; height: 100%; flex: 1"
         >
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          v-else-if="panelSchema.type == 'markdown'"
+          v-else-if="panelSchemaChartType == 'markdown'"
           class="col column"
           style="width: 100%; height: 100%; flex: 1"
         >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @error="errorDetail = $event"
           @click="onChartClick"
-        />
+        >---------{{ panelData }}----</ChartRenderer>
       </div>
       <div v-if="!errorDetail" class="noData" data-test="no-data">
         {{ noData }}
@@ -250,6 +250,12 @@ export default defineComponent({
       forceLoad,
       searchType,
     );
+    const panelSchemaChartType = computed(() => {
+      if (panelSchema.value) {
+        return panelSchema.value.queries?.[0]?.type;
+      }
+    });
+    console.log("panelSchemaChartType", panelSchemaChartType.value);
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -296,7 +302,8 @@ export default defineComponent({
               resultMetaData,
               metadata.value
             );
-
+            console.log("panelData----------", panelData.value);
+            
             errorDetail.value = "";
           } catch (error: any) {
             errorDetail.value = error.message;
@@ -397,8 +404,8 @@ export default defineComponent({
     const noData = computed(() => {
       // if panel type is 'html' or 'markdown', return an empty string
       if (
-        panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown"
+        panelSchemaChartType.value == "html" ||
+        panelSchemaChartType.value == "markdown"
       ) {
         return "";
       }
@@ -413,7 +420,7 @@ export default defineComponent({
         // The queryType is not 'promql'
         return data.value.length &&
           data.value[0]?.length &&
-          handleNoData(panelSchema.value.type)
+          handleNoData(panelSchemaChartType.value)
           ? ""
           : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
@@ -487,7 +494,7 @@ export default defineComponent({
       let offSetValues = { left: 0, top: 0 };
 
       // if type is table, calculate offset
-      if (panelSchema.value.type == "table") {
+      if (panelSchemaChartType.value == "table") {
         offSetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
 
         // also, add offset of clicked position
@@ -560,7 +567,7 @@ export default defineComponent({
         const drilldownVariables: any = {};
 
         // if chart type is 'table' then we need to pass the table name
-        if (panelSchema.value.type == "table") {
+        if (panelSchemaChartType.value == "table") {
           const fields: any = {};
           panelSchema.value.queries.forEach((query: any) => {
             // take all field from x, y and z
@@ -579,7 +586,7 @@ export default defineComponent({
             field: fields,
             index: drilldownParams[1][1],
           };
-        } else if (panelSchema.value.type == "sankey") {
+        } else if (panelSchemaChartType.value == "sankey") {
           // if dataType is node then set node data
           // else set edge data
           if (drilldownParams[0].dataType == "node") {
@@ -599,7 +606,9 @@ export default defineComponent({
         } else {
           // we have an series object
           drilldownVariables.series = {
-            __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
+            __name: ["pie", "donut", "heatmap"].includes(
+              panelSchemaChartType.value
+            )
               ? drilldownParams[0].name
               : drilldownParams[0].seriesName,
             __value: Array.isArray(drilldownParams[0].value)
@@ -764,6 +773,7 @@ export default defineComponent({
       openDrilldown,
       drilldownPopUpRef,
       hideDrilldownPopUp,
+      panelSchemaChartType,
     };
   },
 });

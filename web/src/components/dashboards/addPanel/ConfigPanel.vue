@@ -29,17 +29,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-description"
       />
     </div>
-
+    
     <div class="space"></div>
 
     <q-toggle
       v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'sankey'
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type != 'table' &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type != 'heatmap' &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type != 'metric' &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type != 'gauge' &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type != 'geomap' &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type != 'sankey'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
@@ -49,7 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="space"></div>
 
     <q-toggle
-      v-if="dashboardPanelData.data.type == 'table'"
+      v-if="
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type == 'table'
+      "
       v-model="dashboardPanelData.data.config.wrap_table_cells"
       :label="t('dashboard.wraptext')"
       data-test="dashboard-config-wrap-table-cells"
@@ -60,13 +76,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="o2-input">
       <q-select
         v-if="
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'heatmap' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'table' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'heatmap' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'metric' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'gauge' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'geomap' &&
           dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.type != 'sankey'
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'sankey'
         "
         outlined
         v-model="dashboardPanelData.data.config.legends_position"
@@ -88,14 +116,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="input-container">
         <q-input
           v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'table' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'heatmap' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'metric' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'gauge' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'geomap' &&
             dashboardPanelData.data.config.show_legends &&
             dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'sankey'
           "
           v-model.number="legendWidthValue"
           :label="t('common.legendWidth')"
@@ -114,14 +154,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="unit-container"
           v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'table' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'heatmap' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'metric' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'gauge' &&
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'geomap' &&
             dashboardPanelData.data.config.show_legends &&
             dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type != 'sankey'
           "
         >
           <button
@@ -221,7 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-select
-        v-if="dashboardPanelData.data.type == 'geomap'"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'geomap'
+        "
         outlined
         v-model="dashboardPanelData.data.config.base_map.type"
         :options="basemapTypeOptions"
@@ -237,7 +293,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
-      <div v-if="dashboardPanelData.data.type == 'geomap'">
+      <div
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'geomap'
+        "
+      >
         <span>Initial View:</span>
         <div class="row">
           <q-input
@@ -412,7 +474,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
       <div
-        v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+        v-if="
+          promqlMode ||
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'geomap'
+        "
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
       >
@@ -548,7 +615,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="
           ['area', 'line', 'area-stacked'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
@@ -598,7 +667,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
       <q-select
-        v-if="dashboardPanelData.data.type == 'geomap'"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'geomap'
+        "
         outlined
         v-model="
           dashboardPanelData.data.queries[
@@ -623,7 +696,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-input
-        v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == 'geomap' && !isWeightFieldPresent
+        "
         v-model.number="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -654,7 +731,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-input>
 
       <q-input
-        v-if="dashboardPanelData.data.type === 'gauge'"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type === 'gauge'
+        "
         v-model.number="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -684,7 +765,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
       <q-input
-        v-if="dashboardPanelData.data.type === 'gauge'"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type === 'gauge'
+        "
         v-model.number="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -717,13 +802,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-input
         v-if="
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'pie' &&
-          dashboardPanelData.data.type != 'donut' &&
-          dashboardPanelData.data.type != 'sankey'
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'gauge' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'metric' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'geomap' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'table' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'pie' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'donut' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'sankey'
         "
         v-model.number="dashboardPanelData.data.config.axis_width"
         :label="t('common.axisWidth')"
@@ -750,13 +849,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-toggle
         v-if="
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'pie' &&
-          dashboardPanelData.data.type != 'donut' &&
-          dashboardPanelData.data.type != 'sankey'
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'gauge' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'metric' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'geomap' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'table' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'pie' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'donut' &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type != 'sankey'
         "
         v-model="dashboardPanelData.data.config.axis_border_show"
         :label="t('dashboard.showBorder')"
@@ -767,7 +880,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
-            dashboardPanelData.data.type
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type
           )
         "
         :variablesData="variablesData"

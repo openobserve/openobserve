@@ -253,7 +253,7 @@ export const convertSQLData = async (
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
-
+  const panelSchemaChartType = panelSchema.queries[0]?.type;
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -290,8 +290,8 @@ export const convertSQLData = async (
           formatter: function (params: any) {
             let lineBreaks = "";
             if (
-              panelSchema.type === "h-bar" ||
-              panelSchema.type === "h-stacked"
+              panelSchemaChartType === "h-bar" ||
+              panelSchemaChartType === "h-stacked"
             ) {
               if (params.axisDimension == "x")
                 return formatUnitValue(
@@ -304,7 +304,7 @@ export const convertSQLData = async (
                 );
 
               //we does not required any linebreaks for h-stacked because we only use one x axis
-              if (panelSchema.type === "h-stacked")
+              if (panelSchemaChartType === "h-stacked")
                 return params.value.toString();
               for (
                 let i = 0;
@@ -404,9 +404,9 @@ export const convertSQLData = async (
 
       return {
         type: "category",
-        position: panelSchema.type == "h-bar" ? "left" : "bottom",
+        position: panelSchemaChartType == "h-bar" ? "left" : "bottom",
         // inverse data for h-stacked and h-bar
-        inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
+        inverse: ["h-stacked", "h-bar"].includes(panelSchemaChartType),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
         nameGap: 9 * (xAxisKeys.length - index + 1),
@@ -416,7 +416,7 @@ export const convertSQLData = async (
         },
         axisLabel: {
           interval:
-            panelSchema.type == "h-stacked"
+            panelSchemaChartType == "h-stacked"
               ? "auto"
               : index == xAxisKeys.length - 1
               ? "auto"
@@ -441,7 +441,7 @@ export const convertSQLData = async (
           alignWithLabel: false,
           length: 20 * (xAxisKeys.length - index),
           interval:
-            panelSchema.type == "h-stacked"
+            panelSchemaChartType == "h-stacked"
               ? "auto"
               : function (i: any) {
                   return arr.includes(i);
@@ -459,7 +459,7 @@ export const convertSQLData = async (
       nameLocation: "middle",
       nameGap:
         calculateWidthText(
-          panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
+          panelSchemaChartType == "h-bar" || panelSchemaChartType == "h-stacked"
             ? largestLabel(getAxisDataFromKey(yAxisKeys[0]))
             : formatUnitValue(
                 getUnitValue(
@@ -495,7 +495,7 @@ export const convertSQLData = async (
     },
     toolbox: {
       orient: "vertical",
-      show: !["pie", "donut", "metric", "gauge"].includes(panelSchema.type),
+      show: !["pie", "donut", "metric", "gauge"].includes(panelSchemaChartType),
       showTitle: false,
       tooltip: {
         show: false,
@@ -512,11 +512,13 @@ export const convertSQLData = async (
     },
     series: [],
   };
-  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
+  console.log("panelSchema", panelSchema);
+  
+  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchemaChartType);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
-  switch (panelSchema.type) {
+  switch (panelSchemaChartType) {
     case "area-stacked":
     case "line":
     case "area":
@@ -524,12 +526,14 @@ export const convertSQLData = async (
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
       if (
-        panelSchema.type == "area-stacked" ||
-        ((panelSchema.type == "line" ||
-          panelSchema.type == "area" ||
-          panelSchema.type == "scatter") &&
+        panelSchemaChartType == "area-stacked" ||
+        ((panelSchemaChartType == "line" ||
+          panelSchemaChartType == "area" ||
+          panelSchemaChartType == "scatter") &&
           panelSchema.queries[0].fields.x.length == 2)
       ) {
+        console.log("-----------panelSchemaChartType", panelSchema);
+
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
           show: true,
@@ -596,7 +600,9 @@ export const convertSQLData = async (
             });
           })
           .flat();
-      } else if (panelSchema.type == "line" || panelSchema.type == "area") {
+      } else if (panelSchemaChartType == "line" || panelSchemaChartType == "area") {
+        console.log("-----------panelSchemaChartType", panelSchema);
+
         //if x and y length is not 2 and 1 respectively then do following
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
@@ -1302,12 +1308,12 @@ export const convertSQLData = async (
 
   // auto SQL: if x axis has time series
   if (
-    panelSchema.type != "h-bar" &&
-    panelSchema.type != "h-stacked" &&
-    panelSchema.type != "heatmap" &&
-    panelSchema.type != "metric" &&
-    panelSchema.type != "pie" &&
-    panelSchema.type != "donut" &&
+    panelSchemaChartType != "h-bar" &&
+    panelSchemaChartType != "h-stacked" &&
+    panelSchemaChartType != "heatmap" &&
+    panelSchemaChartType != "metric" &&
+    panelSchemaChartType != "pie" &&
+    panelSchemaChartType != "donut" &&
     panelSchema?.queries[0]?.customQuery == false &&
     Array.isArray(options.xAxis) &&
     options.xAxis.length > 0 &&
@@ -1447,12 +1453,12 @@ export const convertSQLData = async (
 
   //custom SQL: check if it is timeseries or not
   if (
-    panelSchema.type != "h-bar" &&
-    panelSchema.type != "h-stacked" &&
-    panelSchema.type != "heatmap" &&
-    panelSchema.type != "metric" &&
-    panelSchema.type != "pie" &&
-    panelSchema.type != "donut" &&
+    panelSchemaChartType != "h-bar" &&
+    panelSchemaChartType != "h-stacked" &&
+    panelSchemaChartType != "heatmap" &&
+    panelSchemaChartType != "metric" &&
+    panelSchemaChartType != "pie" &&
+    panelSchemaChartType != "donut" &&
     panelSchema?.queries[0]?.customQuery == true &&
     Array.isArray(options.xAxis) &&
     options.xAxis.length > 0 &&
@@ -1588,7 +1594,7 @@ export const convertSQLData = async (
     // for h-stacked, categorical axis is y axis
     // for stacked and area-stacked, categorical axis is x axis
     const xAxisObj =
-      panelSchema.type == "h-stacked" ? options.yAxis : options.xAxis;
+      panelSchemaChartType == "h-stacked" ? options.yAxis : options.xAxis;
 
     // check if order by uses y axis field
     // will return null if not exist
@@ -1630,8 +1636,8 @@ export const convertSQLData = async (
   if (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
-    panelSchema.type != "gauge" &&
-    panelSchema.type != "metric"
+    panelSchemaChartType != "gauge" &&
+    panelSchemaChartType != "metric"
   ) {
     let legendWidth;
 
@@ -1650,7 +1656,7 @@ export const convertSQLData = async (
       }
     } else {
       let maxValue: string;
-      if (panelSchema.type === "pie" || panelSchema.type === "donut") {
+      if (panelSchemaChartType === "pie" || panelSchemaChartType === "donut") {
         maxValue = options.series[0].data.reduce((max: any, it: any) => {
           return max.length < it?.name?.length ? it?.name : max;
         }, "");
@@ -1674,9 +1680,9 @@ export const convertSQLData = async (
 
   //check if is there any data else filter out axis or series data
   // for metric we does not have data field
-  if (panelSchema.type != "metric") {
+  if (panelSchemaChartType != "metric") {
     options.series = options.series.filter((it: any) => it.data?.length);
-    if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
+    if (panelSchemaChartType == "h-bar" || panelSchemaChartType == "h-stacked") {
       options.xAxis = options.series.length ? options.xAxis : {};
     } else {
       options.yAxis = options.series.length ? options.yAxis : {};

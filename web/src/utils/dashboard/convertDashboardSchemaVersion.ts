@@ -57,7 +57,6 @@ export function convertDashboardSchemaVersion(data: any) {
     return;
   }
   if (!data.version) data = { ...data, version: 1 };
-  console.log("convertDashboardSchemaVersion", data);
   switch (data.version) {
     case 1: {
       // Create a object with key as a panel id and value will be its layout.

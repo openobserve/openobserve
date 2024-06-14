@@ -81,7 +81,7 @@
               />
               <div style="flex: 1; overflow: hidden">
                 <PanelSchemaRenderer
-                  :key="dashboardPanelData.data.type"
+                  :key="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type"
                   :panelSchema="chartData"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
                   :variablesData="variablesData"
