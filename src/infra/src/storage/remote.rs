@@ -20,10 +20,9 @@ use bytes::Bytes;
 use config::{get_config, metrics};
 use futures::stream::BoxStream;
 use object_store::{
-    limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
-    ObjectMeta, ObjectStore, PutOptions, PutResult, Result,
+    limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartUpload,
+    ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
 };
-use tokio::io::AsyncWrite;
 
 use crate::storage::{format_key, CONCURRENT_REQUESTS};
 
@@ -53,13 +52,18 @@ impl std::fmt::Display for Remote {
 
 #[async_trait]
 impl ObjectStore for Remote {
-    async fn put_opts(&self, location: &Path, bytes: Bytes, opts: PutOptions) -> Result<PutResult> {
+    async fn put_opts(
+        &self,
+        location: &Path,
+        payload: PutPayload,
+        opts: PutOptions,
+    ) -> Result<PutResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let data_size = bytes.len();
+        let data_size = payload.content_length();
         match self
             .client
-            .put_opts(&(format_key(&file, true).into()), bytes, opts)
+            .put_opts(&(format_key(&file, true).into()), payload, opts)
             .await
         {
             Ok(_) => {
@@ -89,14 +93,15 @@ impl ObjectStore for Remote {
         }
     }
 
-    async fn put_multipart(
-        &self,
-        _location: &Path,
-    ) -> Result<(MultipartId, Box<dyn AsyncWrite + Unpin + Send>)> {
+    async fn put_multipart(&self, _location: &Path) -> Result<Box<dyn MultipartUpload>> {
         Err(Error::NotImplemented)
     }
 
-    async fn abort_multipart(&self, _location: &Path, _multipart_id: &MultipartId) -> Result<()> {
+    async fn put_multipart_opts(
+        &self,
+        _location: &Path,
+        _opts: PutMultipartOpts,
+    ) -> Result<Box<dyn MultipartUpload>> {
         Err(Error::NotImplemented)
     }
 
