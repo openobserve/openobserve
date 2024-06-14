@@ -883,7 +883,7 @@ export default defineComponent({
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
           }
-          query_context = b64EncodeUnicode(query_context) || "";
+          // query_context = b64EncodeUnicode(query_context) || "";
         }
 
         let query_fn = "";
