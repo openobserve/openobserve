@@ -112,7 +112,7 @@ async function multistreamselect(page) {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_stream1');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(4000);
   await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
     await page.getByRole('cell', { name: 'Common Group Fields (40)' }).click();
     await page.getByRole('cell', { name: 'E2e_automate (13)' }).click();
