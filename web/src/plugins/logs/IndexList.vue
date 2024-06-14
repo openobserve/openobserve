@@ -110,9 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ] > 0
                 "
                 :name="
-                  searchObj.data.stream.expandGroupRows[props.row.group]
-                class="float-right"
-              ></q-icon>
+                  searchObj.data.stream.expandGroupRows[props.row.group]"
+                class="float-right"></q-icon>
             </q-td>
           </q-tr>
           <q-tr
