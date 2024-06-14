@@ -24,7 +24,7 @@ use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster, get_config,
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
+    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
@@ -683,15 +683,28 @@ pub(crate) async fn generate_index_on_ingester(
     .await;
 
     if !schema_chk.has_fields {
-        db::schema::merge(
+        // create schema
+        let Some((schema, _)) = db::schema::merge(
             org_id,
             stream_name,
             StreamType::Index,
             idx_schema.as_ref(),
             Some(Utc::now().timestamp_micros()),
         )
-        .await
-        .unwrap();
+        .await?
+        else {
+            return Err(anyhow::anyhow!(
+                "generate_index_on_ingester error: schema not found"
+            ));
+        };
+        // update schema to enable bloomfilter for field: term, file_name
+        let settings = StreamSettings {
+            bloom_filter_fields: vec!["term".to_string(), "file_name".to_string()],
+            ..Default::default()
+        };
+        let mut metadata = schema.metadata().clone();
+        metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+        db::schema::update_setting(org_id, stream_name, StreamType::Index, metadata).await?;
     }
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
