@@ -1098,7 +1098,7 @@ async fn selector_load_data_from_datafusion(
                     .chain(
                         [
                             HASH_LABEL.to_string(),
-                            config::get_config().common.column_timestamp.clone(),
+                            cfg.common.column_timestamp.clone(),
                             VALUE_LABEL.to_string(),
                         ]
                         .iter(),
