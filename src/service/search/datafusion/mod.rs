@@ -35,6 +35,7 @@ pub mod spath_udf;
 pub mod storage;
 pub mod string_to_array_v2_udf;
 mod time_range_udf;
+pub mod to_arr_string_udf;
 mod transform_udf;
 
 #[derive(PartialEq, Debug)]
