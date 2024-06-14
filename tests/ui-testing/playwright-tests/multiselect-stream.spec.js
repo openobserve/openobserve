@@ -110,8 +110,8 @@ test.describe("Stream multiselect testcases", () => {
 async function multistreamselect(page) {
     await page.locator('[data-test="menu-link-\\/-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_stream');
-    await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').first().click();
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_stream1');
+    await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click();
     await page.getByRole('cell', { name: 'Common Group Fields (40)' }).click();
     await page.getByRole('cell', { name: 'E2e_automate (13)' }).click();
     await page.getByRole('cell', { name: 'E2e_stream1 (0)' }).click();
