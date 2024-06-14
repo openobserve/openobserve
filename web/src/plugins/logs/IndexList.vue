@@ -479,7 +479,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
             <q-td colspan="100%"
-class="text-bold" style="opacity: 0.7">
+class="text-bold"
+style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
