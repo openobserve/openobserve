@@ -46,7 +46,7 @@ pub(crate) static STRING_TO_ARRAY_V2_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// date_format function for datafusion
+/// string_to_array_v2 function for datafusion
 pub fn string_to_array_v2_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     let args = ColumnarValue::values_to_arrays(args)?;
 

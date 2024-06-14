@@ -1179,6 +1179,15 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
     ctx.register_udf(super::date_format_udf::DATE_FORMAT_UDF.clone());
     ctx.register_udf(super::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
+    ctx.register_udf(super::arrzip_udf::ARR_ZIP_UDF.clone());
+    ctx.register_udf(super::arrindex_udf::ARR_INDEX_UDF.clone());
+    ctx.register_udf(super::arr_descending_udf::ARR_DESCENDING_UDF.clone());
+    ctx.register_udf(super::arrjoin_udf::ARR_JOIN_UDF.clone());
+    ctx.register_udf(super::arrcount_udf::ARR_COUNT_UDF.clone());
+    ctx.register_udf(super::arrsort_udf::ARR_SORT_UDF.clone());
+    ctx.register_udf(super::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
+    ctx.register_udf(super::spath_udf::SPATH_UDF.clone());
+    ctx.register_udf(super::to_arr_string_udf::TO_ARR_STRING.clone());
 
     {
         let udf_list = get_all_transform(_org_id).await;

@@ -15,16 +15,27 @@
 
 use std::str::FromStr;
 
+use config::utils::json;
+
 use crate::common::meta::functions::ZoFunction;
 
+pub mod arr_descending_udf;
+pub mod arrcount_udf;
+pub mod arrindex_udf;
+pub mod arrjoin_udf;
+pub mod arrsort_udf;
+pub mod arrzip_udf;
+pub mod cast_to_arr_udf;
 mod date_format_udf;
 pub mod exec;
 pub mod match_udf;
 pub mod regexp_udf;
 mod rewrite;
+pub mod spath_udf;
 pub mod storage;
 pub mod string_to_array_v2_udf;
 mod time_range_udf;
+pub mod to_arr_string_udf;
 mod transform_udf;
 
 #[derive(PartialEq, Debug)]
@@ -55,6 +66,18 @@ pub const MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
 pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
 /// The name of the not_regex_match UDF given to DataFusion.
 pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
+
+pub fn stringify_json_value(field: &json::Value) -> String {
+    match field {
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => match n.as_f64() {
+            Some(f) => f.to_string(),
+            None => n.as_i64().unwrap().to_string(),
+        },
+        serde_json::Value::String(s) => s.clone(),
+        _ => json::to_string(field).expect("failed to stringify json field"),
+    }
+}
 
 pub const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
     ZoFunction {
