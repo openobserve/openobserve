@@ -10,6 +10,7 @@ infra.workspace = true
 wal.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
+async-walkdir.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
@@ -24,7 +25,6 @@ serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
-async-walkdir.workspace = true
 
 [[bin]]
 name = "wal-reader"

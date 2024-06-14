@@ -47,7 +47,6 @@ pub async fn save_enrichment_table(
     path: web::Path<(String, String)>,
     payload: Multipart,
     req: HttpRequest,
-    thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, table_name) = path.into_inner();
     let content_type = req.headers().get("content-type");
@@ -82,7 +81,7 @@ pub async fn save_enrichment_table(
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,
                 };
-                save_enrichment_data(&org_id, &table_name, payload, **thread_id, append_data).await
+                save_enrichment_data(&org_id, &table_name, payload, append_data).await
             } else {
                 Ok(MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",

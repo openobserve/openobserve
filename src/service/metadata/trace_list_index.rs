@@ -55,10 +55,10 @@ pub struct TraceListIndex {
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub struct TraceListItem {
+    pub _timestamp: i64,
     pub stream_name: String,
     pub service_name: String,
     pub trace_id: String,
-    pub _timestamp: u64,
 }
 
 impl Metadata for TraceListIndex {
@@ -119,7 +119,8 @@ impl Metadata for TraceListIndex {
             hour_buf.records_size += data_size;
         }
 
-        let writer = ingester::get_writer(0, org_id, &StreamType::Metadata.to_string()).await;
+        let writer =
+            ingester::get_writer(org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
         _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
         if let Err(e) = writer.sync().await {
             log::error!("[TraceListIndex] error while syncing writer: {}", e);
@@ -262,8 +263,12 @@ mod tests {
         hour_buf.records.push(Arc::new(data));
         hour_buf.records_size += data_size;
 
-        let writer =
-            ingester::get_writer(0, "openobserve", &StreamType::Metadata.to_string()).await;
+        let writer = ingester::get_writer(
+            "openobserve",
+            &StreamType::Metadata.to_string(),
+            STREAM_NAME,
+        )
+        .await;
         for (key, val) in buf.iter() {
             println!(
                 "key: {key} val: {:?} schema: {}, records_size: {}, records: {:?}",

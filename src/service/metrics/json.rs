@@ -46,7 +46,7 @@ use crate::{
     },
 };
 
-pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
+pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -284,7 +284,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
     // write data to wal
     let time = start.elapsed().as_secs_f64();
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in stream_data_buf {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
@@ -297,7 +296,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             continue;
         }
 
+        let writer =
+            ingester::get_writer(org_id, &StreamType::Metrics.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
+        // if let Err(e) = writer.sync().await {
+        //     log::error!("ingestion error while syncing writer: {}", e);
+        // }
+
         req_stats.response_time = time;
         report_request_usage_stats(
             req_stats,
@@ -308,9 +313,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             0,
         )
         .await;
-    }
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     metrics::HTTP_RESPONSE_TIME

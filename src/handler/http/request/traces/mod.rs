@@ -49,26 +49,23 @@ use crate::{
 #[post("/{org_id}/traces")]
 pub async fn traces_write(
     org_id: web::Path<String>,
-    thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    handle_req(org_id, thread_id, req, body).await
+    handle_req(org_id, req, body).await
 }
 
 #[post("/{org_id}/v1/traces")]
 pub async fn otlp_traces_write(
     org_id: web::Path<String>,
-    thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    handle_req(org_id, thread_id, req, body).await
+    handle_req(org_id, req, body).await
 }
 
 async fn handle_req(
     org_id: web::Path<String>,
-    thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -79,9 +76,9 @@ async fn handle_req(
         .get(&get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        otlp_http::traces_proto(&org_id, **thread_id, body, in_stream_name).await
+        otlp_http::traces_proto(&org_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        otlp_http::traces_json(&org_id, **thread_id, body, in_stream_name).await
+        otlp_http::traces_json(&org_id, body, in_stream_name).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(

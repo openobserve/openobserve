@@ -77,7 +77,7 @@ pub async fn get(file: &str) -> Result<bytes::Bytes, anyhow::Error> {
 }
 
 pub async fn put(file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
-    DEFAULT.put(&file.into(), data).await?;
+    DEFAULT.put(&file.into(), data.into()).await?;
     Ok(())
 }
 

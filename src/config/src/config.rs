@@ -54,6 +54,7 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
@@ -152,6 +153,28 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields.sort();
     fields.dedup();
     fields
+});
+
+pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    let streams: Vec<String> = get_config()
+        .common
+        .mem_table_individual_streams
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect();
+    let num_mem_tables = get_config().limit.mem_table_bucket_num;
+    for (idx, stream) in streams.into_iter().enumerate() {
+        map.insert(stream, num_mem_tables + idx);
+    }
+    map
 });
 
 static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
@@ -494,8 +517,6 @@ pub struct Common {
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
-    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
@@ -524,6 +545,12 @@ pub struct Common {
     pub bloom_filter_on_all_fields: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_NDV_RATIO",
+        default = 100,
+        help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
+    )]
+    pub bloom_filter_ndv_ratio: u64,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -662,6 +689,12 @@ pub struct Common {
     pub bulk_api_response_errors_only: bool,
     #[env_config(name = "ZO_ALLOW_USER_DEFINED_SCHEMAS", default = false)]
     pub allow_user_defined_schemas: bool,
+    #[env_config(
+        name = "ZO_MEM_TABLE_STREAMS",
+        default = "",
+        help = "Streams for which dedicated MemTable will be used as comma separated values"
+    )]
+    pub mem_table_individual_streams: String,
 }
 
 #[derive(EnvConfig)]
@@ -688,6 +721,12 @@ pub struct Limit {
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
+    #[env_config(
+        name = "ZO_MEM_TABLE_BUCKET_NUM",
+        default = 0,
+        help = "MemTable bucket num, default is 1"
+    )] // default is 1
+    pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
@@ -1218,6 +1257,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.inverted_index_split_chars.is_empty() {
         cfg.common.inverted_index_split_chars = " ;,".to_string();
     }
+
+    // check bloom filter ndv ratio
+    if cfg.common.bloom_filter_ndv_ratio == 0 {
+        cfg.common.bloom_filter_ndv_ratio = 100;
+    }
     Ok(())
 }
 
@@ -1353,6 +1397,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.mem_table_max_size = mem_total / 2; // 50%
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
+    }
+    if cfg.limit.mem_table_bucket_num == 0 {
+        cfg.limit.mem_table_bucket_num = 1;
     }
 
     // check query settings

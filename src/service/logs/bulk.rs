@@ -61,7 +61,6 @@ pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub async fn ingest(
     org_id: &str,
     body: web::Bytes,
-    thread_id: usize,
     user_email: &str,
 ) -> Result<BulkResponse, anyhow::Error> {
     let start = std::time::Instant::now();
@@ -471,7 +470,6 @@ pub async fn ingest(
 
     // write data to wal
     let time = start.elapsed().as_secs_f64();
-    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
     for (stream_name, mut stream_data) in stream_data_map {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
@@ -501,7 +499,13 @@ pub async fn ingest(
         };
 
         // write to file
+        let writer =
+            ingester::get_writer(org_id, &StreamType::Logs.to_string(), &stream_name).await;
         let mut req_stats = write_file(&writer, &stream_name, stream_data.data).await;
+        // if let Err(e) = writer.sync().await {
+        //     log::error!("ingestion error while syncing writer: {}", e);
+        // }
+
         req_stats.response_time += time;
         req_stats.user_email = Some(user_email.to_string());
         // metric + data usage
@@ -515,9 +519,6 @@ pub async fn ingest(
             fns_length as u16,
         )
         .await;
-    }
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd
