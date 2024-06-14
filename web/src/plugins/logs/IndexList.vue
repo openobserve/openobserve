@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section @click="handleSingleStreamSelect(opt)">
               <q-item-label v-html="opt.label" />
             </q-item-section>
-            <q-item-section side v-if="streamOptions.length > 1">
+            <q-item-section side>
               <q-toggle
                 :data-test="`log-search-index-list-stream-toggle-${opt.label}`"
                 :model-value="selected"
