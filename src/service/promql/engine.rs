@@ -60,12 +60,11 @@ impl Engine {
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
-        // log::warn!("TL: prom_expr: {:?}", prom_expr);
         if matches!(
             prom_expr,
             PromExpr::Aggregate(_) | PromExpr::Unary(_) | PromExpr::Binary(_) | PromExpr::Call(_)
         ) {
-            // Only filter columns for agg, unary, & binary queries
+            // Only filter columns for agg, unary, binary, & function call queries
             self.extract_columns_from_prom_expr(prom_expr)?;
         }
         let value = self.exec_expr(prom_expr).await?;
@@ -115,16 +114,13 @@ impl Engine {
                         VectorMatchCardinality::ManyToOne(labels) => {
                             self.col_filters.0.extend(labels.labels.iter().cloned());
                             self.extract_columns_from_prom_expr(lhs)?;
-                            // self.extract_columns_from_modifier(matching, op);
                         }
                         // group_right
                         VectorMatchCardinality::OneToMany(labels) => {
                             self.col_filters.0.extend(labels.labels.iter().cloned());
                             self.extract_columns_from_prom_expr(rhs)?;
-                            // self.extract_columns_from_modifier(matching, op);
                         }
                         VectorMatchCardinality::ManyToMany => {
-                            // self.extract_columns_from_prom_expr(rhs)?;
                             self.extract_columns_from_modifier(matching, op);
                         }
                     },
@@ -175,7 +171,6 @@ impl Engine {
     /// Help function to extract columns from [LabelModifier].
     /// Aggregation function topk & bottomk are special cases where
     /// modifier is applied to grouped result -> not columns filtered.
-    #[inline(always)]
     fn extract_columns_from_modifier(
         &mut self,
         modifier: &Option<LabelModifier>,
