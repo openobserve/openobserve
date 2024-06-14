@@ -313,12 +313,12 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
-    WHERE stream = $1 AND min_ts <= $2 AND max_ts >= $3;
+    WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
             )
             .bind(stream_key)
-            .bind(time_end)
             .bind(time_start)
+            .bind(time_end)
             .fetch_all(&pool)
             .await
         };
@@ -814,7 +814,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
         (
             "file_list",
-            "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
+            "CREATE INDEX IF NOT EXISTS file_list_stream_ts_idx on file_list (stream, max_ts, min_ts);",
         ),
         (
             "file_list_history",
@@ -822,7 +822,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
         (
             "file_list_history",
-            "CREATE INDEX IF NOT EXISTS file_list_history_stream_ts_idx on file_list_history (stream, min_ts, max_ts);",
+            "CREATE INDEX IF NOT EXISTS file_list_history_stream_ts_idx on file_list_history (stream, max_ts, min_ts);",
         ),
         (
             "file_list_history",

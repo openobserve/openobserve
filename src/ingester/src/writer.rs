@@ -142,7 +142,7 @@ impl Writer {
             .join("logs")
             .join(idx.to_string());
         log::info!(
-            "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
+            "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
             wal_dir.display().to_string(),
             &key.org_id,
             &key.stream_type,
@@ -207,7 +207,7 @@ impl Writer {
                 .join("logs")
                 .join(self.idx.to_string());
             log::info!(
-                "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
+                "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
                 wal_dir.display().to_string(),
                 &self.key.org_id,
                 &self.key.stream_type,
@@ -233,9 +233,9 @@ impl Writer {
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
             let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-            log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
+            log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
             IMMUTABLES.write().await.insert(path, table);
-            log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
+            log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
         }
 
         if !check_ttl {
