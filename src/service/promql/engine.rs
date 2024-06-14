@@ -29,8 +29,9 @@ use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier,
-        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr, VectorSelector,
+        token, AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function,
+        FunctionArgs, LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr,
+        StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
     },
 };
 
@@ -43,6 +44,8 @@ pub struct Engine {
     ctx: Arc<super::exec::Query>,
     /// The time boundaries for the evaluation.
     time: i64,
+    /// Filters to (include, exclude) certain columns
+    col_filters: (HashSet<String>, HashSet<String>),
     result_type: Option<String>,
 }
 
@@ -51,13 +54,145 @@ impl Engine {
         Self {
             ctx,
             time,
+            col_filters: (HashSet::new(), HashSet::new()),
             result_type: None,
         }
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
+        if matches!(
+            prom_expr,
+            PromExpr::Aggregate(_) | PromExpr::Unary(_) | PromExpr::Binary(_) | PromExpr::Call(_)
+        ) {
+            // Only filter columns for agg, unary, binary, & function call queries
+            self.extract_columns_from_prom_expr(prom_expr)?;
+        }
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
+    }
+
+    /// Recursively filters the necessary columns needed for before executing the given PromQL
+    /// expression.
+    pub fn extract_columns_from_prom_expr(&mut self, prom_expr: &PromExpr) -> Result<()> {
+        match prom_expr {
+            PromExpr::Aggregate(AggregateExpr {
+                op,
+                expr,
+                param,
+                modifier,
+            }) => {
+                self.extract_columns_from_prom_expr(expr)?;
+                if let Some(expr) = param {
+                    self.extract_columns_from_prom_expr(expr)?;
+                }
+                self.extract_columns_from_modifier(modifier, op);
+                Ok(())
+            }
+            PromExpr::Unary(UnaryExpr { expr }) => self.extract_columns_from_prom_expr(expr),
+            PromExpr::Binary(BinaryExpr {
+                op,
+                lhs,
+                rhs,
+                modifier,
+            }) => {
+                match modifier {
+                    None => {
+                        self.extract_columns_from_prom_expr(lhs)?;
+                        self.extract_columns_from_prom_expr(rhs)?;
+                    }
+                    Some(BinModifier {
+                        card,
+                        matching,
+                        return_bool: _,
+                    }) => match card {
+                        VectorMatchCardinality::OneToOne => {
+                            self.extract_columns_from_prom_expr(lhs)?;
+                            self.extract_columns_from_prom_expr(rhs)?;
+                            self.extract_columns_from_modifier(matching, op);
+                        }
+                        // group_left
+                        VectorMatchCardinality::ManyToOne(labels) => {
+                            self.col_filters.0.extend(labels.labels.iter().cloned());
+                            self.extract_columns_from_prom_expr(lhs)?;
+                        }
+                        // group_right
+                        VectorMatchCardinality::OneToMany(labels) => {
+                            self.col_filters.0.extend(labels.labels.iter().cloned());
+                            self.extract_columns_from_prom_expr(rhs)?;
+                        }
+                        VectorMatchCardinality::ManyToMany => {
+                            self.extract_columns_from_modifier(matching, op);
+                        }
+                    },
+                }
+                Ok(())
+            }
+            PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
+            PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
+            PromExpr::VectorSelector(selector) => {
+                self.col_filters.0.extend(
+                    selector
+                        .matchers
+                        .matchers
+                        .iter()
+                        .map(|mat| mat.name.to_owned()),
+                );
+                Ok(())
+            }
+            PromExpr::MatrixSelector(MatrixSelector {
+                vs: selector,
+                range: _,
+            }) => {
+                self.col_filters.0.extend(
+                    selector
+                        .matchers
+                        .matchers
+                        .iter()
+                        .map(|mat| mat.name.to_owned()),
+                );
+                Ok(())
+            }
+            PromExpr::Call(Call { func: _, args }) => {
+                _ = args
+                    .args
+                    .iter()
+                    .map(|expr| self.extract_columns_from_prom_expr(expr))
+                    .collect::<Vec<_>>();
+                Ok(())
+            }
+            PromExpr::Extension(expr) => Err(DataFusionError::NotImplemented(format!(
+                "Unsupported Extension: {:?}",
+                expr
+            ))),
+            _ => Ok(()),
+        }
+    }
+
+    /// Help function to extract columns from [LabelModifier].
+    /// Aggregation function topk & bottomk are special cases where
+    /// modifier is applied to grouped result -> not columns filtered.
+    fn extract_columns_from_modifier(
+        &mut self,
+        modifier: &Option<LabelModifier>,
+        op: &token::TokenType,
+    ) {
+        if let Some(label_modifier) = modifier {
+            match op.id() {
+                // topk and bottomk query all columns when with modifiers
+                token::T_TOPK | token::T_BOTTOMK => {
+                    self.col_filters.0.clear();
+                    self.col_filters.1.clear();
+                }
+                _ => match label_modifier {
+                    LabelModifier::Include(labels) => {
+                        self.col_filters.0.extend(labels.labels.iter().cloned());
+                    }
+                    LabelModifier::Exclude(labels) => {
+                        self.col_filters.1.extend(labels.labels.iter().cloned());
+                    }
+                },
+            }
+        }
     }
 
     #[async_recursion]
@@ -207,16 +342,7 @@ impl Engine {
                     Value::Matrix(data)
                 }
             }
-            PromExpr::Call(Call { func, args }) => {
-                // let output = self.call_expr(func, args).await?;
-                // if output.contains_same_label_set() {
-                //     return Err(DataFusionError::NotImplemented(
-                //         "vector cannot contain metrics with the same labelset".into(),
-                //     ));
-                // }
-                // output
-                self.call_expr(func, args).await?
-            }
+            PromExpr::Call(Call { func, args }) => self.call_expr(func, args).await?,
             PromExpr::Extension(expr) => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Extension: {:?}",
@@ -432,8 +558,10 @@ impl Engine {
         let mut tasks = Vec::new();
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
+            let col_filters = &self.col_filters;
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
+                selector_load_data_from_datafusion(ctx, schema, selector, start, end, col_filters)
+                    .await
             });
             tasks.push(task);
             // update stats
@@ -912,6 +1040,7 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
+    col_filters: &(HashSet<String>, HashSet<String>),
 ) -> Result<HashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
     let table = match ctx.table(table_name).await {
@@ -957,6 +1086,56 @@ async fn selector_load_data_from_datafusion(
             }
         }
     }
+
+    // Can filter necessary columns when either is not empty
+    if !col_filters.0.is_empty() ^ !col_filters.1.is_empty() {
+        let selected_cols: Vec<_> = {
+            if !col_filters.0.is_empty() {
+                // include only found columns and required hash, _timestamp, & value cols
+                col_filters
+                    .0
+                    .iter()
+                    .chain(
+                        [
+                            HASH_LABEL.to_string(),
+                            cfg.common.column_timestamp.clone(),
+                            VALUE_LABEL.to_string(),
+                        ]
+                        .iter(),
+                    )
+                    .filter_map(|incl| {
+                        if schema.column_with_name(incl).is_some() {
+                            Some(col(incl))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            } else {
+                // exclude found columns from schema
+                schema
+                    .fields()
+                    .iter()
+                    .filter_map(|field| {
+                        if col_filters.1.contains(field.name()) {
+                            None
+                        } else {
+                            Some(col(field.name()))
+                        }
+                    })
+                    .collect()
+            }
+        };
+
+        df_group = match df_group.select(selected_cols) {
+            Ok(df) => df,
+            Err(e) => {
+                log::error!("Selecting cols error: {:?}", e);
+                return Ok(HashMap::default());
+            }
+        };
+    }
+
     let batches = df_group
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
