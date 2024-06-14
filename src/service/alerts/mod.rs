@@ -488,6 +488,7 @@ impl QueryCondition {
 }
 
 impl ConditionList {
+    /// Evaluate Row against preset conditions
     #[async_recursion::async_recursion]
     pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         match self {
@@ -514,7 +515,7 @@ impl ConditionList {
         }
     }
 
-    /// Returns end nodes of the condition list
+    /// Returns end node count of a Condition list
     #[async_recursion::async_recursion]
     pub async fn len(&self) -> u32 {
         match self {
@@ -532,7 +533,7 @@ impl ConditionList {
         }
     }
 
-    /// Converts Condition list to SQL query as per schema validation
+    /// Converts Condition list to SQL query as per schema
     #[async_recursion::async_recursion]
     pub async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
         match self {

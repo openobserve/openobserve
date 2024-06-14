@@ -124,9 +124,8 @@ pub enum ConditionList {
     OrNode{or: Vec<ConditionList>},
     AndNode{and: Vec<ConditionList>},
     NotNode{not: Box<ConditionList>},
-    /// This is a variant to handle back compat cases where
-    /// conditions were stored as Vec<Condition> and interpreted
-    /// as a list of conditions joined with AND operator(default)
+    /// This variant handles data serialized in `Vec<Condition>`
+    /// where all conditions are evaluated as conjunction
     LegacyConditions(Vec<ConditionList>),
     EndCondition(Condition)
 }
