@@ -215,13 +215,13 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "38"
-datafusion-expr = "38"
-arrow = { version = "51.0.0", features = ["ipc_compression", "prettyprint"] }
-arrow-json = "51.0.0"
-arrow-schema = { version = "51.0.0", features = ["serde"] }
-parquet = { version = "51.0.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.9.1", features = ["aws", "azure", "gcp"] }
+datafusion = "39"
+datafusion-expr = "39"
+arrow = { version = "52.0.0", features = ["ipc_compression", "prettyprint"] }
+arrow-json = "52.0.0"
+arrow-schema = { version = "52.0.0", features = ["serde"] }
+parquet = { version = "52.0.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.10.1", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -274,7 +274,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.45", features = ["serde", "visitor"] }
+sqlparser = { version = "0.47", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"

@@ -184,7 +184,7 @@ pub async fn run_merge(
     worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [
         StreamType::Logs,
