@@ -599,8 +599,8 @@ pub struct Common {
     pub usage_batch_size: usize,
     #[env_config(
         name = "ZO_USAGE_PUBLISH_INTERVAL",
-        help = "duration in seconds after last reporting usage will be published",
-        default = 600
+        default = 600,
+        help = "duration in seconds after last reporting usage will be published"
     )]
     // in seconds
     pub usage_publish_interval: i64,
@@ -738,6 +738,10 @@ pub struct Limit {
     pub file_move_fields_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
+    #[env_config(name = "ZO_FILE_MERGE_THREAD_NUM", default = 0)]
+    pub file_merge_thread_num: usize,
+    #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
+    pub mem_dump_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
@@ -818,14 +822,14 @@ pub struct Limit {
     pub sql_max_db_connections: u32,
     #[env_config(
         name = "ZO_META_TRANSACTION_RETRIES",
-        help = "max time of transaction will retry",
-        default = 3
+        default = 3,
+        help = "max time of transaction will retry"
     )]
     pub meta_transaction_retries: usize,
     #[env_config(
         name = "ZO_META_TRANSACTION_LOCK_TIMEOUT",
-        help = "timeout of transaction lock",
-        default = 600
+        default = 600,
+        help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
@@ -860,6 +864,12 @@ pub struct Compact {
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
     pub data_retention_history: bool,
+    #[env_config(
+        name = "ZO_COMPACT_FAST_MODE",
+        default = true,
+        help = "Enable fast mode compact, will use more memory but faster"
+    )]
+    pub fast_mode: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1096,6 +1106,14 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num;
+    }
+    // HACK for file_merge_thread_num equal to CPU core
+    if cfg.limit.file_merge_thread_num == 0 {
+        cfg.limit.file_merge_thread_num = cpu_num;
+    }
+    // HACK for mem_dump_thread_num equal to CPU core
+    if cfg.limit.mem_dump_thread_num == 0 {
+        cfg.limit.mem_dump_thread_num = cpu_num;
     }
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;

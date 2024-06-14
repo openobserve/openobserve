@@ -44,7 +44,7 @@ use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
-    let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_move_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
     let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [StreamType::Logs];
     for org_id in orgs {

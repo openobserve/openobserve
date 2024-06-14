@@ -100,5 +100,8 @@ pub enum Error {
     TokioJoinError {
         source: tokio::task::JoinError,
     },
+    TokioMpscSendError {
+        source: tokio::sync::mpsc::error::SendError<PathBuf>,
+    },
     MemoryTableOverflowError {},
 }
