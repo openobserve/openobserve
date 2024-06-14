@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-list dense>
                       <q-item
                         clickable
+                        v-close-popup="true"
                         @click.stop="editFolder(tab.folderId)"
                         data-test="dashboard-edit-folder-icon"
                         ><q-item-section>
@@ -128,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                       <q-item
                         clickable
+                        v-close-popup="true"
                         @click.stop="showDeleteFolderDialogFn(tab.folderId)"
                         data-test="dashboard-delete-folder-icon"
                         ><q-item-section>
