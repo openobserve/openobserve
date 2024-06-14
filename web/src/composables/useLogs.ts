@@ -2388,7 +2388,6 @@ const useLogs = () => {
                       fieldObj.streams.push(
                         ...schemaMaps[schemaFieldsIndex].streams
                       );
-
                       searchObj.data.stream.expandGroupRowsFieldCount[
                         schemaMaps[schemaFieldsIndex].streams[0]
                       ] =
@@ -2396,7 +2395,6 @@ const useLogs = () => {
                           schemaMaps[schemaFieldsIndex].streams[0]
                         ] - 1;
                     }
-
                     commonSchemaMaps.push(fieldObj);
                     commonSchemaFields.push(field.name);
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] =
@@ -2450,7 +2448,6 @@ const useLogs = () => {
                     fieldObj.streams.push(
                       ...schemaMaps[schemaFieldsIndex].streams
                     );
-
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       schemaMaps[schemaFieldsIndex].streams[0]
                     ] =
