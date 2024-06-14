@@ -307,8 +307,7 @@ pub async fn merge(
                         json::to_vec(&vec![{
                             // there is no schema, just set the new schema
                             let schema_metadata = inferred_schema.metadata();
-                            tx.send(Some((inferred_schema.clone(), vec![]))).unwrap();
-                            if schema_metadata.contains_key("created_at")
+                            let inferred_schema = if schema_metadata.contains_key("created_at")
                                 && schema_metadata.contains_key("start_dt")
                             {
                                 inferred_schema
@@ -325,7 +324,9 @@ pub async fn merge(
                                         .insert("start_dt".to_string(), start_dt.to_string());
                                 }
                                 inferred_schema.with_metadata(schema_metadata)
-                            }
+                            };
+                            tx.send(Some((inferred_schema.clone(), vec![]))).unwrap();
+                            inferred_schema
                         }])
                         .unwrap()
                         .into(),
