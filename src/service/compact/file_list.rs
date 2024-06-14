@@ -224,7 +224,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let filter_file_keys: Arc<RwLock<HashMap<String, FileKey>>> =
         Arc::new(RwLock::new(HashMap::new()));
     let semaphore = std::sync::Arc::new(Semaphore::new(
-        config::get_config().limit.file_move_thread_num,
+        config::get_config().limit.file_merge_thread_num,
     ));
     let mut tasks = Vec::new();
     for file in file_list.clone() {
