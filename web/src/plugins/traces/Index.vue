@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
-                @get:traceDetails="getTraceDetails"
                 @shareLink="copyTracesUrl"
               />
             </div>
@@ -173,7 +172,6 @@ import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
 
-import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
@@ -260,7 +258,8 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useTraces();
+    const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
+      useTraces();
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -578,103 +577,15 @@ export default defineComponent({
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
         const queryParams = getUrlQueryParams();
+
         router.push({ query: queryParams });
         return req;
       } catch (e) {
+        console.log(e);
         searchObj.loading = false;
         showErrorNotification("Invalid SQL Syntax");
       }
     }
-
-    const openTraceDetails = () => {
-      searchObj.loading = true;
-      const queryReq = buildSearch();
-
-      let filter = searchObj.data.editorValue;
-
-      if (filter?.length)
-        filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
-      else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
-
-      searchService
-        .get_traces({
-          org_identifier: searchObj.organizationIdetifier,
-          start_time: queryReq.query.start_time,
-          end_time: queryReq.query.end_time,
-          filter: filter || "",
-          size: 1,
-          from: 0,
-          stream_name: selectedStreamName.value,
-        })
-        .then(async (res) => {
-          const trace = getTracesMetaData(res.data.hits)[0];
-          if (!trace) {
-            showTraceDetailsError();
-            return;
-          }
-          searchObj.data.traceDetails.selectedTrace = trace;
-          getTraceDetails();
-        })
-        .catch(() => {
-          showTraceDetailsError();
-        })
-        .finally(() => {
-          searchObj.loading = false;
-        });
-    };
-
-    const showTraceDetailsError = () => {
-      showErrorNotification(
-        `Trace ${router.currentRoute.value.query.trace_id} not found`
-      );
-      const query = cloneDeep(router.currentRoute.value.query);
-      delete query.trace_id;
-      router.push({
-        name: "traces",
-        query: {
-          ...query,
-        },
-      });
-      return;
-    };
-
-    const buildTraceSearchQuery = (trace: string) => {
-      const req = getDefaultRequest();
-      req.query.from = 0;
-      req.query.size = 1000;
-      req.query.start_time = trace.trace_start_time - 30000000;
-      req.query.end_time = trace.trace_end_time + 30000000;
-
-      req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
-      );
-
-      return req;
-    };
-
-    const getTraceDetails = () => {
-      searchObj.meta.showTraceDetails = true;
-      searchObj.data.traceDetails.loading = true;
-      searchObj.data.traceDetails.spanList = [];
-      const req = buildTraceSearchQuery(
-        searchObj.data.traceDetails.selectedTrace
-      );
-
-      delete req.aggs;
-
-      searchService
-        .search({
-          org_identifier: searchObj.organizationIdetifier,
-          query: req,
-          page_type: "traces",
-        }, "UI")
-        .then((res) => {
-          searchObj.data.traceDetails.spanList = res.data?.hits || [];
-        })
-        .finally(() => {
-          searchObj.data.traceDetails.loading = false;
-        });
-    };
 
     const updateFieldValues = (data) => {
       const excludedFields = [store.state.zoConfig.timestamp_column];
@@ -758,7 +669,7 @@ export default defineComponent({
         let filter = searchObj.data.editorValue.trim();
 
         let duration = "";
-        if (durationFilter.max) {
+        if (searchObj.meta.filterType === "basic" && durationFilter.max) {
           duration += ` duration >= ${
             durationFilter.min * 1000
           } AND duration <= ${durationFilter.max * 1000}`;
@@ -797,8 +708,6 @@ export default defineComponent({
 
             //update grid columns
             updateGridColumns();
-
-            if (router.currentRoute.value.query.trace_id) openTraceDetails();
 
             // dismiss();
           })
@@ -1137,6 +1046,10 @@ export default defineComponent({
     });
 
     onActivated(() => {
+      const params = router.currentRoute.value.query;
+      if (params.reload === "true") {
+        loadPageData();
+      }
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier
@@ -1194,68 +1107,6 @@ export default defineComponent({
           value: queryParams.stream,
         };
       }
-    }
-
-    const copyTracesUrl = (customTimeRange = null) => {
-      const queryParams = getUrlQueryParams(true);
-
-      if (customTimeRange) {
-        queryParams.from = customTimeRange.from;
-        queryParams.to = customTimeRange.to;
-      }
-
-      const queryString = Object.entries(queryParams)
-        .map(
-          ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
-        )
-        .join("&");
-
-      let shareURL = window.location.origin + window.location.pathname;
-
-      if (queryString != "") {
-        shareURL += "?" + queryString;
-      }
-
-      copyToClipboard(shareURL)
-        .then(() => {
-          $q.notify({
-            type: "positive",
-            message: "Link Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Error while copy link.",
-            timeout: 5000,
-          });
-        });
-    };
-
-    function getUrlQueryParams(getShareLink: false) {
-      const date = searchObj.data.datetime;
-      const query = {};
-
-      query["stream"] = selectedStreamName.value;
-
-      if (date.type == "relative" && !getShareLink) {
-        query["period"] = date.relativeTimePeriod;
-      } else {
-        query["from"] = date.startTime;
-        query["to"] = date.endTime;
-      }
-
-      query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
-
-      query["filter_type"] = searchObj.meta.filterType;
-
-      query["org_identifier"] = store.state.selectedOrganization.identifier;
-
-      query["trace_id"] = router.currentRoute.value.query.trace_id;
-
-      return query;
     }
 
     const onSplitterUpdate = () => {
@@ -1316,7 +1167,6 @@ export default defineComponent({
       updateGridColumns,
       getConsumableDateTime,
       runQueryFn,
-      getTraceDetails,
       verifyOrganizationStatus,
       fieldValues,
       onSplitterUpdate,

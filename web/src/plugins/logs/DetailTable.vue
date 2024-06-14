@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
+            @view-trace="viewTrace"
           />
         </q-card-section>
       </q-tab-panel>
@@ -359,6 +360,7 @@ export default defineComponent({
     "remove:searchterm",
     "search:timeboxed",
     "add:table",
+    "view-trace",
   ],
   props: {
     modelValue: {
@@ -458,6 +460,10 @@ export default defineComponent({
       emit("add:table", value);
     };
 
+    const viewTrace = () => {
+      emit("view-trace");
+    };
+
     return {
       t,
       store,
@@ -473,6 +479,7 @@ export default defineComponent({
       copyContentToClipboard,
       addFieldToTable,
       searchObj,
+      viewTrace,
     };
   },
   async created() {
