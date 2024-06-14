@@ -2230,6 +2230,7 @@ const useLogs = () => {
         let fieldObj: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
         const streamInterestingFields: any = [];
+        let streamInterestingFieldsLocal: any = [];
 
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
@@ -2325,7 +2326,7 @@ const useLogs = () => {
                 searchObj.data.stream.selectedStream.length > 1;
             }
 
-            searchObj.data.stream.interestingFieldList =
+            streamInterestingFieldsLocal =
               localInterestingFields.value != null &&
               localInterestingFields.value[
                 searchObj.organizationIdetifier + "_" + stream.name
@@ -2339,6 +2340,10 @@ const useLogs = () => {
                 : environmentInterestingFields.length > 0
                 ? [...environmentInterestingFields]
                 : [...schemaInterestingFields];
+
+            searchObj.data.stream.interestingFieldList.push(
+              ...streamInterestingFieldsLocal
+            );
 
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
@@ -2376,7 +2381,10 @@ const useLogs = () => {
                   if (schemaFieldsIndex > -1) {
                     fieldObj.group = "common";
 
-                    if(schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") && schemaMaps[schemaFieldsIndex].streams.length > 0) {
+                    if (
+                      schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
+                      schemaMaps[schemaFieldsIndex].streams.length > 0
+                    ) {
                       fieldObj.streams.push(
                         ...schemaMaps[schemaFieldsIndex].streams
                       );
@@ -2435,7 +2443,10 @@ const useLogs = () => {
                 );
                 if (schemaFieldsIndex > -1) {
                   fieldObj.group = "common";
-                  if(schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") && schemaMaps[schemaFieldsIndex].streams.length > 0) {
+                  if (
+                    schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
+                    schemaMaps[schemaFieldsIndex].streams.length > 0
+                  ) {
                     fieldObj.streams.push(
                       ...schemaMaps[schemaFieldsIndex].streams
                     );
