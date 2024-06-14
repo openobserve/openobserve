@@ -21,7 +21,7 @@ use config::FxIndexSet;
 use datafusion::error::Result;
 use itertools::Itertools;
 use sqlparser::{
-    ast::{Expr, Function, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
+    ast::{Expr, Function, FunctionArguments, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -86,23 +86,29 @@ impl VisitorMut for Rewrite {
             }
             let mut field_names = FxIndexSet::default();
             let mut delete_idx = Vec::new();
+            let empty_vec = vec![];
             for (idx, select_item) in &mut select.projection.iter_mut().enumerate() {
                 match select_item {
                     sqlparser::ast::SelectItem::ExprWithAlias { expr, alias } => {
                         match expr {
-                            Expr::Function(Function {
-                                name,
-                                args,
-                                distinct,
-                                ..
-                            }) => {
+                            Expr::Function(Function { name, args, .. }) => {
                                 // extract field name from the aggregate function
                                 if AGGREGATE_UDF_LIST
                                     .contains(&name.to_string().to_lowercase().as_str())
                                 {
-                                    // check if aggregate function is count and distinct is
-                                    // false
-                                    if name.to_string().to_lowercase() == "count" && !(*distinct) {
+                                    let distinct = match &args {
+                                        FunctionArguments::List(args) => matches!(
+                                            args.duplicate_treatment,
+                                            Some(sqlparser::ast::DuplicateTreatment::Distinct,)
+                                        ),
+                                        _ => false,
+                                    };
+                                    let args = match &args {
+                                        FunctionArguments::List(args) => &args.args,
+                                        _ => &empty_vec,
+                                    };
+                                    // check if aggregate function is count and distinct is false
+                                    if name.to_string().to_lowercase() == "count" && !(distinct) {
                                         select.distinct = None;
                                     }
                                     // check if the field name is already in the projection list
@@ -133,13 +139,7 @@ impl VisitorMut for Rewrite {
                     }
                     // extrace function paraments from the projection list
                     sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
-                        if let Expr::Function(Function {
-                            name,
-                            args,
-                            distinct,
-                            ..
-                        }) = expr
-                        {
+                        if let Expr::Function(Function { name, args, .. }) = expr {
                             if !AGGREGATE_UDF_LIST
                                 .contains(&name.to_string().to_lowercase().as_str())
                             {
@@ -154,7 +154,18 @@ impl VisitorMut for Rewrite {
                                     }
                                 }
                             } else {
-                                if name.to_string().to_lowercase() == "count" && !(*distinct) {
+                                let distinct = match &args {
+                                    FunctionArguments::List(args) => matches!(
+                                        args.duplicate_treatment,
+                                        Some(sqlparser::ast::DuplicateTreatment::Distinct)
+                                    ),
+                                    _ => false,
+                                };
+                                let args = match &args {
+                                    FunctionArguments::List(args) => &args.args,
+                                    _ => &empty_vec,
+                                };
+                                if name.to_string().to_lowercase() == "count" && !(distinct) {
                                     select.distinct = None;
                                 }
                                 let field_name = remove_brackets(format!("{}", args[0]).as_str());

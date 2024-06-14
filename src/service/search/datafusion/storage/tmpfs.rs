@@ -22,11 +22,10 @@ use config::utils::time::BASE_TIME;
 use futures::{stream::BoxStream, StreamExt};
 use infra::cache::tmpfs;
 use object_store::{
-    path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
-    ObjectStore, PutOptions, PutResult, Result,
+    path::Path, Attributes, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
+    ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
 };
 use thiserror::Error as ThisError;
-use tokio::io::AsyncWrite;
 
 use super::GetRangeExt;
 
@@ -80,6 +79,7 @@ impl ObjectStore for Tmpfs {
             payload: GetResultPayload::Stream(
                 futures::stream::once(async move { Ok(data) }).boxed(),
             ),
+            attributes: Attributes::default(),
             meta,
             range,
         })
@@ -108,6 +108,7 @@ impl ObjectStore for Tmpfs {
             payload: GetResultPayload::Stream(
                 futures::stream::once(async move { Ok(data) }).boxed(),
             ),
+            attributes: Attributes::default(),
             meta,
             range,
         })
@@ -198,24 +199,25 @@ impl ObjectStore for Tmpfs {
     async fn put_opts(
         &self,
         location: &Path,
-        _bytes: Bytes,
+        _payload: PutPayload,
         _opts: PutOptions,
     ) -> Result<PutResult> {
         log::error!("NotImplemented put_opts: {}", location);
         Err(object_store::Error::NotImplemented {})
     }
 
-    async fn put_multipart(
-        &self,
-        location: &Path,
-    ) -> Result<(MultipartId, Box<dyn AsyncWrite + Unpin + Send>)> {
+    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart: {}", location);
-        Err(object_store::Error::NotImplemented {})
+        Err(object_store::Error::NotImplemented)
     }
 
-    async fn abort_multipart(&self, location: &Path, _multipart_id: &MultipartId) -> Result<()> {
-        log::error!("NotImplemented abort_multipart: {}", location);
-        Err(object_store::Error::NotImplemented {})
+    async fn put_multipart_opts(
+        &self,
+        location: &Path,
+        _opts: PutMultipartOpts,
+    ) -> Result<Box<dyn MultipartUpload>> {
+        log::error!("NotImplemented put_multipart_opts: {}", location);
+        Err(object_store::Error::NotImplemented)
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {

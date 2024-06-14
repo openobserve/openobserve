@@ -18,9 +18,9 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, GroupByExpr,
-        Offset as SqlOffset, OrderByExpr, Select, SelectItem, SetExpr, Statement, TableFactor,
-        TableWithJoins, Value,
+        BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, FunctionArguments,
+        GroupByExpr, Offset as SqlOffset, OrderByExpr, Select, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Value,
     },
     parser::Parser,
 };
@@ -557,7 +557,7 @@ fn parse_expr_like(
     _negated: &bool,
     expr: &SqlExpr,
     pattern: &SqlExpr,
-    _escape_char: &Option<char>,
+    _escape_char: &Option<String>,
     next_op: &SqlOperator,
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
@@ -660,16 +660,21 @@ fn parse_expr_function(
         return parse_expr_fun_time_range(f, field, fields);
     }
 
-    if f.args.len() < 2 {
+    let args = match &f.args {
+        FunctionArguments::None => return Ok(()),
+        FunctionArguments::Subquery(_) => return Ok(()),
+        FunctionArguments::List(args) => &args.args,
+    };
+    if args.len() < 2 {
         return Ok(());
     }
 
     let nop = SqlOperator::And;
     let next_op = SqlOperator::And;
-    let field_name = f.args.first().unwrap().to_string();
+    let field_name = args.first().unwrap().to_string();
     let field_name = field_name.trim_matches(|c: char| c == '\'' || c == '"');
     if parse_expr_check_field_name(field_name, field) {
-        match f.args.get(1).unwrap() {
+        match args.get(1).unwrap() {
             FunctionArg::Named {
                 name: _name,
                 arg,
@@ -709,18 +714,23 @@ fn parse_expr_fun_time_range(
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
-    if f.args.len() != 3 {
+    let args = match &f.args {
+        FunctionArguments::None => return Ok(()),
+        FunctionArguments::Subquery(_) => return Ok(()),
+        FunctionArguments::List(args) => &args.args,
+    };
+    if args.len() != 3 {
         return Err(anyhow::anyhow!(
             "SqlExpr::Function: time_range function must have 3 arguments"
         ));
     }
 
     let next_op = SqlOperator::And;
-    let field_name = f.args.first().unwrap().to_string();
+    let field_name = args.first().unwrap().to_string();
     let field_name = field_name.trim_matches(|c: char| c == '\'' || c == '"');
     if parse_expr_check_field_name(field_name, field) {
         let mut vals = Vec::new();
-        for arg in f.args.iter() {
+        for arg in args.iter() {
             let val = match arg {
                 FunctionArg::Named {
                     name: _name,
@@ -799,8 +809,13 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
             (!fields.is_empty()).then_some(fields)
         }
         SqlExpr::Function(f) => {
-            let mut fields = Vec::with_capacity(f.args.len());
-            for arg in f.args.iter() {
+            let args = match &f.args {
+                FunctionArguments::None => return None,
+                FunctionArguments::Subquery(_) => return None,
+                FunctionArguments::List(args) => &args.args,
+            };
+            let mut fields = Vec::with_capacity(args.len());
+            for arg in args.iter() {
                 match arg {
                     FunctionArg::Named {
                         name: _name,
@@ -842,9 +857,7 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
             }
             (!fields.is_empty()).then_some(fields)
         }
-        SqlExpr::Cast { expr, .. } | SqlExpr::TryCast { expr, .. } => {
-            get_field_name_from_expr(expr)
-        }
+        SqlExpr::Cast { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Case {
             operand: _,
             conditions,
@@ -862,7 +875,8 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
-        SqlExpr::ArrayIndex { obj, .. } => get_field_name_from_expr(obj),
+        SqlExpr::CompositeAccess { expr, .. } => get_field_name_from_expr(expr),
+        SqlExpr::Subscript { expr, .. } => get_field_name_from_expr(expr),
         _ => None,
     }
 }
