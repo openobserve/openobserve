@@ -2381,12 +2381,15 @@ const useLogs = () => {
                         ...schemaMaps[schemaFieldsIndex].streams
                       );
                     }
-                    searchObj.data.stream.expandGroupRowsFieldCount[
-                      schemaMaps[schemaFieldsIndex].streams[0]
-                    ] =
+
+                    if(schemaMaps[schemaFieldsIndex].streams.length>0) {
                       searchObj.data.stream.expandGroupRowsFieldCount[
                         schemaMaps[schemaFieldsIndex].streams[0]
-                      ] - 1;
+                      ] =
+                        searchObj.data.stream.expandGroupRowsFieldCount[
+                          schemaMaps[schemaFieldsIndex].streams[0]
+                        ] - 1;
+                    }
                     commonSchemaMaps.push(fieldObj);
                     commonSchemaFields.push(field.name);
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] =
@@ -2438,12 +2441,15 @@ const useLogs = () => {
                       ...schemaMaps[schemaFieldsIndex].streams
                     );
                   }
-                  searchObj.data.stream.expandGroupRowsFieldCount[
-                    schemaMaps[schemaFieldsIndex].streams[0]
-                  ] =
+
+                  if(schemaMaps[schemaFieldsIndex].streams.length>0) {
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       schemaMaps[schemaFieldsIndex].streams[0]
-                    ] - 1;
+                    ] =
+                      searchObj.data.stream.expandGroupRowsFieldCount[
+                        schemaMaps[schemaFieldsIndex].streams[0]
+                      ] - 1;
+                  }
 
                   commonSchemaMaps.push(fieldObj);
                   commonSchemaFields.push(field.name);
