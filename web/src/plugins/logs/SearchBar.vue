@@ -18,6 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div class="row">
       <div class="float-right col q-mb-xs">
+        <q-btn-toggle
+          class="q-ml-xs no-outline q-pa-none no-border"
+          v-model="searchObj.meta.logsVisualizeToggle"
+          style="margin-left: 5px; border-radius: 4px"
+          no-caps
+          padding="5px"
+          size="sm"
+          toggle-color="primary"
+          :options="[
+            { label: 'Search', value: 'logs' },
+            { label: 'Visualize', value: 'visualize' },
+          ]"
+        />
         <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
@@ -251,19 +264,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchObj.meta.quickMode"
           :label="t('search.quickModeLabel')"
           @click="handleQuickMode"
-        />
-        <q-btn-toggle
-          class="q-ml-xs no-outline q-pa-none no-border"
-          v-model="searchObj.meta.logsVisualizeToggle"
-          style="margin-left: 5px; border-radius: 4px"
-          no-caps
-          padding="5px"
-          size="sm"
-          toggle-color="primary"
-          :options="[
-            { label: 'Logs', value: 'logs' },
-            { label: 'Visualize', value: 'visualize' },
-          ]"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">
