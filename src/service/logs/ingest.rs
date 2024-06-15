@@ -165,67 +165,78 @@ pub async fn ingest(
             }
         };
 
-        let mut local_val = match res.take() {
-            json::Value::Object(val) => val,
+        let local_vals = match res.take() {
+            json::Value::Object(val) => vec![val],
+            json::Value::Array(v) => {
+                v.into_iter().filter_map(|item| {
+                    if let json::Value::Object(map) = item {
+                        Some(map)
+                    } else {
+                        None
+                    }
+                }).collect()
+            }
             _ => unreachable!(),
         };
 
-        if let Some(fields) = user_defined_schema_map.get(stream_name) {
-            local_val = crate::service::logs::refactor_map(local_val, fields);
-        }
-
-        if let Err(e) = handle_timestamp(&mut local_val, min_ts) {
-            stream_status.status.failed += 1;
-            stream_status.status.error = e.to_string();
-            continue;
-        }
-
-        let mut to_add_distinct_values = vec![];
-        // get distinct_value item
-        for field in DISTINCT_FIELDS.iter() {
-            if let Some(val) = local_val.get(field) {
-                if !val.is_null() {
-                    to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                        stream_type: StreamType::Logs,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.as_str().unwrap().to_string(),
-                        filter_name: "".to_string(),
-                        filter_value: "".to_string(),
-                    }));
-                }
+        for mut local_val in local_vals {
+            if let Some(fields) = user_defined_schema_map.get(stream_name) {
+                local_val = crate::service::logs::refactor_map(local_val, fields);
             }
-        }
 
-        let local_trigger = match super::add_valid_record(
-            &StreamMeta {
-                org_id: org_id.to_string(),
-                stream_name: stream_name.to_string(),
-                partition_keys: &partition_keys,
-                partition_time_level: &partition_time_level,
-                stream_alerts_map: &stream_alerts_map,
-            },
-            &mut stream_schema_map,
-            &mut stream_status.status,
-            &mut write_buf,
-            local_val,
-            trigger.is_none(),
-        )
-        .await
-        {
-            Ok(v) => v,
-            Err(e) => {
+            if let Err(e) = handle_timestamp(&mut local_val, min_ts) {
                 stream_status.status.failed += 1;
                 stream_status.status.error = e.to_string();
                 continue;
             }
-        };
-        if local_trigger.is_some() {
-            trigger = local_trigger;
-        }
 
-        // add distinct values
-        distinct_values.extend(to_add_distinct_values);
+            let mut to_add_distinct_values = vec![];
+            // get distinct_value item
+            for field in DISTINCT_FIELDS.iter() {
+                if let Some(val) = local_val.get(field) {
+                    if !val.is_null() {
+                        to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                            stream_type: StreamType::Logs,
+                            stream_name: stream_name.to_string(),
+                            field_name: field.to_string(),
+                            field_value: val.as_str().unwrap().to_string(),
+                            filter_name: "".to_string(),
+                            filter_value: "".to_string(),
+                        }));
+                    }
+                }
+            }
+
+            let local_trigger = match super::add_valid_record(
+                &StreamMeta {
+                    org_id: org_id.to_string(),
+                    stream_name: stream_name.to_string(),
+                    partition_keys: &partition_keys,
+                    partition_time_level: &partition_time_level,
+                    stream_alerts_map: &stream_alerts_map,
+                },
+                &mut stream_schema_map,
+                &mut stream_status.status,
+                &mut write_buf,
+                local_val,
+                trigger.is_none(),
+            )
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = e.to_string();
+                    continue;
+                }
+            };
+            if local_trigger.is_some() {
+                trigger = local_trigger;
+            }
+
+            // add distinct values
+            distinct_values.extend(to_add_distinct_values);
+        }
     }
 
     // write data to wal
@@ -314,10 +325,9 @@ pub fn apply_functions<'a>(
         )?;
     }
 
-    if value.is_null() || !value.is_object() {
-        Err(anyhow::Error::msg("apply functions failure"))
-    } else {
-        Ok(value)
+    match &value {
+        json::Value::Object(_) | json::Value::Array(_) => Ok(value),
+        _ => Err(anyhow::Error::msg("apply functions failure")),
     }
 }
 

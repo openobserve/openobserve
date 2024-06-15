@@ -368,7 +368,18 @@ pub fn apply_stream_functions(
             value = apply_vrl_fn(runtime, vrl_runtime, &value, org_id, stream_name);
         }
     }
-    flatten::flatten_with_level(value, get_config().limit.ingest_flatten_level)
+
+    let flatten_level = get_config().limit.ingest_flatten_level;
+
+    if let Value::Array(v) = value {
+        return v
+            .into_iter()
+            .map(|item| flatten::flatten_with_level(item, flatten_level))
+            .collect::<Result<Vec<_>, _>>()
+            .map(|v| Value::Array(v));
+    }
+
+    flatten::flatten_with_level(value, flatten_level)
 }
 
 pub fn init_functions_runtime() -> Runtime {
