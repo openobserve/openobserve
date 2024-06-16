@@ -100,10 +100,10 @@ pub async fn validator(
 /// ### Args:
 /// - token: The token to validate
 ///  
-pub async fn validate_token(token: &str, org_id: &str) -> Result<bool, Error> {
+pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     match users::get_user_by_token(org_id, token).await {
-        Some(_user) => Ok(true),
-        None => Err(ErrorForbidden("Not allowed")),
+        Some(_user) => Ok(()),
+        None => Err(ErrorForbidden("User associated with this token not found")),
     }
 }
 
@@ -515,16 +515,22 @@ pub async fn validator_rum(
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
         Some(token) => match validate_token(token, org_id_end_point[0]).await {
-            Ok(res) => {
-                if res {
-                    Ok(req)
-                } else {
-                    Err((ErrorUnauthorized("Unauthorized Access"), req))
-                }
+            Ok(_res) => Ok(req),
+            Err(err) => {
+                log::error!(
+                    "validate_token: Token not found for org_id: {}",
+                    org_id_end_point[0]
+                );
+                Err((err, req))
             }
-            Err(err) => Err((err, req)),
         },
-        None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
+        None => {
+            log::error!(
+                "validate_token: Missing api key for rum endpoint org_id: {}",
+                org_id_end_point[0]
+            );
+            Err((ErrorUnauthorized("Unauthorized Access"), req))
+        }
     }
 }
 
