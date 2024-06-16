@@ -329,11 +329,13 @@ pub async fn get_presigned_url(
     let cfg = get_config();
     let time = chrono::Utc::now().timestamp();
     let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
+
+    let base_url = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
     let url = generate_presigned_url(
         basic_auth.user_id(),
         basic_auth.password().unwrap(),
         password_ext_salt,
-        &cfg.common.web_url,
+        &base_url,
         query.exp_in as i64,
         time,
     );
