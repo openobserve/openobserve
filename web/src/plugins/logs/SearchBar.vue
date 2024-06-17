@@ -2188,7 +2188,7 @@ export default defineComponent({
     };
 
     const customDownloadDialog = ref(false);
-    const downloadCustomInitialNumber = ref(0);
+    const downloadCustomInitialNumber = ref(1);
     const downloadCustomRange = ref(100);
     const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
 
