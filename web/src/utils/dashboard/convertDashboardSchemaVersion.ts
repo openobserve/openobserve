@@ -113,9 +113,17 @@ export function convertDashboardSchemaVersion(data: any) {
         tabItem.panels.forEach((panelItem: any) => {
           panelItem.queries.forEach((queryItem: any) => {
             queryItem.type = panelItem.type;
-            if (queryItem.fields.x.length > 1 && queryItem.type != "table") {
-              queryItem.breakdown = queryItem.fields.x[1] ?? [];
+
+            if (!Array.isArray(queryItem.fields.breakdown)) {
+              queryItem.fields.breakdown = [];
             }
+
+            // Move excess x-axis fields to breakdown
+            if (queryItem.fields.x.length > 1 && queryItem.type != "table") {
+              queryItem.fields.breakdown.push(...queryItem.fields.x.slice(1));
+              queryItem.fields.x = [queryItem.fields.x[0]];
+            }
+
             queryItem.config.unit = panelItem.config.unit;
             queryItem.config.unit_custom = panelItem.config.unit_custom;
           });
