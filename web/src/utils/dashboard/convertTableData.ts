@@ -105,8 +105,8 @@ export const convertTableData = (
               formatUnitValue(
                 getUnitValue(
                   val,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals ?? 2
                 )
               ) ?? 0

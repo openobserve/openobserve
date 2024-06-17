@@ -95,14 +95,15 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
       formatter: function (params: any) {
-        
         let formattedValue = params.value[2];
         if (getUnitValue && formatUnitValue) {
+          console.log("formattedValue", formattedValue);
+
           formattedValue = formatUnitValue(
             getUnitValue(
               formattedValue,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           );

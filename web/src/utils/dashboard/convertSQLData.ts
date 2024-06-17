@@ -297,8 +297,8 @@ export const convertSQLData = async (
                 return formatUnitValue(
                   getUnitValue(
                     params.value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 );
@@ -320,8 +320,8 @@ export const convertSQLData = async (
               return formatUnitValue(
                 getUnitValue(
                   params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals
                 )
               );
@@ -369,8 +369,8 @@ export const convertSQLData = async (
                 `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )} </strong>`
@@ -381,8 +381,8 @@ export const convertSQLData = async (
                 `${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )}`
@@ -464,8 +464,8 @@ export const convertSQLData = async (
             : formatUnitValue(
                 getUnitValue(
                   largestLabel(getAxisDataFromKey(yAxisKeys[0])),
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals
                 )
               )
@@ -479,8 +479,8 @@ export const convertSQLData = async (
           return formatUnitValue(
             getUnitValue(
               value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           );
@@ -546,8 +546,8 @@ export const convertSQLData = async (
               return formatUnitValue(
                 getUnitValue(
                   params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals
                 )
               );
@@ -658,8 +658,8 @@ export const convertSQLData = async (
                   `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                     getUnitValue(
                       it.data,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
+                      panelSchema.queries[0].config?.unit,
+                      panelSchema.queries[0].config?.unit_custom,
                       panelSchema.config?.decimals
                     )
                   )} </strong>`
@@ -670,8 +670,8 @@ export const convertSQLData = async (
                   `${it.marker} ${it.seriesName} : ${formatUnitValue(
                     getUnitValue(
                       it.data,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
+                      panelSchema.queries[0].config?.unit,
+                      panelSchema.queries[0].config?.unit_custom,
                       panelSchema.config?.decimals
                     )
                   )}`
@@ -775,8 +775,8 @@ export const convertSQLData = async (
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           )}</b>`;
@@ -826,8 +826,8 @@ export const convertSQLData = async (
           return `${name.marker} ${name.name} : <b>${formatUnitValue(
             getUnitValue(
               name.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           )}<b/>`;
@@ -871,8 +871,8 @@ export const convertSQLData = async (
             return formatUnitValue(
               getUnitValue(
                 params.value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
+                panelSchema.queries[0].config?.unit,
+                panelSchema.queries[0].config?.unit_custom,
                 panelSchema.config?.decimals
               )
             );
@@ -970,8 +970,8 @@ export const convertSQLData = async (
                   formatUnitValue(
                     getUnitValue(
                       params.value[2],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
+                      panelSchema.queries[0].config?.unit,
+                      panelSchema.queries[0].config?.unit_custom,
                       panelSchema.config?.decimals
                     )
                   ) || params.value[2]
@@ -1007,8 +1007,8 @@ export const convertSQLData = async (
             formatUnitValue(
               getUnitValue(
                 params?.value[2],
-                panelSchema?.config?.unit,
-                panelSchema?.config?.unit_custom,
+                panelSchema?.queries[0].config?.unit,
+                panelSchema?.queries[0].config?.unit_custom,
                 panelSchema?.config?.decimals
               )
             ) || params.value[2]
@@ -1126,8 +1126,8 @@ export const convertSQLData = async (
       const yAxisValue = getAxisDataFromKey(key1);
       const unitValue = getUnitValue(
         yAxisValue.length > 0 ? yAxisValue[0] : 0,
-        panelSchema.config?.unit,
-        panelSchema.config?.unit_custom,
+        panelSchema.queries[0].config?.unit,
+        panelSchema.queries[0].config?.unit_custom,
         panelSchema.config?.decimals
       );
       options.dataset = { source: [[]] };
@@ -1194,8 +1194,8 @@ export const convertSQLData = async (
           return formatUnitValue(
             getUnitValue(
               value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           );
@@ -1283,8 +1283,8 @@ export const convertSQLData = async (
                 formatter: function (value: any) {
                   const unitValue = getUnitValue(
                     value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   );
                   return unitValue.value + unitValue.unit;
@@ -1400,8 +1400,8 @@ export const convertSQLData = async (
                 `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )} </strong>`
@@ -1412,8 +1412,8 @@ export const convertSQLData = async (
                 `${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )}`
@@ -1433,8 +1433,8 @@ export const convertSQLData = async (
               return formatUnitValue(
                 getUnitValue(
                   params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals
                 )
               );
@@ -1535,8 +1535,8 @@ export const convertSQLData = async (
                 `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )} </strong>`
@@ -1547,8 +1547,8 @@ export const convertSQLData = async (
                 `${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )}`
@@ -1568,8 +1568,8 @@ export const convertSQLData = async (
               return formatUnitValue(
                 getUnitValue(
                   params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals
                 )
               );

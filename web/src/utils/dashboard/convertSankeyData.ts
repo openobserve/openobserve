@@ -81,8 +81,8 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
           value = formatUnitValue(
             getUnitValue(
               value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           );

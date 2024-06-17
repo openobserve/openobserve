@@ -211,8 +211,8 @@ export const convertPromQLData = async (
                 `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   )
                 )} </strong>`
@@ -223,8 +223,8 @@ export const convertPromQLData = async (
                 `${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(
                     it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
+                    panelSchema.queries[0].config?.unit,
+                    panelSchema.queries[0].config?.unit_custom,
                     panelSchema.config?.decimals
                   ) ?? ""
                 )}`
@@ -246,8 +246,8 @@ export const convertPromQLData = async (
               return formatUnitValue(
                 getUnitValue(
                   name.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
+                  panelSchema.queries[0].config?.unit,
+                  panelSchema.queries[0].config?.unit_custom,
                   panelSchema.config?.decimals
                 )
               );
@@ -280,8 +280,8 @@ export const convertPromQLData = async (
           return formatUnitValue(
             getUnitValue(
               name,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
+              panelSchema.queries[0].config?.unit,
+              panelSchema.queries[0].config?.unit_custom,
               panelSchema.config?.decimals
             )
           );
@@ -479,8 +479,8 @@ export const convertPromQLData = async (
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
                       value,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
+                      panelSchema.queries[0].config?.unit,
+                      panelSchema.queries[0].config?.unit_custom,
                       panelSchema.config?.decimals
                     );
                     return unitValue.value + unitValue.unit;
@@ -508,8 +508,8 @@ export const convertPromQLData = async (
             return formatUnitValue(
               getUnitValue(
                 value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
+                panelSchema.queries[0].config?.unit,
+                panelSchema.queries[0].config?.unit_custom,
                 panelSchema.config?.decimals
               )
             );
@@ -544,8 +544,8 @@ export const convertPromQLData = async (
               );
               const unitValue = getUnitValue(
                 values[values.length - 1][1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
+                panelSchema.queries[0].config?.unit,
+                panelSchema.queries[0].config?.unit_custom,
                 panelSchema.config?.decimals
               );
               return {

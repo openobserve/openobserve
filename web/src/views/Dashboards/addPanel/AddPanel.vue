@@ -561,8 +561,12 @@ export default defineComponent({
     const isInitailDashboardPanelData = () => {
       return (
         dashboardPanelData.data.description == "" &&
-        !dashboardPanelData.data.config.unit &&
-        !dashboardPanelData.data.config.unit_custom &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.unit &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.unit_custom &&
         dashboardPanelData.data.queries[0].fields.x.length == 0 &&
         dashboardPanelData.data.queries[0].fields.y.length == 0 &&
         dashboardPanelData.data.queries[0].fields.z.length == 0 &&
@@ -754,7 +758,11 @@ export default defineComponent({
       }
 
       //check each query is empty or not for geomap
-      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "geomap") {
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type == "geomap"
+      ) {
         dashboardData.data.queries.map((q: any, index: number) => {
           if (q && q.query == "") {
             errors.push(`Query-${index + 1} is empty`);
@@ -763,14 +771,22 @@ export default defineComponent({
       }
 
       //check content should be empty for html
-      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "html") {
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type == "html"
+      ) {
         if (dashboardData.data.htmlContent.trim() == "") {
           errors.push("Please enter your HTML code");
         }
       }
 
       //check content should be empty for html
-      if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "markdown") {
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type == "markdown"
+      ) {
         if (dashboardData.data.markdownContent.trim() == "") {
           errors.push("Please enter your markdown code");
         }
@@ -1025,7 +1041,13 @@ export default defineComponent({
         }
 
         // check if aggregation function is selected or not
-        if (!(dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == "heatmap")) {
+        if (
+          !(
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].type == "heatmap"
+          )
+        ) {
           const aggregationFunctionError = dashboardData.data.queries[
             dashboardData.layout.currentQueryIndex
           ].fields.y.filter(

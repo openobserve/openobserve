@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-description"
       />
     </div>
-    
+
     <div class="space"></div>
 
     <q-toggle
@@ -214,7 +214,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         outlined
-        v-model="dashboardPanelData.data.config.unit"
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.unit
+        "
         :options="unitOptions"
         dense
         :label="t('dashboard.unitLabel')"
@@ -222,9 +226,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stack-label
         emit-value
         :display-value="`${
-          dashboardPanelData.data.config.unit
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.unit
             ? unitOptions.find(
-                (it) => it.value == dashboardPanelData.data.config.unit
+                (it) =>
+                  it.value ==
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].config.unit
               )?.label
             : 'Default'
         }`"
@@ -233,8 +243,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
       <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
       <q-input
-        v-if="dashboardPanelData.data.config.unit == 'custom'"
-        v-model="dashboardPanelData.data.config.unit_custom"
+        v-if="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.unit == 'custom'
+        "
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.unit_custom
+        "
         :label="t('dashboard.customunitLabel')"
         color="input-border"
         bg-color="input-bg"
