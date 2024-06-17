@@ -1434,7 +1434,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 165px) !important;
+  height: calc(100vh - 140px) !important;
 }
 </style>
 <style lang="scss">
