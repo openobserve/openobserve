@@ -158,10 +158,10 @@ export const getUnitValue = (
     }
     case "default":
     default: {
-      if (isNaN(value)) {
-        return { value, unit: "" };
+      if (isNaN(value) || value == "") {
+        return { value: value == "" ? "-" : value, unit: "" };
       }
-      
+
       let unitIndex = units.largeNumbers.length - 1;
       while (unitIndex > 0 && absValue < units.largeNumbers[unitIndex].divisor) {
         unitIndex--;
