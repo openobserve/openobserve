@@ -242,13 +242,13 @@ export default defineComponent({
       searchType,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata } = usePanelDataLoader(
+    let { data, loading, errorDetail, metadata, resultMetaData } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
       chartPanelRef,
       forceLoad,
-      searchType
+      searchType,
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -292,7 +292,9 @@ export default defineComponent({
               data.value,
               store,
               chartPanelRef,
-              hoveredSeriesState
+              hoveredSeriesState,
+              resultMetaData,
+              metadata.value
             );
 
             errorDetail.value = "";

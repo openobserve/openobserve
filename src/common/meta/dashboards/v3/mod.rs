@@ -185,6 +185,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    no_value_replacement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     wrap_table_cells: Option<bool>,
 }
 

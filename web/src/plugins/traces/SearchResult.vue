@@ -224,6 +224,7 @@ export default defineComponent({
     const closeTraceDetails = () => {
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
+      if (query.span_id) delete query.span_id;
 
       router.push({
         query: {
