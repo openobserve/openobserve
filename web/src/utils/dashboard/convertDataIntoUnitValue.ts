@@ -173,7 +173,7 @@ export const getUnitValue = (
         value: finalValue,
         unit: finalUnit || "",
       };
-    }      
+    }
   }
 };
 
