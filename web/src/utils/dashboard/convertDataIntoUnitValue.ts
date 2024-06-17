@@ -153,27 +153,27 @@ export const getUnitValue = (
       };
     }
     case "default":
-      default: {
-        if (isNaN(value)) {
-          return { value, unit: "" };
-        }
+    default: {
+      if (isNaN(value)) {
+        return { value, unit: "" };
+      }
       
-        let unitIndex = units.largeNumbers.length - 1;
-        while (unitIndex > 0 && absValue < units.largeNumbers[unitIndex].divisor) {
-          unitIndex--;
-        }
+      let unitIndex = units.largeNumbers.length - 1;
+      while (unitIndex > 0 && absValue < units.largeNumbers[unitIndex].divisor) {
+        unitIndex--;
+      }
       
-        const finalValue = (
-          (sign * absValue) /
-          units.largeNumbers[unitIndex].divisor
-        ).toFixed(decimals);
-        const finalUnit = units.largeNumbers[unitIndex].unit;
-      
-        return {
-          value: finalValue,
-          unit: finalUnit || "",
-        };
-      }      
+      const finalValue = (
+        (sign * absValue) /
+        units.largeNumbers[unitIndex].divisor
+      ).toFixed(decimals);
+      const finalUnit = units.largeNumbers[unitIndex].unit;
+
+      return {
+        value: finalValue,
+        unit: finalUnit || "",
+      };
+    }      
   }
 };
 
