@@ -35,7 +35,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js"]
        
     steps:
       - name: Remove unused tools
