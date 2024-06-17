@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isCollapsed="collapseMapping[span.spanId]"
         :spanData="spanMap[span.spanId]"
         @toggle-collapse="toggleSpanCollapse"
+        @select-span="selectSpan"
       />
     </div>
   </template>
@@ -133,7 +134,6 @@ import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
-import type { Ref } from "vue";
 
 export default defineComponent({
   name: "TraceTree",

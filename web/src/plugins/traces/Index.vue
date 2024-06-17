@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
                 @shareLink="copyTracesUrl"
+                @get:traceDetails="getTraceDetails"
               />
             </div>
           </template>
@@ -662,13 +663,21 @@ export default defineComponent({
       delete req.aggs;
 
       searchService
-        .search({
-          org_identifier: searchObj.organizationIdetifier,
-          query: req,
-          page_type: "traces",
-        }, "UI")
+        .search(
+          {
+            org_identifier: searchObj.organizationIdetifier,
+            query: req,
+            page_type: "traces",
+          },
+          "UI"
+        )
         .then((res) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
+          if (router.currentRoute.value.query.span_id) {
+            searchObj.data.traceDetails.showSpanDetails = true;
+            searchObj.data.traceDetails.selectedSpanId =
+              router.currentRoute.value.query.span_id;
+          }
         })
         .finally(() => {
           searchObj.data.traceDetails.loading = false;
@@ -796,6 +805,8 @@ export default defineComponent({
 
             //update grid columns
             updateGridColumns();
+
+            if (router.currentRoute.value.query.trace_id) openTraceDetails();
 
             // dismiss();
           })
@@ -1251,6 +1262,9 @@ export default defineComponent({
       query["org_identifier"] = store.state.selectedOrganization.identifier;
 
       query["trace_id"] = router.currentRoute.value.query.trace_id;
+
+      if (router.currentRoute.value.query.span_id)
+        query["span_id"] = router.currentRoute.value.query.span_id;
 
       return query;
     }
