@@ -570,7 +570,7 @@ clickable v-close-popup>
             data-test="custom-download-initial-number-input"
             v-model="downloadCustomInitialNumber"
             :label="t('search.initialNumber')"
-            default-value="0"
+            default-value="1"
             color="input-border"
             bg-color="input-bg"
             class="showLabelOnTop"
@@ -579,7 +579,7 @@ clickable v-close-popup>
             filled
             dense
             tabindex="0"
-            min="0"
+            min="1"
           />
           <q-select
             data-test="custom-download-range-select"
