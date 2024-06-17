@@ -35,6 +35,11 @@ static TIME_UNITS: [(char, u64); 7] = [
 ];
 
 #[inline(always)]
+pub fn now_micros() -> i64 {
+    Utc::now().timestamp_micros()
+}
+
+#[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> i64 {
     if v == 0 {
         return Utc::now().timestamp_micros();

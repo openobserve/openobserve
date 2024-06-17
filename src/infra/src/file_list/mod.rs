@@ -75,6 +75,7 @@ pub trait FileList: Sync + Send + 'static {
         time_max: i64,
         limit: i64,
     ) -> Result<Vec<(String, bool)>>;
+    // stream stats
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -113,6 +114,19 @@ pub trait FileList: Sync + Send + 'static {
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
+    // merge job
+    async fn add_job(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        date: i64,
+        offset: i64,
+    ) -> Result<()>;
+    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn set_job_done(&self, id: i64) -> Result<()>;
+    async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
+    async fn clean_jobs(&self, before_date: i64) -> Result<()>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -355,4 +369,30 @@ pub struct FileDeletedRecord {
     pub date: String,
     pub file: String,
     pub flattened: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct MergeJobRecord {
+    pub id: i64,
+    pub org: String,    // org id
+    pub stream: String, // default/logs/default
+    pub date: i64,      // 20240617
+    pub offset: i64,    // 1718603746000000
+    pub node: String,   // node name
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct MergeJobPendingRecord {
+    pub stream: String,
+    pub id: i64,
+    pub num: i64,
+}
+
+#[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
+#[repr(i32)]
+pub enum FileListJobStatus {
+    #[default]
+    Pending,
+    Running,
+    Done,
 }
