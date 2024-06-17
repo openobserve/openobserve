@@ -478,19 +478,22 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 
     let key = format!("{org_id}/{token}");
-    let user = USERS_RUM_TOKEN.get(&key);
-    match user {
-        Some(loc_user) => Some(loc_user.value().clone()),
+    let cached_user = USERS_RUM_TOKEN
+        .get(&key)
+        .map(|loc_user| loc_user.value().clone());
+
+    match cached_user {
+        Some(user) => Some(user),
         None => {
-            if let Some(user) = db::user::get_by_token(Some(org_id), token)
+            log::info!("get_user_by_token: User not found in cache, fetching from db");
+            if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
                 .await
                 .ok()
                 .flatten()
             {
-                USERS_RUM_TOKEN
-                    .clone()
-                    .insert(format!("{}/{}", org_id, token), user.clone());
-                Some(user)
+                log::info!("get_user_by_token: User found updating cache");
+                USERS_RUM_TOKEN.insert(key, user_from_db.clone());
+                Some(user_from_db)
             } else {
                 None
             }
