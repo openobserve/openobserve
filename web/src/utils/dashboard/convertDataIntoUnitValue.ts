@@ -75,6 +75,14 @@ const units: any = {
     { unit: "TB", divisor: 1024 * 1024 },
     { unit: "PB", divisor: 1024 * 1024 * 1024 },
   ],
+  largeNumbers: [
+    { unit: "", divisor: 1 },
+    { unit: "K", divisor: 1e3 },
+    { unit: "M", divisor: 1e6 },
+    { unit: "B", divisor: 1e9 },
+    { unit: "T", divisor: 1e12 },
+    { unit: "Q", divisor: 1e15 },
+  ],
 };
 
 /**
@@ -145,13 +153,27 @@ export const getUnitValue = (
       };
     }
     case "default":
-    default: {
-      // console.timeEnd("getUnitValue:");
-      return {
-        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
-        unit: "",
-      };
-    }
+      default: {
+        if (isNaN(value)) {
+          return { value, unit: "" };
+        }
+      
+        let unitIndex = units.largeNumbers.length - 1;
+        while (unitIndex > 0 && absValue < units.largeNumbers[unitIndex].divisor) {
+          unitIndex--;
+        }
+      
+        const finalValue = (
+          (sign * absValue) /
+          units.largeNumbers[unitIndex].divisor
+        ).toFixed(decimals);
+        const finalUnit = units.largeNumbers[unitIndex].unit;
+      
+        return {
+          value: finalValue,
+          unit: finalUnit || "",
+        };
+      }      
   }
 };
 
