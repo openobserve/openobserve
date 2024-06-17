@@ -109,9 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     props.row.group
                   ] > 0
                 "
-                :name="
-                  searchObj.data.stream.expandGroupRows[props.row.group]"
-                class="float-right"></q-icon>
+                :name="searchObj.data.stream.expandGroupRows[props.row.group]"
+                class="float-right"
+              ></q-icon>
             </q-td>
           </q-tr>
           <q-tr
@@ -1159,7 +1159,11 @@ export default defineComponent({
         // console.log(searchObj.data.stream.expandGroupRows)
         // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
         for (let key of expandKeys) {
-          if (searchObj.data.stream.expandGroupRows[key] == false) {
+          if (
+            searchObj.data.stream.expandGroupRows[key] == false &&
+            selectedStreamFields != undefined &&
+            selectedStreamFields?.length > 0
+          ) {
             startIndex =
               selectedStreamFields.length -
               searchObj.data.stream.expandGroupRowsFieldCount[key];
