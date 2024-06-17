@@ -558,6 +558,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-input
+        v-if="
+          ['area', 'line', 'area-stacked'].includes(
+            dashboardPanelData.data.type
+          )
+        "
+        v-model="dashboardPanelData.data.config.no_value_replacement"
+        label="No Value Replacement"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        filled
+        dense
+        label-slot
+        data-test="dashboard-config-no-value-replacement"
+        ><template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            No Value Replacement
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-limit-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+              >
+                What to display when a value is missing
+              </q-tooltip>
+            </div>
+          </div>
+        </template></q-input
+      >
+
+      <div class="space"></div>
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
         outlined
@@ -786,6 +825,11 @@ export default defineComponent({
       // by default, use connect_nulls as false
       if (!dashboardPanelData.data.config.connect_nulls) {
         dashboardPanelData.data.config.connect_nulls = false;
+      }
+
+      // by default, use no_value_replacement as empty string
+      if (!dashboardPanelData.data.config.no_value_replacement) {
+        dashboardPanelData.data.config.no_value_replacement = "";
       }
 
       // by default, use wrap_table_cells as false
