@@ -152,7 +152,11 @@ export const getUnitValue = (
     default: {
       // console.timeEnd("getUnitValue:");
       return {
-        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
+        value: isNaN(value)
+          ? value
+          : value == ""
+          ? "-"
+          : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
