@@ -144,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
-                @get:traceDetails="getTraceDetails"
                 @shareLink="copyTracesUrl"
+                @get:traceDetails="getTraceDetails"
               />
             </div>
           </template>
@@ -663,13 +663,21 @@ export default defineComponent({
       delete req.aggs;
 
       searchService
-        .search({
-          org_identifier: searchObj.organizationIdetifier,
-          query: req,
-          page_type: "traces",
-        }, "UI")
+        .search(
+          {
+            org_identifier: searchObj.organizationIdetifier,
+            query: req,
+            page_type: "traces",
+          },
+          "UI"
+        )
         .then((res) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
+          if (router.currentRoute.value.query.span_id) {
+            searchObj.data.traceDetails.showSpanDetails = true;
+            searchObj.data.traceDetails.selectedSpanId =
+              router.currentRoute.value.query.span_id;
+          }
         })
         .finally(() => {
           searchObj.data.traceDetails.loading = false;
@@ -758,7 +766,7 @@ export default defineComponent({
         let filter = searchObj.data.editorValue.trim();
 
         let duration = "";
-        if (durationFilter.max) {
+        if (searchObj.meta.filterType === "basic" && durationFilter.max) {
           duration += ` duration >= ${
             durationFilter.min * 1000
           } AND duration <= ${durationFilter.max * 1000}`;
@@ -1255,6 +1263,9 @@ export default defineComponent({
 
       query["trace_id"] = router.currentRoute.value.query.trace_id;
 
+      if (router.currentRoute.value.query.span_id)
+        query["span_id"] = router.currentRoute.value.query.span_id;
+
       return query;
     }
 
@@ -1423,7 +1434,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-search-result-container {
-  height: calc(100vh - 165px) !important;
+  height: calc(100vh - 140px) !important;
 }
 </style>
 <style lang="scss">

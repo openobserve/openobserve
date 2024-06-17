@@ -348,6 +348,8 @@ export default defineComponent({
     watch(
       () => props.span,
       () => {
+        tags.value = {};
+        processes.value = {};
         spanDetails.value = getFormattedSpanDetails();
       }
     );
