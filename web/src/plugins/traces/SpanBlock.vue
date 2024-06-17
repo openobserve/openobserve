@@ -148,7 +148,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  emits: ["toggleCollapse"],
+  emits: ["toggleCollapse", "selectSpan"],
   components: { SpanDetails },
   setup(props, { emit }) {
     const store = useStore();
@@ -161,8 +161,7 @@ export default defineComponent({
       return searchObj.data.traceDetails.selectedSpanId !== props.span.spanId;
     });
     const selectSpan = () => {
-      searchObj.data.traceDetails.showSpanDetails = true;
-      searchObj.data.traceDetails.selectedSpanId = props.span.spanId;
+      emit("selectSpan", props.span.spanId);
     };
     const toggleSpanCollapse = () => {
       emit("toggleCollapse", props.span.spanId);
