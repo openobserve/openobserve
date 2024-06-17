@@ -97,6 +97,10 @@ export const getUnitValue = (
   // abs value
   const absValue = Math.abs(value);
 
+  if (Number.isNaN(absValue) || Number.isNaN(sign)) {
+    return { value: value, unit: "" };
+  }
+
   switch (unit) {
     case "bytes":
     case "seconds":

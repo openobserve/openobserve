@@ -52,6 +52,7 @@ export const usePanelDataLoader = (
     loading: false,
     errorDetail: "",
     metadata: {},
+    resultMetaData: [] as any,
   });
 
   // observer for checking if panel is visible on the screen
@@ -324,7 +325,11 @@ export const usePanelDataLoader = (
                 state.errorDetail = "";
                 // console.log("API response received");
 
-                return { result: res.data.hits, metadata: metadata };
+                return {
+                  result: res.data.hits,
+                  metadata: metadata,
+                  resultMetaData: { ...res.data },
+                };
               })
               .catch((error) => {
                 // console.log("API error received", error);
@@ -342,6 +347,11 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: sqlqueryResults.map((it) => it?.metadata),
         };
+
+        state.resultMetaData = sqlqueryResults.map(
+          (it) => it?.resultMetaData
+        );
+
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
       }

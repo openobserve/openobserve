@@ -22,6 +22,8 @@
  * @return {Object} - the options object for rendering the chart
  */
 import { utcToZonedTime } from "date-fns-tz";
+import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
+import { format } from "date-fns";
 import {
   formatDate,
   formatUnitValue,
@@ -36,7 +38,9 @@ export const convertSQLData = async (
   searchQueryData: any,
   store: any,
   chartPanelRef: any,
-  hoveredSeriesState: any
+  hoveredSeriesState: any,
+  resultMetaData: any,
+  metadata: any
 ) => {
   // console.time("convertSQLData");
 
@@ -51,9 +55,6 @@ export const convertSQLData = async (
     // console.timeEnd("convertSQLData");
     return { options: null };
   }
-
-  // flag to check if the data is time series
-  let isTimeSeriesFlag = false;
 
   // get the x axis key
   const getXAxisKeys = () => {
@@ -76,10 +77,106 @@ export const convertSQLData = async (
       : [];
   };
 
+  const noValueConfigOption = panelSchema.config?.no_value_replacement;
+  const missingValue = () => {
+    // Get the interval in minutes
+    const interval = resultMetaData.value.map(
+      (it: any) => it.histogram_interval
+    )[0];
+
+    if (
+      !interval ||
+      !metadata.queries ||
+      !["area-stacked", "line", "area"].includes(panelSchema.type)
+    ) {
+      return JSON.parse(JSON.stringify(searchQueryData[0]));
+    }
+
+    // Extract and process metaDataStartTime
+    const metaDataStartTime = metadata.queries[0].startTime.toString();
+    const startTime = new Date(parseInt(metaDataStartTime) / 1000);
+
+    // Calculate the binnedDate
+    const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
+    const binnedDate = dateBin(interval, startTime, origin);
+
+    // Convert interval to milliseconds
+    const intervalMillis = interval * 1000;
+
+    // Identify the time-based key
+    const searchQueryDataFirstEntry = searchQueryData[0][0];
+
+    const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
+    let timeBasedKey = keys?.find((key) =>
+      isTimeSeries([searchQueryDataFirstEntry?.[key]])
+    );
+
+    if (!timeBasedKey) {
+      return JSON.parse(JSON.stringify(searchQueryData[0]));
+    }
+
+    // Extract and process metaDataEndTime
+    const metaDataEndTime = metadata.queries[0].endTime.toString();
+    const endTime = new Date(parseInt(metaDataEndTime) / 1000);
+
+    const xAxisKeys = getXAxisKeys().filter((key: any) => key !== timeBasedKey);
+
+    // Create a set of unique xAxis values
+    const uniqueXAxisValues = new Set(
+      searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
+    );
+
+    // Create a map of existing data
+    const searchDataMap = new Map();
+    searchQueryData[0]?.forEach((d: any) => {
+      const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
+      searchDataMap.set(key, d);
+    });
+
+    const filledData: any = [];
+    let currentTime = binnedDate;
+
+    while (currentTime <= endTime) {
+      const currentFormattedTime = format(
+        utcToZonedTime(currentTime, "UTC"),
+        "yyyy-MM-dd'T'HH:mm:ss"
+      );
+
+      uniqueXAxisValues.forEach((xAxisValue) => {
+        const key = `${currentFormattedTime}-${xAxisValue}`;
+        const currentData = searchDataMap.get(key);
+        if (currentData) {
+          filledData.push(currentData);
+        } else {
+          const nullEntry = {
+            [timeBasedKey]: currentFormattedTime,
+            [xAxisKeys[0]]: xAxisValue,
+          };
+          keys.forEach((key) => {
+            if (key !== timeBasedKey && key !== xAxisKeys[0])
+              nullEntry[key] =
+                noValueConfigOption === undefined ? null : noValueConfigOption;
+          });
+
+          filledData.push(nullEntry);
+        }
+      });
+
+      currentTime = new Date(currentTime.getTime() + intervalMillis);
+    }
+
+    return filledData;
+  };
+
+  const missingValueData = missingValue();
+
+  // flag to check if the data is time series
+  let isTimeSeriesFlag = false;
+
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
     let data =
-      searchQueryData[0]?.filter((item: any) => {
+      missingValueData?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
           yAxisKeys.every((key: any) => item[key] != null)
@@ -469,7 +566,7 @@ export const convertSQLData = async (
         const key1 = xAxisKeys[1];
         // get the unique value of the second xAxis's key
         const stackedXAxisUniqueValue = [
-          ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
+          ...new Set(missingValueData.map((obj: any) => obj[key1])),
         ].filter((it) => it);
 
         options.series = yAxisKeys
@@ -479,7 +576,7 @@ export const convertSQLData = async (
             ).label;
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-              const data = searchQueryData[0].filter(
+              const data = missingValueData.filter(
                 (it: any) => it[key1] == key
               );
               const seriesObj = {

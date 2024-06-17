@@ -70,6 +70,7 @@ const getDefaultDashboardPanelData: any = () => ({
       },
       drilldown: [],
       connect_nulls: false,
+      no_value_replacement: "",
       wrap_table_cells: false,
     },
     htmlContent: "",
