@@ -915,10 +915,8 @@ export default defineComponent({
       this.customDownloadDialog = true;
     },
     downloadRangeData() {
-      if (
-        this.downloadCustomInitialNumber < 0 ||
-        this.downloadCustomInitialNumber == ""
-      ) {
+      let initNumber = parseInt(this.downloadCustomInitialNumber);
+      if (initNumber < 0) {
         this.$q.notify({
           message: "Initial number must be positive number.",
           color: "negative",
@@ -929,9 +927,7 @@ export default defineComponent({
       }
       // const queryReq = this.buildSearch();
       // console.log(this.searchObj.data.customDownloadQueryObj)
-      this.searchObj.data.customDownloadQueryObj.query.from = parseInt(
-        this.downloadCustomInitialNumber
-      );
+      this.searchObj.data.customDownloadQueryObj.query.from = initNumber;
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
       searchService
