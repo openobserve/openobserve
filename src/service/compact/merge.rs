@@ -123,7 +123,7 @@ pub async fn generate_job_by_stream(
     }
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] offset: {}",
+        "[COMPACTOR] generate_job_by_stream [{}/{}/{}] offset: {}",
         org_id,
         stream_type,
         stream_name,
@@ -428,7 +428,7 @@ pub async fn merge_by_stream(
                 let result = inner_rx.recv().await.unwrap();
                 let now = config::utils::time::now_micros();
                 // convert job_timeout from secs to micros, and check 1/4 of job_timeout
-                if now - updated_at > (cfg.compact.job_timeout * 1000 * 1000 / 4) {
+                if now - updated_at > (cfg.compact.job_run_timeout * 1000 * 1000 / 4) {
                     if let Err(e) = infra_file_list::update_running_jobs(job_id).await {
                         log::error!("[COMPACT] update_running_jobs failed: {e}");
                     }

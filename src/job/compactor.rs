@@ -173,7 +173,7 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
 
 async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
     loop {
-        let timeout = get_config().compact.job_timeout;
+        let timeout = get_config().compact.job_run_timeout;
         time::sleep(time::Duration::from_secs(timeout as u64)).await;
         log::debug!("[COMPACTOR] Running check running jobs");
         let updated_at = config::utils::time::now_micros() - (timeout * 1000 * 1000);
@@ -185,11 +185,10 @@ async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
 
 async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
     loop {
-        // set clean time to 2 times of job timeout
-        let timeout = get_config().compact.job_timeout * 2;
-        time::sleep(time::Duration::from_secs(timeout as u64)).await;
+        let wait_time = get_config().compact.job_clean_wait_time;
+        time::sleep(time::Duration::from_secs(wait_time as u64)).await;
         log::debug!("[COMPACTOR] Running clean done jobs");
-        let updated_at = config::utils::time::now_micros() - (timeout * 1000 * 1000);
+        let updated_at = config::utils::time::now_micros() - (wait_time * 1000 * 1000);
         if let Err(e) = infra::file_list::clean_done_jobs(updated_at).await {
             log::error!("[COMPACTOR] run clean done jobs error: {e}");
         }

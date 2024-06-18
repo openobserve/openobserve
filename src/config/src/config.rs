@@ -877,11 +877,17 @@ pub struct Compact {
     )]
     pub batch_size: i64,
     #[env_config(
-        name = "ZO_COMPACT_JOB_TIMEOUT",
-        default = 600,
+        name = "ZO_COMPACT_JOB_RUN_TIMEOUT",
+        default = 1800, // 30 minutes
         help = "If a compact job is not finished in this time, it will be marked as failed"
     )]
-    pub job_timeout: i64,
+    pub job_run_timeout: i64,
+    #[env_config(
+        name = "ZO_COMPACT_JOB_CLEAN_WAIT_TIME",
+        default = 86400, // 1 day
+        help = "Clean the jobs which are finished more than this time"
+    )]
+    pub job_clean_wait_time: i64,
 }
 
 #[derive(EnvConfig)]
