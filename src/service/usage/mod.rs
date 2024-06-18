@@ -391,6 +391,26 @@ pub async fn run() {
     }
 }
 
+// Cron job to frequently publish auditted events
+#[cfg(feature = "enterprise")]
+pub async fn run_audit_publish() {
+    use o2_enterprise::enterprise::common::{
+        auditor::publish_existing_audits, infra::config::O2_CONFIG,
+    };
+    if !O2_CONFIG.common.audit_enabled {
+        return;
+    }
+    let mut audit_interval = time::interval(time::Duration::from_secs(
+        O2_CONFIG.common.audit_publish_interval.try_into().unwrap(),
+    ));
+    audit_interval.tick().await; // trigger the first run
+    loop {
+        log::info!("Audit ingestion loop running");
+        audit_interval.tick().await;
+        publish_existing_audits(publish_audit).await;
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit(msg: auditor::AuditMessage) {
     auditor::audit(msg, publish_audit).await;
