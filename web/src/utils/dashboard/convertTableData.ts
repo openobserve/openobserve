@@ -55,6 +55,17 @@ export const convertTableData = (
     for (const field of columnData) {
       if (field?.aggregationFunction === "histogram") {
         histogramFields.push(field.alias);
+      } else {
+        const sample = tableRows
+          ?.slice(0, Math.min(20, tableRows.length))
+          ?.map((it: any) => it[field.alias]);
+
+        const isTimeSeriesData = isTimeSeries(sample);
+        const isTimeStampData = isTimeStamp(sample);
+
+        if (isTimeSeriesData || isTimeStampData) {
+          histogramFields.push(field.alias);
+        }
       }
     }
   } else {
@@ -77,22 +88,6 @@ export const convertTableData = (
     }
   }
 
-  // format date for histogram fields
-  for (const it of tableRows) {
-    for (const histogramField of histogramFields) {
-      if (it[histogramField]) {
-        it[histogramField] = formatDate(
-          utcToZonedTime(
-            typeof it[histogramField] === "string"
-              ? `${it[histogramField]}Z`
-              : new Date(it[histogramField])?.getTime() / 1000,
-            store.state.timezone
-          )
-        );
-      }
-    }
-  }
-
   const columns = columnData.map((it: any) => {
     let obj: any = {};
     const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
@@ -104,8 +99,8 @@ export const convertTableData = (
     // if number then sort by number and use decimal point config option in format
     if (isNumber) {
       obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-      obj["format"] = (val: any) =>
-        !Number.isNaN(val)
+      obj["format"] = (val: any) => {
+        return !Number.isNaN(val)
           ? `${
               formatUnitValue(
                 getUnitValue(
@@ -117,6 +112,22 @@ export const convertTableData = (
               ) ?? 0
             }`
           : val;
+      };
+    }
+
+    // if current field is histogram field then return formatted date
+    if (histogramFields.includes(it.alias)) {
+      // if current field is histogram field then return formatted date
+      obj["format"] = (val: any) => {
+        return formatDate(
+          utcToZonedTime(
+            typeof val === "string"
+              ? `${val}Z`
+              : new Date(val)?.getTime() / 1000,
+            store.state.timezone
+          )
+        );
+      };
     }
     return obj;
   });
