@@ -39,11 +39,9 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         }
         time::sleep(time::Duration::from_secs(3600)).await;
         let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
-        if let Err(e) = config::utils::asynchronism::file::clean_empty_dirs(
-            &config::get_config().common.data_wal_dir,
-            Some(last_updated),
-        )
-        .await
+        let root = format!("{}files/", config::get_config().common.data_wal_dir);
+        if let Err(e) =
+            config::utils::asynchronism::file::clean_empty_dirs(&root, Some(last_updated)).await
         {
             log::error!("clean_empty_dirs, err: {}", e);
         }
