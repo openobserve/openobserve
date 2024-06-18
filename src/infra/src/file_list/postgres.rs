@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use config::{
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    utils::parquet::parse_file_key_columns,
+    utils::{hash::Sum64, parquet::parse_file_key_columns},
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, Postgres, QueryBuilder, Row};
@@ -630,6 +630,20 @@ UPDATE stream_stats
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
+        let lock_key = "file_list_jobs:get_pending_jobs";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_id = if lock_id > i64::MAX as u64 {
+            (lock_id >> 1) as i64
+        } else {
+            lock_id as i64
+        };
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
+        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback get_pending_jobs error: {}", e);
+            }
+            return Err(e.into());
+        };
         // get pending jobs group by stream and order by num desc
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
@@ -638,8 +652,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
     WHERE status = $1 
     GROUP BY stream 
     ORDER BY num DESC 
-    LIMIT $2 
-    FOR UPDATE;"#,
+    LIMIT $2;"#,
         )
         .bind(super::FileListJobStatus::Pending)
         .bind(limit)
