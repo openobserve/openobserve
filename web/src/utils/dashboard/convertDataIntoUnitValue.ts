@@ -109,6 +109,11 @@ export const getUnitValue = (
     return { value: value, unit: "" };
   }
 
+  // if value is missing use - as a placeholder
+  if (isNaN(value) || value == "") {
+    return { value: value == "" ? "-" : value, unit: "" };
+  }
+
   switch (unit) {
     case "numbers":
     case "bytes":
@@ -119,10 +124,6 @@ export const getUnitValue = (
     case "kilobytes":
     case "bps":
     case "megabytes": {
-      if (isNaN(value) || value == "") {
-        return { value: value == "" ? "-" : value, unit: "" };
-      }
-
       // start with last index
       let unitIndex = units[unit].length - 1;
       // while the value is smaller than the divisor
