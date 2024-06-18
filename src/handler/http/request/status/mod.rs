@@ -41,14 +41,16 @@ use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::jwt::verify_decode_token,
+    crate::common::utils::{auth::extract_auth_str, jwt::verify_decode_token},
     crate::handler::http::auth::{
         jwt::process_token,
-        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG},
+        validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
     },
+    crate::service::usage::audit,
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
+            auditor::AuditMessage,
             infra::config::O2_CONFIG,
             settings::{get_logo, get_logo_text},
         },
@@ -332,6 +334,20 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     let status = "succcessfully reloaded config";
+    // Audit this event
+    #[cfg(feature = "enterprise")]
+    audit(AuditMessage {
+        // Since this is not a protected route, there is no way to get the user email
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        method: "GET".to_string(),
+        _timestamp: chrono::Utc::now().timestamp_micros(),
+        path: "/config/reload".to_string(),
+        query_params: "".to_string(),
+        body: "".to_string(),
+        response_code: 200,
+    })
+    .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
 }
 
@@ -371,9 +387,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use o2_enterprise::enterprise::common::auditor::AuditMessage;
-
-    use crate::{common::meta::user::AuthTokens, service::usage::audit};
+    use crate::common::meta::user::AuthTokens;
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -611,6 +625,13 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
 async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     // remove the session
     let conf = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let auth_str = extract_auth_str(&req);
+    // Only get the user email from the auth_str, no need to check for permissions and others
+    #[cfg(feature = "enterprise")]
+    let user_email = get_user_email_from_auth_str(&auth_str).await;
+
     if let Some(cookie) = req.cookie("auth_tokens") {
         let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
@@ -622,6 +643,21 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     };
     let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
     let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(user_email) = user_email {
+        audit(AuditMessage {
+            user_email,
+            org_id: "".to_string(),
+            method: "GET".to_string(),
+            _timestamp: chrono::Utc::now().timestamp_micros(),
+            path: "/config/logout".to_string(),
+            query_params: req.query_string().to_string(),
+            body: "".to_string(),
+            response_code: 200,
+        })
+        .await;
+    }
 
     HttpResponse::Ok()
         .append_header((header::LOCATION, "/"))
