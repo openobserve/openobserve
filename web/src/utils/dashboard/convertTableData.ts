@@ -55,6 +55,17 @@ export const convertTableData = (
     for (const field of columnData) {
       if (field?.aggregationFunction === "histogram") {
         histogramFields.push(field.alias);
+      } else {
+        const sample = tableRows
+          ?.slice(0, Math.min(20, tableRows.length))
+          ?.map((it: any) => it[field.alias]);
+
+        const isTimeSeriesData = isTimeSeries(sample);
+        const isTimeStampData = isTimeStamp(sample);
+
+        if (isTimeSeriesData || isTimeStampData) {
+          histogramFields.push(field.alias);
+        }
       }
     }
   } else {
@@ -89,20 +100,6 @@ export const convertTableData = (
     if (isNumber) {
       obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
       obj["format"] = (val: any) => {
-        // if current field is histogram field then return formatted date
-        if (histogramFields.includes(it.alias)) {
-          return formatDate(
-            utcToZonedTime(
-              typeof val === "string"
-                ? `${val}Z`
-                : new Date(val)?.getTime() / 1000,
-              store.state.timezone
-            )
-          );
-        }
-
-        // else, check if val is a number
-        // if it is a number then return formatted value
         return !Number.isNaN(val)
           ? `${
               formatUnitValue(
@@ -115,6 +112,18 @@ export const convertTableData = (
               ) ?? 0
             }`
           : val;
+      };
+    } else if (histogramFields.includes(it.alias)) {
+      // if current field is histogram field then return formatted date
+      obj["format"] = (val: any) => {
+        return formatDate(
+          utcToZonedTime(
+            typeof val === "string"
+              ? `${val}Z`
+              : new Date(val)?.getTime() / 1000,
+            store.state.timezone
+          )
+        );
       };
     }
     return obj;
