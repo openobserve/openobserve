@@ -113,7 +113,10 @@ export const convertTableData = (
             }`
           : val;
       };
-    } else if (histogramFields.includes(it.alias)) {
+    }
+
+    // if current field is histogram field then return formatted date
+    if (histogramFields.includes(it.alias)) {
       // if current field is histogram field then return formatted date
       obj["format"] = (val: any) => {
         return formatDate(
