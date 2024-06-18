@@ -238,7 +238,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length) ||
-                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap'
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'geomap'
                     )
                   "
                 >
@@ -250,7 +252,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>
                       {{
-                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type != "h-bar" ? "+X" : "+Y"
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].type != "h-bar"
+                          ? "+X"
+                          : "+Y"
+                      }}
+                    </div>
+                  </q-btn>
+                  <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'area' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'bar' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'line' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'h-bar' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'h-stacked' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'scatter' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'area-stacked' ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'stacked'
+                    "
+                    padding="sm"
+                    :disabled="isAddBreakdownNotAllowed"
+                    @click="addBreakDownAxisItem(props.row)"
+                    data-test="dashboard-add-x-data"
+                  >
+                    <div>
+                      {{
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].type != "h-bar"
+                          ? "+B"
+                          : "+Y"
                       }}
                     </div>
                   </q-btn>
@@ -262,12 +310,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>
                       {{
-                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type != "h-bar" ? "+Y" : "+X"
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].type != "h-bar"
+                          ? "+Y"
+                          : "+X"
                       }}
                     </div>
                   </q-btn>
                   <q-btn
-                    v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'heatmap'"
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].type == 'heatmap'
+                    "
                     padding="sm"
                     :disabled="isAddZAxisNotAllowed"
                     @click="addZAxisItem(props.row)"
@@ -294,7 +350,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length)
-                    ) && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'geomap'
+                    ) &&
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].type == 'geomap'
                   "
                 >
                   <q-btn
@@ -354,7 +413,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length)
-                    ) && dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].type == 'sankey'
+                    ) &&
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].type == 'sankey'
                   "
                 >
                   <q-btn
@@ -468,8 +530,10 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addBreakDownAxisItem,
       addFilteredItem,
       isAddXAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
@@ -749,6 +813,7 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addBreakDownAxisItem,
       addLatitude,
       addLongitude,
       addWeight,
@@ -763,6 +828,7 @@ export default defineComponent({
       filterStreamFn,
       filteredStreams,
       isAddXAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
@@ -776,7 +842,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .metric-explore-metric-icon {
   min-width: 28px !important;
   padding-right: 8px !important;
