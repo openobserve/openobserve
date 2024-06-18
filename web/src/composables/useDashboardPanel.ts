@@ -35,16 +35,13 @@ const colors = [
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
-    version: 3,
+    version: 4,
     id: "",
-    type: "bar",
     title: "",
     description: "",
     config: {
       show_legends: true,
       legends_position: null,
-      unit: null,
-      unit_custom: null,
       decimals: 2,
       axis_width: null,
       axis_border_show: false,
@@ -79,6 +76,7 @@ const getDefaultDashboardPanelData: any = () => ({
     queries: [
       {
         query: "",
+        type: "bar",
         customQuery: false,
         fields: {
           stream: "",
@@ -86,6 +84,7 @@ const getDefaultDashboardPanelData: any = () => ({
           x: [],
           y: [],
           z: [],
+          breakdown: [],
           filter: [],
           latitude: null,
           longitude: null,
@@ -102,6 +101,8 @@ const getDefaultDashboardPanelData: any = () => ({
           // gauge min and max values
           min: 0,
           max: 100,
+          unit: null,
+          unit_custom: null,
         },
       },
     ],
@@ -216,11 +217,23 @@ const useDashboardPanelData = () => {
   );
 
   const isAddXAxisNotAllowed = computed((e: any) => {
-    switch (dashboardPanelData.data.type) {
+    switch (
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type
+    ) {
       case "pie":
       case "donut":
       case "heatmap":
       case "gauge":
+      case "area":
+      case "bar":
+      case "h-bar":
+      case "line":
+      case "scatter":
+      case "area-stacked":
+      case "stacked":
+      case "h-stacked":
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -243,8 +256,34 @@ const useDashboardPanelData = () => {
     }
   });
 
+  const isAddBreakdownNotAllowed = computed((e: any) => {
+    switch (
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type
+    ) {
+      case "area":
+      case "bar":
+      case "h-bar":
+      case "line":
+      case "scatter":
+      case "area-stacked":
+      case "stacked":
+      case "h-stacked":
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.breakdown.length >= 1
+        );
+    }
+  });
+
   const isAddYAxisNotAllowed = computed((e: any) => {
-    switch (dashboardPanelData.data.type) {
+    switch (
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type
+    ) {
       case "pie":
       case "donut":
       case "gauge":
@@ -274,7 +313,11 @@ const useDashboardPanelData = () => {
   });
 
   const isAddZAxisNotAllowed = computed((e: any) => {
-    switch (dashboardPanelData.data.type) {
+    switch (
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type
+    ) {
       case "heatmap":
         return (
           dashboardPanelData.data.queries[
@@ -342,6 +385,62 @@ const useDashboardPanelData = () => {
     updateArrayAlias();
   };
 
+  const addBreakDownAxisItem = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown = [];
+    }
+
+    if (isAddBreakdownNotAllowed.value) {
+      return;
+    }
+
+    // check for existing field
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.find((it: any) => it.column == row.name)
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.push({
+        label: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? generateLabelFromName(row.name)
+          : row.name,
+        alias: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "breakdown_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown.length +
+              1)
+          : row.name,
+        column: row.name,
+        color: null,
+        aggregationFunction:
+          row.name == store.state.zoConfig.timestamp_column
+            ? "histogram"
+            : null,
+        sortBy:
+          row.name == store.state.zoConfig.timestamp_column
+            ? dashboardPanelData.data.type == "table"
+              ? "DESC"
+              : "ASC"
+            : null,
+      });
+    }
+
+    updateArrayAlias();
+  };
+
   const addYAxisItem = (row: any) => {
     if (
       !dashboardPanelData.data.queries[
@@ -382,7 +481,11 @@ const useDashboardPanelData = () => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction:
-          dashboardPanelData.data.type == "heatmap" ? null : "count",
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].type == "heatmap"
+            ? null
+            : "count",
       });
     }
     updateArrayAlias();
@@ -554,7 +657,11 @@ const useDashboardPanelData = () => {
   };
 
   const resetAggregationFunction = () => {
-    switch (dashboardPanelData.data.type) {
+    switch (
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].type
+    ) {
       case "heatmap":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -642,11 +749,17 @@ const useDashboardPanelData = () => {
         break;
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type = "html";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
         break;
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].type = "markdown";
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.queryType = "";
         break;
@@ -712,6 +825,16 @@ const useDashboardPanelData = () => {
           ? "z_axis_" + (index + 1)
           : it?.column)
     );
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields?.breakdown?.forEach(
+      (it: any, index: any) =>
+        (it.alias = !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "breakdown_" + (index + 1)
+          : it?.column)
+    );
   };
 
   const removeXAxisItem = (name: string) => {
@@ -722,6 +845,17 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(index, 1);
+    }
+  };
+
+  const removeBreakdownItem = (name: string) => {
+    const index = dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.breakdown.findIndex((it: any) => it.column == name);
+    if (index >= 0) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.splice(index, 1);
     }
   };
 
@@ -1250,6 +1384,7 @@ const useDashboardPanelData = () => {
     addXAxisItem,
     addYAxisItem,
     addZAxisItem,
+    addBreakDownAxisItem,
     addLatitude,
     addLongitude,
     addWeight,
@@ -1259,6 +1394,7 @@ const useDashboardPanelData = () => {
     removeXAxisItem,
     removeYAxisItem,
     removeZAxisItem,
+    removeBreakdownItem,
     removeFilterItem,
     removeLatitude,
     removeLongitude,
@@ -1272,6 +1408,7 @@ const useDashboardPanelData = () => {
     updateXYFieldsForCustomQueryMode,
     updateXYFieldsOnCustomQueryChange,
     isAddXAxisNotAllowed,
+    isAddBreakdownNotAllowed,
     isAddYAxisNotAllowed,
     isAddZAxisNotAllowed,
     promqlMode,
