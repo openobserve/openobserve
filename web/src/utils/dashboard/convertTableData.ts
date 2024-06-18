@@ -77,22 +77,6 @@ export const convertTableData = (
     }
   }
 
-  // format date for histogram fields
-  for (const it of tableRows) {
-    for (const histogramField of histogramFields) {
-      if (it[histogramField]) {
-        it[histogramField] = formatDate(
-          utcToZonedTime(
-            typeof it[histogramField] === "string"
-              ? `${it[histogramField]}Z`
-              : new Date(it[histogramField])?.getTime() / 1000,
-            store.state.timezone
-          )
-        );
-      }
-    }
-  }
-
   const columns = columnData.map((it: any) => {
     let obj: any = {};
     const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
@@ -104,8 +88,22 @@ export const convertTableData = (
     // if number then sort by number and use decimal point config option in format
     if (isNumber) {
       obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
-      obj["format"] = (val: any) =>
-        !Number.isNaN(val)
+      obj["format"] = (val: any) => {
+        // if current field is histogram field then return formatted date
+        if (histogramFields.includes(it.alias)) {
+          return formatDate(
+            utcToZonedTime(
+              typeof val === "string"
+                ? `${val}Z`
+                : new Date(val)?.getTime() / 1000,
+              store.state.timezone
+            )
+          );
+        }
+
+        // else, check if val is a number
+        // if it is a number then return formatted value
+        return !Number.isNaN(val)
           ? `${
               formatUnitValue(
                 getUnitValue(
@@ -117,6 +115,7 @@ export const convertTableData = (
               ) ?? 0
             }`
           : val;
+      };
     }
     return obj;
   });
