@@ -75,7 +75,7 @@ const units: any = {
     { unit: "TB", divisor: 1024 * 1024 },
     { unit: "PB", divisor: 1024 * 1024 * 1024 },
   ],
-  largeNumbers: [
+  numbers: [
     { unit: "", divisor: 1 },
     { unit: "K", divisor: 1e3 },
     { unit: "M", divisor: 1e6 },
@@ -110,6 +110,7 @@ export const getUnitValue = (
   }
 
   switch (unit) {
+    case "numbers":
     case "bytes":
     case "seconds":
     case "microseconds":
@@ -118,6 +119,10 @@ export const getUnitValue = (
     case "kilobytes":
     case "bps":
     case "megabytes": {
+      if (isNaN(value) || value == "") {
+        return { value: value == "" ? "-" : value, unit: "" };
+      }
+
       // start with last index
       let unitIndex = units[unit].length - 1;
       // while the value is smaller than the divisor
@@ -158,24 +163,13 @@ export const getUnitValue = (
     }
     case "default":
     default: {
-      if (isNaN(value) || value == "") {
-        return { value: value == "" ? "-" : value, unit: "" };
-      }
-
-      let unitIndex = units.largeNumbers.length - 1;
-      while (unitIndex > 0 && absValue < units.largeNumbers[unitIndex].divisor) {
-        unitIndex--;
-      }
-      
-      const finalValue = (
-        (sign * absValue) /
-        units.largeNumbers[unitIndex].divisor
-      ).toFixed(decimals);
-      const finalUnit = units.largeNumbers[unitIndex].unit;
-
       return {
-        value: finalValue,
-        unit: finalUnit || "",
+        value: isNaN(value)
+          ? value
+          : value == ""
+          ? "-"
+          : (+value)?.toFixed(decimals) ?? 0,
+        unit: "",
       };
     }
   }
