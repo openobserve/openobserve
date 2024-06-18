@@ -662,7 +662,10 @@ fn parse_expr_function(
 
     let args = match &f.args {
         FunctionArguments::None => return Ok(()),
-        FunctionArguments::Subquery(_) => return Ok(()),
+        FunctionArguments::Subquery(_) => {
+            log::error!("We do not support subquery at the moment");
+            return Ok(());
+        }
         FunctionArguments::List(args) => &args.args,
     };
     if args.len() < 2 {

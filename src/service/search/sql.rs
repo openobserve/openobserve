@@ -134,7 +134,11 @@ impl Sql {
         let mut meta = match MetaSql::new(&origin_sql) {
             Ok(meta) => meta,
             Err(err) => {
-                log::error!("parse sql error: {}, sql: {}", err, origin_sql);
+                log::error!(
+                    "split_sql_token: parse sql error: {}, sql: {}",
+                    err,
+                    origin_sql
+                );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
             }
         };
@@ -590,7 +594,11 @@ impl Sql {
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
-                log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
+                log::error!(
+                    "sql_meta: parse sql error: {}, sql: {}",
+                    sql_meta.err().unwrap(),
+                    sql
+                );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
             let sql_meta = sql_meta.unwrap();
@@ -623,7 +631,6 @@ impl Sql {
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());
-
         match &sql_meta {
             Ok(sql_meta) => {
                 let mut used_fns = vec![];
@@ -648,7 +655,7 @@ impl Sql {
                 }
             }
             Err(e) => {
-                log::error!("parse sql error: {}, sql: {}", e, origin_sql);
+                log::error!("final sql: parse sql error: {}, sql: {}", e, origin_sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
             }
         }
