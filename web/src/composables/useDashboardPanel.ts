@@ -178,6 +178,7 @@ const useDashboardPanelData = () => {
         x: [],
         y: [],
         z: [],
+        breakdown: [],
         filter: [],
         latitude: null,
         longitude: null,
@@ -736,6 +737,9 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -773,6 +777,9 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter = [];
@@ -1075,6 +1082,14 @@ const useDashboardPanelData = () => {
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.splice(
+        0,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown.length
+      );
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
       ].fields.filter.splice(
         0,
         dashboardPanelData.data.queries[
@@ -1152,6 +1167,26 @@ const useDashboardPanelData = () => {
           } else {
             // For other field types (x, y, z), determine the type and index as before
             let currentFieldType;
+            console.log(
+              "index",
+              index,
+              "x",
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length,
+              "y",
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.y.length,
+              "BREAKDOWN",
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.breakdown.length,
+              "z",
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.z.length
+            );
 
             if (
               index <
@@ -1170,6 +1205,19 @@ const useDashboardPanelData = () => {
                 ].fields.y.length
             ) {
               currentFieldType = "y";
+            } else if (
+              index <
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.breakdown.length
+            ) {
+              currentFieldType = "breakdown";
             } else {
               currentFieldType = "z";
             }
@@ -1189,6 +1237,21 @@ const useDashboardPanelData = () => {
                       dashboardPanelData.layout.currentQueryIndex
                     ].fields.x.length
                 ];
+            } else if (currentFieldType === "breakdown") {
+              console.log("here", index);
+
+              field =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.breakdown[
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y.length
+                ];
             } else {
               field =
                 dashboardPanelData.data.queries[
@@ -1203,6 +1266,7 @@ const useDashboardPanelData = () => {
                     ].fields.y.length
                 ];
             }
+            console.log("field", field);
 
             // If the current field is a y or z field, set the aggregation function to "count"
             if (currentFieldType === "y" || currentFieldType === "z") {
@@ -1259,6 +1323,26 @@ const useDashboardPanelData = () => {
           field.alias = newName;
           field.column = newName;
         }
+
+        // Check if the field is in the breakdown fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown?.findIndex((it: any) => it?.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown[fieldIndex];
+            console.log("field breakdown", field);
+            
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+          console.log("field breakdown----", field);
+          
+        }
+
         // Check if the field is in the y fields array
         fieldIndex = dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
