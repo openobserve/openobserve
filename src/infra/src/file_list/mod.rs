@@ -410,7 +410,7 @@ pub struct FileDeletedRecord {
 pub struct MergeJobRecord {
     pub id: i64,
     pub stream: String, // default/logs/default
-    pub offset: i64,    // 1718603746000000
+    pub offsets: i64,   // 1718603746000000
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

@@ -619,11 +619,12 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         match sqlx::query(
-            "INSERT INTO file_list_jobs (org, stream, offset, node, updated_at) VALUES ($1, $2, $3, '', 0);",
+            "INSERT INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES ($1, $2, $3, $4, '', 0);",
         )
         .bind(org_id)
         .bind(stream_key)
         .bind(offset)
+        .bind(super::FileListJobStatus::Pending)
         .execute(&*client)
         .await
         {
@@ -649,8 +650,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
     WHERE status = $1 
     GROUP BY stream 
     ORDER BY num DESC 
-    LIMIT $2 
-    FOR UPDATE;"#,
+    LIMIT $2;"#,
         )
         .bind(super::FileListJobStatus::Pending)
         .bind(limit)
@@ -949,7 +949,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     id         INTEGER not null primary key autoincrement,
     org        VARCHAR not null,
     stream     VARCHAR not null,
-    offset     BIGINT not null,
+    offsets    BIGINT not null,
     status     INT not null,
     node       VARCHAR not null,
     updated_at BIGINT not null
@@ -1018,7 +1018,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
         (
             "file_list_jobs",
-            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offset_idx on file_list_jobs (stream, offset);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offsets_idx on file_list_jobs (stream, offsets);",
         ),
         (
             "file_list_jobs",

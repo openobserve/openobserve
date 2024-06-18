@@ -604,11 +604,12 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         match sqlx::query(
-            "INSERT IGNORE INTO file_list_jobs (org, stream, offset, node, updated_at) VALUES (?, ?, ?, '', 0);",
+            "INSERT IGNORE INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES (?, ?, ?, ?, '', 0);",
         )
         .bind(org_id)
         .bind(stream_key)
         .bind(offset)
+        .bind(super::FileListJobStatus::Pending)
         .execute(&pool)
         .await
         {
@@ -922,7 +923,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     id         BIGINT not null primary key AUTO_INCREMENT,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
-    offset     BIGINT not null,
+    offsets    BIGINT not null,
     status     INT not null,
     node       VARCHAR(100) not null,
     updated_at BIGINT not null
@@ -992,7 +993,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
         (
             "file_list_jobs",
-            "CREATE UNIQUE INDEX file_list_jobs_stream_offset_idx on file_list_jobs (stream, offset);",
+            "CREATE UNIQUE INDEX file_list_jobs_stream_offsets_idx on file_list_jobs (stream, offsets);",
         ),
         (
             "file_list_jobs",

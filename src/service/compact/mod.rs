@@ -262,12 +262,12 @@ pub async fn run_merge(
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut min_offset = std::i64::MAX;
     for job in jobs {
-        if job.offset == 0 {
-            log::error!("[COMPACTOR] merge job offset error: {}", job.offset);
+        if job.offsets == 0 {
+            log::error!("[COMPACTOR] merge job offset error: {}", job.offsets);
             continue;
         }
-        if job.offset < min_offset {
-            min_offset = job.offset;
+        if job.offsets < min_offset {
+            min_offset = job.offsets;
         }
 
         let columns = job.stream.split('/').collect::<Vec<&str>>();
@@ -297,7 +297,7 @@ pub async fn run_merge(
                 stream_type,
                 &stream_name,
                 job.id,
-                job.offset,
+                job.offsets,
             )
             .await
             {
