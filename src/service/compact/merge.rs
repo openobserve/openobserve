@@ -170,7 +170,10 @@ pub async fn generate_job_by_stream(
 
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
-        return Err(anyhow::anyhow!("[COMAPCT] add file_list_job failed: {}", e));
+        return Err(anyhow::anyhow!(
+            "[COMAPCT] add file_list_jobs failed: {}",
+            e
+        ));
     }
 
     // write new offset
@@ -326,6 +329,10 @@ pub async fn merge_by_stream(
     );
 
     if files.is_empty() {
+        // update job status
+        if let Err(e) = infra_file_list::set_job_done(job_id).await {
+            log::error!("[COMPACT] set_job_done failed: {e}");
+        }
         return Ok(());
     }
 
@@ -416,14 +423,16 @@ pub async fn merge_by_stream(
                 }
             }
             let mut worker_results = Vec::with_capacity(batch_group_len);
-            let mut updated_at = Utc::now().timestamp_micros();
+            let mut updated_at = config::utils::time::now_micros();
             for _ in 0..batch_group_len {
                 let result = inner_rx.recv().await.unwrap();
-                if Utc::now().timestamp_micros() - updated_at > cfg.compact.job_timeout / 10 {
+                let now = config::utils::time::now_micros();
+                // convert job_timeout from secs to micros, and check 1/4 of job_timeout
+                if now - updated_at > (cfg.compact.job_timeout * 1000 * 1000 / 4) {
                     if let Err(e) = infra_file_list::update_running_jobs(job_id).await {
                         log::error!("[COMPACT] update_running_jobs failed: {e}");
                     }
-                    updated_at = Utc::now().timestamp_micros();
+                    updated_at = now;
                 }
                 worker_results.push(result);
             }
@@ -491,6 +500,11 @@ pub async fn merge_by_stream(
 
     for task in tasks {
         task.await??;
+    }
+
+    // update job status
+    if let Err(e) = infra_file_list::set_job_done(job_id).await {
+        log::error!("[COMPACT] set_job_done failed: {e}");
     }
 
     // update stream stats
@@ -855,7 +869,7 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
     // set to external db
     // retry 5 times
     let mut success = false;
-    let created_at = Utc::now().timestamp_micros();
+    let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
         if !del_items_need_flatten.is_empty() {
             if let Err(e) = infra_file_list::batch_add_deleted(

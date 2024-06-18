@@ -608,7 +608,7 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         match sqlx::query(
-            "INSERT INTO file_list_job (org, stream, offset, node, updated_at) VALUES ($1, $2, $3, '', 0) ON CONFLICT DO NOTHING;",
+            "INSERT INTO file_list_jobs (org, stream, offset, node, updated_at) VALUES ($1, $2, $3, '', 0) ON CONFLICT DO NOTHING;",
         )
         .bind(org_id)
         .bind(stream_key)
@@ -741,7 +741,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         Ok(())
     }
 
-    async fn clean_jobs(&self, before_date: i64) -> Result<()> {
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         let ret =
             sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = $1 AND updated_at < $2;"#)
@@ -928,7 +928,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     id         BIGINT GENERATED ALWAYS AS IDENTITY,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
-    offset     INT not null,
+    offset     BIGINT not null,
     status     INT not null,
     node       VARCHAR(100) not null,
     updated_at BIGINT not null

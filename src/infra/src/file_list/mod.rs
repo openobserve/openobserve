@@ -126,7 +126,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn set_job_done(&self, id: i64) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
-    async fn clean_jobs(&self, before_date: i64) -> Result<()>;
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -342,8 +342,8 @@ pub async fn check_running_jobs(before_date: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn clean_jobs(before_date: i64) -> Result<()> {
-    CLIENT.clean_jobs(before_date).await
+pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
+    CLIENT.clean_done_jobs(before_date).await
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

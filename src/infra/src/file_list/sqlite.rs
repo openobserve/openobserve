@@ -619,7 +619,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         match sqlx::query(
-            "INSERT INTO file_list_job (org, stream, offset, node, updated_at) VALUES ($1, $2, $3, '', 0);",
+            "INSERT INTO file_list_jobs (org, stream, offset, node, updated_at) VALUES ($1, $2, $3, '', 0);",
         )
         .bind(org_id)
         .bind(stream_key)
@@ -756,7 +756,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
-    async fn clean_jobs(&self, before_date: i64) -> Result<()> {
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let ret =
@@ -949,7 +949,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     id         INTEGER not null primary key autoincrement,
     org        VARCHAR not null,
     stream     VARCHAR not null,
-    offset     INT not null,
+    offset     BIGINT not null,
     status     INT not null,
     node       VARCHAR not null,
     updated_at BIGINT not null

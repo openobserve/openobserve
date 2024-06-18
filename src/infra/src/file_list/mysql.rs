@@ -604,7 +604,7 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         match sqlx::query(
-            "INSERT IGNORE INTO file_list_job (org, stream, offset, node, updated_at) VALUES (?, ?, ?, '', 0);",
+            "INSERT IGNORE INTO file_list_jobs (org, stream, offset, node, updated_at) VALUES (?, ?, ?, '', 0);",
         )
         .bind(org_id)
         .bind(stream_key)
@@ -737,7 +737,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(())
     }
 
-    async fn clean_jobs(&self, before_date: i64) -> Result<()> {
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         let ret = sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = ? AND updated_at < ?;"#)
             .bind(super::FileListJobStatus::Done)
@@ -922,7 +922,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     id         BIGINT not null primary key AUTO_INCREMENT,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
-    offset     INT not null,
+    offset     BIGINT not null,
     status     INT not null,
     node       VARCHAR(100) not null,
     updated_at BIGINT not null
