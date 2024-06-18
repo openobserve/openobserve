@@ -594,6 +594,7 @@
     "right": "Right",
     "bottom": "Bottom",
     "default": "Default",
+    "numbers": "Numbers",
     "bytes": "Bytes",
     "kilobytes": "Kilobytes (kb)",
     "megabytes": "Megabytes (mb)",
