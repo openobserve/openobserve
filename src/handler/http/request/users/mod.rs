@@ -26,6 +26,8 @@ use config::{
     utils::{base64, json},
 };
 use strum::IntoEnumIterator;
+#[cfg(feature = "enterprise")]
+use {crate::service::usage::audit, o2_enterprise::enterprise::common::auditor::AuditMessage};
 
 use crate::{
     common::{
@@ -233,6 +235,19 @@ pub async fn authentication(
         return Ok(HttpResponse::Forbidden().json("Not Supported"));
     }
 
+    // Until decoding the token or body, we can not know the the user_email
+    #[cfg(feature = "enterprise")]
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        method: "POST".to_string(),
+        path: "/auth/login".to_string(),
+        body: "".to_string(),
+        query_params: _req.query_string().to_string(),
+        response_code: 200,
+        _timestamp: chrono::Utc::now().timestamp_micros(),
+    };
+
     let mut resp = SignInResponse::default();
     let auth = match auth {
         Some(auth) => auth.into_inner(),
@@ -250,9 +265,11 @@ pub async fn authentication(
                     {
                         SignInUser { name, password }
                     } else {
+                        audit_unauthorized_error(audit_message).await;
                         return unauthorized_error(resp);
                     }
                 } else {
+                    audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
             }
@@ -263,15 +280,24 @@ pub async fn authentication(
         }
     };
 
+    #[cfg(feature = "enterprise")]
+    {
+        audit_message.user_email = auth.name.clone();
+    }
+
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
                 resp.status = true;
             } else {
+                #[cfg(feature = "enterprise")]
+                audit_unauthorized_error(audit_message).await;
                 return unauthorized_error(resp);
             }
         }
         Err(_e) => {
+            #[cfg(feature = "enterprise")]
+            audit_unauthorized_error(audit_message).await;
             return unauthorized_error(resp);
         }
     };
@@ -299,8 +325,13 @@ pub async fn authentication(
         } else {
             auth_cookie.set_same_site(cookie::SameSite::None);
         }
+        // audit the successful login
+        #[cfg(feature = "enterprise")]
+        audit(audit_message).await;
         Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
     } else {
+        #[cfg(feature = "enterprise")]
+        audit_unauthorized_error(audit_message).await;
         unauthorized_error(resp)
     }
 }
@@ -341,6 +372,20 @@ pub async fn get_presigned_url(
     );
 
     let payload = PresignedURLGeneratorResponse { url };
+    #[cfg(feature = "enterprise")]
+    {
+        let audit_message = AuditMessage {
+            user_email: basic_auth.user_id().to_string(),
+            org_id: "".to_string(),
+            method: "GET".to_string(),
+            path: "/auth/presigned-url".to_string(),
+            body: "".to_string(),
+            query_params: _req.query_string().to_string(),
+            response_code: 200,
+            _timestamp: chrono::Utc::now().timestamp_micros(),
+        };
+        audit(audit_message).await;
+    }
     Ok(HttpResponse::Ok().json(&payload))
 }
 
@@ -366,17 +411,30 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         let mut expires_in = 300;
         let mut req_ts = 0;
 
+        let mut audit_message = AuditMessage {
+            user_email: "".to_string(),
+            org_id: "".to_string(),
+            method: "GET".to_string(),
+            path: "/auth/login".to_string(),
+            body: "".to_string(),
+            // Don't include query string as it may contain the auth token
+            query_params: "".to_string(),
+            response_code: 302,
+            _timestamp: chrono::Utc::now().timestamp_micros(),
+        };
         let auth_header = if let Some(s) = query.get("auth") {
             match query.get("request_time") {
                 Some(req_time_str) => {
                     if let Ok(ts) = config::utils::time::parse_str_to_time(req_time_str) {
                         req_ts = ts.timestamp();
                     } else {
+                        audit_unauthorized_error(audit_message).await;
                         return unauthorized_error(resp);
                     }
                     request_time = Some(req_time_str);
                 }
                 None => {
+                    audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
             };
@@ -386,10 +444,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     expires_in = exp_in_str.parse::<i64>().unwrap();
                 }
                 None => {
+                    audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
             };
             if Utc::now().timestamp() - req_ts > expires_in {
+                audit_unauthorized_error(audit_message).await;
                 return unauthorized_error(resp);
             }
             format!("q_auth {}", s)
@@ -397,16 +457,19 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             match auth_header.to_str() {
                 Ok(auth_header_str) => auth_header_str.to_string(),
                 Err(_) => {
+                    audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
             }
         } else {
+            audit_unauthorized_error(audit_message).await;
             return unauthorized_error(resp);
         };
 
         if let Some((name, password)) =
             o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
         {
+            audit_message.user_email = name.clone();
             match crate::handler::http::auth::validator::validate_user_for_query_params(
                 &name,
                 &password,
@@ -419,10 +482,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     if v.is_valid {
                         resp.status = true;
                     } else {
+                        audit_unauthorized_error(audit_message).await;
                         return unauthorized_error(resp);
                     }
                 }
                 Err(_) => {
+                    audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
             };
@@ -467,15 +532,19 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     ID_TOKEN_HEADER,
                     base64::encode(&id_token.to_string())
                 );
+                audit_message._timestamp = Utc::now().timestamp_micros();
+                audit(audit_message).await;
                 return Ok(HttpResponse::Found()
                     .append_header((header::LOCATION, url))
                     .cookie(auth_cookie)
                     .json(resp));
             } else {
+                audit_unauthorized_error(audit_message).await;
                 unauthorized_error(resp)
             }
         } else {
             log::error!("User can not be found from auth-header");
+            audit_unauthorized_error(audit_message).await;
             unauthorized_error(resp)
         }
     }
@@ -523,6 +592,16 @@ fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
     resp.status = false;
     resp.message = "Invalid credentials".to_string();
     Ok(HttpResponse::Unauthorized().json(resp))
+}
+
+#[cfg(feature = "enterprise")]
+async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
+    use chrono::Utc;
+
+    audit_message._timestamp = Utc::now().timestamp_micros();
+    audit_message.response_code = 401;
+    // Even if the user_email of audit_message is not set, still the event should be audited
+    audit(audit_message).await;
 }
 
 #[cfg(test)]

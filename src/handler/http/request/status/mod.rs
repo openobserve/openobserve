@@ -371,7 +371,9 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::AuthTokens;
+    use o2_enterprise::enterprise::common::auditor::AuditMessage;
+
+    use crate::{common::meta::user::AuthTokens, service::usage::audit};
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -380,6 +382,16 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             return Err(Error::new(ErrorKind::Other, "no code in request"));
         }
     };
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        method: "GET".to_string(),
+        path: "/config/redirect".to_string(),
+        body: "".to_string(),
+        query_params: req.query_string().to_string(),
+        response_code: 302,
+        _timestamp: chrono::Utc::now().timestamp_micros(),
+    };
 
     match query.get("state") {
         Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
@@ -387,11 +399,17 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
             }
             Err(_) => {
+                // Bad Request
+                audit_message.response_code = 400;
+                audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
         },
 
         None => {
+            // Bad Request
+            audit_message.response_code = 400;
+            audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
     };
@@ -408,6 +426,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let id_token;
             match token_ver {
                 Ok(res) => {
+                    audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
                         "name": res.0.user_name,
@@ -424,7 +443,12 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     );
                     process_token(res).await
                 }
-                Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
+                Err(e) => {
+                    audit_message.response_code = 401;
+                    audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+                    audit(audit_message).await;
+                    return Ok(HttpResponse::Unauthorized().json(e.to_string()));
+                }
             }
 
             // generate new UUID for access token & store token in DB
@@ -455,12 +479,20 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 auth_cookie.set_same_site(SameSite::None);
             }
             log::info!("Redirecting user after processing token");
+
+            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit(audit_message).await;
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_url))
                 .cookie(auth_cookie)
                 .finish())
         }
-        Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
+        Err(e) => {
+            audit_message.response_code = 401;
+            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit(audit_message).await;
+            Ok(HttpResponse::Unauthorized().json(e.to_string()))
+        }
     }
 }
 
