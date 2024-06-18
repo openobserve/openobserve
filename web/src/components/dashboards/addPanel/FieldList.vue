@@ -261,6 +261,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </q-btn>
                   <q-btn
+                    padding="sm"
+                    :disabled="isAddYAxisNotAllowed"
+                    @click="addYAxisItem(props.row)"
+                    data-test="dashboard-add-y-data"
+                  >
+                    <div>
+                      {{
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].type != "h-bar"
+                          ? "+Y"
+                          : "+X"
+                      }}
+                    </div>
+                  </q-btn>
+                  <q-btn
                     v-if="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -299,22 +315,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].type != "h-bar"
                           ? "+B"
                           : "+Y"
-                      }}
-                    </div>
-                  </q-btn>
-                  <q-btn
-                    padding="sm"
-                    :disabled="isAddYAxisNotAllowed"
-                    @click="addYAxisItem(props.row)"
-                    data-test="dashboard-add-y-data"
-                  >
-                    <div>
-                      {{
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].type != "h-bar"
-                          ? "+Y"
-                          : "+X"
                       }}
                     </div>
                   </q-btn>
