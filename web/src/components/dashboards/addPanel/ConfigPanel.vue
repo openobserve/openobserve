@@ -913,6 +913,10 @@ export default defineComponent({
         value: null,
       },
       {
+        label: t("dashboard.numbers"),
+        value: "numbers",
+      },
+      {
         label: t("dashboard.bytes"),
         value: "bytes",
       },

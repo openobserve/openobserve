@@ -495,6 +495,11 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
                 USERS_RUM_TOKEN.insert(key, user_from_db.clone());
                 Some(user_from_db)
             } else {
+                log::info!(
+                    "get_user_by_token: User not found even in db {} {}",
+                    org_id,
+                    token
+                );
                 None
             }
         }

@@ -875,7 +875,7 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="index-dropdown-stream"]')
       .fill("e2e_tabledashboard");
-    await page.getByRole("option", { name: "e2e_tabledashboard" }).click({force:true});
+    await page.getByRole("option", { name: "e2e_tabledashboard" }).click();
     await page.waitForTimeout(5000);
 
     await page
