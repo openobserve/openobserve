@@ -34,9 +34,7 @@ export const convertPanelData = async (
   resultMetaData: any,
   metadata: any
 ) => {
-  console.log("panelSchema---", panelSchema);
   const panelSchemaChartType = panelSchema.queries?.[0]?.type;
-  console.log("chartType", panelSchemaChartType);
 
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls

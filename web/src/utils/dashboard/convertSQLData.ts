@@ -513,7 +513,7 @@ export const convertSQLData = async (
     series: [],
   };
   console.log("panelSchema", panelSchema);
-  
+
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchemaChartType);
 
   // Now set the series values as per the chart data
@@ -532,8 +532,6 @@ export const convertSQLData = async (
           panelSchemaChartType == "scatter") &&
           panelSchema.queries[0].fields.x.length == 2)
       ) {
-        console.log("-----------panelSchemaChartType", panelSchema);
-
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
           show: true,
@@ -600,9 +598,10 @@ export const convertSQLData = async (
             });
           })
           .flat();
-      } else if (panelSchemaChartType == "line" || panelSchemaChartType == "area") {
-        console.log("-----------panelSchemaChartType", panelSchema);
-
+      } else if (
+        panelSchemaChartType == "line" ||
+        panelSchemaChartType == "area"
+      ) {
         //if x and y length is not 2 and 1 respectively then do following
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
@@ -1682,7 +1681,10 @@ export const convertSQLData = async (
   // for metric we does not have data field
   if (panelSchemaChartType != "metric") {
     options.series = options.series.filter((it: any) => it.data?.length);
-    if (panelSchemaChartType == "h-bar" || panelSchemaChartType == "h-stacked") {
+    if (
+      panelSchemaChartType == "h-bar" ||
+      panelSchemaChartType == "h-stacked"
+    ) {
       options.xAxis = options.series.length ? options.xAxis : {};
     } else {
       options.yAxis = options.series.length ? options.yAxis : {};
