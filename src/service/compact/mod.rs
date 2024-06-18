@@ -21,7 +21,7 @@ use config::{
     get_config,
     meta::{cluster::Role, stream::StreamType},
 };
-use infra::dist_lock;
+use infra::{dist_lock, file_list as infra_file_list};
 use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, Mutex, Semaphore};
 
@@ -167,24 +167,8 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// compactor merge run steps:
-/// 1. get all organization
-/// 2. range streams by organization & stream_type
-/// 3. get a cluster lock for compactor stream
-/// 4. read last compacted offset: year/month/day/hour
-/// 5. read current hour all files
-/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
-/// 7. write to storage
-/// 8. delete small files keys & write big files keys, use transaction
-/// 9. delete small files from storage
-/// 10. update last compacted offset
-/// 11. release cluster lock
-/// 12. compact file list from storage
-pub async fn run_merge(
-    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
-) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
+/// Generate job for compactor
+pub async fn run_generate_job() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [
         StreamType::Logs,
@@ -202,7 +186,6 @@ pub async fn run_merge(
         }
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
-            let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 let Some(node) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
@@ -247,35 +230,97 @@ pub async fn run_merge(
                     continue;
                 }
 
-                let org_id = org_id.clone();
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
-                let worker_tx = worker_tx.clone();
-                let task = tokio::task::spawn(async move {
-                    if let Err(e) =
-                        merge::merge_by_stream(worker_tx, &org_id, stream_type, &stream_name).await
-                    {
-                        log::error!(
-                            "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            e
-                        );
-                    }
-                    drop(permit);
-                });
-                tasks.push(task);
-            }
-            for task in tasks {
-                task.await?;
+                if let Err(e) =
+                    merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
+                {
+                    log::error!(
+                        "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        e
+                    );
+                }
             }
         }
     }
 
+    Ok(())
+}
+
+/// compactor merging
+pub async fn run_merge(
+    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
+) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    let jobs = infra_file_list::get_pending_jobs(&LOCAL_NODE_UUID, cfg.compact.batch_size).await?;
+    if jobs.is_empty() {
+        return Ok(());
+    }
+
+    let mut tasks = Vec::with_capacity(jobs.len());
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
+    let mut min_offset = std::i64::MAX;
+    for job in jobs {
+        if job.offset == 0 {
+            log::error!("[COMPACTOR] merge job offset error: {}", job.offset);
+            continue;
+        }
+        if job.offset < min_offset {
+            min_offset = job.offset;
+        }
+
+        let columns = job.stream.split('/').collect::<Vec<&str>>();
+        assert_eq!(columns.len(), 3);
+        let org_id = columns[0].to_string();
+        let stream_type = StreamType::from(columns[1]);
+        let stream_name = columns[2].to_string();
+
+        // check if we are allowed to merge or just skip
+        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+            log::warn!(
+                "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
+                &org_id,
+                stream_type,
+                &stream_name,
+            );
+            continue;
+        }
+
+        let org_id = org_id.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let worker_tx = worker_tx.clone();
+        let task = tokio::task::spawn(async move {
+            if let Err(e) = merge::merge_by_stream(
+                worker_tx,
+                &org_id,
+                stream_type,
+                &stream_name,
+                job.id,
+                job.offset,
+            )
+            .await
+            {
+                log::error!(
+                    "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    e
+                );
+            }
+            drop(permit);
+        });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        task.await?;
+    }
+
     // after compact, compact file list from storage
     if !cfg.common.meta_store_external {
-        let last_file_list_offset = db::compact::file_list::get_offset().await?;
-        if let Err(e) = file_list::run(last_file_list_offset).await {
+        if let Err(e) = file_list::run(min_offset).await {
             log::error!("[COMPACTOR] merge file list error: {}", e);
         }
     }

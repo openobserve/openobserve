@@ -870,6 +870,18 @@ pub struct Compact {
         help = "Enable fast mode compact, will use more memory but faster"
     )]
     pub fast_mode: bool,
+    #[env_config(
+        name = "ZO_COMPACT_BATCH_SIZE",
+        default = 100,
+        help = "Batch size for compact get pending jobs"
+    )]
+    pub batch_size: i64,
+    #[env_config(
+        name = "ZO_COMPACT_JOB_TIMEOUT",
+        default = 600,
+        help = "If a compact job is not finished in this time, it will be marked as failed"
+    )]
+    pub job_timeout: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1263,6 +1275,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Delete files delay is not allowed to be less than 1 hour."
         ));
+    }
+    if cfg.compact.batch_size < 1 {
+        cfg.compact.batch_size = 100;
     }
 
     // If the default scrape interval is less than 5s, raise an error

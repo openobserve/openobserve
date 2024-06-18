@@ -603,17 +603,15 @@ UPDATE stream_stats
         org_id: &str,
         stream_type: StreamType,
         stream: &str,
-        date: i64,
         offset: i64,
     ) -> Result<()> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         match sqlx::query(
-            "INSERT INTO file_list_job (org, stream, date, offset, node, updated_at) VALUES ($1, $2, $3, $4, '', 0) ON CONFLICT DO NOTHING;",
+            "INSERT INTO file_list_job (org, stream, offset, node, updated_at) VALUES ($1, $2, $3, '', 0) ON CONFLICT DO NOTHING;",
         )
         .bind(org_id)
         .bind(stream_key)
-        .bind(date)
         .bind(offset)
         .execute(&pool)
         .await
@@ -716,10 +714,20 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         Ok(())
     }
 
+    async fn update_running_jobs(&self, id: i64) -> Result<()> {
+        let pool = CLIENT.clone();
+        sqlx::query(r#"UPDATE file_list_jobs SET updated_at = $1 WHERE id = $2;"#)
+            .bind(config::utils::time::now_micros())
+            .bind(id)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         let ret = sqlx::query(
-            r#"UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE status = $3 AND updated_at < $4;"#,
+            r#"UPDATE file_list_jobs SET status = $1, node = '', updated_at = $2 WHERE status = $3 AND updated_at < $4;"#,
         )
         .bind(super::FileListJobStatus::Pending)
         .bind(config::utils::time::now_micros())
@@ -920,7 +928,6 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     id         BIGINT GENERATED ALWAYS AS IDENTITY,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
-    date       INT not null,
     offset     INT not null,
     status     INT not null,
     node       VARCHAR(100) not null,
@@ -992,10 +999,6 @@ pub async fn create_table_index() -> Result<()> {
         (
             "file_list_jobs",
             "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offset_idx on file_list_jobs (stream, offset);",
-        ),
-        (
-            "file_list_jobs",
-            "CREATE INDEX IF NOT EXISTS file_list_jobs_stream_date_idx on file_list_jobs (stream, date);",
         ),
         (
             "file_list_jobs",

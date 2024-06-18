@@ -73,24 +73,15 @@ pub struct MergeResult {
 
 pub type MergeSender = mpsc::Sender<Result<(usize, FileKey), anyhow::Error>>;
 
-/// compactor run steps on a stream:
-/// 3. get a cluster lock for compactor stream
-/// 4. read last compacted offset: year/month/day/hour
-/// 5. read current hour all files
-/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
-/// 7. write to storage
-/// 8. delete small files keys & write big files keys, use transaction
-/// 9. delete small files from storage
-/// 10. update last compacted offset
-/// 11. release cluster lock
-pub async fn merge_by_stream(
-    worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
+/// Generate merging job by stream
+/// 1. get offset from db
+/// 2. check if other node is processing
+/// 3. create job or return
+pub async fn generate_job_by_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let start = std::time::Instant::now();
-
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -123,9 +114,6 @@ pub async fn merge_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let stream_created = stream::stream_created(&schema).unwrap_or_default();
     if offset == 0 {
         offset = stream_created
@@ -141,31 +129,6 @@ pub async fn merge_by_stream(
         stream_name,
         offset
     );
-
-    let offset = offset;
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-    let offset_time_hour = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            offset_time.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    let offset_time_day = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            0,
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
 
     let cfg = get_config();
     // check offset
@@ -204,6 +167,102 @@ pub async fn merge_by_stream(
     {
         return Ok(()); // the time is future, just wait
     }
+
+    // generate merging job
+    if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
+        return Err(anyhow::anyhow!("[COMAPCT] add file_list_job failed: {}", e));
+    }
+
+    // write new offset
+    let offset = offset
+        + Duration::try_seconds(cfg.compact.step_secs)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+    db::compact::files::set_offset(
+        org_id,
+        stream_type,
+        stream_name,
+        offset,
+        Some(&LOCAL_NODE_UUID.clone()),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// compactor run steps on a stream:
+/// 3. get a cluster lock for compactor stream
+/// 4. read last compacted offset: year/month/day/hour
+/// 5. read current hour all files
+/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
+/// 7. write to storage
+/// 8. delete small files keys & write big files keys, use transaction
+/// 9. delete small files from storage
+/// 10. update last compacted offset
+/// 11. release cluster lock
+pub async fn merge_by_stream(
+    worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    job_id: i64,
+    offset: i64,
+) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+
+    // get schema
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] offset: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        offset
+    );
+
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    let offset_time_hour = Utc
+        .with_ymd_and_hms(
+            offset_time.year(),
+            offset_time.month(),
+            offset_time.day(),
+            offset_time.hour(),
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
+    let offset_time_day = Utc
+        .with_ymd_and_hms(
+            offset_time.year(),
+            offset_time.month(),
+            offset_time.day(),
+            0,
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
+
+    let cfg = get_config();
+    // check offset
+    let time_now: DateTime<Utc> = Utc::now();
+    let time_now_hour = Utc
+        .with_ymd_and_hms(
+            time_now.year(),
+            time_now.month(),
+            time_now.day(),
+            time_now.hour(),
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
 
     // get current hour(day) all files
     let (partition_offset_start, partition_offset_end) =
@@ -267,24 +326,6 @@ pub async fn merge_by_stream(
     );
 
     if files.is_empty() {
-        // this hour is no data, and check if pass allowed_upto, then just write new
-        // offset if offset > 0 && offset_time_hour +
-        // Duration::try_hours(cfg.limit.allowed_upto).unwrap().num_microseconds().unwrap() <
-        // time_now_hour { -- no check it
-        // }
-        let offset = offset
-            + Duration::try_seconds(cfg.compact.step_secs)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-        db::compact::files::set_offset(
-            org_id,
-            stream_type,
-            stream_name,
-            offset,
-            Some(&LOCAL_NODE_UUID.clone()),
-        )
-        .await?;
         return Ok(());
     }
 
@@ -375,8 +416,15 @@ pub async fn merge_by_stream(
                 }
             }
             let mut worker_results = Vec::with_capacity(batch_group_len);
+            let mut updated_at = Utc::now().timestamp_micros();
             for _ in 0..batch_group_len {
                 let result = inner_rx.recv().await.unwrap();
+                if Utc::now().timestamp_micros() - updated_at > cfg.compact.job_timeout / 10 {
+                    if let Err(e) = infra_file_list::update_running_jobs(job_id).await {
+                        log::error!("[COMPACT] update_running_jobs failed: {e}");
+                    }
+                    updated_at = Utc::now().timestamp_micros();
+                }
                 worker_results.push(result);
             }
 
@@ -444,21 +492,6 @@ pub async fn merge_by_stream(
     for task in tasks {
         task.await??;
     }
-
-    // write new offset
-    let offset = offset
-        + Duration::try_seconds(cfg.compact.step_secs)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-    db::compact::files::set_offset(
-        org_id,
-        stream_type,
-        stream_name,
-        offset,
-        Some(&LOCAL_NODE_UUID.clone()),
-    )
-    .await?;
 
     // update stream stats
     if stream_stats.doc_num != 0 {
