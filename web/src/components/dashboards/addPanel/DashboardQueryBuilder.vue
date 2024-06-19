@@ -492,8 +492,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("panel.breakdown") }}
         <q-icon name="info_outline" class="q-ml-xs">
           <q-tooltip>
-            Use these fields to split the data into different sections on the X
-            axis for a clearer view.
+            <span
+              v-if="
+                dashboardPanelData.data.type == 'h-bar' ||
+                dashboardPanelData.data.type == 'h-stacked'
+              "
+            >
+              Use these fields to split the data into different sections on the
+              Y axis for a clearer view.
+            </span>
+
+            <span v-else>
+              Use these fields to split the data into different sections on the
+              X axis for a clearer view.
+            </span>
           </q-tooltip>
         </q-icon>
       </div>
