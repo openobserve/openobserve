@@ -1015,7 +1015,6 @@ export default defineComponent({
           (item: any) => item.name
         );
       }
-      console.log(searchObj.data.stream.selectedStreamFields);
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
