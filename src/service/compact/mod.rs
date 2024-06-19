@@ -258,6 +258,33 @@ pub async fn run_merge(
         return Ok(());
     }
 
+    // create a thread to keep updating the job status
+    //
+    // Update job status (updated_at) to prevent pickup by another node
+    // convert job_timeout from secs to micros, and check 1/4 of job_timeout
+    // why 1/4 of job_run_timeout?
+    // because the timeout is for the entire job, we need to update the job status
+    // before it timeout, using 1/2 might still risk a timeout, so we use 1/4 for safety
+    let ttl = std::cmp::max(60, cfg.compact.job_run_timeout / 4) as u64;
+    let job_ids = jobs.iter().map(|job| job.id).collect::<Vec<_>>();
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    tokio::task::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
+                _ = rx.recv() => {
+                    log::debug!("[COMPACT] update_running_jobs done");
+                    return;
+                }
+            }
+            for id in job_ids.iter() {
+                if let Err(e) = infra_file_list::update_running_jobs(*id).await {
+                    log::error!("[COMPACT] update_job_status failed: {}", e);
+                }
+            }
+        }
+    });
+
     let mut tasks = Vec::with_capacity(jobs.len());
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
     let mut min_offset = std::i64::MAX;

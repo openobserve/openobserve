@@ -122,9 +122,9 @@ async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), an
         time::sleep(time::Duration::from_secs(get_config().compact.interval + 1)).await;
         let locker = compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
-        log::debug!("[COMPACTOR] Running data merge");
+        log::debug!("[COMPACTOR] Running data merge job");
         if let Err(e) = compact::run_merge(tx.clone()).await {
-            log::error!("[COMPACTOR] run data merge error: {e}");
+            log::error!("[COMPACTOR] run data merge job error: {e}");
         }
         drop(locker);
     }
@@ -173,24 +173,24 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
 
 async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
     loop {
-        let timeout = get_config().compact.job_run_timeout;
-        time::sleep(time::Duration::from_secs(timeout as u64)).await;
+        let time = get_config().compact.job_run_timeout;
         log::debug!("[COMPACTOR] Running check running jobs");
-        let updated_at = config::utils::time::now_micros() - (timeout * 1000 * 1000);
+        let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
         if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
             log::error!("[COMPACTOR] run check running jobs error: {e}",);
         }
+        time::sleep(time::Duration::from_secs(time as u64)).await;
     }
 }
 
 async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
     loop {
-        let wait_time = get_config().compact.job_clean_wait_time;
-        time::sleep(time::Duration::from_secs(wait_time as u64)).await;
+        let time = get_config().compact.job_clean_wait_time;
         log::debug!("[COMPACTOR] Running clean done jobs");
-        let updated_at = config::utils::time::now_micros() - (wait_time * 1000 * 1000);
+        let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
         if let Err(e) = infra::file_list::clean_done_jobs(updated_at).await {
             log::error!("[COMPACTOR] run clean done jobs error: {e}");
         }
+        time::sleep(time::Duration::from_secs(time as u64)).await;
     }
 }
