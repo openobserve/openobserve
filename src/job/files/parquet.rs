@@ -794,8 +794,9 @@ pub(crate) async fn generate_index_on_compactor(
         len_of_columns_to_invalidate
     ]));
     let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
-    let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
-    let batch = RecordBatch::try_new(schema, columns).unwrap();
+    let columns = vec![_timestamp, empty_terms, file_names, count, deleted];
+    let batch = RecordBatch::try_new(schema, columns)
+        .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
