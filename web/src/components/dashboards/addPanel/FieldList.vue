@@ -267,6 +267,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.type == 'area' ||
+                      dashboardPanelData.data.type == 'bar' ||
+                      dashboardPanelData.data.type == 'line' ||
+                      dashboardPanelData.data.type == 'h-bar' ||
+                      dashboardPanelData.data.type == 'h-stacked' ||
+                      dashboardPanelData.data.type == 'scatter' ||
+                      dashboardPanelData.data.type == 'area-stacked' ||
+                      dashboardPanelData.data.type == 'stacked'
+                    "
+                    padding="sm"
+                    :disabled="isAddBreakdownNotAllowed"
+                    @click="addBreakDownAxisItem(props.row)"
+                    data-test="dashboard-add-x-data"
+                  >
+                    <div>
+                      {{
+                        dashboardPanelData.data.type != "h-bar" ? "+B" : "+Y"
+                      }}
+                    </div>
+                  </q-btn>
+                  <q-btn
                     v-if="dashboardPanelData.data.type == 'heatmap'"
                     padding="sm"
                     :disabled="isAddZAxisNotAllowed"
@@ -468,8 +490,10 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addBreakDownAxisItem,
       addFilteredItem,
       isAddXAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
@@ -749,6 +773,7 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addBreakDownAxisItem,
       addLatitude,
       addLongitude,
       addWeight,
@@ -763,6 +788,7 @@ export default defineComponent({
       filterStreamFn,
       filteredStreams,
       isAddXAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
