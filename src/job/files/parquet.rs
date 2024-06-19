@@ -789,10 +789,7 @@ pub(crate) async fn generate_index_on_compactor(
             .map(|x| x.meta.min_ts)
             .collect::<Vec<i64>>(),
     ));
-    let count: ArrayRef = Arc::new(Int64Array::from(vec![
-        None::<i64>;
-        len_of_columns_to_invalidate
-    ]));
+    let count: ArrayRef = Arc::new(Int64Array::from(vec![0; len_of_columns_to_invalidate]));
     let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
     let columns = vec![_timestamp, empty_terms, file_names, count, deleted];
     let batch = RecordBatch::try_new(schema, columns)
@@ -851,7 +848,7 @@ async fn prepare_index_record_batches(
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
-        Field::new("term", DataType::Utf8, false),
+        Field::new("term", DataType::Utf8, true),
         Field::new("file_name", DataType::Utf8, false),
         Field::new("_count", DataType::Int64, false),
         Field::new("deleted", DataType::Boolean, false),
