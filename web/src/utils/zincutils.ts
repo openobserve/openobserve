@@ -672,3 +672,24 @@ export const maskText = (text: string) => {
 
   return text;
 };
+
+export const queryIndexSplit = (query: string, splitWord: string) => {
+  // Convert the query to lowercase to perform a case-insensitive search
+  const lowerCaseQuery: string = query.toLowerCase();
+  const lowerCaseSplitWord: string = splitWord.toLowerCase();
+
+  // Find the index of the split word in the query
+  const splitWordIndex = lowerCaseQuery.indexOf(lowerCaseSplitWord);
+
+  // If the split word is not found, return the entire query in the first element and an empty string in the second
+  if (splitWordIndex === -1) {
+    return [query, ""];
+  }
+
+  // Calculate the positions to slice the query
+  const beforeSplit = query.slice(0, splitWordIndex);
+  const afterSplit = query.slice(splitWordIndex + splitWord.length);
+
+  // Return the two parts as an array
+  return [beforeSplit, afterSplit];
+};
