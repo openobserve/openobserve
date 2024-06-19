@@ -17,7 +17,7 @@ use actix_web::web;
 use config::utils::json;
 
 use crate::{
-    common::meta::dashboards::{v1, v2, v3, v4 Dashboard, DashboardVersion},
+    common::meta::dashboards::{v1, v2, v3, v4, Dashboard, DashboardVersion},
     service::db,
 };
 
