@@ -77,6 +77,18 @@ export const convertSQLData = async (
       : [];
   };
 
+  // get the breakdown key
+  const getBreakDownKeys = () => {
+    return panelSchema?.queries[0]?.fields?.breakdown?.length
+      ? panelSchema?.queries[0]?.fields?.breakdown.map((it: any) => it.alias)
+      : [];
+  };
+
+  const panelSchemaChartType = panelSchema.queries[0]?.type;
+
+  console.log("getBreakDownKeys", getBreakDownKeys());
+  console.log("searchQueryData", searchQueryData);
+
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
@@ -87,7 +99,7 @@ export const convertSQLData = async (
     if (
       !interval ||
       !metadata.queries ||
-      !["area-stacked", "line", "area"].includes(panelSchema.type)
+      !["area-stacked", "line", "area"].includes(panelSchemaChartType)
     ) {
       return JSON.parse(JSON.stringify(searchQueryData[0]));
     }
@@ -104,9 +116,15 @@ export const convertSQLData = async (
     const intervalMillis = interval * 1000;
 
     // Identify the time-based key
+    console.log("searchQueryDataFirstEntry", searchQueryData[0][0]);
     const searchQueryDataFirstEntry = searchQueryData[0][0];
 
-    const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
+    const keys = [
+      ...getXAxisKeys(),
+      ...getYAxisKeys(),
+      ...getZAxisKeys(),
+      ...getBreakDownKeys(),
+    ];
     let timeBasedKey = keys?.find((key) =>
       isTimeSeries([searchQueryDataFirstEntry?.[key]])
     );
@@ -169,6 +187,7 @@ export const convertSQLData = async (
   };
 
   const missingValueData = missingValue();
+  console.log("missingValueData", missingValueData);
 
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
@@ -253,7 +272,6 @@ export const convertSQLData = async (
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
-  const panelSchemaChartType = panelSchema.queries[0]?.type;
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
