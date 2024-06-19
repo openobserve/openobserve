@@ -31,42 +31,71 @@ use crate::{
     },
 };
 
+use serde::{Deserialize, Serialize};
+use chrono::Utc;
+
+
+#[derive(Deserialize, Serialize)]
+pub struct KafkaIngestionRequest {
+    pub key: String,
+    pub value: String,
+    pub topic: String,
+    pub partition: i32,
+    pub offset: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KafkaIngestionResponse {
+    pub request_id: String,
+    pub timestamp: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
-    operation_id = "LogsIngestionBulk",
+    operation_id = "KafkaLogsIngestion",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = String, description = "Ingest data (ndjson)", content_type = "application/json"),
+    request_body(content = KafkaIngestionRequest, description = "Ingest data from Kafka", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = BulkResponse, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = KafkaIngestionResponse, example = json!({"request_id": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64})),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse, example = json!({"request_id": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "error_message": "error processing request"})),
     )
 )]
+
 #[post("/{org_id}/_bulk")]
 pub async fn bulk(
     org_id: web::Path<String>,
     body: web::Bytes,
+    thread_id: web::Data<usize>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(match logs::bulk::ingest(&org_id, body, user_email).await {
-        Ok(v) => MetaHttpResponse::json(v),
-        Err(e) => {
-            log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
-        }
-    })
+    Ok(
+        match logs::bulk::ingest(&org_id, body, user_email).await {
+            Ok(v) => MetaHttpResponse::json(v),
+            Err(e) => {
+                log::error!("Error processing request {org_id}/_bulk: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
 }
+
+
 
 /// _multi ingestion API
 #[utoipa::path(
@@ -90,6 +119,7 @@ pub async fn bulk(
 pub async fn multi(
     path: web::Path<(String, String)>,
     body: web::Bytes,
+    thread_id: web::Data<usize>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
@@ -140,6 +170,7 @@ pub async fn multi(
 pub async fn json(
     path: web::Path<(String, String)>,
     body: web::Bytes,
+    thread_id: web::Data<usize>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
@@ -189,6 +220,7 @@ pub async fn json(
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
 pub async fn handle_kinesis_request(
     path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
     post_data: web::Json<KinesisFHRequest>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
@@ -227,6 +259,7 @@ pub async fn handle_kinesis_request(
 #[post("/{org_id}/{stream_name}/_sub")]
 pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
     post_data: web::Json<GCPIngestionRequest>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
@@ -267,6 +300,7 @@ pub async fn handle_gcp_request(
 #[post("/{org_id}/v1/logs")]
 pub async fn otlp_logs_write(
     org_id: web::Path<String>,
+    thread_id: web::Data<usize>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -289,4 +323,45 @@ pub async fn otlp_logs_write(
             "Bad Request".to_string(),
         )))
     }
+}
+
+#[post("/{org_id}/_kafka")]
+pub async fn handle_kafka_request(
+    org_id: web::Path<String>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<KafkaIngestionRequest>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let request_id = post_data.key.clone(); // the key can be used as a request ID
+    let request_time = Utc::now().timestamp_millis();
+
+    // Clone the topic to avoid borrowing issues
+    let topic = post_data.topic.clone();
+
+    Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            &topic,
+            IngestionRequest::Kafka(&post_data.into_inner()),
+            user_email,
+        )
+        .await
+        {
+            Ok(_) => HttpResponse::Ok().json(KafkaIngestionResponse {
+                request_id,
+                timestamp: request_time,
+                error_message: None,
+            }),
+            Err(e) => {
+                log::error!("Error processing Kafka request: {:?}", e);
+                HttpResponse::BadRequest().json(KafkaIngestionResponse {
+                    request_id,
+                    timestamp: request_time,
+                    error_message: Some(e.to_string()),
+                })
+            }
+        },
+    )
 }

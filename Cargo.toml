@@ -43,6 +43,7 @@ strip = false
 codegen-units = 4
 
 [dependencies]
+rdkafka = "0.36.2"
 actix-cors = "0.6"
 actix-http = "3.6"
 actix-multipart = { version = "0.6", features = ["derive"] }

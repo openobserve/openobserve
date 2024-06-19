@@ -24,6 +24,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::stream::SchemaRecords;
+use crate::handler::http::request::logs::ingest::KafkaIngestionRequest;
+use crate::handler::http::request::logs::ingest::KafkaIngestionResponse;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
@@ -313,11 +315,13 @@ pub struct GCPIngestionResponse {
     pub timestamp: String,
 }
 
+
 pub enum IngestionRequest<'a> {
     JSON(&'a web::Bytes),
     Multi(&'a web::Bytes),
     KinesisFH(&'a KinesisFHRequest),
     GCP(&'a GCPIngestionRequest),
+    Kafka(&'a KafkaIngestionRequest),
 }
 
 pub enum IngestionData<'a> {
@@ -325,6 +329,7 @@ pub enum IngestionData<'a> {
     Multi(&'a [u8]),
     GCP(&'a GCPIngestionRequest),
     KinesisFH(&'a KinesisFHRequest),
+    Kafka(&'a KafkaIngestionRequest),
 }
 
 #[derive(Debug)]
@@ -333,6 +338,7 @@ pub enum IngestionError {
     JsonError(json::Error),
     AWSError(KinesisFHIngestionResponse),
     GCPError(GCPIngestionResponse),
+    KafkaError(KafkaIngestionResponse),
 }
 
 impl From<json::Error> for IngestionError {
@@ -347,6 +353,12 @@ impl From<std::io::Error> for IngestionError {
     }
 }
 
+impl From<KafkaIngestionResponse> for IngestionError {
+    fn from(response: KafkaIngestionResponse) -> Self {
+        IngestionError::KafkaError(response)
+    }
+}
+
 pub enum IngestionDataIter<'a> {
     JSONIter(std::slice::Iter<'a, json::Value>),
     MultiIter(Lines<BufReader<&'a [u8]>>),
@@ -358,4 +370,5 @@ pub enum IngestionDataIter<'a> {
         std::vec::IntoIter<json::Value>,
         Option<KinesisFHIngestionResponse>,
     ),
+    Kafka(std::vec::IntoIter<json::Value>, Option<KafkaIngestionResponse>),
 }
