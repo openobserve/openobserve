@@ -283,6 +283,9 @@ export default defineComponent({
         ].fields.y,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
         ].fields.z,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -607,7 +610,10 @@ export default defineComponent({
         ].fields.y.length == 0 &&
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.z.length == 0
+        ].fields.z.length == 0 &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown.length == 0
       ) {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -625,6 +631,9 @@ export default defineComponent({
         ...dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y,
+        ...dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
         ...(dashboardPanelData.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.z
@@ -741,10 +750,15 @@ export default defineComponent({
       const xAxisAlias = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.map((it: any) => it?.alias);
+
       const yAxisAlias = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y.map((it: any) => it?.alias);
 
+      const bAxisAlias = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.map((it: any) => it?.alias);
+      
       if (dashboardPanelData.data.type == "heatmap") {
         query +=
           xAxisAlias.length && yAxisAlias.length
@@ -752,6 +766,14 @@ export default defineComponent({
               xAxisAlias.join(", ") +
               ", " +
               yAxisAlias.join(", ")
+            : "";
+      } else if (bAxisAlias.length) {
+        query +=
+          xAxisAlias.length && bAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              bAxisAlias.join(", ")
             : "";
       } else {
         query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
@@ -838,25 +860,38 @@ export default defineComponent({
 
         // Get the parsed query
         try {
-          let currentQuery = dashboardPanelData.data.queries[
+          let currentQuery =
+            dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].query
-          
-           // replace variables with dummy values to verify query is correct or not
-          if(/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:csv}/g, "1,2")
+            ].query;
+
+          // replace variables with dummy values to verify query is correct or not
+          if (/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:csv}/g,
+              "1,2"
+            );
           }
-          if(/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:singlequote}/g, "'1','2'")
+          if (/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:singlequote}/g,
+              "'1','2'"
+            );
           }
-          if(/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:doublequote}/g, '"1","2"')
+          if (/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:doublequote}/g,
+              '"1","2"'
+            );
           }
-          if(/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:pipe}/g, "1|2")
+          if (/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:pipe}/g,
+              "1|2"
+            );
           }
-          if(/\$(\w+|\{\w+\})/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10")
+          if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10");
           }
 
           dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
