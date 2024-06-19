@@ -1183,6 +1183,7 @@ export default defineComponent({
       isAddXAxisNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       cleanupDraggingFields,
     } = useDashboardPanelData();
     const triggerOperators = [
@@ -1331,7 +1332,8 @@ export default defineComponent({
               if (
                 (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
                 (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
-                (targetAxis === "z" && isAddZAxisNotAllowed.value)
+                (targetAxis === "z" && isAddZAxisNotAllowed.value) ||
+                (targetAxis === "b" && isAddBreakdownNotAllowed.value)
               ) {
                 let maxAllowedAxisFields;
 
@@ -1350,10 +1352,11 @@ export default defineComponent({
                   case "area-stacked":
                   case "stacked":
                   case "h-stacked":
-                    maxAllowedAxisFields = targetAxis === "x" ? 2 : 1;
+                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
                     break;
                   default:
-                    maxAllowedAxisFields = targetAxis === "x" ? 2 : 0;
+                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                    break;
                 }
 
                 const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
