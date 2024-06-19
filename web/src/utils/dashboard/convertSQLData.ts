@@ -77,12 +77,23 @@ export const convertSQLData = async (
       : [];
   };
 
+  // get the breakdown key
+  const getBreakDownKeys = () => {
+    return panelSchema?.queries[0]?.fields?.breakdown?.length
+      ? panelSchema?.queries[0]?.fields?.breakdown.map((it: any) => it.alias)
+      : [];
+  };
+
+  console.log("getBreakDownKeys", getBreakDownKeys());
+  console.log("searchQueryData", searchQueryData);
+
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
     const interval = resultMetaData.value.map(
       (it: any) => it.histogram_interval
     )[0];
+    console.log("interval", interval);
 
     if (
       !interval ||
@@ -104,14 +115,22 @@ export const convertSQLData = async (
     const intervalMillis = interval * 1000;
 
     // Identify the time-based key
+    console.log("searchQueryDataFirstEntry", searchQueryData[0][0]);
     const searchQueryDataFirstEntry = searchQueryData[0][0];
 
-    const keys = [...getXAxisKeys(), ...getYAxisKeys(), ...getZAxisKeys()];
+    const keys = [
+      ...getXAxisKeys(),
+      ...getYAxisKeys(),
+      ...getZAxisKeys(),
+      ...getBreakDownKeys(),
+    ];
     let timeBasedKey = keys?.find((key) =>
       isTimeSeries([searchQueryDataFirstEntry?.[key]])
     );
+    console.log("timeBasedKey", timeBasedKey);
 
     if (!timeBasedKey) {
+      console.log("no timeBasedKey");
       return JSON.parse(JSON.stringify(searchQueryData[0]));
     }
 
@@ -193,7 +212,7 @@ export const convertSQLData = async (
   };
 
   const missingValueData = missingValue();
-
+  console.log("missingValueData", missingValueData);
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
 
