@@ -166,7 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete" color="grey" size="xs" />
+                            <q-icon name="delete"
+color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -347,7 +348,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item"
+clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -848,6 +850,7 @@ import {
   getImageURL,
   useLocalInterestingFields,
   useLocalSavedView,
+  queryIndexSplit,
 } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -935,11 +938,14 @@ export default defineComponent({
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
       searchService
-        .search({
-          org_identifier: this.searchObj.organizationIdetifier,
-          query: this.searchObj.data.customDownloadQueryObj,
-          page_type: this.searchObj.data.stream.streamType,
-        }, "UI")
+        .search(
+          {
+            org_identifier: this.searchObj.organizationIdetifier,
+            query: this.searchObj.data.customDownloadQueryObj,
+            page_type: this.searchObj.data.stream.streamType,
+          },
+          "UI"
+        )
         .then((res) => {
           this.customDownloadDialog = false;
           if (res.data.hits.length > 0) {
@@ -2370,34 +2376,46 @@ export default defineComponent({
             // if query contains order by clause or limit clause then add where clause before that
             // if query contains where clause then add filter after that with and operator and keep order by or limit after that
             // if query does not contain where clause then add where clause before filter
-            let query = currentQuery[0].toLowerCase();
-            if (query.includes("where")) {
-              if (query.includes("order by")) {
-                const [beforeOrderBy, afterOrderBy] = query.split("order by");
+            let query = currentQuery[0];
+            if (query.toLowerCase().includes("where")) {
+              if (query.toLowerCase().includes("order by")) {
+                const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
+                  query,
+                  "order by"
+                );
                 query =
                   beforeOrderBy.trim() +
                   " AND " +
                   filter +
                   " order by" +
                   afterOrderBy;
-              } else if (query.includes("limit")) {
-                const [beforeLimit, afterLimit] = query.split("limit");
+              } else if (query.toLowerCase().includes("limit")) {
+                const [beforeLimit, afterLimit] = queryIndexSplit(
+                  query,
+                  "limit"
+                );
                 query =
                   beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
               } else {
                 query = query + " AND " + filter;
               }
             } else {
-              if (query.includes("order by")) {
-                const [beforeOrderBy, afterOrderBy] = query.split("order by");
+              if (query.toLowerCase().includes("order by")) {
+                const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
+                  query,
+                  "order by"
+                );
                 query =
                   beforeOrderBy.trim() +
                   " where " +
                   filter +
                   " order by" +
                   afterOrderBy;
-              } else if (query.includes("limit")) {
-                const [beforeLimit, afterLimit] = query.split("limit");
+              } else if (query.toLowerCase().includes("limit")) {
+                const [beforeLimit, afterLimit] = queryIndexSplit(
+                  query,
+                  "limit"
+                );
                 query =
                   beforeLimit.trim() +
                   " where " +
