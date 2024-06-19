@@ -851,7 +851,7 @@ async fn prepare_index_record_batches(
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
-        Field::new("term", DataType::Utf8, false),
+        Field::new("term", DataType::Utf8, true),
         Field::new("file_name", DataType::Utf8, false),
         Field::new("_count", DataType::Int64, false),
         Field::new("deleted", DataType::Boolean, false),
