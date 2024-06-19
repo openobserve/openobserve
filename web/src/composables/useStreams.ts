@@ -47,7 +47,7 @@ const useStreams = () => {
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
-
+      console.log("_streamName", _streamName);
       try {
         if (!isStreamFetched(streamName || "all")) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -167,6 +167,7 @@ const useStreams = () => {
         resolve(null);
       }
 
+      console.log("getStream", streamName);
       // Wait for the streams to be fetched if they are being fetched
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
