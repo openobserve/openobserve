@@ -262,7 +262,7 @@ impl<'a> TryFrom<Group<'a>> for String {
         match &g.0 {
             SqlExpr::Identifier(id) => Ok(id.to_string()),
             expr => Err(anyhow::anyhow!(
-                "We only support identifier for order by, got {expr}"
+                "We only support identifier for group by, got {expr}"
             )),
         }
     }

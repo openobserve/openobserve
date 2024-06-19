@@ -43,7 +43,15 @@ pub async fn traces_proto(
     body: web::Bytes,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
-    let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
+    let request = match ExportTraceServiceRequest::decode(body) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid proto: {}", e),
+            )));
+        }
+    };
     super::handle_trace_request(org_id, request, false, in_stream_name).await
 }
 

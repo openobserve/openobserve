@@ -27,8 +27,7 @@ use config::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
-    utils::json,
-    DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
+    utils::{inverted_index::split_token, json},
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -119,17 +118,7 @@ pub async fn search(
         let terms = meta
             .fts_terms
             .iter()
-            .flat_map(|t| {
-                let mut tokenized_search_terms = vec![];
-                t.split(|c| cfg.common.inverted_index_split_chars.contains(c))
-                    .for_each(|s| {
-                        let s = s.trim_matches(|c| DEFAULT_INDEX_TRIM_CHARS.contains(c));
-                        if !s.is_empty() && s.len() >= INDEX_MIN_CHAR_LEN {
-                            tokenized_search_terms.push(s.to_lowercase())
-                        }
-                    });
-                tokenized_search_terms
-            })
+            .flat_map(|t| split_token(t, &cfg.common.inverted_index_split_chars))
             .collect::<HashSet<String>>();
 
         let terms = [terms
