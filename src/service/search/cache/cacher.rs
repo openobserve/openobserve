@@ -1,9 +1,5 @@
 use bytes::Bytes;
-use config::{
-    get_config,
-    meta::search::Response,
-    utils::{json, time::parse_str_to_timestamp_micros_as_option},
-};
+use config::{get_config, meta::search::Response, utils::json};
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
@@ -11,9 +7,7 @@ use infra::cache::{
 
 use crate::{
     common::meta::search::{CachedQueryResponse, QueryDelta},
-    service::search::sql::{
-        generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM, TS_WITH_ALIAS,
-    },
+    service::search::sql::{SqlMode, RE_SELECT_FROM},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -22,31 +16,28 @@ pub async fn check_cache(
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
     parsed_sql: &config::meta::sql::Sql,
-    file_path: &mut String,
+    query_key: &str,
+    file_path: &str,
     is_aggregate: bool,
     should_exec_query: &mut bool,
     trace_id: &str,
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    // check sql_mode
 
-    let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error parsing sql: {:?}", e);
-            return CachedQueryResponse::default();
-        }
-    };
-    let sql_mode: SqlMode = meta.sql_mode;
+    // check sql_mode
+    let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
 
     // skip the count queries
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
-    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp);
-    if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
-        return CachedQueryResponse::default();
+    if is_aggregate && sql_mode.eq(&SqlMode::Full) {
+        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+        let cap_str = caps.get(1).unwrap().as_str();
+        if !cap_str.contains(&cfg.common.column_timestamp) {
+            return CachedQueryResponse::default();
+        }
     }
 
     // Hack select for _timestamp
@@ -59,52 +50,16 @@ pub async fn check_cache(
                 &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
             );
         }
-        req.query.sql = origin_sql.clone();
-        result_ts_col = Some(cfg.common.column_timestamp.clone());
+        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
     }
-    if !is_aggregate && origin_sql.contains('*') {
-        result_ts_col = Some(cfg.common.column_timestamp.clone());
-    }
-
-    let result_ts_col = result_ts_col.unwrap();
-    if let Some(interval) = meta.histogram_interval {
-        *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
-
-        let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
-        let attrs = caps
-            .get(1)
-            .unwrap()
-            .as_str()
-            .split(',')
-            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-            .collect::<Vec<&str>>();
-
-        let interval = match attrs.get(1) {
-            Some(v) => match v.parse::<u16>() {
-                Ok(v) => generate_histogram_interval(parsed_sql.time_range, v),
-                Err(_) => v.to_string(),
-            },
-            None => generate_histogram_interval(parsed_sql.time_range, 0),
-        };
-        *origin_sql = origin_sql.replace(
-            caps.get(0).unwrap().as_str(),
-            &format!("histogram(_timestamp,'{}')", interval),
-        );
-        req.query.sql = origin_sql.clone();
-    };
-    if req.query.size >= 0 {
-        *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
-    }
-    let query_key = file_path.replace('/', "_");
 
     let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
         is_aggregate,
         query_key.to_owned(),
-        file_path.to_string(),
+        file_path.to_owned(),
         trace_id.to_owned(),
-        result_ts_col.clone(),
     )
     .await
     {
@@ -116,7 +71,7 @@ pub async fn check_cache(
                 .cloned()
                 .collect();
             if search_delta.is_empty() {
-                log::debug!("cached response found");
+                log::info!("cached response found");
                 *should_exec_query = false;
             };
             cached_resp.deltas = search_delta;
@@ -129,7 +84,6 @@ pub async fn check_cache(
         }
     };
     c_resp.cache_query_response = true;
-    c_resp.ts_column = result_ts_col;
     c_resp
 }
 
@@ -137,13 +91,12 @@ pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
     is_aggregate: bool,
+    query_key: &str,
     file_path: &str,
-    result_ts_column: &str,
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
-    let query_key = file_path.replace('/', "_");
-    let is_cached = r.get(&query_key).cloned();
+    let is_cached = r.get(query_key).cloned();
     drop(r);
 
     if let Some(cache_metas) = is_cached {
@@ -182,37 +135,22 @@ pub async fn get_cached_results(
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
                         // remove hits if time range is lesser than cached time range
-                        let mut to_retain = Vec::new();
 
                         if !remove_hits.is_empty() {
                             for delta in remove_hits {
-                                for hit in &cached_response.hits {
-                                    let hit_ts = match hit.get(result_ts_column) {
-                                        Some(serde_json::Value::String(ts)) => {
-                                            parse_str_to_timestamp_micros_as_option(ts.as_str())
-                                        }
-                                        Some(serde_json::Value::Number(ts)) => ts.as_i64(),
-                                        _ => {
-                                            return None;
-                                        }
-                                    };
+                                cached_response.hits.retain(|hit| {
+                                    let hit_ts = hit
+                                        .get(&cfg.common.column_timestamp)
+                                        .unwrap()
+                                        .as_i64()
+                                        .unwrap();
 
-                                    match hit_ts {
-                                        Some(hit_ts) => {
-                                            if !(hit_ts >= delta.delta_start_time
-                                                && hit_ts < delta.delta_end_time)
-                                            {
-                                                to_retain.push(hit.clone());
-                                            }
-                                        }
-                                        None => return None,
-                                    }
-                                }
+                                    !(hit_ts >= delta.delta_start_time
+                                        && hit_ts < delta.delta_end_time)
+                                });
                             }
-                            cached_response.hits = to_retain;
                         };
 
-                        log::info!("Get results from disk success for query key: {}", query_key);
                         Some(CachedQueryResponse {
                             cached_response,
                             deltas,
@@ -221,7 +159,6 @@ pub async fn get_cached_results(
                             cache_query_response: true,
                             response_start_time: matching_cache_meta.start_time,
                             response_end_time: matching_cache_meta.end_time,
-                            ts_column: result_ts_column.to_string(),
                         })
                     }
                     Err(e) => {
@@ -314,6 +251,7 @@ pub async fn cache_results_to_disk(
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
     let file = format!("results/{}/{}", file_path, file_name);
+    println!("getting file: {:?}", file);
     match disk::get(&file, None).await {
         Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
         None => Err(std::io::Error::new(
@@ -321,21 +259,4 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
             "File not found",
         )),
     }
-}
-
-fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<String> {
-    let mut result_ts_col = None;
-
-    for (original, alias) in &parsed_sql.field_alias {
-        if TS_WITH_ALIAS.is_match(original) {
-            if alias == ts_col {
-                result_ts_col = Some(ts_col.to_string());
-            }
-            if original.contains("histogram") {
-                result_ts_col = Some(alias.clone());
-            }
-        }
-    }
-
-    result_ts_col
 }
