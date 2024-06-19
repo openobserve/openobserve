@@ -222,7 +222,8 @@ export const convertSQLData = async (
       missingValueData?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
-          yAxisKeys.every((key: any) => item[key] != null)
+          yAxisKeys.every((key: any) => item[key] != null) &&
+          breakDownKeys.every((key: any) => item[key] != null)
         );
       }) || [];
 
@@ -247,6 +248,8 @@ export const convertSQLData = async (
   const yAxisKeys = getYAxisKeys();
 
   const zAxisKeys = getZAxisKeys();
+
+  const breakDownKeys = getBreakDownKeys();
 
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position
@@ -351,7 +354,8 @@ export const convertSQLData = async (
                 return params.value.toString();
               for (
                 let i = 0;
-                i < xAxisKeys.length - params.axisIndex - 1;
+                i <
+                xAxisKeys.length + breakDownKeys.length - params.axisIndex - 1;
                 i++
               ) {
                 lineBreaks += " \n \n";
@@ -368,7 +372,12 @@ export const convertSQLData = async (
                   panelSchema.config?.decimals
                 )
               );
-            for (let i = 0; i < xAxisKeys.length - params.axisIndex - 1; i++) {
+            for (
+              let i = 0;
+              i <
+              xAxisKeys.length + breakDownKeys.length - params.axisIndex - 1;
+              i++
+            ) {
               lineBreaks += " \n \n";
             }
             params.value = params.value.toString();
@@ -436,7 +445,7 @@ export const convertSQLData = async (
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
-    xAxis: xAxisKeys?.map((key: any, index: number) => {
+    xAxis: [...breakDownKeys, ...xAxisKeys]?.map((key: any, index: number) => {
       const data = getAxisDataFromKey(key);
 
       //unique value index array
@@ -452,7 +461,7 @@ export const convertSQLData = async (
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
         name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
         nameLocation: "middle",
-        nameGap: 9 * (xAxisKeys.length - index + 1),
+        nameGap: 9 * (xAxisKeys.length + breakDownKeys.length - index + 1),
         nameTextStyle: {
           fontWeight: "bold",
           fontSize: 14,
@@ -461,16 +470,20 @@ export const convertSQLData = async (
           interval:
             panelSchema.type == "h-stacked"
               ? "auto"
-              : index == xAxisKeys.length - 1
+              : index == xAxisKeys.length + breakDownKeys.length - 1
               ? "auto"
               : function (i: any) {
                   return arr.includes(i);
                 },
-          overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
+          overflow:
+            index == xAxisKeys.length + breakDownKeys.length - 1
+              ? "none"
+              : "truncate",
           // hide axis label if overlaps
           hideOverlap: true,
           width: 100,
-          margin: 18 * (xAxisKeys.length - index - 1) + 5,
+          margin:
+            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5,
         },
         splitLine: {
           show: true,
@@ -479,10 +492,10 @@ export const convertSQLData = async (
           show: panelSchema.config?.axis_border_show || false,
         },
         axisTick: {
-          show: xAxisKeys.length == 1 ? false : true,
+          show: xAxisKeys.length + breakDownKeys.length == 1 ? false : true,
           align: "left",
           alignWithLabel: false,
-          length: 20 * (xAxisKeys.length - index),
+          length: 20 * (xAxisKeys.length + breakDownKeys.length - index),
           interval:
             panelSchema.type == "h-stacked"
               ? "auto"
@@ -571,7 +584,7 @@ export const convertSQLData = async (
         ((panelSchema.type == "line" ||
           panelSchema.type == "area" ||
           panelSchema.type == "scatter") &&
-          panelSchema.queries[0].fields.x.length == 2)
+          panelSchema.queries[0].fields.breakdown.length)
       ) {
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
@@ -606,7 +619,7 @@ export const convertSQLData = async (
         // stacked with xAxis's second value
         // allow 2 xAxis and 1 yAxis value for stack chart
         // get second x axis key
-        const key1 = xAxisKeys[1];
+        const key1 = breakDownKeys[0];
         // get the unique value of the second xAxis's key
         const stackedXAxisUniqueValue = [
           ...new Set(missingValueData.map((obj: any) => obj[key1])),
@@ -924,7 +937,7 @@ export const convertSQLData = async (
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      const key1 = xAxisKeys[1];
+      const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
@@ -1127,7 +1140,7 @@ export const convertSQLData = async (
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      const key1 = xAxisKeys[1];
+      const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
