@@ -213,7 +213,7 @@ pub async fn move_dashboard(
             json::to_vec(&dashboard.v3.unwrap()).unwrap()
         } else {
             json::to_vec(&dashboard.v4.unwrap()).unwrap()
-        }
+        };
 
         // add the dashboard to the destination folder
         if let Err(error) = dashboards::put(org_id, dashboard_id, to_folder, dash.into()).await {
