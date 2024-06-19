@@ -60,7 +60,6 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
-pub const DEFAULT_INDEX_TRIM_CHARS: &str = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
@@ -651,8 +650,8 @@ pub struct Common {
     pub inverted_index_enabled: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = ".,;:|/#_ =-+*^&%$@!~`",
-        help = "Characters which should be used as a delimiter to split the string."
+        default = "",
+        help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
     )]
     pub inverted_index_split_chars: String,
     #[env_config(
@@ -878,7 +877,7 @@ pub struct Compact {
     pub batch_size: i64,
     #[env_config(
         name = "ZO_COMPACT_JOB_RUN_TIMEOUT",
-        default = 1800, // 30 minutes
+        default = 600, // 10 minutes
         help = "If a compact job is not finished in this time, it will be marked as failed"
     )]
     pub job_run_timeout: i64,
@@ -1291,10 +1290,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Default scrape interval can not be set to lesser than 5s ."
         ));
-    }
-
-    if cfg.common.inverted_index_split_chars.is_empty() {
-        cfg.common.inverted_index_split_chars = " ;,".to_string();
     }
 
     // check bloom filter ndv ratio
