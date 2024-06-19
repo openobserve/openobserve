@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'expand_more'
                 "
                 size="20px"
+                class="float-right q-mt-xs"
               ></q-icon>
           <q-tr
             :props="props"
