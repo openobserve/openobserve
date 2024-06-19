@@ -1522,11 +1522,7 @@ export default defineComponent({
     });
 
     const bAxisHint = computed((e: any) => {
-      switch (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].type
-      ) {
+      switch (dashboardPanelData.data.type) {
         case "stacked":
         case "area-stacked":
         case "h-stacked":
