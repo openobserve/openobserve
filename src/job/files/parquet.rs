@@ -13,10 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::Path,
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
 
 use arrow::{
-    array::{ArrayRef, BooleanArray, Int64Array, StringArray},
+    array::{
+        ArrayRef, BooleanArray, BooleanBuilder, Int64Array, Int64Builder, StringArray,
+        StringBuilder,
+    },
+    datatypes::Field,
     record_batch::RecordBatch,
 };
 use arrow_schema::{DataType, Schema, SchemaRef};
@@ -30,15 +39,16 @@ use config::{
         arrow::record_batches_to_json_rows,
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files_with_channel,
+        inverted_index::split_token,
         json,
         parquet::{
             read_metadata_from_file, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
+        record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
     },
-    FxIndexMap, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
+    FxIndexMap,
 };
-use datafusion::{datasource::MemTable, prelude::*};
 use hashbrown::HashSet;
 use infra::{cache::tmpfs, schema::SchemaCache, storage};
 use ingester::WAL_PARQUET_METADATA;
@@ -55,10 +65,7 @@ use crate::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::{
-            exec::merge_parquet_files as merge_parquet_files_by_datafusion,
-            string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
-        },
+        search::datafusion::exec::merge_parquet_files as merge_parquet_files_by_datafusion,
     },
 };
 
@@ -665,9 +672,9 @@ pub(crate) async fn generate_index_on_ingester(
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
-    let index_record_batches =
-        prepare_index_record_batches(batches, org_id, stream_name, &new_file_key).await?;
-    let record_batches: Vec<RecordBatch> = index_record_batches.into_iter().flatten().collect();
+    let record_batches = prepare_index_record_batches(batches, org_id, stream_name, &new_file_key)
+        .await
+        .map_err(|e| anyhow::anyhow!("prepare_index_record_batches error: {}", e))?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(());
     }
@@ -757,9 +764,8 @@ pub(crate) async fn generate_index_on_compactor(
     org_id: &str,
     stream_name: &str,
 ) -> Result<(String, FileMeta), anyhow::Error> {
-    let index_record_batches =
+    let mut record_batches =
         prepare_index_record_batches(batches, org_id, stream_name, &new_file_key).await?;
-    let mut record_batches: Vec<RecordBatch> = index_record_batches.into_iter().flatten().collect();
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok((String::new(), FileMeta::default()));
     }
@@ -788,8 +794,9 @@ pub(crate) async fn generate_index_on_compactor(
         len_of_columns_to_invalidate
     ]));
     let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
-    let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
-    let batch = RecordBatch::try_new(schema, columns).unwrap();
+    let columns = vec![_timestamp, empty_terms, file_names, count, deleted];
+    let batch = RecordBatch::try_new(schema, columns)
+        .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
 
     let original_file_size = 0; // The file never existed before this function was called
@@ -809,20 +816,24 @@ pub(crate) async fn generate_index_on_compactor(
 }
 
 async fn prepare_index_record_batches(
-    batches: Vec<RecordBatch>, // 10 fields index
+    mut batches: Vec<RecordBatch>,
     org_id: &str,
     stream_name: &str,
     new_file_key: &str,
-) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
+) -> Result<Vec<RecordBatch>, anyhow::Error> {
     if batches.is_empty() {
         return Ok(vec![]);
     }
 
     let cfg = get_config();
     // filter null columns
-    let schema = batches.first().unwrap().schema();
-    let batches = batches.iter().collect::<Vec<_>>();
-    let mut new_batch = arrow::compute::concat_batches(&schema, batches)?;
+    let mut new_batch = if batches.len() == 1 {
+        batches.remove(0)
+    } else {
+        let schema = batches.first().unwrap().schema();
+        concat_batches(schema, batches, true)
+            .map_err(|e| anyhow::anyhow!("concat_batches error: {}", e))?
+    };
     let mut null_columns = 0;
     for i in 0..new_batch.num_columns() {
         let ni = i - null_columns;
@@ -838,50 +849,99 @@ async fn prepare_index_record_batches(
         return Ok(vec![]);
     }
 
-    let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema.clone(), vec![vec![new_batch]])?;
-    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
+    let new_schema = Arc::new(Schema::new(vec![
+        Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
+        Field::new("term", DataType::Utf8, false),
+        Field::new("file_name", DataType::Utf8, false),
+        Field::new("_count", DataType::Int64, false),
+        Field::new("deleted", DataType::Boolean, false),
+    ]));
+
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
+
+    // get _timestamp column
+    let Some(time_data) = new_batch
+        .column_by_name(&cfg.common.column_timestamp)
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+    else {
+        return Ok(vec![]);
+    };
+
+    let num_rows = new_batch.num_rows();
     for column in schema.fields().iter() {
         if column.data_type() != &DataType::Utf8 {
             continue;
         }
 
-        // 1500 columns --> 100 columns of inverted index
-        let index_df = ctx.table("_tbl_raw_data").await?;
+        // get full text search column
+        let Some(column_data) = new_batch
+            .column_by_name(column.name())
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+        else {
+            continue;
+        };
 
-        let column_name = column.name();
-        let split_chars = &cfg.common.inverted_index_split_chars;
-        let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
-        let lower_case_expr = lower(concat(vec![col(column_name), lit("")]));
-        let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
-        let distinct_terms = array_distinct(split_arr);
+        // split the column into terms
+        let terms = (0..num_rows)
+            .flat_map(|i| {
+                split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
+                    .into_iter()
+                    .map(|s| (s, time_data.value(i)))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        if terms.is_empty() {
+            continue;
+        }
 
-        let record_batch = index_df
-            .with_column("terms", distinct_terms)?
-            .unnest_columns(&["terms"])?
-            .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(remove_chars_btrim)]))?
-            .with_column("file_name", lit(file_name_without_prefix))?
-            .aggregate(
-                vec![col("term"), col("file_name")],
-                vec![
-                    min(col("_timestamp")).alias("_timestamp"),
-                    count(col("term")).alias("_count"),
-                ],
-            )?
-            .with_column("character_len", character_length(col("term")))?
-            .with_column("deleted", lit(false))?
-            .filter(col("character_len").gt_eq(lit(INDEX_MIN_CHAR_LEN as i32)))?
-            .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
-            .collect()
-            .await?;
+        // unique terms and get the min _timestamp
+        let mut uniq_terms = BTreeMap::new();
+        for term in terms {
+            let (time, cnt) = uniq_terms.entry(term.0.to_string()).or_insert((term.1, 0));
+            if *time > term.1 {
+                *time = term.1;
+            }
+            *cnt += 1;
+        }
 
+        // build record batch
+        let records_len = uniq_terms.len();
+        let mut field_timestamp = Int64Builder::with_capacity(records_len);
+        let mut field_term = StringBuilder::with_capacity(
+            records_len,
+            uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
+        );
+        let mut field_file_name =
+            StringBuilder::with_capacity(records_len, file_name_without_prefix.len() * records_len);
+        let mut field_count = Int64Builder::with_capacity(records_len);
+        let mut field_deleted = BooleanBuilder::with_capacity(records_len);
+        for (term, (time, count)) in uniq_terms {
+            field_timestamp.append_value(time);
+            field_term.append_value(term);
+            field_file_name.append_value(file_name_without_prefix);
+            field_count.append_value(count);
+            field_deleted.append_value(false);
+        }
+
+        let record_batch = RecordBatch::try_new(
+            new_schema.clone(),
+            vec![
+                Arc::new(field_timestamp.finish()),
+                Arc::new(field_term.finish()),
+                Arc::new(field_file_name.finish()),
+                Arc::new(field_count.finish()),
+                Arc::new(field_deleted.finish()),
+            ],
+        )
+        .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
         indexed_record_batches_to_merge.push(record_batch);
     }
-    ctx.deregister_table("_tbl_raw_data")?;
     Ok(indexed_record_batches_to_merge)
 }
 

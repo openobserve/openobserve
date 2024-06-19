@@ -25,7 +25,8 @@ pub use writer::Writer;
 
 const SOFT_MAX_BUFFER_LEN: usize = 1024 * 128; // 128KB
 
-type FileTypeIdentifier = [u8; 13];
+pub const FILE_TYPE_IDENTIFIER_LEN: usize = 13;
+type FileTypeIdentifier = [u8; FILE_TYPE_IDENTIFIER_LEN];
 const FILE_TYPE_IDENTIFIER: &FileTypeIdentifier = b"OPENOBSERVEV2";
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";

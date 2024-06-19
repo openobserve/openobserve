@@ -20,6 +20,7 @@ pub mod cgroup;
 pub mod file;
 pub mod flatten;
 pub mod hash;
+pub mod inverted_index;
 pub mod json;
 pub mod parquet;
 pub mod rand;
