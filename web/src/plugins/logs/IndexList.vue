@@ -117,6 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="20px"
                 class="float-right q-mt-xs"
               ></q-icon>
+            </q-td>
+          </q-tr>
           <q-tr
             :props="props"
             v-else
