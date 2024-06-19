@@ -687,17 +687,6 @@ test.describe("Sanity testcases", () => {
       )
       .click();
     await page.getByLabel("SQL Mode").locator("div").nth(2).click();
-    await page
-      .locator('[data-test="log-search-index-list-select-stream"]')
-      .click();
-    await page
-      .locator('[data-test="log-search-index-list-select-stream"]')
-      .fill("e2e_automate");
-    await page
-      .getByRole("option", { name: "e2e_automate" })
-      .locator("div")
-      .nth(2)
-      .click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page
       .locator(

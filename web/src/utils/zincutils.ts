@@ -692,4 +692,11 @@ export const queryIndexSplit = (query: string, splitWord: string) => {
 
   // Return the two parts as an array
   return [beforeSplit, afterSplit];
+}
+export const convertToCamelCase = (str: string) => {
+  if (!str) {
+    return ''; // or handle the case as needed
+  }
+
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
