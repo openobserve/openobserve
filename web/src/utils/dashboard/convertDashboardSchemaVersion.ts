@@ -108,6 +108,26 @@ export function convertDashboardSchemaVersion(data: any) {
       data.version = 3;
       break;
     }
+    case 3: {
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.queries.forEach((queryItem: any) => {
+            if (!Array.isArray(queryItem.fields.breakdown)) {
+              queryItem.fields.breakdown = [];
+            }
+
+            // Move excess x-axis fields to breakdown
+            if (queryItem.fields.x.length > 1 && queryItem.type != "table") {
+              queryItem.fields.breakdown.push(...queryItem.fields.x.slice(1));
+              queryItem.fields.x = [queryItem.fields.x[0]];
+            }
+          });
+        });
+      });
+      // update the version
+      data.version = 4;
+      break;
+    }
   }
 
   // return converted data
