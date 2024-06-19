@@ -427,7 +427,11 @@ pub async fn merge_by_stream(
             for _ in 0..batch_group_len {
                 let result = inner_rx.recv().await.unwrap();
                 let now = config::utils::time::now_micros();
+                // Update job status (updated_at) to prevent pickup by another node
                 // convert job_timeout from secs to micros, and check 1/4 of job_timeout
+                // why 1/4 of job_run_timeout?
+                // because the timeout is for the entire job, we need to update the job status
+                // before it timeout, using 1/2 might still risk a timeout, so we use 1/4 for safety
                 if now - updated_at > (cfg.compact.job_run_timeout * 1000 * 1000 / 4) {
                     if let Err(e) = infra_file_list::update_running_jobs(job_id).await {
                         log::error!("[COMPACT] update_running_jobs failed: {e}");
