@@ -121,18 +121,6 @@ export const convertSQLData = async (
 
     const xAxisKeys = getXAxisKeys().filter((key: any) => key !== timeBasedKey);
 
-    // Create a set of unique xAxis values
-    const uniqueXAxisValues = new Set(
-      searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
-    );
-
-    // Create a map of existing data
-    const searchDataMap = new Map();
-    searchQueryData[0]?.forEach((d: any) => {
-      const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
-      searchDataMap.set(key, d);
-    });
-
     const filledData: any = [];
     let currentTime = binnedDate;
 
@@ -142,25 +130,58 @@ export const convertSQLData = async (
         "yyyy-MM-dd'T'HH:mm:ss"
       );
 
-      uniqueXAxisValues.forEach((xAxisValue) => {
-        const key = `${currentFormattedTime}-${xAxisValue}`;
-        const currentData = searchDataMap.get(key);
-        if (currentData) {
-          filledData.push(currentData);
-        } else {
-          const nullEntry = {
-            [timeBasedKey]: currentFormattedTime,
-            [xAxisKeys[0]]: xAxisValue,
-          };
+      if (xAxisKeys.length === 0) {
+        const currentData = searchQueryData[0].find(
+          (d: any) => d[timeBasedKey] === currentFormattedTime
+        );
+        const nullEntry = {
+          [timeBasedKey]: currentFormattedTime,
+          ...currentData,
+        };
+        if (!currentData) {
           keys.forEach((key) => {
-            if (key !== timeBasedKey && key !== xAxisKeys[0])
+            if (key !== timeBasedKey)
               nullEntry[key] =
                 noValueConfigOption === undefined ? null : noValueConfigOption;
           });
-
-          filledData.push(nullEntry);
         }
-      });
+
+        filledData.push(nullEntry);
+      } else {
+        // Create a set of unique xAxis values
+        const uniqueXAxisValues = new Set(
+          searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
+        );
+
+        // Create a map of existing data
+        const searchDataMap = new Map();
+        searchQueryData[0]?.forEach((d: any) => {
+          const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
+          searchDataMap.set(key, d);
+        });
+
+        uniqueXAxisValues.forEach((xAxisValue) => {
+          const key = `${currentFormattedTime}-${xAxisValue}`;
+          const currentData = searchDataMap.get(key);
+          if (currentData) {
+            filledData.push(currentData);
+          } else {
+            const nullEntry = {
+              [timeBasedKey]: currentFormattedTime,
+              [xAxisKeys[0]]: xAxisValue,
+            };
+            keys.forEach((key) => {
+              if (key !== timeBasedKey && key !== xAxisKeys[0])
+                nullEntry[key] =
+                  noValueConfigOption === undefined
+                    ? null
+                    : noValueConfigOption;
+            });
+
+            filledData.push(nullEntry);
+          }
+        });
+      }
 
       currentTime = new Date(currentTime.getTime() + intervalMillis);
     }
