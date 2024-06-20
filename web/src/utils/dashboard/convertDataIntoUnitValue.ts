@@ -110,8 +110,8 @@ export const getUnitValue = (
   }
 
   // if value is missing use - as a placeholder
-  if (isNaN(value) || value == "") {
-    return { value: value == "" ? "-" : value, unit: "" };
+  if (isNaN(value) || value === "") {
+    return { value: value === "" ? "-" : value, unit: "" };
   }
 
   switch (unit) {
@@ -167,7 +167,7 @@ export const getUnitValue = (
       return {
         value: isNaN(value)
           ? value
-          : value == ""
+          : value === ""
           ? "-"
           : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
