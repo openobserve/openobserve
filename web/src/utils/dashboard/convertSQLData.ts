@@ -123,6 +123,15 @@ export const convertSQLData = async (
 
     const filledData: any = [];
     let currentTime = binnedDate;
+    // Create a map of existing data
+    const searchDataMap = new Map();
+    searchQueryData[0]?.forEach((d: any) => {
+      const key =
+        xAxisKeys.length > 0
+          ? `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`
+          : `${d[timeBasedKey]}`;
+      searchDataMap.set(key, d);
+    });
 
     while (currentTime <= endTime) {
       const currentFormattedTime = format(
@@ -131,9 +140,8 @@ export const convertSQLData = async (
       );
 
       if (xAxisKeys.length === 0) {
-        const currentData = searchQueryData[0].find(
-          (d: any) => d[timeBasedKey] === currentFormattedTime
-        );
+        const key = `${currentFormattedTime}`;
+        const currentData = searchDataMap.get(key);
         const nullEntry = {
           [timeBasedKey]: currentFormattedTime,
           ...currentData,
@@ -152,13 +160,6 @@ export const convertSQLData = async (
         const uniqueXAxisValues = new Set(
           searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
         );
-
-        // Create a map of existing data
-        const searchDataMap = new Map();
-        searchQueryData[0]?.forEach((d: any) => {
-          const key = `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`;
-          searchDataMap.set(key, d);
-        });
 
         uniqueXAxisValues.forEach((xAxisValue) => {
           const key = `${currentFormattedTime}-${xAxisValue}`;
