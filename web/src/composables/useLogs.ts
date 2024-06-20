@@ -2345,6 +2345,9 @@ const useLogs = () => {
               ...streamInterestingFieldsLocal
             );
 
+            let intField = new Set(searchObj.data.stream.interestingFieldList);
+            searchObj.data.stream.interestingFieldList = [...intField];
+
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
             let UDSFieldCount = 0;
