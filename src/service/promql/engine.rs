@@ -951,6 +951,8 @@ async fn selector_load_data_from_datafusion(
 
     let mut metrics: HashMap<String, RangeValue> = HashMap::default();
 
+    let mut timer = std::time::Instant::now();
+
     let label_cols = schema
         .fields()
         .iter()
@@ -969,6 +971,9 @@ async fn selector_load_data_from_datafusion(
         .aggregate(vec![col(HASH_LABEL)], label_cols)?
         .collect()
         .await?;
+
+    log::debug!("step1 took: {} ms", timer.elapsed().as_millis());
+    timer = std::time::Instant::now();
 
     for batch in series {
         let hash_values = batch
@@ -995,11 +1000,17 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
+    log::debug!("process1 took: {} ms", timer.elapsed().as_millis());
+    timer = std::time::Instant::now();
+
     let batches = df_group
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
+
+    log::debug!("step2 took: {} ms", timer.elapsed().as_millis());
+    timer = std::time::Instant::now();
 
     for batch in &batches {
         let hash_values = batch
@@ -1029,5 +1040,6 @@ async fn selector_load_data_from_datafusion(
             });
         }
     }
+    log::debug!("process2 took: {} ms", timer.elapsed().as_millis());
     Ok(metrics)
 }
