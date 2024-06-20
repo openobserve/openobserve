@@ -224,13 +224,12 @@ impl Sql {
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{stream_name}[ '"]?"#)).unwrap();
-        let caps = match re.captures(origin_sql.as_str()) {
-            Some(caps) => caps,
-            None => {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
-            }
-        };
-        origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
+
+        // Check if at least one match exists
+        if re.captures(&origin_sql).is_none() {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+        }
+        origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
 
         // Hack select for _timestamp
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {

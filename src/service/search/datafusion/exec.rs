@@ -254,7 +254,6 @@ async fn exec_query(
 
     if !fast_mode && (!field_fns.is_empty() || sql.query_fn.is_some()) {
         if let Some(caps) = RE_WHERE.captures(&sql.origin_sql) {
-            println!("***************** {:?}", caps);
             sql_parts.insert(
                 0,
                 sql.origin_sql
@@ -264,7 +263,6 @@ async fn exec_query(
             sql_parts.insert(1, caps.get(1).unwrap().as_str());
         };
     }
-    println!("***************** {:?}", sql_parts);
     // query
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
