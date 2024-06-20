@@ -593,6 +593,178 @@ UPDATE stream_stats
     async fn clear(&self) -> Result<()> {
         Ok(())
     }
+
+    async fn add_job(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset: i64,
+    ) -> Result<()> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream}");
+        let pool = CLIENT.clone();
+        match sqlx::query(
+            "INSERT IGNORE INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES (?, ?, ?, ?, '', 0);",
+        )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(offset)
+        .bind(super::FileListJobStatus::Pending)
+        .execute(&pool)
+        .await
+        {
+            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
+                Ok(())
+            } else {
+                Err(Error::Message(e.to_string()))
+            },
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
+    }
+
+    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+        let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
+        // get pending jobs group by stream and order by num desc
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+            r#"
+SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
+    FROM file_list_jobs 
+    WHERE status = ? 
+    GROUP BY stream 
+    ORDER BY num DESC 
+    LIMIT ? 
+    FOR UPDATE;"#,
+        )
+        .bind(super::FileListJobStatus::Pending)
+        .bind(limit)
+        .fetch_all(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!(
+                        "[MYSQL] rollback select file_list_jobs pending jobs for update error: {e}"
+                    );
+                }
+                return Err(e.into());
+            }
+        };
+        // update jobs status to running
+        let ids = ret.iter().map(|r| r.id.to_string()).collect::<Vec<_>>();
+        if ids.is_empty() {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback select file_list_jobs pending jobs error: {e}");
+            }
+            return Ok(Vec::new());
+        }
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = ?, node = ?, updated_at = ? WHERE id IN ({});",
+            ids.join(",")
+        );
+        if let Err(e) = sqlx::query(&sql)
+            .bind(super::FileListJobStatus::Running)
+            .bind(node)
+            .bind(config::utils::time::now_micros())
+            .execute(&mut *tx)
+            .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback update file_list_jobs status error: {e}");
+            }
+            return Err(e.into());
+        }
+        // get jobs by ids
+        let sql = format!(
+            "SELECT * FROM file_list_jobs WHERE id IN ({});",
+            ids.join(",")
+        );
+        let ret = match sqlx::query_as::<_, super::MergeJobRecord>(&sql)
+            .fetch_all(&mut *tx)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback select file_list_jobs by ids error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit select file_list_jobs pending jobs error: {e}");
+            return Err(e.into());
+        }
+        Ok(ret)
+    }
+
+    async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
+        let pool = CLIENT.clone();
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = ? WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql)
+            .bind(super::FileListJobStatus::Pending)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn set_job_done(&self, id: i64) -> Result<()> {
+        let pool = CLIENT.clone();
+        sqlx::query(r#"UPDATE file_list_jobs SET status = ?, updated_at = ? WHERE id = ?;"#)
+            .bind(super::FileListJobStatus::Done)
+            .bind(config::utils::time::now_micros())
+            .bind(id)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn update_running_jobs(&self, id: i64) -> Result<()> {
+        let pool = CLIENT.clone();
+        sqlx::query(r#"UPDATE file_list_jobs SET updated_at = ? WHERE id = ?;"#)
+            .bind(config::utils::time::now_micros())
+            .bind(id)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
+        let pool = CLIENT.clone();
+        let ret = sqlx::query(
+            r#"UPDATE file_list_jobs SET status = ? WHERE status = ? AND updated_at < ?;"#,
+        )
+        .bind(super::FileListJobStatus::Pending)
+        .bind(super::FileListJobStatus::Running)
+        .bind(before_date)
+        .execute(&pool)
+        .await?;
+        if ret.rows_affected() > 0 {
+            log::warn!("[MYSQL] reset running jobs status to pending");
+        }
+        Ok(())
+    }
+
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
+        let pool = CLIENT.clone();
+        let ret = sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = ? AND updated_at < ?;"#)
+            .bind(super::FileListJobStatus::Done)
+            .bind(before_date)
+            .execute(&pool)
+            .await?;
+        if ret.rows_affected() > 0 {
+            log::warn!("[MYSQL] clean done jobs");
+        }
+        Ok(())
+    }
 }
 
 impl MysqlFileList {
@@ -761,6 +933,23 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
 
     sqlx::query(
         r#"
+CREATE TABLE IF NOT EXISTS file_list_jobs
+(
+    id         BIGINT not null primary key AUTO_INCREMENT,
+    org        VARCHAR(100) not null,
+    stream     VARCHAR(256) not null,
+    offsets    BIGINT not null,
+    status     INT not null,
+    node       VARCHAR(100) not null,
+    updated_at BIGINT not null
+);
+        "#,
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
     id       BIGINT not null primary key AUTO_INCREMENT,
@@ -816,6 +1005,14 @@ pub async fn create_table_index() -> Result<()> {
         (
             "file_list_deleted",
             "CREATE INDEX file_list_deleted_stream_date_file_idx on file_list_deleted (stream, date, file);",
+        ),
+        (
+            "file_list_jobs",
+            "CREATE UNIQUE INDEX file_list_jobs_stream_offsets_idx on file_list_jobs (stream, offsets);",
+        ),
+        (
+            "file_list_jobs",
+            "CREATE INDEX file_list_jobs_stream_status_idx on file_list_jobs (status, stream);",
         ),
         (
             "stream_stats",

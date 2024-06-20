@@ -31,6 +31,16 @@ use crate::{
     },
 };
 
+pub const ALL_STREAM_TYPES: [StreamType; 7] = [
+    StreamType::Logs,
+    StreamType::Metrics,
+    StreamType::Traces,
+    StreamType::EnrichmentTables,
+    StreamType::Filelist,
+    StreamType::Metadata,
+    StreamType::Index,
+];
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamType {

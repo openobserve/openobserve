@@ -13,17 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
     get_config,
-    meta::{cluster::Role, stream::StreamType},
+    meta::{
+        cluster::Role,
+        stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
+    },
 };
-use infra::dist_lock;
-use once_cell::sync::Lazy;
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use infra::{dist_lock, file_list as infra_file_list, schema::get_settings};
+use tokio::sync::{mpsc, Semaphore};
 
 use crate::{
     common::infra::cluster::{get_node_by_uuid, get_node_from_consistent_hash},
@@ -37,94 +37,55 @@ pub mod merge;
 pub mod retention;
 pub mod stats;
 
-pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::const_new(false)));
-
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // check data retention
-    if cfg.compact.data_retention_days > 0 {
-        let now = Utc::now();
-        let date = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-        let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
+    if cfg.compact.data_retention_days <= 0 {
+        return Ok(());
+    }
 
-        let orgs = db::schema::list_organizations_from_cache().await;
-        let stream_types = [
-            StreamType::Logs,
-            StreamType::Metrics,
-            StreamType::Traces,
-            StreamType::EnrichmentTables,
-            StreamType::Metadata,
-            StreamType::Index,
-        ];
-        for org_id in orgs {
-            // get the working node for the organization
-            let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty()
-                && LOCAL_NODE_UUID.ne(&node)
-                && get_node_by_uuid(&node).await.is_some()
-            {
-                continue;
-            }
+    let now = config::utils::time::now();
+    let date = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+    let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
-            // before start processing, set current node to lock the organization
-            let lock_key = format!("/compact/organization/{org_id}");
-            let locker = dist_lock::lock(&lock_key, 0).await?;
-            // check the working node for the organization again, maybe other node locked it
-            // first
-            let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty()
-                && LOCAL_NODE_UUID.ne(&node)
-                && get_node_by_uuid(&node).await.is_some()
-            {
-                dist_lock::unlock(&locker).await?;
-                continue;
-            }
-            let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-                db::compact::organization::set_offset(
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        for stream_type in ALL_STREAM_TYPES {
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in streams {
+                let Some(node) =
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                else {
+                    continue; // no compactor node
+                };
+                if LOCAL_NODE_UUID.ne(&node) {
+                    continue; // not this node
+                }
+
+                let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
+                let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
+                let stream_data_retention_end = if stream.settings.data_retention > 0 {
+                    let date = now - Duration::try_days(stream.settings.data_retention).unwrap();
+                    date.format("%Y-%m-%d").to_string()
+                } else {
+                    data_lifecycle_end.clone()
+                };
+                if let Err(e) = retention::delete_by_stream(
+                    &stream_data_retention_end,
                     &org_id,
-                    "retention",
-                    0,
-                    Some(&LOCAL_NODE_UUID.clone()),
+                    stream_type,
+                    &stream_name,
                 )
                 .await
-            } else {
-                Ok(())
-            };
-            // already bind to this node, we can unlock now
-            dist_lock::unlock(&locker).await?;
-            drop(locker);
-            ret?;
-
-            for stream_type in stream_types {
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
-                for stream_name in streams {
-                    let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
-                    let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
-                    let stream_data_retention_end = if stream.settings.data_retention > 0 {
-                        let date =
-                            now - Duration::try_days(stream.settings.data_retention).unwrap();
-                        date.format("%Y-%m-%d").to_string()
-                    } else {
-                        data_lifecycle_end.clone()
-                    };
-                    if let Err(e) = retention::delete_by_stream(
-                        &stream_data_retention_end,
-                        &org_id,
+                {
+                    log::error!(
+                        "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
+                        org_id,
                         stream_type,
-                        &stream_name,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            e
-                        );
-                    }
+                        stream_name,
+                        e
+                    );
                 }
             }
         }
@@ -138,7 +99,13 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let stream_type = StreamType::from(columns[1]);
         let stream_name = columns[2];
         let retention = columns[3];
-        tokio::task::yield_now().await; // yield to other tasks
+
+        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor).await else {
+            continue; // no compactor node
+        };
+        if LOCAL_NODE_UUID.ne(&node) {
+            continue; // not this node
+        }
 
         let ret = if retention.eq("all") {
             retention::delete_all(org_id, stream_type, stream_name).await
@@ -167,42 +134,17 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// compactor merge run steps:
-/// 1. get all organization
-/// 2. range streams by organization & stream_type
-/// 3. get a cluster lock for compactor stream
-/// 4. read last compacted offset: year/month/day/hour
-/// 5. read current hour all files
-/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
-/// 7. write to storage
-/// 8. delete small files keys & write big files keys, use transaction
-/// 9. delete small files from storage
-/// 10. update last compacted offset
-/// 11. release cluster lock
-/// 12. compact file list from storage
-pub async fn run_merge(
-    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
-) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
+/// Generate job for compactor
+pub async fn run_generate_job() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
-    let stream_types = [
-        StreamType::Logs,
-        StreamType::Metrics,
-        StreamType::Traces,
-        StreamType::EnrichmentTables,
-        StreamType::Metadata,
-        StreamType::Index,
-    ];
     for org_id in orgs {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
-        for stream_type in stream_types {
+        for stream_type in ALL_STREAM_TYPES {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
-            let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 let Some(node) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
@@ -247,35 +189,158 @@ pub async fn run_merge(
                     continue;
                 }
 
-                let org_id = org_id.clone();
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
-                let worker_tx = worker_tx.clone();
-                let task = tokio::task::spawn(async move {
-                    if let Err(e) =
-                        merge::merge_by_stream(worker_tx, &org_id, stream_type, &stream_name).await
-                    {
-                        log::error!(
-                            "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            e
-                        );
-                    }
-                    drop(permit);
-                });
-                tasks.push(task);
-            }
-            for task in tasks {
-                task.await?;
+                if let Err(e) =
+                    merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
+                {
+                    log::error!(
+                        "[COMPACTOR] generate_job_by_stream [{}/{}/{}] error: {}",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        e
+                    );
+                }
             }
         }
     }
 
+    Ok(())
+}
+
+/// compactor merging
+pub async fn run_merge(
+    worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
+) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    let mut jobs =
+        infra_file_list::get_pending_jobs(&LOCAL_NODE_UUID, cfg.compact.batch_size).await?;
+    if jobs.is_empty() {
+        return Ok(());
+    }
+
+    // check the stream, if the stream partition_time_level is daily or compact step secs less than
+    // 1 hour, we only allow one compactor to working on it
+    let mut need_release_ids = Vec::new();
+    for job in jobs.iter() {
+        let columns = job.stream.split('/').collect::<Vec<&str>>();
+        assert_eq!(columns.len(), 3);
+        let org_id = columns[0].to_string();
+        let stream_type = StreamType::from(columns[1]);
+        let stream_name = columns[2].to_string();
+        let stream_setting = get_settings(&org_id, &stream_name, stream_type)
+            .await
+            .unwrap_or_default();
+        if stream_setting.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Daily
+            || cfg.compact.step_secs < 3600
+        {
+            // check if this stream need process by this node
+            let Some(node) = get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+            else {
+                continue; // no compactor node
+            };
+            if LOCAL_NODE_UUID.ne(&node) {
+                need_release_ids.push(job.id); // not this node
+            }
+        }
+    }
+    if !need_release_ids.is_empty() {
+        // release those jobs
+        if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
+            log::error!("[COMPACT] set_job_pending failed: {}", e);
+        }
+        jobs.retain(|job| !need_release_ids.contains(&job.id));
+    }
+
+    // create a thread to keep updating the job status
+    //
+    // Update job status (updated_at) to prevent pickup by another node
+    // convert job_timeout from secs to micros, and check 1/4 of job_timeout
+    // why 1/4 of job_run_timeout?
+    // because the timeout is for the entire job, we need to update the job status
+    // before it timeout, using 1/2 might still risk a timeout, so we use 1/4 for safety
+    let ttl = std::cmp::max(60, cfg.compact.job_run_timeout / 4) as u64;
+    let job_ids = jobs.iter().map(|job| job.id).collect::<Vec<_>>();
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    tokio::task::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
+                _ = rx.recv() => {
+                    log::debug!("[COMPACT] update_running_jobs done");
+                    return;
+                }
+            }
+            for id in job_ids.iter() {
+                if let Err(e) = infra_file_list::update_running_jobs(*id).await {
+                    log::error!("[COMPACT] update_job_status failed: {}", e);
+                }
+            }
+        }
+    });
+
+    let mut tasks = Vec::with_capacity(jobs.len());
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
+    let mut min_offset = std::i64::MAX;
+    for job in jobs {
+        if job.offsets == 0 {
+            log::error!("[COMPACTOR] merge job offset error: {}", job.offsets);
+            continue;
+        }
+        if job.offsets < min_offset {
+            min_offset = job.offsets;
+        }
+
+        let columns = job.stream.split('/').collect::<Vec<&str>>();
+        assert_eq!(columns.len(), 3);
+        let org_id = columns[0].to_string();
+        let stream_type = StreamType::from(columns[1]);
+        let stream_name = columns[2].to_string();
+
+        // check if we are allowed to merge or just skip
+        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+            log::warn!(
+                "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
+                &org_id,
+                stream_type,
+                &stream_name,
+            );
+            continue;
+        }
+
+        let org_id = org_id.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let worker_tx = worker_tx.clone();
+        let task = tokio::task::spawn(async move {
+            if let Err(e) = merge::merge_by_stream(
+                worker_tx,
+                &org_id,
+                stream_type,
+                &stream_name,
+                job.id,
+                job.offsets,
+            )
+            .await
+            {
+                log::error!(
+                    "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    e
+                );
+            }
+            drop(permit);
+        });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        task.await?;
+    }
+
     // after compact, compact file list from storage
     if !cfg.common.meta_store_external {
-        let last_file_list_offset = db::compact::file_list::get_offset().await?;
-        if let Err(e) = file_list::run(last_file_list_offset).await {
+        if let Err(e) = file_list::run(min_offset).await {
             log::error!("[COMPACTOR] merge file list error: {}", e);
         }
     }
