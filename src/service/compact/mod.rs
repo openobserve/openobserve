@@ -17,9 +17,12 @@ use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
     get_config,
-    meta::{cluster::Role, stream::StreamType},
+    meta::{
+        cluster::Role,
+        stream::{PartitionTimeLevel, StreamType},
+    },
 };
-use infra::{dist_lock, file_list as infra_file_list};
+use infra::{dist_lock, file_list as infra_file_list, schema::get_settings};
 use tokio::sync::{mpsc, Semaphore};
 
 use crate::{
@@ -247,9 +250,38 @@ pub async fn run_merge(
     worker_tx: mpsc::Sender<(merge::MergeSender, merge::MergeBatch)>,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let jobs = infra_file_list::get_pending_jobs(&LOCAL_NODE_UUID, cfg.compact.batch_size).await?;
+    let mut jobs =
+        infra_file_list::get_pending_jobs(&LOCAL_NODE_UUID, cfg.compact.batch_size).await?;
     if jobs.is_empty() {
         return Ok(());
+    }
+
+    // check the stream, if the stream partition_time_level is daily or compact step secs less than
+    // 1 hour, we only allow one compactor to working on it
+    let mut need_remove_ids = Vec::new();
+    for job in jobs.iter() {
+        let columns = job.stream.split('/').collect::<Vec<&str>>();
+        assert_eq!(columns.len(), 3);
+        let org_id = columns[0].to_string();
+        let stream_type = StreamType::from(columns[1]);
+        let stream_name = columns[2].to_string();
+        let stream_setting = get_settings(&org_id, &stream_name, stream_type)
+            .await
+            .unwrap_or_default();
+        if stream_setting.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Daily
+            || cfg.compact.step_secs < 3600
+        {
+            // check if this stream need process by this node
+            let node = get_node_from_consistent_hash(&stream_name, &Role::Compactor)
+                .await
+                .unwrap_or_default();
+            if LOCAL_NODE_UUID.ne(&node) {
+                need_remove_ids.push(job.id);
+            }
+        }
+    }
+    if !need_remove_ids.is_empty() {
+        jobs.retain(|job| !need_remove_ids.contains(&job.id));
     }
 
     // create a thread to keep updating the job status
