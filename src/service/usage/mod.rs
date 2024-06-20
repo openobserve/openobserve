@@ -277,7 +277,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
         } else {
             format!("Basic {}", &cfg.common.usage_reporting_creds)
         };
-        if let Err(e) = Client::builder()
+        match Client::builder()
             .build()
             .unwrap()
             .post(url)
@@ -287,13 +287,33 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             .send()
             .await
         {
-            log::error!("Error in ingesting usage data to external URL {:?}", e);
-            if &cfg.common.usage_reporting_mode != "both" {
-                // on error in ingesting usage data, push back the data
-                let mut usages = USAGE_DATA.write().await;
-                let mut curr_usages = curr_usages.clone();
-                usages.append(&mut curr_usages);
-                drop(usages);
+            Ok(resp) => {
+                let resp_status = resp.status();
+                if !resp_status.is_success() {
+                    log::error!(
+                        "Error in ingesting usage data to external URL: {}",
+                        resp.text()
+                            .await
+                            .unwrap_or_else(|_| resp_status.to_string())
+                    );
+                    if &cfg.common.usage_reporting_mode != "both" {
+                        // on error in ingesting usage data, push back the data
+                        let mut usages = USAGE_DATA.write().await;
+                        let mut curr_usages = curr_usages.clone();
+                        usages.append(&mut curr_usages);
+                        drop(usages);
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Error in ingesting usage data to external URL {:?}", e);
+                if &cfg.common.usage_reporting_mode != "both" {
+                    // on error in ingesting usage data, push back the data
+                    let mut usages = USAGE_DATA.write().await;
+                    let mut curr_usages = curr_usages.clone();
+                    usages.append(&mut curr_usages);
+                    drop(usages);
+                }
             }
         }
     }
@@ -405,7 +425,7 @@ pub async fn run_audit_publish() {
     ));
     audit_interval.tick().await; // trigger the first run
     loop {
-        log::info!("Audit ingestion loop running");
+        log::debug!("Audit ingestion loop running");
         audit_interval.tick().await;
         publish_existing_audits(publish_audit).await;
     }
