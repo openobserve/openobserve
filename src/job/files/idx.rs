@@ -78,7 +78,7 @@ pub(crate) async fn write_to_disk(
     let new_idx_file_name =
         generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name);
     log::info!(
-        "[JOB] IDX: write_to_disk: {} {} {} {} {} {}",
+        "[JOB] IDX: write_to_disk: {}/{}/{} {} {} {}",
         org_id,
         stream_name,
         stream_type,

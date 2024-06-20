@@ -75,6 +75,7 @@ pub trait FileList: Sync + Send + 'static {
         time_max: i64,
         limit: i64,
     ) -> Result<Vec<(String, bool)>>;
+    // stream stats
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -113,6 +114,20 @@ pub trait FileList: Sync + Send + 'static {
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
+    // merge job
+    async fn add_job(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset: i64,
+    ) -> Result<()>;
+    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
+    async fn set_job_done(&self, id: i64) -> Result<()>;
+    async fn update_running_jobs(&self, id: i64) -> Result<()>;
+    async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -297,6 +312,46 @@ pub async fn clear() -> Result<()> {
     CLIENT.clear().await
 }
 
+#[inline]
+pub async fn add_job(
+    org_id: &str,
+    stream_type: StreamType,
+    stream: &str,
+    offset: i64,
+) -> Result<()> {
+    CLIENT.add_job(org_id, stream_type, stream, offset).await
+}
+
+#[inline]
+pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobRecord>> {
+    CLIENT.get_pending_jobs(node, limit).await
+}
+
+#[inline]
+pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
+    CLIENT.set_job_pending(ids).await
+}
+
+#[inline]
+pub async fn set_job_done(id: i64) -> Result<()> {
+    CLIENT.set_job_done(id).await
+}
+
+#[inline]
+pub async fn update_running_jobs(id: i64) -> Result<()> {
+    CLIENT.update_running_jobs(id).await
+}
+
+#[inline]
+pub async fn check_running_jobs(before_date: i64) -> Result<()> {
+    CLIENT.check_running_jobs(before_date).await
+}
+
+#[inline]
+pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
+    CLIENT.clean_done_jobs(before_date).await
+}
+
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
     pub stream: String,
@@ -355,4 +410,27 @@ pub struct FileDeletedRecord {
     pub date: String,
     pub file: String,
     pub flattened: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct MergeJobRecord {
+    pub id: i64,
+    pub stream: String, // default/logs/default
+    pub offsets: i64,   // 1718603746000000
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct MergeJobPendingRecord {
+    pub id: i64,
+    pub stream: String,
+    pub num: i64,
+}
+
+#[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
+#[repr(i32)]
+pub enum FileListJobStatus {
+    #[default]
+    Pending,
+    Running,
+    Done,
 }

@@ -607,6 +607,185 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
     async fn clear(&self) -> Result<()> {
         Ok(())
     }
+
+    async fn add_job(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset: i64,
+    ) -> Result<()> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream}");
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        match sqlx::query(
+            "INSERT INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES ($1, $2, $3, $4, '', 0);",
+        )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(offset)
+        .bind(super::FileListJobStatus::Pending)
+        .execute(&*client)
+        .await
+        {
+            Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
+                Ok(())
+            } else {
+                Err(Error::Message(e.to_string()))
+            },
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
+    }
+
+    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let mut tx = client.begin().await?;
+        // get pending jobs group by stream and order by num desc
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+            r#"
+SELECT stream, max(id) as id, COUNT(*) AS num
+    FROM file_list_jobs 
+    WHERE status = $1 
+    GROUP BY stream 
+    ORDER BY num DESC 
+    LIMIT $2;"#,
+        )
+        .bind(super::FileListJobStatus::Pending)
+        .bind(limit)
+        .fetch_all(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!(
+                        "[SQLITE] rollback select file_list_jobs pending jobs for update error: {e}"
+                    );
+                }
+                return Err(e.into());
+            }
+        };
+        // update jobs status to running
+        let ids = ret.iter().map(|r| r.id.to_string()).collect::<Vec<_>>();
+        if ids.is_empty() {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback select file_list_jobs pending jobs error: {e}");
+            }
+            return Ok(Vec::new());
+        }
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = $1, node = $2, updated_at = $3 WHERE id IN ({});",
+            ids.join(",")
+        );
+        if let Err(e) = sqlx::query(&sql)
+            .bind(super::FileListJobStatus::Running)
+            .bind(node)
+            .bind(config::utils::time::now_micros())
+            .execute(&mut *tx)
+            .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback update file_list_jobs status error: {e}");
+            }
+            return Err(e.into());
+        }
+        // get jobs by ids
+        let sql = format!(
+            "SELECT * FROM file_list_jobs WHERE id IN ({});",
+            ids.join(",")
+        );
+        let ret = match sqlx::query_as::<_, super::MergeJobRecord>(&sql)
+            .fetch_all(&mut *tx)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback select file_list_jobs by ids error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit select file_list_jobs pending jobs error: {e}");
+            return Err(e.into());
+        }
+        Ok(ret)
+    }
+
+    async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql)
+            .bind(super::FileListJobStatus::Pending)
+            .execute(&*client)
+            .await?;
+        Ok(())
+    }
+
+    async fn set_job_done(&self, id: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query(r#"UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id = $3;"#)
+            .bind(super::FileListJobStatus::Done)
+            .bind(config::utils::time::now_micros())
+            .bind(id)
+            .execute(&*client)
+            .await?;
+        Ok(())
+    }
+
+    async fn update_running_jobs(&self, id: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query(r#"UPDATE file_list_jobs SET updated_at = $1 WHERE id = $2;"#)
+            .bind(config::utils::time::now_micros())
+            .bind(id)
+            .execute(&*client)
+            .await?;
+        Ok(())
+    }
+
+    async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let ret = sqlx::query(
+            r#"UPDATE file_list_jobs SET status = $1 WHERE status = $2 AND updated_at < $3;"#,
+        )
+        .bind(super::FileListJobStatus::Pending)
+        .bind(super::FileListJobStatus::Running)
+        .bind(before_date)
+        .execute(&*client)
+        .await?;
+        if ret.rows_affected() > 0 {
+            log::warn!("[SQLITE] reset running jobs status to pending");
+        }
+        Ok(())
+    }
+
+    async fn clean_done_jobs(&self, before_date: i64) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let ret =
+            sqlx::query(r#"DELETE FROM file_list_jobs WHERE status = $1 AND updated_at < $2;"#)
+                .bind(super::FileListJobStatus::Done)
+                .bind(before_date)
+                .execute(&*client)
+                .await?;
+        if ret.rows_affected() > 0 {
+            log::warn!("[SQLITE] clean done jobs");
+        }
+        Ok(())
+    }
 }
 
 impl SqliteFileList {
@@ -781,6 +960,23 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
 
     sqlx::query(
         r#"
+CREATE TABLE IF NOT EXISTS file_list_jobs
+(
+    id         INTEGER not null primary key autoincrement,
+    org        VARCHAR not null,
+    stream     VARCHAR not null,
+    offsets    BIGINT not null,
+    status     INT not null,
+    node       VARCHAR not null,
+    updated_at BIGINT not null
+);
+        "#,
+    )
+    .execute(&*client)
+    .await?;
+
+    sqlx::query(
+        r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
     id      INTEGER not null primary key autoincrement,
@@ -835,6 +1031,14 @@ pub async fn create_table_index() -> Result<()> {
         (
             "file_list_deleted",
             "CREATE INDEX IF NOT EXISTS file_list_deleted_stream_date_file_idx on file_list_deleted (stream, date, file);",
+        ),
+        (
+            "file_list_jobs",
+            "CREATE UNIQUE INDEX IF NOT EXISTS file_list_jobs_stream_offsets_idx on file_list_jobs (stream, offsets);",
+        ),
+        (
+            "file_list_jobs",
+            "CREATE INDEX IF NOT EXISTS file_list_jobs_stream_status_idx on file_list_jobs (status, stream);",
         ),
         (
             "stream_stats",
