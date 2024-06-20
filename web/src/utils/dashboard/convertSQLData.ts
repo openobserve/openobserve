@@ -119,7 +119,9 @@ export const convertSQLData = async (
     const metaDataEndTime = metadata.queries[0].endTime.toString();
     const endTime = new Date(parseInt(metaDataEndTime) / 1000);
 
-    const xAxisKeys = getXAxisKeys().filter((key: any) => key !== timeBasedKey);
+    const xAxisKeysWithoutTimeStamp = getXAxisKeys().filter(
+      (key: any) => key !== timeBasedKey
+    );
 
     const filledData: any = [];
     let currentTime = binnedDate;
@@ -127,8 +129,8 @@ export const convertSQLData = async (
     const searchDataMap = new Map();
     searchQueryData[0]?.forEach((d: any) => {
       const key =
-        xAxisKeys.length > 0
-          ? `${d[timeBasedKey]}-${d[xAxisKeys[0]]}`
+        xAxisKeysWithoutTimeStamp.length > 0
+          ? `${d[timeBasedKey]}-${d[xAxisKeysWithoutTimeStamp[0]]}`
           : `${d[timeBasedKey]}`;
       searchDataMap.set(key, d);
     });
@@ -139,7 +141,7 @@ export const convertSQLData = async (
         "yyyy-MM-dd'T'HH:mm:ss"
       );
 
-      if (xAxisKeys.length === 0) {
+      if (xAxisKeysWithoutTimeStamp.length === 0) {
         const key = `${currentFormattedTime}`;
         const currentData = searchDataMap.get(key);
         const nullEntry = {
@@ -158,7 +160,7 @@ export const convertSQLData = async (
       } else {
         // Create a set of unique xAxis values
         const uniqueXAxisValues = new Set(
-          searchQueryData[0].map((d: any) => d[xAxisKeys[0]])
+          searchQueryData[0].map((d: any) => d[xAxisKeysWithoutTimeStamp[0]])
         );
 
         uniqueXAxisValues.forEach((xAxisValue) => {
@@ -169,10 +171,10 @@ export const convertSQLData = async (
           } else {
             const nullEntry = {
               [timeBasedKey]: currentFormattedTime,
-              [xAxisKeys[0]]: xAxisValue,
+              [xAxisKeysWithoutTimeStamp[0]]: xAxisValue,
             };
             keys.forEach((key) => {
-              if (key !== timeBasedKey && key !== xAxisKeys[0])
+              if (key !== timeBasedKey && key !== xAxisKeysWithoutTimeStamp[0])
                 nullEntry[key] =
                   noValueConfigOption === undefined
                     ? null
