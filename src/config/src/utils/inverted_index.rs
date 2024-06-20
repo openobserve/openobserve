@@ -39,3 +39,81 @@ pub fn split_token(s: &str, delimiter: &str) -> Vec<String> {
         .unique()
         .collect()
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_string() {
+        let result = split_token("", "");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_empty_delimiter() {
+        let result = split_token("Hello, world! This is a test.", "");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+    }
+
+    #[test]
+    fn test_non_empty_delimiter() {
+        let result = split_token("Hello,world,This,is,a,test", ",");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+    }
+
+    #[test]
+    fn test_mixed_whitespace_and_punctuation() {
+        let result = split_token("Hello, world! This - is; a: test.", "");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+    }
+
+    #[test]
+    fn test_all_punctuation() {
+        let result = split_token("!!!,,,;;;...???", "");
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_min_char_length_filter() {
+        let result = split_token("a an and", "");
+        assert_eq!(result, vec!["and".to_string()]);
+    }
+
+    #[test]
+    fn test_with_numeric_characters() {
+        let result = split_token("123 4567 89", "");
+        assert_eq!(result, vec!["123".to_string(), "4567".to_string()]);
+    }
+
+    #[test]
+    fn test_leading_and_trailing_punctuation() {
+        let result = split_token("!!!Hello!!! !!!world!!!", "");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string()]);
+    }
+
+    #[test]
+    fn test_duplicate_tokens() {
+        let result = split_token("hello, hello, world, world", ",");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string()]);
+    }
+
+    #[test]
+    fn test_mixed_case_sensitivity() {
+        let result = split_token("Hello, HeLLo, WORLD, world", ",");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string()]);
+    }
+
+    #[test]
+    fn test_delimiter_as_whitespace() {
+        let result = split_token("Hello world This is a test", " ");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+    }
+
+    #[test]
+    fn test_complex_delimiter() {
+        let result = split_token("Hello||world||This||is||a||test", "||");
+        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+    }
+}

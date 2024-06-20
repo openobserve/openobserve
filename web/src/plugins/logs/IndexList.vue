@@ -1111,6 +1111,7 @@ export default defineComponent({
 
     const toggleSchema = async () => {
       searchObj.loadingStream = true;
+      selectedFieldsName = [];
       setTimeout(async () => {
         await extractFields();
         searchObj.loadingStream = false;
