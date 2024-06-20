@@ -35,6 +35,11 @@ static TIME_UNITS: [(char, u64); 7] = [
 ];
 
 #[inline(always)]
+pub fn now() -> DateTime<Utc> {
+    Utc::now()
+}
+
+#[inline(always)]
 pub fn now_micros() -> i64 {
     Utc::now().timestamp_micros()
 }

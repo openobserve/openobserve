@@ -130,7 +130,7 @@ async fn run_retention() -> Result<(), anyhow::Error> {
         time::sleep(time::Duration::from_secs(get_config().compact.interval + 1)).await;
         log::debug!("[COMPACTOR] Running data retention");
         if let Err(e) = compact::run_retention().await {
-            log::error!("[COMPACTOR] run data delete error: {e}");
+            log::error!("[COMPACTOR] run data retention error: {e}");
         }
     }
 }
@@ -141,7 +141,7 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         time::sleep(time::Duration::from_secs(get_config().compact.interval + 2)).await;
         log::debug!("[COMPACTOR] Running data delay deletion");
         if let Err(e) = compact::run_delay_deletion().await {
-            log::error!("[COMPACTOR] run files delete error: {e}");
+            log::error!("[COMPACTOR] run data delay deletion error: {e}");
         }
     }
 }

@@ -19,7 +19,7 @@ use config::{
     get_config,
     meta::{
         cluster::Role,
-        stream::{PartitionTimeLevel, StreamType},
+        stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
 use infra::{dist_lock, file_list as infra_file_list, schema::get_settings};
@@ -41,87 +41,51 @@ pub mod stats;
 pub async fn run_retention() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // check data retention
-    if cfg.compact.data_retention_days > 0 {
-        let now = Utc::now();
-        let date = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-        let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
+    if cfg.compact.data_retention_days <= 0 {
+        return Ok(());
+    }
 
-        let orgs = db::schema::list_organizations_from_cache().await;
-        let stream_types = [
-            StreamType::Logs,
-            StreamType::Metrics,
-            StreamType::Traces,
-            StreamType::EnrichmentTables,
-            StreamType::Metadata,
-            StreamType::Index,
-        ];
-        for org_id in orgs {
-            // get the working node for the organization
-            let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty()
-                && LOCAL_NODE_UUID.ne(&node)
-                && get_node_by_uuid(&node).await.is_some()
-            {
-                continue;
-            }
+    let now = config::utils::time::now();
+    let date = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+    let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
-            // before start processing, set current node to lock the organization
-            let lock_key = format!("/compact/organization/{org_id}");
-            let locker = dist_lock::lock(&lock_key, 0).await?;
-            // check the working node for the organization again, maybe other node locked it
-            // first
-            let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty()
-                && LOCAL_NODE_UUID.ne(&node)
-                && get_node_by_uuid(&node).await.is_some()
-            {
-                dist_lock::unlock(&locker).await?;
-                continue;
-            }
-            let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-                db::compact::organization::set_offset(
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        for stream_type in ALL_STREAM_TYPES {
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in streams {
+                let Some(node) =
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                else {
+                    continue; // no compactor node
+                };
+                if LOCAL_NODE_UUID.ne(&node) {
+                    continue; // not this node
+                }
+
+                let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
+                let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
+                let stream_data_retention_end = if stream.settings.data_retention > 0 {
+                    let date = now - Duration::try_days(stream.settings.data_retention).unwrap();
+                    date.format("%Y-%m-%d").to_string()
+                } else {
+                    data_lifecycle_end.clone()
+                };
+                if let Err(e) = retention::delete_by_stream(
+                    &stream_data_retention_end,
                     &org_id,
-                    "retention",
-                    0,
-                    Some(&LOCAL_NODE_UUID.clone()),
+                    stream_type,
+                    &stream_name,
                 )
                 .await
-            } else {
-                Ok(())
-            };
-            // already bind to this node, we can unlock now
-            dist_lock::unlock(&locker).await?;
-            drop(locker);
-            ret?;
-
-            for stream_type in stream_types {
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
-                for stream_name in streams {
-                    let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
-                    let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
-                    let stream_data_retention_end = if stream.settings.data_retention > 0 {
-                        let date =
-                            now - Duration::try_days(stream.settings.data_retention).unwrap();
-                        date.format("%Y-%m-%d").to_string()
-                    } else {
-                        data_lifecycle_end.clone()
-                    };
-                    if let Err(e) = retention::delete_by_stream(
-                        &stream_data_retention_end,
-                        &org_id,
+                {
+                    log::error!(
+                        "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
+                        org_id,
                         stream_type,
-                        &stream_name,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            e
-                        );
-                    }
+                        stream_name,
+                        e
+                    );
                 }
             }
         }
@@ -135,7 +99,13 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let stream_type = StreamType::from(columns[1]);
         let stream_name = columns[2];
         let retention = columns[3];
-        tokio::task::yield_now().await; // yield to other tasks
+
+        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor).await else {
+            continue; // no compactor node
+        };
+        if LOCAL_NODE_UUID.ne(&node) {
+            continue; // not this node
+        }
 
         let ret = if retention.eq("all") {
             retention::delete_all(org_id, stream_type, stream_name).await
@@ -167,21 +137,13 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 /// Generate job for compactor
 pub async fn run_generate_job() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
-    let stream_types = [
-        StreamType::Logs,
-        StreamType::Metrics,
-        StreamType::Traces,
-        StreamType::EnrichmentTables,
-        StreamType::Metadata,
-        StreamType::Index,
-    ];
     for org_id in orgs {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
-        for stream_type in stream_types {
+        for stream_type in ALL_STREAM_TYPES {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node) =
@@ -272,11 +234,12 @@ pub async fn run_merge(
             || cfg.compact.step_secs < 3600
         {
             // check if this stream need process by this node
-            let node = get_node_from_consistent_hash(&stream_name, &Role::Compactor)
-                .await
-                .unwrap_or_default();
+            let Some(node) = get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+            else {
+                continue; // no compactor node
+            };
             if LOCAL_NODE_UUID.ne(&node) {
-                need_remove_ids.push(job.id);
+                need_remove_ids.push(job.id); // not this node
             }
         }
     }
