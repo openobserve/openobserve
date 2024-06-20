@@ -43,8 +43,8 @@ strip = false
 codegen-units = 4
 
 [dependencies]
-actix-cors = "0.6"
-actix-http = "3.6"
+actix-cors = "0.7"
+actix-http = "3.8"
 actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
@@ -196,7 +196,7 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = "4.5"
+actix-web = "4.8"
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 anyhow = "1.0"
 arc-swap = "1.7.1"

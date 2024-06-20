@@ -22,7 +22,10 @@ use config::{
         stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
-use infra::{dist_lock, file_list as infra_file_list, schema::get_settings};
+use infra::{
+    dist_lock, file_list as infra_file_list,
+    schema::{get_settings, unwrap_partition_time_level},
+};
 use tokio::sync::{mpsc, Semaphore};
 
 use crate::{
@@ -230,9 +233,9 @@ pub async fn run_merge(
         let stream_setting = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
-        if stream_setting.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Daily
-            || cfg.compact.step_secs < 3600
-        {
+        let partition_time_level =
+            unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
+        if partition_time_level == PartitionTimeLevel::Daily || cfg.compact.step_secs < 3600 {
             // check if this stream need process by this node
             let Some(node) = get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
             else {
