@@ -573,6 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filled
         dense
         label-slot
+        placeholder="-"
         data-test="dashboard-config-no-value-replacement"
         ><template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -589,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 anchor="top middle"
                 self="bottom middle"
               >
-                What to display when a value is missing
+                What to display when a value is missing for time series
               </q-tooltip>
             </div>
           </div>
