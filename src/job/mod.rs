@@ -85,6 +85,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // check version
     db::version::set().await.expect("db version set failed");
 
+    // Auth auditing should be done by router also
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { usage::run_audit_publish().await });
+
     // Router doesn't need to initialize job
     if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
         return Ok(());
@@ -96,8 +100,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { usage::run().await });
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { usage::run_audit_publish().await });
 
     // initialize metadata watcher
     tokio::task::spawn(async move { db::schema::watch().await });
