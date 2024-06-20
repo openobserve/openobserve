@@ -986,6 +986,9 @@ async fn selector_load_data_from_datafusion(
             let mut labels = Vec::with_capacity(batch.num_columns());
             for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
                 let name = k.name();
+                if name == HASH_LABEL {
+                    continue;
+                }
                 let value = v.as_any().downcast_ref::<StringArray>().unwrap();
                 labels.push(Arc::new(Label {
                     name: name.to_string(),
@@ -1004,8 +1007,8 @@ async fn selector_load_data_from_datafusion(
     timer = std::time::Instant::now();
 
     let batches = df_group
-        .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
+        .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .collect()
         .await?;
 
@@ -1032,12 +1035,12 @@ async fn selector_load_data_from_datafusion(
             .downcast_ref::<Float64Array>()
             .unwrap();
         for i in 0..batch.num_rows() {
-            let hash = hash_values.value(i).to_string();
-            metrics.entry(hash).and_modify(|entry| {
-                entry
-                    .samples
-                    .push(Sample::new(time_values.value(i), value_values.value(i)))
-            });
+            let hash = hash_values.value(i);
+            metrics
+                .get_mut(hash)
+                .unwrap()
+                .samples
+                .push(Sample::new(time_values.value(i), value_values.value(i)));
         }
     }
     log::debug!("process2 took: {} ms", timer.elapsed().as_millis());
