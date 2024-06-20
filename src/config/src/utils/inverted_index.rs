@@ -40,7 +40,6 @@ pub fn split_token(s: &str, delimiter: &str) -> Vec<String> {
         .collect()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,19 +53,43 @@ mod tests {
     #[test]
     fn test_empty_delimiter() {
         let result = split_token("Hello, world! This is a test.", "");
-        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+        assert_eq!(
+            result,
+            vec![
+                "hello".to_string(),
+                "world".to_string(),
+                "this".to_string(),
+                "test".to_string()
+            ]
+        );
     }
 
     #[test]
     fn test_non_empty_delimiter() {
         let result = split_token("Hello,world,This,is,a,test", ",");
-        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+        assert_eq!(
+            result,
+            vec![
+                "hello".to_string(),
+                "world".to_string(),
+                "this".to_string(),
+                "test".to_string()
+            ]
+        );
     }
 
     #[test]
     fn test_mixed_whitespace_and_punctuation() {
         let result = split_token("Hello, world! This - is; a: test.", "");
-        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+        assert_eq!(
+            result,
+            vec![
+                "hello".to_string(),
+                "world".to_string(),
+                "this".to_string(),
+                "test".to_string()
+            ]
+        );
     }
 
     #[test]
@@ -108,12 +131,28 @@ mod tests {
     #[test]
     fn test_delimiter_as_whitespace() {
         let result = split_token("Hello world This is a test", " ");
-        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+        assert_eq!(
+            result,
+            vec![
+                "hello".to_string(),
+                "world".to_string(),
+                "this".to_string(),
+                "test".to_string()
+            ]
+        );
     }
 
     #[test]
     fn test_complex_delimiter() {
         let result = split_token("Hello||world||This||is||a||test", "||");
-        assert_eq!(result, vec!["hello".to_string(), "world".to_string(), "this".to_string(), "test".to_string()]);
+        assert_eq!(
+            result,
+            vec![
+                "hello".to_string(),
+                "world".to_string(),
+                "this".to_string(),
+                "test".to_string()
+            ]
+        );
     }
 }
