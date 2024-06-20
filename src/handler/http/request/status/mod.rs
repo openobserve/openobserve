@@ -41,14 +41,16 @@ use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::jwt::verify_decode_token,
+    crate::common::utils::{auth::extract_auth_str, jwt::verify_decode_token},
     crate::handler::http::auth::{
         jwt::process_token,
-        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG},
+        validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
     },
+    crate::service::usage::audit,
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
+            auditor::AuditMessage,
             infra::config::O2_CONFIG,
             settings::{get_logo, get_logo_text},
         },
@@ -332,6 +334,20 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     let status = "succcessfully reloaded config";
+    // Audit this event
+    #[cfg(feature = "enterprise")]
+    audit(AuditMessage {
+        // Since this is not a protected route, there is no way to get the user email
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        method: "GET".to_string(),
+        _timestamp: chrono::Utc::now().timestamp_micros(),
+        path: "/config/reload".to_string(),
+        query_params: "".to_string(),
+        body: "".to_string(),
+        response_code: 200,
+    })
+    .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
 }
 
@@ -380,6 +396,16 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             return Err(Error::new(ErrorKind::Other, "no code in request"));
         }
     };
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        method: "GET".to_string(),
+        path: "/config/redirect".to_string(),
+        body: "".to_string(),
+        query_params: req.query_string().to_string(),
+        response_code: 302,
+        _timestamp: chrono::Utc::now().timestamp_micros(),
+    };
 
     match query.get("state") {
         Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
@@ -387,11 +413,17 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
             }
             Err(_) => {
+                // Bad Request
+                audit_message.response_code = 400;
+                audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
         },
 
         None => {
+            // Bad Request
+            audit_message.response_code = 400;
+            audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
     };
@@ -408,6 +440,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let id_token;
             match token_ver {
                 Ok(res) => {
+                    audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
                         "name": res.0.user_name,
@@ -424,7 +457,12 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     );
                     process_token(res).await
                 }
-                Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
+                Err(e) => {
+                    audit_message.response_code = 401;
+                    audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+                    audit(audit_message).await;
+                    return Ok(HttpResponse::Unauthorized().json(e.to_string()));
+                }
             }
 
             // generate new UUID for access token & store token in DB
@@ -455,12 +493,20 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 auth_cookie.set_same_site(SameSite::None);
             }
             log::info!("Redirecting user after processing token");
+
+            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit(audit_message).await;
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_url))
                 .cookie(auth_cookie)
                 .finish())
         }
-        Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
+        Err(e) => {
+            audit_message.response_code = 401;
+            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit(audit_message).await;
+            Ok(HttpResponse::Unauthorized().json(e.to_string()))
+        }
     }
 }
 
@@ -579,6 +625,13 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
 async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     // remove the session
     let conf = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let auth_str = extract_auth_str(&req);
+    // Only get the user email from the auth_str, no need to check for permissions and others
+    #[cfg(feature = "enterprise")]
+    let user_email = get_user_email_from_auth_str(&auth_str).await;
+
     if let Some(cookie) = req.cookie("auth_tokens") {
         let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
@@ -590,6 +643,21 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     };
     let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
     let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(user_email) = user_email {
+        audit(AuditMessage {
+            user_email,
+            org_id: "".to_string(),
+            method: "GET".to_string(),
+            _timestamp: chrono::Utc::now().timestamp_micros(),
+            path: "/config/logout".to_string(),
+            query_params: req.query_string().to_string(),
+            body: "".to_string(),
+            response_code: 200,
+        })
+        .await;
+    }
 
     HttpResponse::Ok()
         .append_header((header::LOCATION, "/"))
