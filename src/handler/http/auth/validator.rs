@@ -575,6 +575,42 @@ async fn oo_validator_internal(
     }
 }
 
+#[cfg(feature = "enterprise")]
+pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
+    if auth_str.starts_with("Basic") {
+        let decoded = base64::decode(auth_str.strip_prefix("Basic").unwrap().trim())
+            .expect("Failed to decode base64 string");
+
+        match get_user_details(decoded) {
+            Some(value) => Some(value.0),
+            None => None,
+        }
+    } else if auth_str.starts_with("Bearer") {
+        super::token::get_user_name_from_token(auth_str).await
+    } else if auth_str.starts_with("{\"auth_ext\":") {
+        let auth_tokens: AuthTokensExt =
+            config::utils::json::from_str(&auth_str).unwrap_or_default();
+        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+            None
+        } else {
+            let decoded = base64::decode(
+                auth_tokens
+                    .auth_ext
+                    .strip_prefix("auth_ext")
+                    .unwrap()
+                    .trim(),
+            )
+            .expect("Failed to decode base64 string");
+            match get_user_details(decoded) {
+                Some(value) => Some(value.0),
+                None => None,
+            }
+        }
+    } else {
+        None
+    }
+}
+
 fn get_user_details(decoded: String) -> Option<(String, String)> {
     let credentials = String::from_utf8(decoded.into())
         .map_err(|_| ())
