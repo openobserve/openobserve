@@ -123,6 +123,7 @@ pub trait FileList: Sync + Send + 'static {
         offset: i64,
     ) -> Result<()>;
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
     async fn set_job_done(&self, id: i64) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
@@ -324,6 +325,11 @@ pub async fn add_job(
 #[inline]
 pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobRecord>> {
     CLIENT.get_pending_jobs(node, limit).await
+}
+
+#[inline]
+pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
+    CLIENT.set_job_pending(ids).await
 }
 
 #[inline]

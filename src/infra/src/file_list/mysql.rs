@@ -700,6 +700,22 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         Ok(ret)
     }
 
+    async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
+        let pool = CLIENT.clone();
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = ?, node = '', updated_at = 0 WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql)
+            .bind(super::FileListJobStatus::Pending)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
     async fn set_job_done(&self, id: i64) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(r#"UPDATE file_list_jobs SET status = ?, updated_at = ? WHERE id = ?;"#)
