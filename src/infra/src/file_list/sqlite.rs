@@ -719,7 +719,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let sql = format!(
-            "UPDATE file_list_jobs SET status = $1, node = '', updated_at = 0 WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
             ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
@@ -759,13 +759,12 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let ret = sqlx::query(
-            r#"UPDATE file_list_jobs SET status = $1, node = '', updated_at = $2 WHERE status = $3 AND updated_at < $4;"#,
+            r#"UPDATE file_list_jobs SET status = $1 WHERE status = $2 AND updated_at < $3;"#,
         )
         .bind(super::FileListJobStatus::Pending)
-        .bind(config::utils::time::now_micros())
         .bind(super::FileListJobStatus::Running)
         .bind(before_date)
-         .execute(&*client)
+        .execute(&*client)
         .await?;
         if ret.rows_affected() > 0 {
             log::warn!("[SQLITE] reset running jobs status to pending");

@@ -703,7 +703,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
         let pool = CLIENT.clone();
         let sql = format!(
-            "UPDATE file_list_jobs SET status = ?, node = '', updated_at = 0 WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = ? WHERE id IN ({});",
             ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
@@ -740,10 +740,9 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn check_running_jobs(&self, before_date: i64) -> Result<()> {
         let pool = CLIENT.clone();
         let ret = sqlx::query(
-            r#"UPDATE file_list_jobs SET status = ?, node = '', updated_at = ? WHERE status = ? AND updated_at < ?;"#,
+            r#"UPDATE file_list_jobs SET status = ? WHERE status = ? AND updated_at < ?;"#,
         )
         .bind(super::FileListJobStatus::Pending)
-        .bind(config::utils::time::now_micros())
         .bind(super::FileListJobStatus::Running)
         .bind(before_date)
         .execute(&pool)
