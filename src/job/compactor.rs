@@ -106,55 +106,43 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_generate_job() -> Result<(), anyhow::Error> {
     loop {
         time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
-        let locker = compact::QUEUE_LOCKER.clone();
-        let locker = locker.lock().await;
         log::debug!("[COMPACTOR] Running generate merge job");
         if let Err(e) = compact::run_generate_job().await {
             log::error!("[COMPACTOR] run generate merge job error: {e}");
         }
-        drop(locker);
     }
 }
 
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval + 1)).await;
-        let locker = compact::QUEUE_LOCKER.clone();
-        let locker = locker.lock().await;
-        log::debug!("[COMPACTOR] Running data merge job");
+        time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
+        log::debug!("[COMPACTOR] Running data merge");
         if let Err(e) = compact::run_merge(tx.clone()).await {
-            log::error!("[COMPACTOR] run data merge job error: {e}");
+            log::error!("[COMPACTOR] run data merge error: {e}");
         }
-        drop(locker);
     }
 }
 
 /// Deletion for data retention
 async fn run_retention() -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval + 2)).await;
-        let locker = compact::QUEUE_LOCKER.clone();
-        let locker = locker.lock().await;
+        time::sleep(time::Duration::from_secs(get_config().compact.interval + 1)).await;
         log::debug!("[COMPACTOR] Running data retention");
         if let Err(e) = compact::run_retention().await {
             log::error!("[COMPACTOR] run data delete error: {e}");
         }
-        drop(locker);
     }
 }
 
 /// Delete files based on the file_file_deleted in the database
 async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval + 3)).await;
-        let locker = compact::QUEUE_LOCKER.clone();
-        let locker = locker.lock().await;
+        time::sleep(time::Duration::from_secs(get_config().compact.interval + 2)).await;
         log::debug!("[COMPACTOR] Running data delay deletion");
         if let Err(e) = compact::run_delay_deletion().await {
             log::error!("[COMPACTOR] run files delete error: {e}");
         }
-        drop(locker);
     }
 }
 

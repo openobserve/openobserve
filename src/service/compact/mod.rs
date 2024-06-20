@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
@@ -22,8 +20,7 @@ use config::{
     meta::{cluster::Role, stream::StreamType},
 };
 use infra::{dist_lock, file_list as infra_file_list};
-use once_cell::sync::Lazy;
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::sync::{mpsc, Semaphore};
 
 use crate::{
     common::infra::cluster::{get_node_by_uuid, get_node_from_consistent_hash},
@@ -36,9 +33,6 @@ pub mod flatten;
 pub mod merge;
 pub mod retention;
 pub mod stats;
-
-pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
-    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
