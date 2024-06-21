@@ -1768,8 +1768,6 @@ export const convertSQLData = async (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
-  console.log("options", JSON.parse(JSON.stringify(options)));
-
   // console.timeEnd("convertSQLData");
   return {
     options,
