@@ -23,12 +23,10 @@
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
