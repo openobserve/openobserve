@@ -443,9 +443,7 @@ clickable v-close-popup>
               class="q-pa-none search-button"
               @click="handleRunQuery"
               :disable="
-                searchObj.loading == 'true' ||
-                (searchObj.data.hasOwnProperty('streamResults') &&
-                  searchObj.data.streamResults?.list?.length == 0)
+                searchObj.loading == true || searchObj.loadingHistogram == true
               "
               >{{ t("search.runQuery") }}</q-btn
             >
