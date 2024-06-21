@@ -306,7 +306,7 @@ pub async fn search(
                 res.function_error = if res.function_error.is_empty() {
                     range_error
                 } else {
-                    format!("{} /n {}", range_error, res.function_error)
+                    format!("{} \n {}", range_error, res.function_error)
                 };
                 res.new_start_time = Some(req.query.start_time);
                 res.new_end_time = Some(req.query.end_time);
