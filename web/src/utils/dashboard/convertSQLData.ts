@@ -1420,18 +1420,13 @@ export const convertSQLData = async (
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
-            // console.log("field", JSON.parse(JSON.stringify(seriesObj)));
-            console.log(options.xAxis[0].data[index]);
-
-            return [
-              utcToZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime(),
-                store.state.timezone
-              ),
-              it ?? null,
-            ];
-          });
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
+            utcToZonedTime(
+              new Date(options.xAxis[0].data[index] + "Z").getTime(),
+              store.state.timezone
+            ),
+            it ?? null,
+          ]);
         } else if (timestampField) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             utcToZonedTime(
