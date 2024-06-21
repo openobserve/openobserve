@@ -471,7 +471,7 @@ export const convertSQLData = async (
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
-    xAxis: [...breakDownKeys, ...xAxisKeys]?.map((key: any, index: number) => {
+    xAxis: [...xAxisKeys, ...breakDownKeys]?.map((key: any, index: number) => {
       const data = getAxisDataFromKey(key);
 
       //unique value index array
@@ -1420,13 +1420,18 @@ export const convertSQLData = async (
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            utcToZonedTime(
-              new Date(options.xAxis[0].data[index] + "Z").getTime(),
-              store.state.timezone
-            ),
-            it ?? null,
-          ]);
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            // console.log("field", JSON.parse(JSON.stringify(seriesObj)));
+            console.log(options.xAxis[0].data[index]);
+
+            return [
+              utcToZonedTime(
+                new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                store.state.timezone
+              ),
+              it ?? null,
+            ];
+          });
         } else if (timestampField) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             utcToZonedTime(
@@ -1767,6 +1772,8 @@ export const convertSQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+
+  console.log("options", JSON.parse(JSON.stringify(options)));
 
   // console.timeEnd("convertSQLData");
   return {
