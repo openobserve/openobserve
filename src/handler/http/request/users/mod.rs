@@ -390,7 +390,10 @@ pub async fn get_presigned_url(
 }
 
 #[get("/login")]
-pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_auth(
+    _req: HttpRequest,
+    basic_auth: Option<BasicAuth>,
+) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use actix_web::http::header;
@@ -422,61 +425,11 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             response_code: 302,
             _timestamp: chrono::Utc::now().timestamp_micros(),
         };
-        let auth_header = if let Some(s) = query.get("auth") {
-            match query.get("request_time") {
-                Some(req_time_str) => {
-                    if let Ok(ts) = config::utils::time::parse_str_to_time(req_time_str) {
-                        req_ts = ts.timestamp();
-                    } else {
-                        audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
-                    }
-                    request_time = Some(req_time_str);
-                }
-                None => {
-                    audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
-                }
-            };
 
-            match query.get("exp_in") {
-                Some(exp_in_str) => {
-                    expires_in = exp_in_str.parse::<i64>().unwrap();
-                }
-                None => {
-                    audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
-                }
-            };
-            if Utc::now().timestamp() - req_ts > expires_in {
-                audit_unauthorized_error(audit_message).await;
-                return unauthorized_error(resp);
-            }
-            format!("q_auth {}", s)
-        } else if let Some(auth_header) = _req.headers().get("Authorization") {
-            match auth_header.to_str() {
-                Ok(auth_header_str) => auth_header_str.to_string(),
-                Err(_) => {
-                    audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
-                }
-            }
-        } else {
-            audit_unauthorized_error(audit_message).await;
-            return unauthorized_error(resp);
-        };
-
-        if let Some((name, password)) =
-            o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
-        {
-            audit_message.user_email = name.clone();
-            match crate::handler::http::auth::validator::validate_user_for_query_params(
-                &name,
-                &password,
-                request_time,
-                expires_in,
-            )
-            .await
+        let (name, password) = if let Some(basic_auth) = basic_auth {
+            let user_id = basic_auth.user_id();
+            let user_password = basic_auth.password().unwrap();
+            match crate::handler::http::auth::validator::validate_user(user_id, user_password).await
             {
                 Ok(v) => {
                     if v.is_valid {
@@ -491,59 +444,129 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     return unauthorized_error(resp);
                 }
             };
+            (user_id.to_string(), user_password.to_string())
+        } else {
+            let auth_header = if let Some(s) = query.get("auth") {
+                match query.get("request_time") {
+                    Some(req_time_str) => {
+                        if let Ok(ts) = config::utils::time::parse_str_to_time(req_time_str) {
+                            req_ts = ts.timestamp();
+                        } else {
+                            audit_unauthorized_error(audit_message).await;
+                            return unauthorized_error(resp);
+                        }
+                        request_time = Some(req_time_str);
+                    }
+                    None => {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    }
+                };
 
-            if resp.status {
-                let cfg = get_config();
-                let auth_ext = format!(
-                    "auth_ext {}",
-                    base64::encode(&format!("{}:{}", &name, &password))
-                );
-
-                let id_token = config::utils::json::json!({
-                    "email": name,
-                    "name": name,
-                });
-                let tokens = json::to_string(&AuthTokensExt {
-                    auth_ext,
-                    refresh_token: "".to_string(),
-                    request_time: req_ts,
-                    expires_in,
-                })
-                .unwrap();
-
-                let mut auth_cookie = cookie::Cookie::new("auth_ext", tokens);
-                auth_cookie.set_expires(
-                    cookie::time::OffsetDateTime::now_utc()
-                        + cookie::time::Duration::seconds(req_ts),
-                );
-                auth_cookie.set_http_only(true);
-                auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-                auth_cookie.set_path("/");
-
-                if cfg.auth.cookie_same_site_lax {
-                    auth_cookie.set_same_site(cookie::SameSite::Lax);
-                } else {
-                    auth_cookie.set_same_site(cookie::SameSite::None);
+                match query.get("exp_in") {
+                    Some(exp_in_str) => {
+                        expires_in = exp_in_str.parse::<i64>().unwrap();
+                    }
+                    None => {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    }
+                };
+                if Utc::now().timestamp() - req_ts > expires_in {
+                    audit_unauthorized_error(audit_message).await;
+                    return unauthorized_error(resp);
                 }
-                let url = format!(
-                    "{}{}/web/cb#id_token={}.{}",
-                    cfg.common.web_url,
-                    cfg.common.base_uri,
-                    ID_TOKEN_HEADER,
-                    base64::encode(&id_token.to_string())
-                );
-                audit_message._timestamp = Utc::now().timestamp_micros();
-                audit(audit_message).await;
-                return Ok(HttpResponse::Found()
-                    .append_header((header::LOCATION, url))
-                    .cookie(auth_cookie)
-                    .json(resp));
+                format!("q_auth {}", s)
+            } else if let Some(auth_header) = _req.headers().get("Authorization") {
+                match auth_header.to_str() {
+                    Ok(auth_header_str) => auth_header_str.to_string(),
+                    Err(_) => {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    }
+                }
             } else {
                 audit_unauthorized_error(audit_message).await;
-                unauthorized_error(resp)
+                return unauthorized_error(resp);
+            };
+
+            use o2_enterprise::enterprise::dex::service::auth::get_user_from_token;
+
+            use crate::handler::http::auth::validator::validate_user_for_query_params;
+
+            let (name, password) = if let Some((name, password)) = get_user_from_token(&auth_header)
+            {
+                audit_message.user_email = name.clone();
+                match validate_user_for_query_params(&name, &password, request_time, expires_in)
+                    .await
+                {
+                    Ok(v) => {
+                        if v.is_valid {
+                            resp.status = true;
+                            (name, password)
+                        } else {
+                            audit_unauthorized_error(audit_message).await;
+                            return unauthorized_error(resp);
+                        }
+                    }
+                    Err(_) => {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    }
+                }
+            } else {
+                audit_unauthorized_error(audit_message).await;
+                return unauthorized_error(resp);
+            };
+            (name, password)
+        };
+
+        if resp.status {
+            let cfg = get_config();
+            let auth_ext = format!(
+                "auth_ext {}",
+                base64::encode(&format!("{}:{}", &name, &password))
+            );
+
+            let id_token = config::utils::json::json!({
+                "email": name,
+                "name": name,
+            });
+            let tokens = json::to_string(&AuthTokensExt {
+                auth_ext,
+                refresh_token: "".to_string(),
+                request_time: req_ts,
+                expires_in,
+            })
+            .unwrap();
+
+            let mut auth_cookie = cookie::Cookie::new("auth_ext", tokens);
+            auth_cookie.set_expires(
+                cookie::time::OffsetDateTime::now_utc() + cookie::time::Duration::seconds(req_ts),
+            );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+
+            if cfg.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(cookie::SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(cookie::SameSite::None);
             }
+            let url = format!(
+                "{}{}/web/cb#id_token={}.{}",
+                cfg.common.web_url,
+                cfg.common.base_uri,
+                ID_TOKEN_HEADER,
+                base64::encode(&id_token.to_string())
+            );
+            audit_message._timestamp = Utc::now().timestamp_micros();
+            audit(audit_message).await;
+            return Ok(HttpResponse::Found()
+                .append_header((header::LOCATION, url))
+                .cookie(auth_cookie)
+                .json(resp));
         } else {
-            log::error!("User can not be found from auth-header");
             audit_unauthorized_error(audit_message).await;
             unauthorized_error(resp)
         }
