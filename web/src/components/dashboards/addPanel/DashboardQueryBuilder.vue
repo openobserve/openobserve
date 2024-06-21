@@ -287,19 +287,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
               'drop-entered':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
-                dashboardPanelData.meta.dragAndDrop.currentDragArea == 'b',
+                dashboardPanelData.meta.dragAndDrop.currentDragArea ==
+                  'breakdown',
             }"
-            @dragover="onDragOver($event, 'b')"
+            @dragover="onDragOver($event, 'breakdown')"
             @drop="
               onDrop(
                 $event,
-                'b',
+                'breakdown',
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.breakdown?.length || 0
               )
             "
-            @dragenter="onDragEnter($event, 'b', null)"
+            @dragenter="onDragEnter($event, 'breakdown', null)"
             @dragend="onDragEnd()"
             data-test="dashboard-b-layout"
           >
@@ -314,7 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="
                   dashboardPanelData.meta.dragAndDrop.targetDragIndex ==
                     index &&
-                  dashboardPanelData.meta.dragAndDrop.currentDragArea == 'b'
+                  dashboardPanelData.meta.dragAndDrop.currentDragArea ==
+                    'breakdown'
                 "
                 class="dragItem"
               >
@@ -323,9 +325,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn-group
                 class="axis-field"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemB, 'b', index)"
-                @drop="onDrop($event, 'b', index)"
-                @dragenter="onDragEnter($event, 'b', index)"
+                @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
+                @drop="onDrop($event, 'breakdown', index)"
+                @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <div>
                   <q-icon
@@ -1177,6 +1179,7 @@ export default defineComponent({
       x: true,
       y: true,
       z: true,
+      breakdown: true,
       config: true,
       filter: false,
     });
@@ -1258,6 +1261,7 @@ export default defineComponent({
           expansionItems.x = true;
           expansionItems.y = true;
           expansionItems.z = true;
+          expansionItems.breakdown = true;
           expansionItems.config = false;
           expansionItems.filter = true;
         }
@@ -1274,11 +1278,11 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].fields[targetAxis];
         const draggedItem = dashboardPanelData.meta.dragAndDrop.dragElement;
-        fieldList.splice(
+        fieldList?.splice(
           dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
           1
         );
-        fieldList.splice(droppedAtIndex, 0, draggedItem);
+        fieldList?.splice(droppedAtIndex, 0, draggedItem);
       } else {
         // move the items  between axis or from the field list
         // check if the source is from axis or field list
@@ -1299,7 +1303,7 @@ export default defineComponent({
             case "z":
               addZAxisItem(dragElement);
               break;
-            case "b":
+            case "breakdown":
               addBreakDownAxisItem(dragElement);
               break;
             case "f":
@@ -1348,7 +1352,7 @@ export default defineComponent({
                 (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
                 (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
                 (targetAxis === "z" && isAddZAxisNotAllowed.value) ||
-                (targetAxis === "b" && isAddBreakdownNotAllowed.value)
+                (targetAxis === "breakdown" && isAddBreakdownNotAllowed.value)
               ) {
                 let maxAllowedAxisFields;
 
@@ -1393,7 +1397,7 @@ export default defineComponent({
                 removeYAxisItem((dragName || customDragName).name);
               } else if (dragSource === "z") {
                 removeZAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "b") {
+              } else if (dragSource === "breakdown") {
                 removeBreakdownItem((dragName || customDragName).name);
               }
             }
@@ -1409,7 +1413,7 @@ export default defineComponent({
               addYAxisItem(dragName || customDragName);
             } else if (targetAxis === "z") {
               addZAxisItem(dragName || customDragName);
-            } else if (targetAxis === "b") {
+            } else if (targetAxis === "breakdown") {
               addBreakDownAxisItem(dragName || customDragName);
             }
             reorderItems(
@@ -1462,6 +1466,10 @@ export default defineComponent({
           return dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.z;
+        case "breakdown":
+          return dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.breakdown;
         default:
           return [];
       }
