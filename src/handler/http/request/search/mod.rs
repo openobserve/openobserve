@@ -179,6 +179,25 @@ pub async fn search(
         }
     };
 
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let stream_schema = r.get(format!("{}/{}/{}", org_id, stream_type, stream_name).as_str());
+    if let Some(det) = stream_schema {
+        let local_schema = det.schema();
+        if let Some(settings) = infra::schema::unwrap_stream_settings(&local_schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60)
+                    > max_query_range
+            {
+                log::info!(
+                    "query range is too large, limit to {} hours",
+                    max_query_range
+                );
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60;
+            }
+        }
+    }
+
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
