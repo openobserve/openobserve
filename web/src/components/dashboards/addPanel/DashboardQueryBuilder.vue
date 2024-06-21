@@ -241,8 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <!-- Separator between X and B (Breakdown) -->
-      <q-separator vertical />
       <!-- b axis container -->
       <div style="flex: 1 1; width: 50%">
         <div
@@ -259,6 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type == 'stacked'
           "
         >
+          <!-- Separator between X and Breakdown -->
+          <q-separator vertical class="q-mr-md" />
           <div class="layout-name" style="min-width: 0 !important">
             {{ t("panel.breakdown") }}
             <q-icon name="info_outline" class="q-ml-xs">
