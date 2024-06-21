@@ -433,6 +433,8 @@ pub struct StreamSettings {
     pub flatten_level: Option<i64>,
     #[serde(skip_serializing_if = "Option::None")]
     pub defined_schema_fields: Option<Vec<String>>,
+    #[serde(default)]
+    pub max_query_range: i64,
 }
 
 impl Serialize for StreamSettings {
@@ -453,6 +455,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
+        state.serialize_field("max_query_range", &self.max_query_range)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -529,6 +532,11 @@ impl From<&str> for StreamSettings {
             data_retention = v.as_i64().unwrap();
         };
 
+        let mut max_query_range = 0;
+        if let Some(v) = settings.get("max_query_range") {
+            max_query_range = v.as_i64().unwrap();
+        };
+
         let mut defined_schema_fields: Option<Vec<String>> = None;
         if let Some(value) = settings.get("defined_schema_fields") {
             let fields = value
@@ -550,6 +558,7 @@ impl From<&str> for StreamSettings {
             full_text_search_keys,
             bloom_filter_fields,
             data_retention,
+            max_query_range,
             flatten_level,
             defined_schema_fields,
         }
