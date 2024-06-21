@@ -126,7 +126,7 @@ pub async fn search(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
-
+    let mut range_error = String::new();
     let cfg = get_config();
     let mut http_span = None;
     let trace_id = if cfg.common.tracing_enabled {
@@ -183,17 +183,17 @@ pub async fn search(
     let stream_schema = r.get(format!("{}/{}/{}", org_id, stream_type, stream_name).as_str());
     if let Some(det) = stream_schema {
         let local_schema = det.schema();
-        if let Some(settings) = infra::schema::unwrap_stream_settings(&local_schema) {
+        if let Some(settings) = infra::schema::unwrap_stream_settings(local_schema) {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
-                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60)
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
                     > max_query_range
             {
-                log::info!(
-                    "query range is too large, limit to {} hours",
-                    max_query_range
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "Query duration is modified with start time as {:?} - end time {:?} , due to query range restriction of {} hours",
+                    req.query.end_time, req.query.start_time, max_query_range
                 );
-                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60;
             }
         }
     }
@@ -301,6 +301,16 @@ pub async fn search(
                 .inc();
             res.set_trace_id(trace_id.clone());
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+            if !range_error.is_empty() {
+                res.is_partial = true;
+                res.function_error = if res.function_error.is_empty() {
+                    range_error
+                } else {
+                    format!("{} /n {}", res.function_error, range_error)
+                };
+                res.mod_start_time = Some(req.query.start_time);
+                res.mod_end_time = Some(req.query.end_time);
+            }
 
             let req_stats = RequestStats {
                 records: res.hits.len() as i64,
