@@ -308,8 +308,8 @@ pub async fn search(
                 } else {
                     format!("{} /n {}", res.function_error, range_error)
                 };
-                res.mod_start_time = Some(req.query.start_time);
-                res.mod_end_time = Some(req.query.end_time);
+                res.new_start_time = Some(req.query.start_time);
+                res.new_end_time = Some(req.query.end_time);
             }
 
             let req_stats = RequestStats {
