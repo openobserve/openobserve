@@ -401,7 +401,7 @@ export default defineComponent({
       } else {
         const currentTime = Date.now() * 1000; // Convert current time to microseconds
 
-        const timeMap = {
+        const timeMap: any = {
           lt_1m: 1 * 60 * 1000000, // 1 minute
           lt_5m: 5 * 60 * 1000000, // 5 minutes
           lt_15m: 15 * 60 * 1000000, // 15 minutes
@@ -416,7 +416,7 @@ export default defineComponent({
           gt_1M: 30 * 24 * 60 * 60 * 1000000, // greater than 1 month (approx.)
         };
 
-        return queries.value.filter((item) => {
+        return queries.value.filter((item: any) => {
           const timeDifference =
             selectedSearchField.value == "exec_duration"
               ? currentTime - item.created_at
