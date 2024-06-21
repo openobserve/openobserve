@@ -1,5 +1,9 @@
 <template>
   <div class="running-queries-page" v-if="isMetaOrg">
+    <div class="text-h6 q-mx-md q-my-xs" data-test="log-stream-title-text">
+      {{ t("queries.runningQueries") }}
+    </div>
+
     <q-table
       data-test="running-queries-table"
       ref="qTable"
@@ -7,6 +11,8 @@
       :columns="columns"
       row-key="trace_id"
       style="width: 100%"
+      selection="multiple"
+      v-model:selected="selectedRow"
     >
       <template #no-data>
         <div v-if="!loadingState" class="text-center full-width full-height">
@@ -17,10 +23,12 @@
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -54,9 +62,17 @@
 
       <template #top>
         <div class="flex justify-between items-center full-width">
-          <div class="q-table__title" data-test="log-stream-title-text">
-            {{ t("queries.runningQueries") }}
-          </div>
+          <q-btn
+            class="text-bold"
+            outline
+            padding="sm lg"
+            color="red"
+            :disable="selectedRow.length === 0"
+            @click="handleMultiQueryCancel"
+            no-caps
+            :label="t('queries.cancelQuery')"
+          />
+          <q-space />
           <div class="flex items-start">
             <div
               data-test="streams-search-stream-input"
@@ -111,7 +127,7 @@
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
       :message="deleteDialog.message"
-      @update:ok="deleteQuery"
+      @update:ok="handleDeleteQuery"
       @update:cancel="deleteDialog.show = false"
     />
     <q-dialog
@@ -156,6 +172,8 @@ export default defineComponent({
     const lastRefreshed = ref("");
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
+    const selectedRow = ref([]);
+    const deleteRowCount = ref(0);
 
     const refreshData = () => {
       getRunningQueries();
@@ -185,7 +203,7 @@ export default defineComponent({
       message: "Are you sure you want to delete this running query?",
       data: null as any,
     });
-    
+
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
@@ -358,7 +376,7 @@ export default defineComponent({
         position: "bottom",
         spinner: true,
       });
-      SearchService.get_running_queries(store.state.zoConfig.meta_org,)
+      SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
           // resultTotal.value = response?.data?.status?.length;
           queries.value = response?.data?.status;
@@ -379,31 +397,54 @@ export default defineComponent({
         });
     };
 
-    const deleteQuery = () => {
-      SearchService.delete_running_query(store.state.zoConfig.meta_org, deleteDialog.value.data)
+    const handleDeleteQuery = () => {
+      // alert(JSON.parse(JSON.stringify(deleteDialog.value.data)))
+      const data = deleteDialog.value.data.split(",");
+      deleteRowCount.value = data.length;
+      for (let traceID of data) {
+        setTimeout(() => {
+          deleteQuery(traceID);
+        }, 100);
+      }
+    };
+
+    const deleteQuery = (traceID: string) => {
+      SearchService.delete_running_query(store.state.zoConfig.meta_org, traceID)
         .then(() => {
+          deleteRowCount.value--;
           getRunningQueries();
           deleteDialog.value.show = false;
-          q.notify({
-            message: "Running query deleted successfully",
-            color: "positive",
-            position: "bottom",
-            timeout: 2500,
-          });
+          if (deleteRowCount.value === 0) {
+            q.notify({
+              message: "Running query deleted successfully",
+              color: "positive",
+              position: "bottom",
+              timeout: 1500,
+            });
+          }
         })
         .catch((error: any) => {
+          deleteRowCount.value--;
           q.notify({
             message:
               error.response?.data?.message || "Failed to delete running query",
             color: "negative",
             position: "bottom",
-            timeout: 2500,
+            timeout: 1500,
           });
         });
     };
 
     const confirmDeleteAction = (props: any) => {
       deleteDialog.value.data = props.row.trace_id;
+      deleteDialog.value.show = true;
+    };
+
+    const handleMultiQueryCancel = () => {
+      const selectedRowsTraceID = selectedRow.value.map(
+        (row: any) => row.trace_id
+      );
+      deleteDialog.value.data = selectedRowsTraceID.join(",");
       deleteDialog.value.show = true;
     };
 
@@ -460,6 +501,9 @@ export default defineComponent({
       qTable,
       rowsQuery,
       filteredQueries,
+      selectedRow,
+      handleMultiQueryCancel,
+      handleDeleteQuery,
     };
   },
 });
