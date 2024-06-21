@@ -114,6 +114,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 period is {{ store.state.zoConfig.data_retention_days }} days
               </div>
             </div>
+
+            <div class="row flex items-center q-pb-xs q-mt-lg">
+              <label class="q-pr-sm text-bold">Max Query Range (in hours)</label>
+              <q-input
+                data-test="stream-details-max-query-range-input"
+                v-model="maxQueryRange"
+                type="number"
+                dense
+                filled
+                min="0"
+                round
+                class="q-mr-sm data-retention-input"
+                @change="formDirtyFlag = true"
+              ></q-input>
+            </div>
+          </template>
+
+
+          <template>
+           
           </template>
 
           <template
@@ -405,6 +425,7 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
+    const maxQueryRange = ref(0);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
@@ -451,6 +472,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
+      maxQueryRange.value =  0;
     });
 
     const isSchemaEvolutionEnabled = computed(() => {
@@ -460,6 +482,8 @@ export default defineComponent({
     const markFormDirty = () => {
       formDirtyFlag.value = true;
     };
+
+   
 
     const deleteFields = async () => {
       loadingState.value = true;
@@ -591,6 +615,8 @@ export default defineComponent({
           streamResponse.settings.data_retention ||
           store.state.zoConfig.data_retention_days;
 
+      maxQueryRange.value = streamResponse.settings.max_query_range || 0;  
+
       if (!streamResponse.schema) {
         loadingState.value = false;
         dismiss();
@@ -661,11 +687,14 @@ export default defineComponent({
         });
         return;
       }
-
+      if (Number(maxQueryRange.value) > 0) {
+        settings["max_query_range"] = Number(maxQueryRange.value);
+      }
+      
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
-
+    
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
@@ -914,7 +943,10 @@ export default defineComponent({
       selectedFields.value = [];
     };
 
-    const onSelection = () => {};
+    const onSelection = () => { };
+
+
+
 
     return {
       t,
@@ -930,6 +962,7 @@ export default defineComponent({
       showFullTextSearchColumn,
       getImageURL,
       dataRetentionDays,
+      maxQueryRange,
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
