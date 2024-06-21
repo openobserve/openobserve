@@ -1022,9 +1022,21 @@ pub struct Nats {
     pub user: String,
     #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
     pub password: String,
-    #[env_config(name = "ZO_NATS_REPLICAS", default = 3)]
+    #[env_config(
+        name = "ZO_NATS_REPLICAS",
+        default = 3,
+        help = "the copies of a given message to store in the NATS cluster. 
+        Can not be modified after bucket is initialized. 
+        To update this, delete and recreate the bucket."
+    )]
     pub replicas: usize,
-    #[env_config(name = "ZO_NATS_HISTORY", default = 3)]
+    #[env_config(
+        name = "ZO_NATS_HISTORY",
+        default = 3,
+        help = "in the context of KV to configure how many historical entries to keep for a given bucket. 
+        Can not be modified after bucket is initialized. 
+        To update this, delete and recreate the bucket."
+    )]
     pub history: i64,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
