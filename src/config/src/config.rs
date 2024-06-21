@@ -694,6 +694,12 @@ pub struct Common {
         help = "Streams for which dedicated MemTable will be used as comma separated values"
     )]
     pub mem_table_individual_streams: String,
+    #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_ENABLED",
+        default = false,
+        help = "enable span metrics for traces"
+    )]
+    pub traces_span_metrics_enabled: bool,
 }
 
 #[derive(EnvConfig)]
