@@ -69,8 +69,10 @@ pub async fn search(
     let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
-
     let stream_type = StreamType::from(req.stream_type.as_str());
+    if req.timeout == 0 {
+        req.timeout = cfg.limit.query_timeout as i64;
+    }
 
     // get nodes from cluster
     let mut nodes = infra_cluster::get_cached_online_query_nodes()
@@ -270,10 +272,16 @@ pub async fn search(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, 0).await?
+        dist_lock::lock(&locker_key, req.timeout as u64).await?
     };
     #[cfg(feature = "enterprise")]
     loop {
+        if start.elapsed().as_millis() as usize >= req.timeout * 1000 {
+            dist_lock::unlock(&locker).await?;
+            return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(format!(
+                "[trace_id {trace_id}] search: timeout in queue"
+            ))));
+        }
         match work_group.as_ref().unwrap().need_wait().await {
             Ok(true) => {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
