@@ -63,6 +63,7 @@ size="sm" color="secondary" />
       <template #top>
         <div class="flex justify-between items-center full-width">
           <q-btn
+            data-test="qm-multiple-cancel-query-btn"
             class="text-bold"
             outline
             padding="sm lg"
@@ -78,12 +79,24 @@ size="sm" color="secondary" />
               data-test="streams-search-stream-input"
               class="flex items-center"
             >
+              <q-select
+                v-model="selectedSearchField"
+                dense
+                map-options
+                emit-value
+                filled
+                :options="searchFieldOptions"
+                class="q-pa-none search-field-select"
+                data-test="running-queries-search-fields-select"
+                @update:model-value="filterQuery = ''"
+              ></q-select>
               <q-input
+                v-if="selectedSearchField == 'all'"
                 v-model="filterQuery"
                 borderless
                 filled
                 dense
-                class="q-ml-auto q-mb-xs no-border search-input"
+                class="q-mb-xs no-border search-input q-pa-none search-running-query"
                 :placeholder="t('queries.search')"
                 data-test="running-queries-search-input"
               >
@@ -91,6 +104,20 @@ size="sm" color="secondary" />
                   <q-icon name="search" />
                 </template>
               </q-input>
+              <q-select
+                v-else
+                v-model="filterQuery"
+                borderless
+                map-options
+                emit-value
+                filled
+                dense
+                label="Select option"
+                :options="otherFieldOptions"
+                class="q-mb-xs no-border search-input q-pa-none search-running-query"
+                :placeholder="t('queries.search')"
+                data-test="running-queries-search-input"
+              ></q-select>
               <q-btn
                 data-test="running-queries-refresh-btn"
                 class="q-ml-md q-mb-xs text-bold no-border"
@@ -174,6 +201,12 @@ export default defineComponent({
     const resultTotal = ref<number>(0);
     const selectedRow = ref([]);
     const deleteRowCount = ref(0);
+    const searchFieldOptions = ref([
+      { label: "All Fields", value: "all" },
+      { label: "Exec. Duration", value: "exec_duration" },
+      { label: "Query Range", value: "query_range" },
+    ]);
+    const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
     const refreshData = () => {
       getRunningQueries();
@@ -354,12 +387,76 @@ export default defineComponent({
 
     const filteredRows = computed(() => {
       const newVal = filterQuery.value;
-      if (!newVal) {
-        return queries.value;
+      if (selectedSearchField.value === "all") {
+        if (!newVal) {
+          return queries.value;
+        } else {
+          return queries.value.filter(
+            (query: any) =>
+              query.user_id.toLowerCase().includes(newVal.toLowerCase()) ||
+              query.org_id.toLowerCase().includes(newVal.toLowerCase()) ||
+              query.stream_type.toLowerCase().includes(newVal.toLowerCase()) ||
+              query.status.toLowerCase().includes(newVal.toLowerCase()) ||
+              query.trace_id.toLowerCase().includes(newVal.toLowerCase())
+          );
+        }
       } else {
-        return queries.value.filter((query: any) =>
-          query.user_id.toLowerCase().includes(newVal.toLowerCase())
-        );
+        const currentTime = Date.now() * 1000; // Convert current time to microseconds
+
+        const timeMap = {
+          lt_1m: 1 * 60 * 1000000, // 1 minute
+          lt_5m: 5 * 60 * 1000000, // 5 minutes
+          lt_15m: 15 * 60 * 1000000, // 15 minutes
+          lt_30m: 30 * 60 * 1000000, // 30 minutes
+          lt_1h: 60 * 60 * 1000000, // 1 hour
+          lt_5h: 5 * 60 * 60 * 1000000, // 5 hours
+          lt_10h: 10 * 60 * 60 * 1000000, // 10 hours
+          lt_1d: 24 * 60 * 60 * 1000000, // 1 day
+          lt_1w: 7 * 24 * 60 * 60 * 1000000, // 1 week
+          lt_1M: 30 * 24 * 60 * 60 * 1000000, // 1 month (approx.)
+          gt_1d: 24 * 60 * 60 * 1000000, // greater than 1 day
+          gt_1M: 30 * 24 * 60 * 60 * 1000000, // greater than 1 month (approx.)
+        };
+
+        return queries.value.filter((item) => {
+          const timeDifference =
+            selectedSearchField.value == "exec_duration"
+              ? currentTime - item.created_at
+              : item.query.end_time - item.query.start_time;
+
+          if (newVal.startsWith("lt_")) {
+            return timeDifference < timeMap[newVal];
+          } else if (newVal.startsWith("gt_")) {
+            return timeDifference > timeMap[newVal];
+          } else {
+            return true; // If the filter is not recognized, return all items
+          }
+        });
+      }
+    });
+
+    const otherFieldOptions = computed(() => {
+      filterQuery.value = "";
+      if (selectedSearchField.value === "exec_duration") {
+        return [
+          { label: "< 1 minute", value: "lt_1m" },
+          { label: "< 5 minutes", value: "lt_5m" },
+          { label: "< 15 minutes", value: "lt_15m" },
+          { label: "< 30 minutes", value: "lt_30m" },
+          { label: "< 1 hour", value: "lt_1h" },
+          { label: "< 5 hours", value: "lt_5h" },
+          { label: "< 12 hours", value: "lt_12h" },
+          { label: "< 1 day", value: "lt_1d" },
+          { label: "> 1 day", value: "gt_1d" },
+        ];
+      } else if (selectedSearchField.value === "query_range") {
+        return [
+          { label: "< 1 hour", value: "lt_1h" },
+          { label: "< 1 day", value: "lt_1d" },
+          { label: "< 1 week", value: "lt_1w" },
+          { label: "< 1 Month", value: "lt_1M" },
+          { label: "> 1 Month", value: "gt_1M" },
+        ];
       }
     });
 
@@ -504,6 +601,9 @@ export default defineComponent({
       selectedRow,
       handleMultiQueryCancel,
       handleDeleteQuery,
+      selectedSearchField,
+      searchFieldOptions,
+      otherFieldOptions,
     };
   },
 });
@@ -520,7 +620,15 @@ export default defineComponent({
 <style lang="scss">
 .running-queries-page {
   .search-input {
-    width: 400px;
+    width: 250px;
+  }
+}
+
+.search-field-select {
+  .q-field__control {
+    padding-left: 12px;
+    top: -1px;
+    position: relative;
   }
 }
 </style>
