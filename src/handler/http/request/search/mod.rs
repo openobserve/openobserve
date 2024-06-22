@@ -243,7 +243,7 @@ pub async fn search(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http search API wait in queue took: {} ms", took_wait);
+    log::info!("http search API wait in local queue took: {} ms", took_wait);
 
     let search_fut = SearchService::search(
         &trace_id,

@@ -123,6 +123,7 @@ pub async fn search(
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::Cluster as _;
     req.stream_type = stream_type.to_string();
+    req.user_id = user_id.clone();
 
     let req_query = req.clone().query.unwrap();
 

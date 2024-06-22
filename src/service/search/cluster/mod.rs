@@ -69,8 +69,16 @@ pub async fn search(
     let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
-
     let stream_type = StreamType::from(req.stream_type.as_str());
+    if req.timeout == 0 {
+        req.timeout = cfg.limit.query_timeout as i64;
+    }
+
+    // get user_id
+    #[cfg(feature = "enterprise")]
+    let user_id = req.user_id.clone();
+    #[cfg(feature = "enterprise")]
+    let user_id = user_id.as_deref();
 
     // get nodes from cluster
     let mut nodes = infra_cluster::get_cached_online_query_nodes()
@@ -256,8 +264,9 @@ pub async fn search(
     let work_group: Option<String> = None;
     // 1. get work group
     #[cfg(feature = "enterprise")]
-    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
-        Some(o2_enterprise::enterprise::search::queue::predict_work_group(&nodes, &file_list));
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
+        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list),
+    );
     // 2. check concurrency
     let work_group_str = if let Some(wg) = &work_group {
         wg.to_string()
@@ -265,36 +274,78 @@ pub async fn search(
         "global".to_string()
     };
 
-    let locker_key = "/search/cluster_queue/".to_string() + work_group_str.as_str();
+    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
     // get a cluster search queue lock
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, 0).await?
+        dist_lock::lock(&locker_key, req.timeout as u64).await?
     };
     #[cfg(feature = "enterprise")]
-    loop {
-        match work_group.as_ref().unwrap().need_wait().await {
-            Ok(true) => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    {
+        // check user concurrency
+        if user_id.is_some() {
+            loop {
+                if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
+                    dist_lock::unlock(&locker).await?;
+                    return Err(Error::Message(format!(
+                        "[trace_id {trace_id}] search: timeout in queue"
+                    )));
+                }
+                match work_group.as_ref().unwrap().need_wait(user_id).await {
+                    Ok(true) => {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    }
+                    Ok(false) => {
+                        break;
+                    }
+                    Err(e) => {
+                        dist_lock::unlock(&locker).await?;
+                        return Err(Error::Message(e.to_string()));
+                    }
+                }
             }
-            Ok(false) => {
-                break;
-            }
-            Err(e) => {
+            // process the search in the work group
+            if let Err(e) = work_group
+                .as_ref()
+                .unwrap()
+                .process(trace_id, user_id)
+                .await
+            {
                 dist_lock::unlock(&locker).await?;
                 return Err(Error::Message(e.to_string()));
             }
         }
-    }
-    // 3. process the search in the work group
-    #[cfg(feature = "enterprise")]
-    if let Err(e) = work_group.as_ref().unwrap().process(trace_id).await {
+        // check global concurrency
+        loop {
+            if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
+                dist_lock::unlock(&locker).await?;
+                return Err(Error::Message(format!(
+                    "[trace_id {trace_id}] search: timeout in queue"
+                )));
+            }
+            match work_group.as_ref().unwrap().need_wait(None).await {
+                Ok(true) => {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+                Ok(false) => {
+                    break;
+                }
+                Err(e) => {
+                    dist_lock::unlock(&locker).await?;
+                    return Err(Error::Message(e.to_string()));
+                }
+            }
+        }
+        // 3. process the search in the work group
+        if let Err(e) = work_group.as_ref().unwrap().process(trace_id, None).await {
+            dist_lock::unlock(&locker).await?;
+            return Err(Error::Message(e.to_string()));
+        }
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(e.to_string()));
     }
-    #[cfg(feature = "enterprise")]
-    dist_lock::unlock(&locker).await?;
+
+    // done in the queue
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
         "[trace_id {trace_id}] search: wait in queue took: {} ms",
@@ -430,9 +481,17 @@ pub async fn search(
             work_group
                 .as_ref()
                 .unwrap()
-                .done(&trace_id)
+                .done(&trace_id, None)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
+            if user_id.is_some() {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(&trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             ))));
@@ -557,12 +616,22 @@ pub async fn search(
                 #[cfg(not(feature = "enterprise"))]
                 dist_lock::unlock(&locker).await?;
                 #[cfg(feature = "enterprise")]
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(trace_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
+                {
+                    work_group
+                        .as_ref()
+                        .unwrap()
+                        .done(trace_id, None)
+                        .await
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                    if user_id.is_some() {
+                        work_group
+                            .as_ref()
+                            .unwrap()
+                            .done(trace_id, user_id)
+                            .await
+                            .map_err(|e| Error::Message(e.to_string()))?;
+                    }
+                }
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     e.to_string(),
                 )));
@@ -583,12 +652,22 @@ pub async fn search(
                 #[cfg(not(feature = "enterprise"))]
                 dist_lock::unlock(&locker).await?;
                 #[cfg(feature = "enterprise")]
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(trace_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
+                {
+                    work_group
+                        .as_ref()
+                        .unwrap()
+                        .done(trace_id, None)
+                        .await
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                    if user_id.is_some() {
+                        work_group
+                            .as_ref()
+                            .unwrap()
+                            .done(trace_id, user_id)
+                            .await
+                            .map_err(|e| Error::Message(e.to_string()))?;
+                    }
+                }
                 return Err(e);
             }
         };
@@ -598,12 +677,22 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     dist_lock::unlock(&locker).await?;
     #[cfg(feature = "enterprise")]
-    work_group
-        .as_ref()
-        .unwrap()
-        .done(trace_id)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
+    {
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(trace_id, None)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        if user_id.is_some() {
+            work_group
+                .as_ref()
+                .unwrap()
+                .done(trace_id, user_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
+    }
 
     Ok((merge_batches, scan_stats, took_wait, is_partial))
 }
