@@ -60,6 +60,7 @@ impl Engine {
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
+        log::debug!("prom_expr: {:?}", prom_expr);
         self.extract_columns_from_prom_expr(prom_expr)?;
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
@@ -97,11 +98,16 @@ impl Engine {
                     return_bool: _,
                 }) = modifier
                 {
-                    // group_left -> labels must be selected
-                    if let VectorMatchCardinality::ManyToOne(labels) = card {
-                        self.col_filters.extend(labels.labels.iter().cloned());
-                    }
                     self.extract_columns_from_modifier(matching, op);
+                    // group_left
+                    if let VectorMatchCardinality::ManyToOne(labels) = card {
+                        if labels.labels.is_empty() {
+                            self.col_filters.clear(); // select all labels in the left table
+                        } else {
+                            // group_left(label1, label2, ...)
+                            self.col_filters.extend(labels.labels.iter().cloned()); // only select provided labels
+                        }
+                    }
                 }
                 Ok(())
             }
