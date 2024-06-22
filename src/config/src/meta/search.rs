@@ -471,6 +471,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
             stream_type: "".to_string(),
             timeout: req.timeout,
             work_group: "".to_string(),
+            user_id: None,
         }
     }
 }
