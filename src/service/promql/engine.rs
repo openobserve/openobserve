@@ -60,7 +60,6 @@ impl Engine {
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
-        log::debug!("prom_expr: {:?}", prom_expr);
         self.extract_columns_from_prom_expr(prom_expr)?;
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
