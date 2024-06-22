@@ -186,6 +186,7 @@ impl TraceListIndex {
                 bloom_filter_fields: vec!["trace_id".to_string()],
                 data_retention: 0,
                 flatten_level: None,
+                max_query_range: 0,
                 defined_schema_fields: None,
             };
 
