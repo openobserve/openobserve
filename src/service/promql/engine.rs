@@ -44,8 +44,8 @@ pub struct Engine {
     ctx: Arc<super::exec::Query>,
     /// The time boundaries for the evaluation.
     time: i64,
-    /// Filters to (include, exclude) certain columns
-    col_filters: (HashSet<String>, HashSet<String>),
+    /// Filters to include certain columns
+    col_filters: HashSet<String>,
     result_type: Option<String>,
 }
 
@@ -54,19 +54,13 @@ impl Engine {
         Self {
             ctx,
             time,
-            col_filters: (HashSet::new(), HashSet::new()),
+            col_filters: HashSet::new(),
             result_type: None,
         }
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
-        if matches!(
-            prom_expr,
-            PromExpr::Aggregate(_) | PromExpr::Unary(_) | PromExpr::Binary(_) | PromExpr::Call(_)
-        ) {
-            // Only filter columns for agg, unary, binary, & function call queries
-            self.extract_columns_from_prom_expr(prom_expr)?;
-        }
+        self.extract_columns_from_prom_expr(prom_expr)?;
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
     }
@@ -95,72 +89,25 @@ impl Engine {
                 rhs,
                 modifier,
             }) => {
-                match modifier {
-                    None => {
-                        self.extract_columns_from_prom_expr(lhs)?;
-                        self.extract_columns_from_prom_expr(rhs)?;
+                self.extract_columns_from_prom_expr(lhs)?;
+                self.extract_columns_from_prom_expr(rhs)?;
+                if let Some(BinModifier {
+                    card,
+                    matching,
+                    return_bool: _,
+                }) = modifier
+                {
+                    // group_left -> labels must be selected
+                    if let VectorMatchCardinality::ManyToOne(labels) = card {
+                        self.col_filters.extend(labels.labels.iter().cloned());
                     }
-                    Some(BinModifier {
-                        card,
-                        matching,
-                        return_bool: _,
-                    }) => match card {
-                        VectorMatchCardinality::OneToOne => {
-                            self.extract_columns_from_prom_expr(lhs)?;
-                            self.extract_columns_from_prom_expr(rhs)?;
-                            self.extract_columns_from_modifier(matching, op);
-                        }
-                        // group_left
-                        VectorMatchCardinality::ManyToOne(labels) => {
-                            self.col_filters.0.extend(labels.labels.iter().cloned());
-                            self.extract_columns_from_prom_expr(lhs)?;
-                        }
-                        // group_right
-                        VectorMatchCardinality::OneToMany(labels) => {
-                            self.col_filters.0.extend(labels.labels.iter().cloned());
-                            self.extract_columns_from_prom_expr(rhs)?;
-                        }
-                        VectorMatchCardinality::ManyToMany => {
-                            self.extract_columns_from_modifier(matching, op);
-                        }
-                    },
+                    self.extract_columns_from_modifier(matching, op);
                 }
                 Ok(())
             }
             PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
             PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
-            PromExpr::VectorSelector(selector) => {
-                self.col_filters.0.extend(
-                    selector
-                        .matchers
-                        .matchers
-                        .iter()
-                        .map(|mat| mat.name.to_owned()),
-                );
-                Ok(())
-            }
-            PromExpr::MatrixSelector(MatrixSelector {
-                vs: selector,
-                range: _,
-            }) => {
-                self.col_filters.0.extend(
-                    selector
-                        .matchers
-                        .matchers
-                        .iter()
-                        .map(|mat| mat.name.to_owned()),
-                );
-                Ok(())
-            }
-            PromExpr::Call(Call { func, args }) => {
-                if func.name == "label_replace" {
-                    // only the col at args[1] should be selected, which is a StringLiteral
-                    if let Some(PromExpr::StringLiteral(column)) =
-                        args.args.get(1).and_then(|expr| Some(expr.as_ref()))
-                    {
-                        self.col_filters.0.insert(column.val.clone());
-                    }
-                }
+            PromExpr::Call(Call { func: _, args }) => {
                 _ = args
                     .args
                     .iter()
@@ -188,17 +135,13 @@ impl Engine {
             match op.id() {
                 // topk and bottomk query all columns when with modifiers
                 token::T_TOPK | token::T_BOTTOMK => {
-                    self.col_filters.0.clear();
-                    self.col_filters.1.clear();
+                    self.col_filters.clear();
                 }
-                _ => match label_modifier {
-                    LabelModifier::Include(labels) => {
-                        self.col_filters.0.extend(labels.labels.iter().cloned());
+                _ => {
+                    if let LabelModifier::Include(labels) = label_modifier {
+                        self.col_filters.extend(labels.labels.iter().cloned());
                     }
-                    LabelModifier::Exclude(labels) => {
-                        self.col_filters.1.extend(labels.labels.iter().cloned());
-                    }
-                },
+                }
             }
         }
     }
@@ -1048,7 +991,7 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
-    col_filters: &(HashSet<String>, HashSet<String>),
+    col_filters: &HashSet<String>,
 ) -> Result<HashMap<String, RangeValue>> {
     let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
@@ -1094,40 +1037,23 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    // For two filters (col_filters.0 include, col_filters.1 exclude),
-    // a column could have 4 scenarios
-    //  1. in col_filters.0 only
-    //  2. in both col_filters.0 & col_filters.1
-    //  3. in col_filters.1 only
-    //  4. neither in col_filters.0 nor col_filters.1
-    // special cols (hash, timestamp, value) always to be selected
-    if !col_filters.0.is_empty() || !col_filters.1.is_empty() {
-        // sum without(job) (demo_memory_usage_bytes) / on(instance, type) group_left(job)
-        // demo_memory_usage_bytes
-        let selected_cols: Vec<_> = schema
-            .fields()
+    if !col_filters.is_empty() {
+        // include only found columns and required hash, _timestamp, & value cols
+        let selected_cols: Vec<_> = col_filters
             .iter()
-            .filter_map(|field| {
-                let name = field.name();
-                if name == HASH_LABEL
-                    || name == &cfg.common.column_timestamp
-                    || name == VALUE_LABEL
-                    || col_filters.0.contains(name)
-                {
-                    // scenario 1 & 2, special cols
-                    Some(col(name)) // select
-                } else if col_filters.1.contains(name) {
-                    // scenario 3
-                    None // skip
+            .chain(
+                [
+                    HASH_LABEL.to_string(),
+                    cfg.common.column_timestamp.clone(),
+                    VALUE_LABEL.to_string(),
+                ]
+                .iter(),
+            )
+            .filter_map(|incl| {
+                if schema.column_with_name(incl).is_some() {
+                    Some(col(incl))
                 } else {
-                    // scenario 4
-                    if !col_filters.0.is_empty() {
-                        // if we are selecting cols to select
-                        None // skip
-                    } else {
-                        // if we are selecting cols to skip
-                        Some(col(name)) // select
-                    }
+                    None
                 }
             })
             .collect();
@@ -1146,9 +1072,7 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp || name == VALUE_LABEL
-            // || schema.field_with_name(name).is_err()
-            {
+            if name == &cfg.common.column_timestamp || name == VALUE_LABEL {
                 None
             } else {
                 Some(col(name))
