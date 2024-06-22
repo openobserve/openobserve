@@ -212,6 +212,10 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub histogram_interval: Option<i64>, // seconds, for histogram
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_start_time: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_end_time: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -251,6 +255,8 @@ impl Response {
             function_error: "".to_string(),
             is_partial: false,
             histogram_interval: None,
+            new_start_time: None,
+            new_end_time: None,
         }
     }
 
