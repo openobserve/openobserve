@@ -98,14 +98,13 @@ impl Engine {
                 }) = modifier
                 {
                     self.extract_columns_from_modifier(matching, op);
-                    // group_left
-                    if let VectorMatchCardinality::ManyToOne(labels) = card {
-                        if labels.labels.is_empty() {
-                            self.col_filters.clear(); // select all labels in the left table
-                        } else {
-                            // group_left(label1, label2, ...)
-                            self.col_filters.extend(labels.labels.iter().cloned()); // only select provided labels
+                    // group_left or group_right -> no column selection
+                    match card {
+                        VectorMatchCardinality::ManyToOne(_)
+                        | VectorMatchCardinality::OneToMany(_) => {
+                            self.col_filters.clear();
                         }
+                        _ => {}
                     }
                 }
                 Ok(())
