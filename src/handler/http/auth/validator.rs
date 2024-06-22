@@ -589,7 +589,7 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
         super::token::get_user_name_from_token(auth_str).await
     } else if auth_str.starts_with("{\"auth_ext\":") {
         let auth_tokens: AuthTokensExt =
-            config::utils::json::from_str(&auth_str).unwrap_or_default();
+            config::utils::json::from_str(auth_str).unwrap_or_default();
         if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
             None
         } else {
