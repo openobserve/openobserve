@@ -274,7 +274,7 @@ pub async fn search(
         "global".to_string()
     };
 
-    let locker_key = "/search/cluster_queue/".to_string() + work_group_str.as_str();
+    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
     // get a cluster search queue lock
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
