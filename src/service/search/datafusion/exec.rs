@@ -1219,14 +1219,14 @@ pub async fn register_table(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(cfg.limit.query_thread_num)
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(cfg.limit.query_thread_num)
                 .with_collect_stat(true)
         }
         _ => {
