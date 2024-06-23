@@ -1071,8 +1071,10 @@ pub async fn merge_parquet_files(
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
+    let cfg = get_config();
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
+        .with_target_partitions(cfg.limit.query_thread_num)
         .with_information_schema(true);
     config = config.set_bool(
         "datafusion.execution.listing_table_ignore_subdirectory",
@@ -1082,7 +1084,6 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
-    let cfg = get_config();
     if cfg.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
@@ -1219,14 +1220,12 @@ pub async fn register_table(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.query_thread_num)
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.query_thread_num)
                 .with_collect_stat(true)
         }
         _ => {
