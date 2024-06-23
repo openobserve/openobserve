@@ -27,8 +27,9 @@ use bytes::Bytes;
 use config::{cluster, get_config, ider, utils::base64};
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
+use once_cell::sync::Lazy;
 use tokio::{
-    sync::{mpsc, OnceCell},
+    sync::{mpsc, Mutex, OnceCell},
     task::JoinHandle,
 };
 
@@ -661,6 +662,10 @@ pub async fn connect() -> async_nats::Client {
     }
 }
 
+/// global locker for nats
+static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 pub(crate) struct Locker {
     key: String,
     lock_id: String,
@@ -689,6 +694,20 @@ impl Locker {
             chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
         let value = Bytes::from(format!("{}:{}", self.lock_id, expiration));
         let key = key_encode(new_key);
+
+        // check local global locker
+        let mut local_mutex = LOCAL_LOCKER.lock().await;
+        let locker = match local_mutex.get(&key) {
+            Some(v) => v.clone(),
+            None => {
+                let locker = Arc::new(Mutex::new(false));
+                local_mutex.insert(key.clone(), locker.clone());
+                locker
+            }
+        };
+        drop(local_mutex);
+        let _lock_guard = locker.lock().await;
+
         // check if the locker already expired, clean it
         if let Ok(Some(ret)) = bucket.get(&key).await {
             let ret = String::from_utf8_lossy(&ret).to_string();
