@@ -392,7 +392,7 @@ pub async fn get_presigned_url(
 #[get("/login")]
 pub async fn get_auth(
     _req: HttpRequest,
-    basic_auth: Option<BasicAuth>,
+    _basic_auth: Option<BasicAuth>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -426,7 +426,7 @@ pub async fn get_auth(
             _timestamp: chrono::Utc::now().timestamp_micros(),
         };
 
-        let (name, password) = if let Some(basic_auth) = basic_auth {
+        let (name, password) = if let Some(basic_auth) = _basic_auth {
             let user_id = basic_auth.user_id();
             let user_password = basic_auth.password().unwrap();
             match crate::handler::http::auth::validator::validate_user(user_id, user_password).await
