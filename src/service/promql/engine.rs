@@ -45,7 +45,7 @@ pub struct Engine {
     /// The time boundaries for the evaluation.
     time: i64,
     /// Filters to include certain columns
-    col_filters: HashSet<String>,
+    col_filters: Option<HashSet<String>>,
     result_type: Option<String>,
 }
 
@@ -54,7 +54,7 @@ impl Engine {
         Self {
             ctx,
             time,
-            col_filters: HashSet::new(),
+            col_filters: Some(HashSet::new()),
             result_type: None,
         }
     }
@@ -102,7 +102,7 @@ impl Engine {
                     match card {
                         VectorMatchCardinality::ManyToOne(_)
                         | VectorMatchCardinality::OneToMany(_) => {
-                            self.col_filters.clear();
+                            self.col_filters = None;
                         }
                         _ => {}
                     }
@@ -138,12 +138,12 @@ impl Engine {
         if let Some(label_modifier) = modifier {
             match op.id() {
                 // topk and bottomk query all columns when with modifiers
-                token::T_TOPK | token::T_BOTTOMK => {
-                    self.col_filters.clear();
-                }
+                token::T_TOPK | token::T_BOTTOMK => self.col_filters = None,
                 _ => {
-                    if let LabelModifier::Include(labels) = label_modifier {
-                        self.col_filters.extend(labels.labels.iter().cloned());
+                    if let (Some(col_filters), LabelModifier::Include(labels)) =
+                        (&mut self.col_filters, label_modifier)
+                    {
+                        col_filters.extend(labels.labels.iter().cloned());
                     }
                 }
             }
@@ -995,7 +995,7 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
-    col_filters: &HashSet<String>,
+    col_filters: &Option<HashSet<String>>,
 ) -> Result<HashMap<String, RangeValue>> {
     let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
@@ -1041,33 +1041,35 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    if !col_filters.is_empty() {
-        // include only found columns and required hash, _timestamp, & value cols
-        let selected_cols: Vec<_> = col_filters
-            .iter()
-            .chain(
-                [
-                    HASH_LABEL.to_string(),
-                    cfg.common.column_timestamp.clone(),
-                    VALUE_LABEL.to_string(),
-                ]
-                .iter(),
-            )
-            .filter_map(|incl| {
-                if schema.column_with_name(incl).is_some() {
-                    Some(col(incl))
-                } else {
-                    None
+    if let Some(col_filters) = col_filters {
+        if !col_filters.is_empty() {
+            // include only found columns and required hash, _timestamp, & value cols
+            let selected_cols: Vec<_> = col_filters
+                .iter()
+                .chain(
+                    [
+                        HASH_LABEL.to_string(),
+                        cfg.common.column_timestamp.clone(),
+                        VALUE_LABEL.to_string(),
+                    ]
+                    .iter(),
+                )
+                .filter_map(|incl| {
+                    if schema.column_with_name(incl).is_some() {
+                        Some(col(incl))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            df_group = match df_group.select(selected_cols) {
+                Ok(df) => df,
+                Err(e) => {
+                    log::error!("Selecting cols error: {:?}", e);
+                    return Ok(HashMap::default());
                 }
-            })
-            .collect();
-        df_group = match df_group.select(selected_cols) {
-            Ok(df) => df,
-            Err(e) => {
-                log::error!("Selecting cols error: {:?}", e);
-                return Ok(HashMap::default());
-            }
-        };
+            };
+        }
     }
 
     let label_cols = df_group
