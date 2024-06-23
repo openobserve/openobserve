@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, sync::Arc};
 
 use actix_web::{
     cookie, delete, get,
@@ -24,7 +24,9 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     get_config,
     utils::{base64, json},
+    Config,
 };
+use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {crate::service::usage::audit, o2_enterprise::enterprise::common::auditor::AuditMessage};
@@ -182,6 +184,25 @@ pub async fn add_user_to_org(
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
+fn prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
+    conf: &Arc<Config>,
+    cookie_name: &'a str,
+    token_struct: &T,
+    cookie_expiry: E,
+) -> cookie::Cookie<'a> {
+    let tokens = json::to_string(token_struct).unwrap();
+    let mut auth_cookie = cookie::Cookie::new(cookie_name, tokens);
+    auth_cookie.set_expires(cookie_expiry.into());
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if conf.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(cookie::SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(cookie::SameSite::None);
+    }
+    auth_cookie
+}
 /// RemoveUserFromOrganization
 #[utoipa::path(
     context_path = "/api",
@@ -303,6 +324,7 @@ pub async fn authentication(
     };
     if resp.status {
         let cfg = get_config();
+
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
@@ -312,6 +334,7 @@ pub async fn authentication(
             refresh_token: "".to_string(),
         })
         .unwrap();
+
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
@@ -390,10 +413,7 @@ pub async fn get_presigned_url(
 }
 
 #[get("/login")]
-pub async fn get_auth(
-    _req: HttpRequest,
-    _basic_auth: Option<BasicAuth>,
-) -> Result<HttpResponse, Error> {
+pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use actix_web::http::header;
@@ -426,26 +446,7 @@ pub async fn get_auth(
             _timestamp: chrono::Utc::now().timestamp_micros(),
         };
 
-        let (name, password) = if let Some(basic_auth) = _basic_auth {
-            let user_id = basic_auth.user_id();
-            let user_password = basic_auth.password().unwrap();
-            match crate::handler::http::auth::validator::validate_user(user_id, user_password).await
-            {
-                Ok(v) => {
-                    if v.is_valid {
-                        resp.status = true;
-                    } else {
-                        audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
-                    }
-                }
-                Err(_) => {
-                    audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
-                }
-            };
-            (user_id.to_string(), user_password.to_string())
-        } else {
+        let (name, password) = {
             let auth_header = if let Some(s) = query.get("auth") {
                 match query.get("request_time") {
                     Some(req_time_str) => {
@@ -478,6 +479,7 @@ pub async fn get_auth(
                 }
                 format!("q_auth {}", s)
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
+                log::debug!("get_auth: auth header found: {:?}", auth_header);
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {
@@ -492,14 +494,26 @@ pub async fn get_auth(
 
             use o2_enterprise::enterprise::dex::service::auth::get_user_from_token;
 
-            use crate::handler::http::auth::validator::validate_user_for_query_params;
+            use crate::handler::http::auth::validator::{
+                validate_user, validate_user_for_query_params,
+            };
 
             let (name, password) = if let Some((name, password)) = get_user_from_token(&auth_header)
             {
+                let token_validation_response = match request_time {
+                    Some(req_ts) => {
+                        log::debug!("Validating user for query params");
+                        validate_user_for_query_params(&name, &password, Some(req_ts), expires_in)
+                            .await
+                    }
+                    None => {
+                        log::debug!("Validating user for basic auth header");
+                        validate_user(&name, &password).await
+                    }
+                };
+
                 audit_message.user_email = name.clone();
-                match validate_user_for_query_params(&name, &password, request_time, expires_in)
-                    .await
-                {
+                match token_validation_response {
                     Ok(v) => {
                         if v.is_valid {
                             resp.status = true;
@@ -523,36 +537,46 @@ pub async fn get_auth(
 
         if resp.status {
             let cfg = get_config();
-            let auth_ext = format!(
-                "auth_ext {}",
-                base64::encode(&format!("{}:{}", &name, &password))
-            );
-
             let id_token = config::utils::json::json!({
                 "email": name,
                 "name": name,
             });
-            let tokens = json::to_string(&AuthTokensExt {
-                auth_ext,
-                refresh_token: "".to_string(),
-                request_time: req_ts,
-                expires_in,
-            })
-            .unwrap();
+            let cookie_name = "auth_tokens";
+            let auth_cookie = if req_ts == 0 {
+                let access_token = format!(
+                    "Basic {}",
+                    base64::encode(&format!("{}:{}", &name, &password))
+                );
+                let tokens = AuthTokens {
+                    access_token,
+                    refresh_token: "".to_string(),
+                };
+                let expiry = cookie::time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
-            let mut auth_cookie = cookie::Cookie::new("auth_ext", tokens);
-            auth_cookie.set_expires(
-                cookie::time::OffsetDateTime::now_utc() + cookie::time::Duration::seconds(req_ts),
-            );
-            auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-            auth_cookie.set_path("/");
-
-            if cfg.auth.cookie_same_site_lax {
-                auth_cookie.set_same_site(cookie::SameSite::Lax);
+                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
-                auth_cookie.set_same_site(cookie::SameSite::None);
-            }
+                let cookie_name = "auth_ext";
+                let auth_ext = format!(
+                    "{} {}",
+                    cookie_name,
+                    base64::encode(&format!("{}:{}", &name, &password))
+                );
+
+                let tokens = AuthTokensExt {
+                    auth_ext,
+                    refresh_token: "".to_string(),
+                    request_time: req_ts,
+                    expires_in,
+                };
+                let expiry = cookie::time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(req_ts);
+
+                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                prepare_cookie(&cfg, cookie_name, &tokens, expiry)
+            };
+
             let url = format!(
                 "{}{}/web/cb#id_token={}.{}",
                 cfg.common.web_url,
