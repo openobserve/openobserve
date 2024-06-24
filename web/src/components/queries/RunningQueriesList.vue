@@ -1,9 +1,5 @@
 <template>
   <div class="running-queries-page" v-if="isMetaOrg">
-    <div class="text-h6 q-mx-md q-my-xs" data-test="log-stream-title-text">
-      {{ t("queries.runningQueries") }}
-    </div>
-
     <q-table
       data-test="running-queries-table"
       ref="qTable"
@@ -60,17 +56,9 @@
 
       <template #top>
         <div class="flex justify-between items-center full-width">
-          <q-btn
-            data-test="qm-multiple-cancel-query-btn"
-            class="text-bold"
-            outline
-            padding="sm lg"
-            color="red"
-            :disable="selectedRow.length === 0"
-            @click="handleMultiQueryCancel"
-            no-caps
-            :label="t('queries.cancelQuery')"
-          />
+          <div class="text-h6 q-mx-md q-my-xs" data-test="log-stream-title-text">
+            {{ t("queries.runningQueries") }}
+          </div>
           <q-space />
           <div class="flex items-start">
             <div
@@ -137,15 +125,30 @@
       </template>
 
       <template #bottom="scope">
-        <q-table-pagination
-          data-test="query-stream-table-pagination"
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-          v-model="filterQuery"
-        />
+        <q-btn
+            data-test="qm-multiple-cancel-query-btn"
+            class="text-bold"
+            outline
+            padding="sm lg"
+            color="red"
+            :disable="selectedRow.length === 0"
+            @click="handleMultiQueryCancel"
+            no-caps
+            :label="t('queries.cancelQuery')"
+          />
+        <q-space />
+        <div style="width: auto;">
+          <q-table-pagination
+            data-test="query-stream-table-pagination"
+            :scope="scope"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            position="bottom"
+            @update:changeRecordPerPage="changePagination"
+            v-model="filterQuery"
+            class="fit"
+          />
+        </div>
       </template>
     </q-table>
     <confirm-dialog
@@ -402,16 +405,21 @@ export default defineComponent({
         const currentTime = Date.now() * 1000; // Convert current time to microseconds
 
         const timeMap: any = {
-          lt_1m: 1 * 60 * 1000000, // 1 minute
-          lt_5m: 5 * 60 * 1000000, // 5 minutes
-          lt_15m: 15 * 60 * 1000000, // 15 minutes
-          lt_30m: 30 * 60 * 1000000, // 30 minutes
-          lt_1h: 60 * 60 * 1000000, // 1 hour
-          lt_5h: 5 * 60 * 60 * 1000000, // 5 hours
-          lt_10h: 10 * 60 * 60 * 1000000, // 10 hours
-          lt_1d: 24 * 60 * 60 * 1000000, // 1 day
-          lt_1w: 7 * 24 * 60 * 60 * 1000000, // 1 week
-          lt_1M: 30 * 24 * 60 * 60 * 1000000, // 1 month (approx.)
+          gt_1s: 1 * 1000000,             // greater than 1 second
+          gt_5s: 5 * 1000000,             // greater than 5 seconds
+          gt_15s: 15 * 1000000,           // greater than 15 seconds
+          gt_30s: 30 * 1000000,           // greater than 30 seconds
+          gt_1m: 1 * 60 * 1000000, // 1 minute
+          gt_5m: 5 * 60 * 1000000, // 5 minutes
+          gt_10m: 10 * 60 * 1000000, // 10 minutes
+          gt_15m: 15 * 60 * 1000000, // 15 minutes
+          gt_30m: 30 * 60 * 1000000, // 30 minutes
+          gt_1h: 60 * 60 * 1000000, // 1 hour
+          gt_5h: 5 * 60 * 60 * 1000000, // 5 hours
+          gt_10h: 10 * 60 * 60 * 1000000, // 10 hours
+          gt_1d: 24 * 60 * 60 * 1000000, // 1 day
+          gt_1w: 7 * 24 * 60 * 60 * 1000000, // 1 week
+          gt_1M: 30 * 24 * 60 * 60 * 1000000, // 1 month (approx.)
           gt_1d: 24 * 60 * 60 * 1000000, // greater than 1 day
           gt_1M: 30 * 24 * 60 * 60 * 1000000, // greater than 1 month (approx.)
         };
@@ -437,22 +445,23 @@ export default defineComponent({
       filterQuery.value = "";
       if (selectedSearchField.value === "exec_duration") {
         return [
-          { label: "< 1 minute", value: "lt_1m" },
-          { label: "< 5 minutes", value: "lt_5m" },
-          { label: "< 15 minutes", value: "lt_15m" },
-          { label: "< 30 minutes", value: "lt_30m" },
-          { label: "< 1 hour", value: "lt_1h" },
-          { label: "< 5 hours", value: "lt_5h" },
-          { label: "< 12 hours", value: "lt_12h" },
-          { label: "< 1 day", value: "lt_1d" },
-          { label: "> 1 day", value: "gt_1d" },
+          { label: "> 1 second", value: "gt_1s" },
+          { label: "> 5 seconds", value: "gt_5s" },
+          { label: "> 15 seconds", value: "gt_15s" },
+          { label: "> 30 seconds", value: "gt_30s" },
+          { label: "> 1 minute", value: "gt_1m" },
+          { label: "> 5 minutes", value: "gt_5m" },
+          { label: "> 10 minutes", value: "gt_10m" },
         ];
       } else if (selectedSearchField.value === "query_range") {
         return [
-          { label: "< 1 hour", value: "lt_1h" },
-          { label: "< 1 day", value: "lt_1d" },
-          { label: "< 1 week", value: "lt_1w" },
-          { label: "< 1 Month", value: "lt_1M" },
+          { label: "> 5 minutes", value: "gt_5m" },
+          { label: "> 10 minutes", value: "gt_10m" },
+          { label: "> 15 minutes", value: "gt_15m" },
+          { label: "> 1 hour", value: "gt_1h" },
+          { label: "> 1 day", value: "gt_1d" },
+          { label: "> 1 week", value: "gt_1w" },
+          { label: "> 1 Month", value: "gt_1M" },
           { label: "> 1 Month", value: "gt_1M" },
         ];
       }
