@@ -344,6 +344,7 @@ export default defineComponent({
         case "h-stacked":
         case "line":
         case "scatter":
+        case "gauge":
         case "table": {
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
@@ -352,7 +353,6 @@ export default defineComponent({
               yAlias.every((y: any) => data.value[0][0][y]) != null)
           );
         }
-        case "gauge":
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
