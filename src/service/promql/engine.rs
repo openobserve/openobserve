@@ -995,7 +995,7 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
-    col_filters: &Option<HashSet<String>>,
+    label_selector: &Option<HashSet<String>>,
 ) -> Result<HashMap<String, RangeValue>> {
     let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
@@ -1041,28 +1041,31 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    if let Some(col_filters) = col_filters {
-        let schema_fields = schema
-            .fields()
-            .iter()
-            .map(|f| f.name())
-            .collect::<HashSet<_>>();
-        if !col_filters.is_empty() {
-            // include only found columns and required _timestamp, hash, value, le cols
-            let selected_cols: Vec<_> = col_filters
+    if let Some(label_selector) = label_selector {
+        if !label_selector.is_empty() {
+            let schema_fields = schema
+                .fields()
                 .iter()
-                .chain(
-                    [
-                        HASH_LABEL.to_string(),
-                        VALUE_LABEL.to_string(),
-                        BUCKET_LABEL.to_string(),
-                        cfg.common.column_timestamp.clone(),
-                    ]
-                    .iter(),
-                )
-                .filter_map(|incl| {
-                    if schema_fields.contains(incl) {
-                        Some(col(incl))
+                .map(|f| f.name())
+                .collect::<HashSet<_>>();
+            let mut def_labels = vec![
+                HASH_LABEL.to_string(),
+                VALUE_LABEL.to_string(),
+                BUCKET_LABEL.to_string(),
+                cfg.common.column_timestamp.to_string(),
+            ];
+            for label in label_selector.iter() {
+                if def_labels.contains(label) {
+                    def_labels.retain(|x| x != label);
+                }
+            }
+            // include only found columns and required _timestamp, hash, value, le cols
+            let selected_cols: Vec<_> = label_selector
+                .iter()
+                .chain(def_labels.iter())
+                .filter_map(|label| {
+                    if schema_fields.contains(label) {
+                        Some(col(label))
                     } else {
                         None
                     }
@@ -1071,7 +1074,7 @@ async fn selector_load_data_from_datafusion(
             df_group = match df_group.select(selected_cols) {
                 Ok(df) => df,
                 Err(e) => {
-                    log::error!("Selecting cols error: {:?}", e);
+                    log::error!("Selecting cols error: {}", e);
                     return Ok(HashMap::default());
                 }
             };
