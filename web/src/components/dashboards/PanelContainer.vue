@@ -94,6 +94,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-btn>
+        <q-btn
+          v-if="maxQueryRange"
+          :icon="outlinedWarning"
+          flat
+          size="xs"
+          padding="2px"
+          @click="showViewPanel = true"
+          data-test="dashboard-panel-max-duration-warning"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            <div style="white-space: pre-wrap">
+              {{ maxQueryRange }}
+            </div>
+          </q-tooltip>
+        </q-btn>
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           dense
@@ -178,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :forceLoad="props.forceLoad"
       :searchType="searchType"
       @metadata-update="metaDataValue"
+      @result-metadata-update="handleResultMetadataUpdate"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
       @update:initial-variable-values="
         (...args) => $emit('update:initial-variable-values', ...args)
@@ -263,6 +280,13 @@ export default defineComponent({
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
+
+    const maxQueryRange = ref(null);
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      maxQueryRange.value = metadata[0].function_error;
+    };
+    
     const showText = ref(false);
 
     // need PanleSchemaRendererRef for table download as a csv
@@ -374,6 +398,8 @@ export default defineComponent({
       outlinedWarning,
       store,
       metaDataValue,
+      handleResultMetadataUpdate,
+      maxQueryRange,
       metaData,
       showViewPanel,
       dependentAdHocVariable,
@@ -412,5 +438,9 @@ export default defineComponent({
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.warning {
+  color: var(--q-warning);
 }
 </style>
