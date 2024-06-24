@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <q-btn
-          v-if="maxQueryRange"
+          v-if="maxQueryRange.length > 0"
           :icon="outlinedWarning"
           flat
           size="xs"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
-              {{ maxQueryRange }}
+              {{ maxQueryRange.join("\n\n") }}
             </div>
           </q-tooltip>
         </q-btn>
@@ -280,10 +280,16 @@ export default defineComponent({
       metaData.value = metadata;
     };
 
-    const maxQueryRange = ref(null);
+    const maxQueryRange: any = ref([]);
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRange.value = metadata[0].function_error;
+      const combinedWarnings: any[] = [];
+      metadata.forEach((query: any) => {
+        if (query.function_error) {
+          combinedWarnings.push(query.function_error);
+        }
+      });
+      maxQueryRange.value = combinedWarnings;
     };
 
     const showText = ref(false);
