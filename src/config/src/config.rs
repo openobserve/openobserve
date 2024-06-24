@@ -512,6 +512,9 @@ pub struct Common {
     pub wal_line_mode_enabled: bool,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
+    // TODO: should rename to column_all
+    #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
+    pub column_all: String,
     #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
@@ -530,6 +533,8 @@ pub struct Common {
     pub feature_query_partition_strategy: String,
     #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
     pub feature_query_infer_schema: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
+    pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -678,8 +683,6 @@ pub struct Common {
     pub report_server_url: String,
     #[env_config(name = "ZO_REPORT_SERVER_SKIP_TLS_VERIFY", default = false)]
     pub report_server_skip_tls_verify: bool,
-    #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
-    pub all_fields_name: String,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
     #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
