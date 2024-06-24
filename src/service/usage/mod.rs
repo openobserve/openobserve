@@ -52,6 +52,7 @@ pub async fn report_request_usage_stats(
     stream_type: StreamType,
     usage_type: UsageType,
     num_functions: u16,
+    timestamp: i64,
 ) {
     metrics::INGEST_RECORDS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
@@ -73,6 +74,7 @@ pub async fn report_request_usage_stats(
 
     if num_functions > 0 {
         usage.push(UsageData {
+            _timestamp: timestamp,
             event: UsageEvent::Functions,
             day: now.day(),
             hour: now.hour(),
@@ -104,6 +106,7 @@ pub async fn report_request_usage_stats(
     };
 
     usage.push(UsageData {
+        _timestamp: timestamp,
         event,
         day: now.day(),
         hour: now.hour(),
