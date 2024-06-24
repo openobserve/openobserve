@@ -105,7 +105,7 @@
     "btnDownload": "Download",
     "customDownloadMessage": "Enter the initial number and select the range for downloading data.",
     "noRecordFound": "No records found. Please adjust filters and try again.",
-    "functionErrorLabel": "Function not applied: (expand for more details)",
+    "functionErrorLabel": "Query execution warning: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search Saved View",
@@ -115,7 +115,8 @@
     "userDefinedSchemaLabel": "User Defined Schema",
     "allFieldsLabel": "All Fields",
     "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately.",
-    "regionFilterMsg": "Search Region/Cluster"
+    "regionFilterMsg": "Search Region/Cluster",
+    "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit."
   },
   "menu": {
     "home": "Home",

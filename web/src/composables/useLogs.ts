@@ -32,6 +32,7 @@ import {
   useLocalInterestingFields,
   useLocalSavedView,
   convertToCamelCase,
+  getFunctionErrorMessage,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -181,6 +182,8 @@ const defaultObject = {
       type: "relative",
       selectedDate: <any>{},
       selectedTime: <any>{},
+      queryRangeRestrictionMsg: "",
+      queryRangeRestrictionInHour: 100000,
     },
     searchAround: {
       indexTimestamp: 0,
@@ -1856,6 +1859,13 @@ const useLogs = () => {
           "UI"
         )
         .then(async (res) => {
+          if(res.data.hasOwnProperty("function_error") && res.data.function_error != "" && res.data.hasOwnProperty("new_start_time") && res.data.hasOwnProperty("new_end_time")) {
+            res.data.function_error = getFunctionErrorMessage(res.data.function_error, res.data.new_start_time, res.data.new_end_time, store.state.timezone);
+            searchObj.data.datetime.startTime = res.data.new_start_time;
+            searchObj.data.datetime.endTime = res.data.new_end_time;
+            searchObj.data.datetime.type = "absolute";
+            updateUrlQueryParams();
+          }
           searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
@@ -2259,6 +2269,8 @@ const useLogs = () => {
           ),
         };
 
+        searchObj.data.datetime.queryRangeRestrictionMsg = "";
+        searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
@@ -2294,6 +2306,11 @@ const useLogs = () => {
               }
               stream.settings = streamData.settings;
               stream.schema = streamSchema;
+            }
+
+            if(stream.settings.max_query_range > 0 && (searchObj.data.datetime.queryRangeRestrictionInHour > stream.settings.max_query_range || stream.settings.max_query_range == 0 || searchObj.data.datetime.queryRangeRestrictionInHour == -1) && searchObj.data.datetime.queryRangeRestrictionInHour != 0) {
+              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range;
+              searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {range: searchObj.data.datetime.queryRangeRestrictionInHour > 1 ? searchObj.data.datetime.queryRangeRestrictionInHour + "hours" : searchObj.data.datetime.queryRangeRestrictionInHour + "hour"});
             }
 
             let environmentInterestingFields = [];

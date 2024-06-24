@@ -380,6 +380,12 @@ clickable v-close-popup>
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            :queryRangeRestrictionMsg="
+              searchObj.data.datetime.queryRangeRestrictionMsg
+            "
+            :queryRangeRestrictionInHour="
+              searchObj.data.datetime.queryRangeRestrictionInHour
+            "
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -1243,6 +1249,10 @@ export default defineComponent({
         type: value.relativeTimePeriod ? "relative" : "absolute",
         selectedDate: value?.selectedDate,
         selectedTime: value?.selectedTime,
+        queryRangeRestrictionMsg:
+          searchObj.data.datetime?.queryRangeRestrictionMsg || "",
+        queryRangeRestrictionInHour:
+          searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
 
       await nextTick();
