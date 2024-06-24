@@ -59,6 +59,7 @@ pub async fn save_enrichment_data(
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let mut hour_key = String::new();
     let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let table_name = table_name.trim();
@@ -236,6 +237,7 @@ pub async fn save_enrichment_data(
         StreamType::Logs,
         UsageType::EnrichmentTable,
         0,
+        started_at,
     )
     .await;
 

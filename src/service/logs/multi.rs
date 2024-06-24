@@ -68,6 +68,7 @@ async fn ingest_inner(
     extend_json: &HashMap<String, serde_json::Value>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let cfg = config::get_config();
 
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -253,6 +254,7 @@ async fn ingest_inner(
         StreamType::Logs,
         UsageType::Multi,
         local_trans.len() as u16,
+        started_at,
     )
     .await;
 
