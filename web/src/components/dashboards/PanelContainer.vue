@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           size="xs"
           padding="2px"
-          @click="showViewPanel = true"
           data-test="dashboard-panel-max-duration-warning"
           class="warning"
         >
@@ -286,7 +285,7 @@ export default defineComponent({
     const handleResultMetadataUpdate = (metadata: any) => {
       maxQueryRange.value = metadata[0].function_error;
     };
-    
+
     const showText = ref(false);
 
     // need PanleSchemaRendererRef for table download as a csv
