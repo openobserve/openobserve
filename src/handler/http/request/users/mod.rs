@@ -184,7 +184,7 @@ pub async fn add_user_to_org(
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
-fn prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
+fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     conf: &Arc<Config>,
     cookie_name: &'a str,
     token_struct: &T,
@@ -555,7 +555,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
                 log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
-                prepare_cookie(&cfg, cookie_name, &tokens, expiry)
+                _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
                 let auth_ext = format!(
@@ -574,7 +574,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     + cookie::time::Duration::seconds(req_ts);
 
                 log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
-                prepare_cookie(&cfg, cookie_name, &tokens, expiry)
+                _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
             let url = format!(
