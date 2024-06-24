@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::{
@@ -119,6 +119,7 @@ pub async fn search_multi(
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let cfg = get_config();
+    let started_at = Utc::now().timestamp_micros();
 
     let mut http_span = None;
     let trace_id = if cfg.common.tracing_enabled {
@@ -312,6 +313,7 @@ pub async fn search_multi(
                     StreamType::Logs,
                     UsageType::Search,
                     num_fn,
+                    started_at,
                 )
                 .await;
 
@@ -558,6 +560,8 @@ pub async fn around_multi(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+
     let (org_id, stream_names) = path.into_inner();
     let cfg = get_config();
 
@@ -898,6 +902,7 @@ pub async fn around_multi(
             StreamType::Logs,
             UsageType::SearchAround,
             num_fn,
+            started_at,
         )
         .await;
     }

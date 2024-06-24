@@ -90,6 +90,7 @@ pub async fn handle_grpc_request(
     }
 
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -420,6 +421,7 @@ pub async fn handle_grpc_request(
             StreamType::Metrics,
             UsageType::Metrics,
             0,
+            started_at,
         )
         .await;
 

@@ -84,6 +84,8 @@ pub async fn logs_json_handler(
     in_stream_name: Option<&str>,
     user_email: &str,
 ) -> Result<HttpResponse, std::io::Error> {
+    let started_at = Utc::now().timestamp_micros();
+
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -475,6 +477,7 @@ pub async fn logs_json_handler(
         StreamType::Logs,
         UsageType::Json,
         0,
+        started_at,
     )
     .await;
 
