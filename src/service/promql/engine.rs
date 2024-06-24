@@ -36,7 +36,7 @@ use promql_parser::{
 };
 
 use crate::{
-    common::meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     service::promql::{aggregations, binaries, functions, micros, value::*},
 };
 
@@ -1042,20 +1042,26 @@ async fn selector_load_data_from_datafusion(
     }
 
     if let Some(col_filters) = col_filters {
+        let schema_fields = schema
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<HashSet<_>>();
         if !col_filters.is_empty() {
-            // include only found columns and required hash, _timestamp, & value cols
+            // include only found columns and required _timestamp, hash, value, le cols
             let selected_cols: Vec<_> = col_filters
                 .iter()
                 .chain(
                     [
                         HASH_LABEL.to_string(),
-                        cfg.common.column_timestamp.clone(),
                         VALUE_LABEL.to_string(),
+                        BUCKET_LABEL.to_string(),
+                        cfg.common.column_timestamp.clone(),
                     ]
                     .iter(),
                 )
                 .filter_map(|incl| {
-                    if schema.column_with_name(incl).is_some() {
+                    if schema_fields.contains(incl) {
                         Some(col(incl))
                     } else {
                         None
@@ -1123,7 +1129,7 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let mut metrics: HashMap<String, RangeValue> = HashMap::default();
+    let mut metrics: HashMap<String, RangeValue> = HashMap::with_capacity(hash_value_set.len());
     for batch in series {
         let hash_values = batch
             .column_by_name(HASH_LABEL)
@@ -1151,7 +1157,7 @@ async fn selector_load_data_from_datafusion(
             labels.sort_by(|a, b| a.name.cmp(&b.name));
             metrics.insert(
                 hash.to_string(),
-                RangeValue::new(labels, Vec::with_capacity(20)),
+                RangeValue::new(labels, Vec::with_capacity(32)),
             );
         }
     }
