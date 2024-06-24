@@ -73,6 +73,7 @@ pub async fn handle_trace_request(
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -305,6 +306,7 @@ pub async fn handle_trace_request(
         StreamType::Traces,
         UsageType::Traces,
         0,
+        started_at,
     )
     .await;
 
