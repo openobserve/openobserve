@@ -340,7 +340,15 @@ pub async fn search(
         return Err(Error::Message(e.to_string()));
     }
     #[cfg(feature = "enterprise")]
-    dist_lock::unlock(&locker).await?;
+    if let Err(e) = dist_lock::unlock(&locker).await {
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(&trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        return Err(e);
+    }
     // done in the queue
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
@@ -620,6 +628,17 @@ pub async fn search(
     }
     if succeed == 0 || results.iter().map(|(_, v)| v.total).sum::<i64>() == 0 {
         if let Some(err) = last_error {
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
             return Err(err);
         }
     }
