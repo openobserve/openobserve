@@ -32,7 +32,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .get("authorization")
         .ok_or(Status::unauthenticated("No valid auth token"))?
         .to_str()
-        .map_err(|_e| Status::unauthenticated("No valid auth token"))?
+        .map_err(|_e| Status::unauthenticated("Provided auth token is not valid ascii"))?
         .to_string();
 
     let org_id = metadata
