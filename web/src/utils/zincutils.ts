@@ -700,3 +700,29 @@ export const convertToCamelCase = (str: string) => {
 
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
+
+// Function to generate error message for max query range limit on logs and dashboard page.
+export const getFunctionErrorMessage = (
+  message: string,
+  newStartTime: number,
+  newEndTime: number,
+  timezone = "UTC"
+) => {
+  try {
+    // Convert timestamps to formatted dates using timestampToTimezoneDate function
+    const startTimeFormatted = timestampToTimezoneDate(
+      newStartTime / 1000,
+      timezone,
+      "yyyy-MM-dd HH:mm:ss"
+    );
+    const endTimeFormatted = timestampToTimezoneDate(
+      newEndTime / 1000,
+      timezone,
+      "yyyy-MM-dd HH:mm:ss"
+    );
+
+    return `${message} (Data returned for: ${startTimeFormatted} to ${endTimeFormatted})`;
+  } catch (error) {
+    return message;
+  }
+};
