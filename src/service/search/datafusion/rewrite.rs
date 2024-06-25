@@ -21,7 +21,10 @@ use config::FxIndexSet;
 use datafusion::error::Result;
 use itertools::Itertools;
 use sqlparser::{
-    ast::{Expr, Function, FunctionArguments, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
+    ast::{
+        Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr, Ident, Query,
+        VisitMut, VisitorMut,
+    },
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -190,6 +193,31 @@ impl VisitorMut for Rewrite {
             }
         }
         ControlFlow::Continue(())
+    }
+}
+
+// extract field name from the function arguments
+fn extract_field_name(args: FunctionArg) -> String {
+    match args {
+        FunctionArg::Named { name, .. } => name.to_string(),
+        FunctionArg::Unnamed(expr) => match expr {
+            FunctionArgExpr::Expr(expr) => expr_extect_field_name(&expr),
+            _ => format!("{}", expr),
+        },
+    }
+}
+
+// extract field name from the expression
+fn expr_extect_field_name(expr: &Expr) -> String {
+    match expr {
+        Expr::Identifier(ident) => ident.to_string(),
+        Expr::Cast {
+            kind: _,
+            expr,
+            data_type: _,
+            format: _,
+        } => expr_extect_field_name(expr),
+        _ => format!("{}", expr),
     }
 }
 
@@ -378,6 +406,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
+            "SELECT COUNT(DISTINCT name) AS cnt, SUM(CAST(code AS int)) AS sum_code, MAX(_timestamp) AS latest_timestamp FROM default ORDER BY latest_timestamp",
         ];
 
         let excepts = [
@@ -388,6 +417,7 @@ mod tests {
             "SELECT a, b FROM tbl WHERE a > 3",
             "SELECT DISTINCT a, b FROM tbl WHERE a > 3",
             "SELECT DISTINCT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, userid FROM segment WHERE event IN ('OpenObserve - heartbeat')",
+            "SELECT DISTINCT name, CAST(code AS INT), _timestamp FROM default",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_distinct_sql(sql, true).unwrap();
@@ -405,6 +435,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
+            "SELECT COUNT(DISTINCT name) AS cnt, SUM(CAST(code AS int)) AS sum_code, MAX(_timestamp) AS latest_timestamp FROM default ORDER BY latest_timestamp",
         ];
 
         let excepts = [
@@ -415,6 +446,7 @@ mod tests {
             "SELECT a, b FROM tbl",
             "SELECT DISTINCT a, b FROM tbl",
             "SELECT DISTINCT x_axis_1, userid FROM segment",
+            "SELECT DISTINCT name, CAST(code AS INT), _timestamp FROM default",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_distinct_sql(sql, false).unwrap();
@@ -432,6 +464,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
+            "SELECT COUNT(DISTINCT name) AS cnt, SUM(CAST(code AS int)) AS sum_code, MAX(_timestamp) AS latest_timestamp FROM default ORDER BY latest_timestamp",
         ];
 
         let excepts = [
@@ -442,6 +475,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt, MAX(b) FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
             "SELECT x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
+            "SELECT COUNT(DISTINCT name) AS cnt, SUM(CAST(code AS INT)) AS sum_code, MAX(_timestamp) AS latest_timestamp FROM default ORDER BY latest_timestamp",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_distinct_merge_sql(sql).unwrap();
