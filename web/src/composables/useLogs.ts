@@ -2178,6 +2178,11 @@ const useLogs = () => {
                 searchObj.data.histogram.errorMsg = t(customMessage);
               }
 
+              if (err?.response?.data?.code == 429) {
+                notificationMsg.value = err.response.data.message;
+                searchObj.data.histogram.errorMsg = err.response.data.message;
+              }
+
               reject(false);
             });
         }
