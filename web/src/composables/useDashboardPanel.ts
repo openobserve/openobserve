@@ -1137,26 +1137,7 @@ const useDashboardPanelData = () => {
           } else {
             // For other field types (x, y, z), determine the type and index as before
             let currentFieldType;
-            console.log(
-              "index",
-              index,
-              "x",
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.x.length,
-              "y",
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.y.length,
-              "BREAKDOWN",
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.breakdown.length,
-              "z",
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.z.length
-            );
+
             if (
               index <
               dashboardPanelData.data.queries[
@@ -1207,8 +1188,6 @@ const useDashboardPanelData = () => {
                     ].fields.x.length
                 ];
             } else if (currentFieldType === "breakdown") {
-              console.log("here", index);
-
               field =
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -1235,7 +1214,6 @@ const useDashboardPanelData = () => {
                     ].fields.y.length
                 ];
             }
-            console.log("field", field);
             // If the current field is a y or z field, set the aggregation function to "count"
             if (currentFieldType === "y" || currentFieldType === "z") {
               field.aggregationFunction = "count";
@@ -1301,12 +1279,10 @@ const useDashboardPanelData = () => {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.breakdown[fieldIndex];
-          console.log("field breakdown", field);
 
           // Update the field alias and column to the new name
           field.alias = newName;
           field.column = newName;
-          console.log("field breakdown----", field);
         }
         // Check if the field is in the y fields array
         fieldIndex = dashboardPanelData.data.queries[

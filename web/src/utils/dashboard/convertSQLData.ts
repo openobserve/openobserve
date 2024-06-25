@@ -84,16 +84,12 @@ export const convertSQLData = async (
       : [];
   };
 
-  console.log("getBreakDownKeys", getBreakDownKeys());
-  console.log("searchQueryData", searchQueryData);
-
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
     const interval = resultMetaData.value.map(
       (it: any) => it.histogram_interval
     )[0];
-    console.log("interval", interval);
 
     if (
       !interval ||
@@ -115,7 +111,6 @@ export const convertSQLData = async (
     const intervalMillis = interval * 1000;
 
     // Identify the time-based key
-    console.log("searchQueryDataFirstEntry", searchQueryData[0][0]);
     const searchQueryDataFirstEntry = searchQueryData[0][0];
 
     const keys = [
@@ -127,10 +122,8 @@ export const convertSQLData = async (
     let timeBasedKey = keys?.find((key) =>
       isTimeSeries([searchQueryDataFirstEntry?.[key]])
     );
-    console.log("timeBasedKey", timeBasedKey);
 
     if (!timeBasedKey) {
-      console.log("no timeBasedKey");
       return JSON.parse(JSON.stringify(searchQueryData[0]));
     }
 
@@ -144,24 +137,17 @@ export const convertSQLData = async (
     const breakdownAxisKeysWithoutTimeStamp = getBreakDownKeys().filter(
       (key: any) => key !== timeBasedKey
     );
-    // console.log("xAxisKeys", xAxisKeysWithoutTimeStamp);
-    console.log(
-      "breakdownAxisKeysWithoutTimeStamp",
-      breakdownAxisKeysWithoutTimeStamp
-    );
 
     const timeKey = timeBasedKey;
     const uniqueKey =
       xAxisKeysWithoutTimeStamp[0] !== undefined
         ? xAxisKeysWithoutTimeStamp[0]
         : breakdownAxisKeysWithoutTimeStamp[0];
-    console.log("uniqueKey", uniqueKey);
 
     // Create a set of unique xAxis values
     const uniqueXAxisValues = new Set(
       searchQueryData[0].map((d: any) => d[uniqueKey])
     );
-    console.log("uniqueXAxisValues", uniqueXAxisValues);
 
     const filledData: any = [];
     let currentTime = binnedDate;
@@ -182,7 +168,6 @@ export const convertSQLData = async (
         utcToZonedTime(currentTime, "UTC"),
         "yyyy-MM-dd'T'HH:mm:ss"
       );
-      // console.log("xAxisKeysWithoutTimeStamp", xAxisKeysWithoutTimeStamp);
 
       if (
         xAxisKeysWithoutTimeStamp.length === 0 &&
@@ -204,8 +189,6 @@ export const convertSQLData = async (
 
         filledData.push(nullEntry);
       } else {
-        console.log("inside else");
-
         uniqueXAxisValues.forEach((uniqueValue: any) => {
           const key = `${currentFormattedTime}-${uniqueValue}`;
           const currentData = searchDataMap.get(key);
@@ -238,7 +221,6 @@ export const convertSQLData = async (
   };
 
   const missingValueData = missingValue();
-  console.log("missingValueData", missingValueData);
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
 
