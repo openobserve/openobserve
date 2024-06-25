@@ -135,6 +135,7 @@ pub async fn search(
 ) -> Result<HttpResponse, Error> {
     let user_id_hdr = in_req.headers().get("user_id").unwrap();
     let user_id = user_id_hdr.to_str().unwrap().to_string();
+    let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
@@ -482,6 +483,7 @@ pub async fn search(
         StreamType::Logs,
         UsageType::Search,
         num_fn,
+        started_at,
     )
     .await;
 
@@ -572,6 +574,7 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let (org_id, stream_name) = path.into_inner();
     let cfg = get_config();
     let mut http_span = None;
@@ -895,6 +898,7 @@ pub async fn around(
         StreamType::Logs,
         UsageType::SearchAround,
         num_fn,
+        started_at,
     )
     .await;
 
@@ -1057,7 +1061,7 @@ async fn values_v1(
     http_span: Option<Span>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-
+    let started_at = Utc::now().timestamp_micros();
     let mut uses_fn = false;
     let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
@@ -1329,6 +1333,7 @@ async fn values_v1(
         StreamType::Logs,
         UsageType::SearchTopNValues,
         num_fn,
+        started_at,
     )
     .await;
 
@@ -1349,7 +1354,7 @@ async fn values_v2(
     http_span: Option<Span>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-
+    let started_at = Utc::now().timestamp_micros();
     let mut query_sql = format!(
         "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
         stream_type, stream_name, field
@@ -1556,6 +1561,7 @@ async fn values_v2(
         StreamType::Logs,
         UsageType::SearchTopNValues,
         num_fn,
+        started_at,
     )
     .await;
 
