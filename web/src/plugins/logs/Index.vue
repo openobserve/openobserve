@@ -843,7 +843,9 @@ export default defineComponent({
       );
 
       // set stream Name
-      dashboardPanelData.data.queries[0].fields.stream = streamName;
+      if (streamName) {
+        dashboardPanelData.data.queries[0].fields.stream = streamName;
+      }
 
       // set fields
       fields.forEach((field) => {

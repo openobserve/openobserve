@@ -191,44 +191,160 @@ export const isGivenFieldInOrderBy = async (
 };
 
 export const getFieldsFromQuery = async (query: any) => {
-  await importSqlParser();
-  const ast: any = parser.astify(query);
+  try {
+    await importSqlParser();
+    const ast: any = parser.astify(query);
 
-  // Function to extract field names, aliases, and aggregation functions
-  function extractFields(parsedAst: any) {
-    let fields = parsedAst.columns.map((column: any) => {
-      const field = {
-        column: "",
-        alias: "",
-        aggregationFunction: "",
-      };
+    // Function to extract field names, aliases, and aggregation functions
+    function extractFields(parsedAst: any) {
+      let fields = parsedAst.columns.map((column: any) => {
+        const field = {
+          column: "",
+          alias: "",
+          aggregationFunction: "",
+        };
 
-      if (column.expr.type === "column_ref") {
-        field.column = column?.expr?.column ?? "_timestamp";
-      } else if (column.expr.type === "aggr_func") {
-        field.column = column?.expr?.args?.expr?.column ?? "_timestamp";
-        field.aggregationFunction =
-          column?.expr?.name?.toLowerCase() ?? "count";
-      } else if (column.expr.type === "function") {
-        // histogram field
-        field.column = column?.expr?.args?.value[0]?.column ?? "_timestamp";
-        field.aggregationFunction =
-          column?.expr?.name?.toLowerCase() ?? "histogram";
+        if (column.expr.type === "column_ref") {
+          field.column = column?.expr?.column ?? "_timestamp";
+        } else if (column.expr.type === "aggr_func") {
+          field.column = column?.expr?.args?.expr?.column ?? "_timestamp";
+          field.aggregationFunction =
+            column?.expr?.name?.toLowerCase() ?? "count";
+        } else if (column.expr.type === "function") {
+          // histogram field
+          field.column = column?.expr?.args?.value[0]?.column ?? "_timestamp";
+          field.aggregationFunction =
+            column?.expr?.name?.toLowerCase() ?? "histogram";
+        }
+
+        field.alias = column?.as ?? field?.column ?? "_timestamp";
+
+        return field;
+      });
+
+      // Check if all fields are selected and remove the `*` entry
+      const allFieldsSelected = parsedAst.columns.some(
+        (column: any) => column.expr && column.expr.column === "*"
+      );
+
+      if (allFieldsSelected) {
+        // Add histogram(_timestamp) and count(_timestamp) to the fields array
+        fields.push(
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+          {
+            column: "_timestamp",
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          }
+        );
+
+        // Filter out the `*` entry from fields
+        fields = fields.filter((field: any) => field.column !== "*");
       }
 
-      field.alias = column?.as ?? field?.column ?? "_timestamp";
+      return fields;
+    }
 
-      return field;
-    });
+    // Function to extract conditions from the WHERE clause
+    function extractConditions(parsedAst: any) {
+      const conditions: any = [];
 
-    // Check if all fields are selected and remove the `*` entry
-    const allFieldsSelected = parsedAst.columns.some(
-      (column: any) => column.expr && column.expr.column === "*"
+      function traverseCondition(node: any) {
+        if (node.type === "binary_expr") {
+          const condition = {
+            column: "",
+            operator: node.operator,
+            value: "",
+          };
+
+          if (node.left.type === "column_ref") {
+            condition.column = node.left.column;
+          }
+
+          if (
+            node.right.type === "string" ||
+            node.right.type === "number" ||
+            node.right.type === "single_quote_string"
+          ) {
+            condition.value = node.right.value;
+          } else if (node.right.type === "column_ref") {
+            condition.value = node.right.column;
+          } else if (node.right.type === "expr_list") {
+            condition.value = node.right.value.map(
+              (item: any) => item.value || item.column
+            );
+          }
+
+          conditions.push(condition);
+        } else if (node.type === "unary_expr" && node.operator === "NOT") {
+          const condition = {
+            column: "",
+            operator: "NOT",
+            value: "",
+          };
+
+          if (node.expr.type === "binary_expr") {
+            condition.operator = `NOT ${node.expr.operator}`;
+            if (node.expr.left.type === "column_ref") {
+              condition.column = node.expr.left.column;
+            }
+            if (
+              node.expr.right.type === "string" ||
+              node.expr.right.type === "number" ||
+              node.expr.right.type === "single_quote_string"
+            ) {
+              condition.value = node.expr.right.value;
+            } else if (node.expr.right.type === "column_ref") {
+              condition.value = node.expr.right.column;
+            }
+          }
+
+          conditions.push(condition);
+        }
+
+        if (node.left && node.left.type === "binary_expr") {
+          traverseCondition(node.left);
+        }
+
+        if (node.right && node.right.type === "binary_expr") {
+          traverseCondition(node.right);
+        }
+      }
+
+      if (parsedAst.where) {
+        traverseCondition(parsedAst.where);
+      }
+
+      return conditions;
+    }
+
+    // Function to extract the table name
+    function extractTableName(parsedAst: any) {
+      return parsedAst.from[0].table;
+    }
+
+    const fields = extractFields(ast);
+    const conditions = extractConditions(ast);
+    const streamName = extractTableName(ast) ?? null;
+
+    // filter fields and conditions
+    const filteredFields = fields.filter((field: any) => field.column);
+    const filteredConditions = conditions.filter(
+      (condition: any) => condition.column
     );
 
-    if (allFieldsSelected) {
-      // Add histogram(_timestamp) and count(_timestamp) to the fields array
-      fields.push(
+    return {
+      fields: filteredFields,
+      conditions: filteredConditions,
+      streamName,
+    };
+  } catch (error) {
+    return {
+      fields: [
         {
           column: "_timestamp",
           alias: "x_axis_1",
@@ -238,96 +354,10 @@ export const getFieldsFromQuery = async (query: any) => {
           column: "_timestamp",
           alias: "y_axis_1",
           aggregationFunction: "count",
-        }
-      );
-
-      // Filter out the `*` entry from fields
-      fields = fields.filter((field: any) => field.column !== "*");
-    }
-
-    return fields;
+        },
+      ],
+      conditions: [],
+      streamName: null,
+    };
   }
-
-  // Function to extract conditions from the WHERE clause
-  function extractConditions(parsedAst: any) {
-    const conditions: any = [];
-
-    function traverseCondition(node: any) {
-      if (node.type === "binary_expr") {
-        const condition = {
-          column: "",
-          operator: node.operator,
-          value: "",
-        };
-
-        if (node.left.type === "column_ref") {
-          condition.column = node.left.column;
-        }
-
-        if (
-          node.right.type === "string" ||
-          node.right.type === "number" ||
-          node.right.type === "single_quote_string"
-        ) {
-          condition.value = node.right.value;
-        } else if (node.right.type === "column_ref") {
-          condition.value = node.right.column;
-        } else if (node.right.type === "expr_list") {
-          condition.value = node.right.value.map(
-            (item: any) => item.value || item.column
-          );
-        }
-
-        conditions.push(condition);
-      } else if (node.type === "unary_expr" && node.operator === "NOT") {
-        const condition = {
-          column: "",
-          operator: "NOT",
-          value: "",
-        };
-
-        if (node.expr.type === "binary_expr") {
-          condition.operator = `NOT ${node.expr.operator}`;
-          if (node.expr.left.type === "column_ref") {
-            condition.column = node.expr.left.column;
-          }
-          if (
-            node.expr.right.type === "string" ||
-            node.expr.right.type === "number" ||
-            node.expr.right.type === "single_quote_string"
-          ) {
-            condition.value = node.expr.right.value;
-          } else if (node.expr.right.type === "column_ref") {
-            condition.value = node.expr.right.column;
-          }
-        }
-
-        conditions.push(condition);
-      }
-
-      if (node.left && node.left.type === "binary_expr") {
-        traverseCondition(node.left);
-      }
-
-      if (node.right && node.right.type === "binary_expr") {
-        traverseCondition(node.right);
-      }
-    }
-
-    if (parsedAst.where) {
-      traverseCondition(parsedAst.where);
-    }
-
-    return conditions;
-  }
-
-  // Function to extract the table name
-  function extractTableName(parsedAst: any) {
-    return parsedAst.from[0].table;
-  }
-
-  const fields = extractFields(ast);
-  const conditions = extractConditions(ast);
-  const streamName = extractTableName(ast);
-  return { fields, conditions, streamName };
 };
