@@ -115,6 +115,7 @@ impl VisitorMut for Rewrite {
                                         select.distinct = None;
                                     }
                                     // check if the field name is already in the projection list
+                                    let column_name = remove_brackets(&extract_column_name(&args[0]));
                                     let field_name =
                                         remove_brackets(format!("{}", args[0]).as_str());
                                     if field_names.contains(&field_name) {
@@ -122,9 +123,13 @@ impl VisitorMut for Rewrite {
                                         continue;
                                     }
                                     field_names.insert(field_name.clone());
-                                    *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                        Expr::Identifier(Ident::new(field_name)),
-                                    )
+                                    *select_item = sqlparser::ast::SelectItem::ExprWithAlias{
+                                        expr: Expr::Identifier(Ident::new(field_name)),
+                                        alias: Ident::new(column_name),
+                                    }
+                                    // *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                    //     Expr::Identifier(Ident::new(field_name)),
+                                    // )
                                 } else if !self.is_first_phase {
                                     *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
                                         Expr::Identifier(alias.clone()),
@@ -171,15 +176,21 @@ impl VisitorMut for Rewrite {
                                 if name.to_string().to_lowercase() == "count" && !(distinct) {
                                     select.distinct = None;
                                 }
+                                let column_name = remove_brackets(&extract_column_name(&args[0]));
                                 let field_name = remove_brackets(format!("{}", args[0]).as_str());
                                 if field_names.contains(&field_name) {
                                     delete_idx.push(idx);
                                     continue;
                                 }
                                 field_names.insert(field_name.clone());
-                                *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                    Expr::Identifier(Ident::new(field_name)),
-                                )
+
+                                *select_item = sqlparser::ast::SelectItem::ExprWithAlias{
+                                    expr: Expr::Identifier(Ident::new(field_name)),
+                                    alias: Ident::new(column_name),
+                                }
+                                // *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                //     Expr::Identifier(Ident::new(field_name)),
+                                // )
                             }
                         }
                     }
@@ -197,18 +208,18 @@ impl VisitorMut for Rewrite {
 }
 
 // extract field name from the function arguments
-fn extract_field_name(args: FunctionArg) -> String {
+fn extract_column_name(args: &FunctionArg) -> String {
     match args {
         FunctionArg::Named { name, .. } => name.to_string(),
         FunctionArg::Unnamed(expr) => match expr {
-            FunctionArgExpr::Expr(expr) => expr_extect_field_name(&expr),
+            FunctionArgExpr::Expr(expr) => expr_extect_column_name(&expr),
             _ => format!("{}", expr),
         },
     }
 }
 
 // extract field name from the expression
-fn expr_extect_field_name(expr: &Expr) -> String {
+fn expr_extect_column_name(expr: &Expr) -> String {
     match expr {
         Expr::Identifier(ident) => ident.to_string(),
         Expr::Cast {
@@ -216,7 +227,7 @@ fn expr_extect_field_name(expr: &Expr) -> String {
             expr,
             data_type: _,
             format: _,
-        } => expr_extect_field_name(expr),
+        } => expr_extect_column_name(expr),
         _ => format!("{}", expr),
     }
 }
@@ -410,14 +421,14 @@ mod tests {
         ];
 
         let excepts = [
-            "SELECT DISTINCT a FROM tbl WHERE a > 3",
-            "SELECT DISTINCT a FROM tbl WHERE a > 3",
-            "SELECT DISTINCT a, b FROM tbl WHERE a > 3",
-            "SELECT DISTINCT a, b, c FROM tbl WHERE a > 3",
-            "SELECT a, b FROM tbl WHERE a > 3",
-            "SELECT DISTINCT a, b FROM tbl WHERE a > 3",
-            "SELECT DISTINCT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, userid FROM segment WHERE event IN ('OpenObserve - heartbeat')",
-            "SELECT DISTINCT name, CAST(code AS INT), _timestamp FROM default",
+            "SELECT DISTINCT a AS a FROM tbl WHERE a > 3",
+            "SELECT DISTINCT a AS a FROM tbl WHERE a > 3",
+            "SELECT DISTINCT a, b AS b FROM tbl WHERE a > 3",
+            "SELECT DISTINCT a, b AS b, c AS c FROM tbl WHERE a > 3",
+            "SELECT a, b AS b FROM tbl WHERE a > 3",
+            "SELECT DISTINCT a, b AS b FROM tbl WHERE a > 3",
+            "SELECT DISTINCT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, userid AS userid FROM segment WHERE event IN ('OpenObserve - heartbeat')",
+            "SELECT DISTINCT name AS name, CAST(code AS INT) AS code, _timestamp AS _timestamp FROM default",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_distinct_sql(sql, true).unwrap();
@@ -439,14 +450,14 @@ mod tests {
         ];
 
         let excepts = [
-            "SELECT DISTINCT a FROM tbl",
-            "SELECT DISTINCT a FROM tbl",
-            "SELECT DISTINCT a, b FROM tbl",
-            "SELECT DISTINCT a, b, c FROM tbl",
-            "SELECT a, b FROM tbl",
-            "SELECT DISTINCT a, b FROM tbl",
-            "SELECT DISTINCT x_axis_1, userid FROM segment",
-            "SELECT DISTINCT name, CAST(code AS INT), _timestamp FROM default",
+            "SELECT DISTINCT a AS a FROM tbl",
+            "SELECT DISTINCT a AS a FROM tbl",
+            "SELECT DISTINCT a, b AS b FROM tbl",
+            "SELECT DISTINCT a, b AS b, c AS c FROM tbl",
+            "SELECT a, b AS b FROM tbl",
+            "SELECT DISTINCT a, b AS b FROM tbl",
+            "SELECT DISTINCT x_axis_1, userid AS userid FROM segment",
+            "SELECT DISTINCT name AS name, CAST(code AS INT) AS code, _timestamp AS _timestamp FROM default",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_distinct_sql(sql, false).unwrap();
