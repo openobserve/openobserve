@@ -127,9 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 min="0"
                 round
-                @wheel.prevent
                 class="q-mr-sm data-retention-input"
-                @change="formDirtyFlag = true"
+                @wheel.prevent
+                @update:model-value="markFormDirty"
               />
             </div>
           </template>
