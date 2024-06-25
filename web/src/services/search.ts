@@ -65,7 +65,7 @@ const search = {
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
-    if(is_multistream) {
+    if (is_multistream) {
       url = `/api/${org_identifier}/${index}/_around_multi?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     } else {
       url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
@@ -168,9 +168,9 @@ const search = {
     const url = `/api/${org_identifier}/query_manager/status`;
     return http().get(url);
   },
-  delete_running_query: (org_identifier: string, traceID: string) => {
-    const url = `/api/${org_identifier}/query_manager/${traceID}`;
-    return http().delete(url);
+  delete_running_queries: (org_identifier: string, traceIDs: string[]) => {
+    const url = `/api/${org_identifier}/query_manager/cancel`;
+    return http().put(url, traceIDs);
   },
   get_regions: () => {
     const url = `/api/clusters`;
