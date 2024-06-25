@@ -254,10 +254,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import {
-  addHistogramToQuery,
-  removeHistogramFromQuery,
-} from "@/utils/query/sqlUtils";
+import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -844,32 +841,37 @@ export default defineComponent({
     watch(
       () => [
         searchObj.meta.logsVisualizeToggle,
-        searchObj.data.query,
-        searchObj.data.stream.selectedStream.value,
-        searchObj.data.stream.streamType,
+        // searchObj.data.query,
+        // searchObj.data.stream.selectedStream.value,
+        // searchObj.data.stream.streamType,
       ],
-      () => {
+      async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           // enable sql mode
-          searchObj.meta.sqlMode = true;
-          dashboardPanelData.data.queries[0].customQuery = true;
+          // searchObj.meta.sqlMode = true;
+          // dashboardPanelData.data.queries[0].customQuery = true;
           // searchObj.data.query = await addHistogramToQuery(searchObj.data.query);
+          // dashboardPanelData.data.queries[0].fields.stream_type =
+          //   searchObj.data.stream.streamType ?? "logs";
+          // dashboardPanelData.data.queries[0].fields.stream =
+          //   searchObj.data.stream.selectedStream.value ?? "default";
+          // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
 
-          dashboardPanelData.data.queries[0].fields.stream_type =
-            searchObj.data.stream.streamType ?? "logs";
-          dashboardPanelData.data.queries[0].fields.stream =
-            searchObj.data.stream.selectedStream.value ?? "default";
-          dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+          const { fields, conditions } = await getFieldsFromQuery(
+            searchObj.data.query ?? ""
+          );
+
+          console.log("fields", fields, "conditions", conditions);
         }
       }
     );
 
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        dashboardPanelData.data.queries[0].customQuery = true;
+        // dashboardPanelData.data.queries[0].customQuery = true;
         // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
         // dashboardPanelData.data.queries[0].fields.stream =
-        //   searchObj.data.stream.selectedStream.value ?? "default";
+        //   searchObj.data.stream.selectedStream.value ?? "default"
 
         const dateTime =
           searchObj.data.datetime.type === "relative"

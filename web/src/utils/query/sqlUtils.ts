@@ -89,32 +89,33 @@ export const addLabelToSQlQuery = async (
   }
 
   // Construct condition based on operator
-  condition = operator === "IS NULL" || operator === "IS NOT NULL" ?
-    {
-      type: "binary_expr",
-      operator: operator,
-      left: {
-        type: "column_ref",
-        table: null,
-        column: label,
-      },
-      right: {
-        type: "",
-      },
-    } :
-    {
-      type: "binary_expr",
-      operator: operator,
-      left: {
-        type: "column_ref",
-        table: null,
-        column: label,
-      },
-      right: {
-        type: "string",
-        value: value,
-      },
-    };
+  condition =
+    operator === "IS NULL" || operator === "IS NOT NULL"
+      ? {
+          type: "binary_expr",
+          operator: operator,
+          left: {
+            type: "column_ref",
+            table: null,
+            column: label,
+          },
+          right: {
+            type: "",
+          },
+        }
+      : {
+          type: "binary_expr",
+          operator: operator,
+          left: {
+            type: "column_ref",
+            table: null,
+            column: label,
+          },
+          right: {
+            type: "string",
+            value: value,
+          },
+        };
 
   const ast: any = parser.astify(originalQuery);
 
@@ -189,72 +190,123 @@ export const isGivenFieldInOrderBy = async (
   return null;
 };
 
-export const addHistogramToQuery = async (query: any) => {
+export const getFieldsFromQuery = async (query: any) => {
   await importSqlParser();
+  const ast: any = parser.astify(query);
 
-  try {
-    const ast: any = parser.astify(query); // Parse the SQL query
+  // Function to extract field names, aliases, and aggregation functions
+  function extractFields(parsedAst: any) {
+    const fields = parsedAst.columns.map((column: any) => {
+      const field = {
+        name: "",
+        alias: "",
+        aggregation: "",
+      };
 
-    // Check if the query selects the _timestamp field
-    for (let column of ast.columns) {
-      if (
-        column.expr.type === "column_ref" &&
-        column.expr.column === "_timestamp"
-      ) {
-        // If it does, replace it with histogram(_timestamp)
-        column.expr = {
-          type: "function",
-          name: "histogram",
-          args: {
-            type: "expr_list",
-            value: [
-              {
-                type: "column_ref",
-                column: "_timestamp",
-              },
-            ],
-          },
+      if (column.expr.type === "column_ref") {
+        field.name = column?.expr?.column;
+      } else if (column.expr.type === "aggr_func") {
+        field.name = column?.expr?.args?.expr?.column;
+        field.aggregation = column?.expr?.name?.toUpperCase();
+      }
+
+      if (column.as) {
+        field.alias = column.as;
+      }
+
+      return field;
+    });
+
+    // Check if all fields are selected
+    const allFieldsSelected = parsedAst.columns.some(
+      (column: any) => column.expr && column.expr.column === "*"
+    );
+
+    if (allFieldsSelected) {
+      // Add histogram(_timestamp) and count(_timestamp) to the fields array
+      fields.push(
+        { name: "_timestamp", alias: "", aggregation: "HISTOGRAM" },
+        { name: "_timestamp", alias: "", aggregation: "COUNT" }
+      );
+    }
+
+    return fields;
+  }
+
+  // Function to extract conditions from the WHERE clause
+  function extractConditions(parsedAst: any) {
+    const conditions: any = [];
+
+    function traverseCondition(node: any) {
+      if (node.type === "binary_expr") {
+        const condition = {
+          column: "",
+          operator: node.operator,
+          value: "",
         };
-        break;
+
+        if (node.left.type === "column_ref") {
+          condition.column = node.left.column;
+        }
+
+        if (
+          node.right.type === "string" ||
+          node.right.type === "number" ||
+          node.right.type === "single_quote_string"
+        ) {
+          condition.value = node.right.value;
+        } else if (node.right.type === "column_ref") {
+          condition.value = node.right.column;
+        } else if (node.right.type === "expr_list") {
+          condition.value = node.right.value.map(
+            (item: any) => item.value || item.column
+          );
+        }
+
+        conditions.push(condition);
+      } else if (node.type === "unary_expr" && node.operator === "NOT") {
+        const condition = {
+          column: "",
+          operator: "NOT",
+          value: "",
+        };
+
+        if (node.expr.type === "binary_expr") {
+          condition.operator = `NOT ${node.expr.operator}`;
+          if (node.expr.left.type === "column_ref") {
+            condition.column = node.expr.left.column;
+          }
+          if (
+            node.expr.right.type === "string" ||
+            node.expr.right.type === "number" ||
+            node.expr.right.type === "single_quote_string"
+          ) {
+            condition.value = node.expr.right.value;
+          } else if (node.expr.right.type === "column_ref") {
+            condition.value = node.expr.right.column;
+          }
+        }
+
+        conditions.push(condition);
+      }
+
+      if (node.left && node.left.type === "binary_expr") {
+        traverseCondition(node.left);
+      }
+
+      if (node.right && node.right.type === "binary_expr") {
+        traverseCondition(node.right);
       }
     }
 
-    // Convert the modified AST back to a SQL query
-    const newQuery = parser.sqlify(ast);
-    const quotedSql = newQuery.replace(/`/g, '"');
-
-    return quotedSql;
-  } catch (error) {
-    return query;
-  }
-};
-
-export const removeHistogramFromQuery = async (query: any) => {
-  await importSqlParser();
-
-  try {
-    const ast: any = parser.astify(query); // Parse the SQL query
-
-    if (!ast) return query;
-
-    // Iterate over the columns in the query
-    for (let column of ast.columns) {
-      // If the column is a function and its name is histogram
-      if (column.expr.type === "function" && column.expr.name === "histogram") {
-        // Replace the function with _timestamp
-        column.expr = {
-          type: "column_ref",
-          column: "_timestamp",
-        };
-      }
+    if (parsedAst.where) {
+      traverseCondition(parsedAst.where);
     }
 
-    // Convert the modified AST back to a SQL query
-    const newQuery = parser.sqlify(ast);
-    const quotedSql = newQuery.replace(/`/g, '"');
-
-    return quotedSql;
-  } catch (error) {
-    return query;
+    return conditions;
   }
+
+  const fields = extractFields(ast);
+  const conditions = extractConditions(ast);
+  return { fields, conditions };
 };
