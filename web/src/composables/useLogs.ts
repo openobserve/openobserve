@@ -2317,7 +2317,7 @@ const useLogs = () => {
 
             if(stream.settings.max_query_range > 0 && (searchObj.data.datetime.queryRangeRestrictionInHour > stream.settings.max_query_range || stream.settings.max_query_range == 0 || searchObj.data.datetime.queryRangeRestrictionInHour == -1) && searchObj.data.datetime.queryRangeRestrictionInHour != 0) {
               searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range;
-              searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {range: searchObj.data.datetime.queryRangeRestrictionInHour > 1 ? searchObj.data.datetime.queryRangeRestrictionInHour + "hours" : searchObj.data.datetime.queryRangeRestrictionInHour + "hour"});
+              searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {range: searchObj.data.datetime.queryRangeRestrictionInHour > 1 ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours" : searchObj.data.datetime.queryRangeRestrictionInHour + " hour"});
             }
 
             let environmentInterestingFields = [];
