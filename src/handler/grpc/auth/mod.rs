@@ -146,7 +146,7 @@ mod tests {
         let token: MetadataValue<_> = "instance".parse().unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
-
+        meta.insert("organization", "dummy".parse().unwrap());
         assert!(check_auth(request).is_ok())
     }
 
