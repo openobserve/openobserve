@@ -772,11 +772,12 @@ test.describe("Sanity testcases", () => {
   test("should display error if timestamp past the ingestion time limit", async ({
     page,
   }) => {
+    console.log("step1");
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
     const headers = getHeaders();
     const ingestionUrl = getIngestionUrl(orgId, streamName);
-
+    console.log("step2");
     // First payload
     const payload1 = [
       {
@@ -786,7 +787,7 @@ test.describe("Sanity testcases", () => {
         e2e: "1",
       },
     ];
-
+    console.log("step3");
     // Second payload with timestamp 6 hours before
     const timestamp = Date.now() - 6 * 60 * 60 * 1000; // 6 hours before
     const payload2 = [
@@ -798,7 +799,7 @@ test.describe("Sanity testcases", () => {
         _timestamp: timestamp,
       },
     ];
-
+    console.log("step4");
     // Sending first request
     const response1 = await sendRequest(page, ingestionUrl, payload1, headers);
     console.log(response1);
