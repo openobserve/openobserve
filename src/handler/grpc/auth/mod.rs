@@ -27,32 +27,31 @@ use crate::common::{
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
     let metadata = req.metadata();
-    if !metadata.contains_key(&cfg.grpc.org_header_key) && !metadata.contains_key("authorization") {
-        return Err(Status::unauthenticated("No valid auth token"));
-    }
 
-    let token = req
-        .metadata()
+    let token = metadata
         .get("authorization")
-        .unwrap()
+        .ok_or(Status::unauthenticated("No valid auth token"))?
         .to_str()
-        .unwrap()
+        .map_err(|_e| Status::unauthenticated("No valid auth token"))?
         .to_string();
+
+    let org_id = metadata
+        .get(&cfg.grpc.org_header_key)
+        .ok_or(Status::invalid_argument(format!(
+            "Please specify organization id with header key '{}' ",
+            &cfg.grpc.org_header_key
+        )))?
+        .to_str()
+        .map_err(|_e| Status::unauthenticated("No valid auth token"))?
+        .to_string();
+
     if token.eq(get_internal_grpc_token().as_str()) {
         Ok(req)
     } else {
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(format!(
-                "Please specify organization id with header key '{}' ",
-                &cfg.grpc.org_header_key
-            )));
-        }
-
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
-                log::info!("Err authenticating {}", err);
+                log::error!("Err authenticating with token {}", err);
                 return Err(Status::unauthenticated("No valid auth token"));
             }
         };
@@ -60,13 +59,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let user_id = credentials.user_id;
         let user = if is_root_user(&user_id) {
             ROOT_USER.get("root").unwrap()
-        } else if let Some(user) = USERS.get(&format!(
-            "{}/{}",
-            org_id.unwrap().to_str().unwrap(),
-            &user_id
-        )) {
+        } else if let Some(user) = USERS.get(&format!("{}/{}", org_id, &user_id)) {
             user
         } else {
+            log::error!("Err invalid token: user-id does not exists: {}", user_id);
             return Err(Status::unauthenticated("No valid auth token"));
         };
 
@@ -83,6 +79,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
             Ok(req)
         } else {
+            log::error!("Err invalid token: user-credentials-mismatch");
             Err(Status::unauthenticated("No valid auth token"))
         }
     }
