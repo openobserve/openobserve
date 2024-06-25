@@ -234,6 +234,7 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
+import { getFunctionErrorMessage } from "@/utils/zincutils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -285,8 +286,18 @@ export default defineComponent({
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {
-        if (query.function_error) {
-          combinedWarnings.push(query.function_error);
+        if (
+          query.function_error &&
+          query.new_start_time &&
+          query.new_end_time
+        ) {
+          const combinedMessage = getFunctionErrorMessage(
+            query.function_error,
+            query.new_start_time,
+            query.new_end_time,
+            store.state.timezone
+          );
+          combinedWarnings.push(combinedMessage);
         }
       });
       maxQueryRange.value = combinedWarnings;
