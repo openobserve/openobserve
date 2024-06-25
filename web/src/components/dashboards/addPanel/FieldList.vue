@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>
                       {{
-                        dashboardPanelData.data.type != "h-bar" ? "+B" : "+Y"
+                        dashboardPanelData.data.type != "h-bar" ? "+B" : "+B"
                       }}
                     </div>
                   </q-btn>
