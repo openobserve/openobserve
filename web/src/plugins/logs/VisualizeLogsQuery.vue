@@ -113,6 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <DashboardErrorsComponent :errors="errorData" />
                     </div>
                   </template>
+                  <template #after>
+                    <div style="height: 100%; width: 100%" class="row column">
+                      <DashboardQueryEditor />
+                    </div>
+                  </template>
                   <template #separator>
                     <div
                       class="splitter"
@@ -200,6 +205,10 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
 });
 
+const DashboardQueryEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/DashboardQueryEditor.vue");
+});
+
 export default defineComponent({
   name: "VisualizeLogsQuery",
   props: {
@@ -222,6 +231,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     CustomHTMLEditor,
     CustomMarkdownEditor,
+    DashboardQueryEditor,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
