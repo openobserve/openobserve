@@ -40,8 +40,7 @@ use crate::{
         alerts::Alert,
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-            StreamSchemaChk,
+            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, StreamSchemaChk,
         },
         stream::StreamParams,
     },
@@ -103,7 +102,7 @@ pub async fn ingest(
     let mut stream_partition_keys_map: HashMap<String, (StreamSchemaChk, PartitioningDetails)> =
         HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
+    let distinct_values = Vec::with_capacity(16);
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
@@ -356,10 +355,6 @@ pub async fn ingest(
                     None => (vec![], None),
                 };
 
-            // only for bulk insert
-            let mut status = RecordStatus::default();
-            let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-
             let mut to_add_distinct_values = vec![];
             // get distinct_value items
             for field in DISTINCT_FIELDS.iter() {
@@ -379,93 +374,30 @@ pub async fn ingest(
 
             // this is for schema inference at stream level , which avoids locks in case schema
             // changes are frequent within request
-            if cfg.common.infer_schema_per_request {
-                if let Err(e) = add_record(
-                    &StreamMeta {
-                        org_id: org_id.to_string(),
-                        stream_name: stream_name.clone(),
-                        partition_keys: &partition_keys,
-                        partition_time_level: &partition_time_level,
-                        stream_alerts_map: &stream_alerts_map,
-                    },
-                    buf,
-                    local_val,
-                )
-                .await
-                {
-                    bulk_res.errors = true;
-                    add_record_status(
-                        stream_name.clone(),
-                        doc_id.clone(),
-                        action.clone(),
-                        Some(value),
-                        &mut bulk_res,
-                        Some(TS_PARSE_FAILED.to_string()),
-                        Some(e.to_string()),
-                    );
-                    continue;
-                }
-            } else {
-                let local_trigger = match super::add_valid_record(
-                    &StreamMeta {
-                        org_id: org_id.to_string(),
-                        stream_name: stream_name.clone(),
-                        partition_keys: &partition_keys,
-                        partition_time_level: &partition_time_level,
-                        stream_alerts_map: &stream_alerts_map,
-                    },
-                    &mut stream_schema_map,
-                    &mut status,
-                    buf,
-                    local_val,
-                    need_trigger,
-                )
-                .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        bulk_res.errors = true;
-                        add_record_status(
-                            stream_name.clone(),
-                            doc_id.clone(),
-                            action.clone(),
-                            Some(value),
-                            &mut bulk_res,
-                            Some(TS_PARSE_FAILED.to_string()),
-                            Some(e.to_string()),
-                        );
-                        continue;
-                    }
-                };
-                if local_trigger.is_some() {
-                    stream_trigger_map.insert(stream_name.clone(), local_trigger);
-                }
-
-                // get distinct_value item
-                distinct_values.extend(to_add_distinct_values);
-
-                if status.failed > 0 {
-                    bulk_res.errors = true;
-                    add_record_status(
-                        stream_name.clone(),
-                        doc_id.clone(),
-                        action.clone(),
-                        Some(value),
-                        &mut bulk_res,
-                        Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
-                        Some(status.error),
-                    );
-                } else {
-                    add_record_status(
-                        stream_name.clone(),
-                        doc_id.clone(),
-                        action.clone(),
-                        None,
-                        &mut bulk_res,
-                        None,
-                        None,
-                    );
-                }
+            if let Err(e) = add_record(
+                &StreamMeta {
+                    org_id: org_id.to_string(),
+                    stream_name: stream_name.clone(),
+                    partition_keys: &partition_keys,
+                    partition_time_level: &partition_time_level,
+                    stream_alerts_map: &stream_alerts_map,
+                },
+                buf,
+                local_val,
+            )
+            .await
+            {
+                bulk_res.errors = true;
+                add_record_status(
+                    stream_name.clone(),
+                    doc_id.clone(),
+                    action.clone(),
+                    Some(value),
+                    &mut bulk_res,
+                    Some(TS_PARSE_FAILED.to_string()),
+                    Some(e.to_string()),
+                );
+                continue;
             }
         }
     }
@@ -481,24 +413,20 @@ pub async fn ingest(
         }
 
         // new flow for schema inference at stream level
-        stream_data.data = if cfg.common.infer_schema_per_request {
-            process_record(
-                &mut stream_data,
-                &StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_name: stream_name.to_owned().into(),
-                    stream_type: StreamType::Logs,
-                },
-                &mut stream_schema_map,
-                &stream_partition_keys_map,
-                &stream_alerts_map,
-                &mut bulk_res,
-                &mut stream_trigger_map,
-            )
-            .await?
-        } else {
-            stream_data.data
-        };
+        stream_data.data = process_record(
+            &mut stream_data,
+            &StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: stream_name.to_owned().into(),
+                stream_type: StreamType::Logs,
+            },
+            &mut stream_schema_map,
+            &stream_partition_keys_map,
+            &stream_alerts_map,
+            &mut bulk_res,
+            &mut stream_trigger_map,
+        )
+        .await?;
 
         // write to file
         let writer =
@@ -724,6 +652,11 @@ fn add_record_status(
     failure_reason: Option<String>,
 ) {
     let mut item = HashMap::new();
+    let action = if action.is_empty() {
+        "index".to_string()
+    } else {
+        action
+    };
 
     match failure_type {
         Some(failure_type) => {
