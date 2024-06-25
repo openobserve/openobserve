@@ -1258,6 +1258,7 @@ export default defineComponent({
             60 *
             1000000;
 
+            
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
           value.startTime = newStartTime;
 
