@@ -380,6 +380,12 @@ clickable v-close-popup>
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
+            :queryRangeRestrictionMsg="
+              searchObj.data.datetime.queryRangeRestrictionMsg
+            "
+            :queryRangeRestrictionInHour="
+              searchObj.data.datetime.queryRangeRestrictionInHour
+            "
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -443,9 +449,7 @@ clickable v-close-popup>
               class="q-pa-none search-button"
               @click="handleRunQuery"
               :disable="
-                searchObj.loading == 'true' ||
-                (searchObj.data.hasOwnProperty('streamResults') &&
-                  searchObj.data.streamResults?.list?.length == 0)
+                searchObj.loading == true || searchObj.loadingHistogram == true
               "
               >{{ t("search.runQuery") }}</q-btn
             >
@@ -852,6 +856,7 @@ import {
   useLocalInterestingFields,
   useLocalSavedView,
   queryIndexSplit,
+  timestampToTimezoneDate,
 } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -1236,6 +1241,27 @@ export default defineComponent({
     };
 
     const updateDateTime = async (value: object) => {
+      if (value.valueType == "absolute" && searchObj.data.stream.selectedStream.length > 0 && searchObj.data.datetime.queryRangeRestrictionInHour > 0 && value.hasOwnProperty("selectedDate") && value.hasOwnProperty("selectedTime") && value.selectedDate.hasOwnProperty("from") && value.selectedTime.hasOwnProperty("startTime")) {
+        // Convert hours to microseconds
+        value.startTime =
+          value.endTime - (searchObj.data.datetime.queryRangeRestrictionInHour *
+          60 *
+          60 *
+          1000000);
+        value.selectedDate.from = timestampToTimezoneDate(
+          value.startTime / 1000,
+          store.state.timezone,
+          "yyyy/MM/DD"
+        );
+        value.selectedTime.startTime = timestampToTimezoneDate(
+          value.startTime / 1000,
+          store.state.timezone,
+          "HH:mm"
+        );
+
+        dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+        dateTimeRef.value.setDateType("absolute");
+      }
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
@@ -1245,6 +1271,10 @@ export default defineComponent({
         type: value.relativeTimePeriod ? "relative" : "absolute",
         selectedDate: value?.selectedDate,
         selectedTime: value?.selectedTime,
+        queryRangeRestrictionMsg:
+          searchObj.data.datetime?.queryRangeRestrictionMsg || "",
+        queryRangeRestrictionInHour:
+          searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
 
       await nextTick();
