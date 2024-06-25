@@ -420,7 +420,8 @@ export default defineComponent({
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
-    const { dashboardPanelData, validatePanel } = useDashboardPanelData("logs");
+    const { dashboardPanelData, validatePanel, generateLabelFromName } =
+      useDashboardPanelData("logs");
     const visualizeErrorData: any = reactive({
       errors: [],
     });
@@ -836,6 +837,107 @@ export default defineComponent({
       }
     };
 
+    const setFieldsAndConditions = async () => {
+      const { fields, conditions, streamName } = await getFieldsFromQuery(
+        searchObj.data.query ?? ""
+      );
+
+      // set stream Name
+      dashboardPanelData.data.queries[0].fields.stream = streamName;
+
+      // set fields
+      fields.forEach((field) => {
+        console.log(field);
+
+        field.alias = field.alias ?? field.column;
+        field.label = generateLabelFromName(field.column);
+
+        // if fields doesnt have aggregation functions, then add it in the x axis fields
+        if (
+          field.aggregationFunction == "" ||
+          field.aggregationFunction == "histogram"
+        ) {
+          dashboardPanelData.data.queries[0].fields.x.push(field);
+        } else {
+          dashboardPanelData.data.queries[0].fields.y.push(field);
+        }
+      });
+
+      console.log(JSON.parse(JSON.stringify(conditions)));
+
+      // set conditions
+      conditions.forEach((condition) => {
+        condition.operator = condition.operator.toLowerCase();
+
+        console.log(JSON.stringify(condition));
+        switch (condition.operator) {
+          case "in": {
+            condition.type = "list";
+            condition.values = condition.value;
+            condition.operator = "IN";
+            condition.operator = null;
+            condition.value = null;
+            break;
+          }
+          case "not in": {
+            // currently not supported
+            break;
+          }
+          // case "is null": {
+          //   condition.type = "condition";
+          //   condition.values = [];
+          //   condition.operator = "Is Null";
+          //   condition.value = null;
+
+          //   break;
+          // }
+          // case "is not null": {
+          //   condition.type = "condition";
+          //   condition.values = [];
+          //   condition.operator = "Is Not Null";
+          //   condition.value = null;
+          //   break;
+          // }
+          case "like": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Contains";
+            condition.value = null;
+            break;
+          }
+          case "not like": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Not Contains";
+            condition.value = null;
+            break;
+          }
+          case "<>":
+          case "!=": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "<>";
+            condition.value = `'${condition.value}'`;
+            break;
+          }
+          case "=":
+          case "<":
+          case ">":
+          case "<=":
+          case ">=": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.value = `'${condition.value}'`;
+            break;
+          }
+          default:
+            break;
+        }
+
+        dashboardPanelData.data.queries[0].fields.filter.push(condition);
+      });
+    };
+
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
     watch(
@@ -857,11 +959,7 @@ export default defineComponent({
           //   searchObj.data.stream.selectedStream.value ?? "default";
           // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
 
-          const { fields, conditions } = await getFieldsFromQuery(
-            searchObj.data.query ?? ""
-          );
-
-          console.log("fields", fields, "conditions", conditions);
+          setFieldsAndConditions();
         }
       }
     );
