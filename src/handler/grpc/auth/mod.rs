@@ -42,7 +42,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
             &cfg.grpc.org_header_key
         )))?
         .to_str()
-        .map_err(|_e| Status::unauthenticated("No valid auth token"))?
+        .map_err(|_e| Status::invalid_argument("Invalid organization ID format"))?
         .to_string();
 
     if token.eq(get_internal_grpc_token().as_str()) {
