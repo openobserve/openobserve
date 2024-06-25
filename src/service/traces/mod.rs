@@ -247,23 +247,21 @@ pub async fn handle_trace_request(
                 // get json object
                 let mut record_val = match value.take() {
                     json::Value::Object(mut v) => {
-                        if cfg.common.traces_span_metrics_enabled {
-                            // build span metrics item
-                            let mut sm = HashMap::with_capacity(6);
-                            sm.insert("traces_stream_name", traces_stream_name.clone());
-                            sm.insert("service_name", service_name.clone());
-                            sm.insert("span_status", span_status_for_spanmetric);
-                            let span_name = v
+                        // build span metrics item
+                        let sm = crate::job::metrics::TraceMetricsItem {
+                            organization: org_id.to_string(),
+                            traces_stream_name: traces_stream_name.clone(),
+                            service_name: service_name.clone(),
+                            span_name: v
                                 .remove("o2_span_metrics_name")
                                 .map_or(span.name.clone(), |name| {
                                     name.as_str().unwrap().to_string()
-                                });
-                            sm.insert("span_name", span_name);
-                            sm.insert("span_kind", span.kind.to_string());
-                            sm.insert("duration", format!("{}", (end_time - start_time) / 1000)); // microseconds
-                            span_metrics.push(sm);
-                        }
-
+                                }),
+                            span_status: span_status_for_spanmetric,
+                            span_kind: span.kind.to_string(),
+                            duration: ((end_time - start_time) / 1000) as f64, // microseconds
+                        };
+                        span_metrics.push(sm);
                         v
                     }
                     _ => unreachable!(""),
@@ -302,16 +300,24 @@ pub async fn handle_trace_request(
 
     // record span metrics
     for m in span_metrics {
-        metrics::SPAN_DURATION_MILLISECONDS
-            .with_label_values(&[
-                org_id,
-                &m["traces_stream_name"],
-                &m["service_name"],
-                &m["span_name"],
-                &m["span_status"],
-                &m["span_kind"],
-            ])
-            .observe(m["duration"].parse::<f64>().unwrap());
+        if cfg.common.traces_span_metrics_enabled {
+            metrics::SPAN_DURATION_MILLISECONDS
+                .with_label_values(&[
+                    org_id,
+                    &m.traces_stream_name,
+                    &m.service_name,
+                    &m.span_name,
+                    &m.span_status,
+                    &m.span_kind,
+                ])
+                .observe(m.duration);
+        }
+
+        // send to metrics job
+        let tmc = crate::job::metrics::TRACE_METRICS_CHAN.0.write().await;
+        if let Err(e) = tmc.try_send(m) {
+            log::error!("traces metrics item send to job fail : {e}")
+        }
     }
 
     metrics::HTTP_RESPONSE_TIME
