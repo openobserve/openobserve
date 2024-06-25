@@ -115,7 +115,8 @@ impl VisitorMut for Rewrite {
                                         select.distinct = None;
                                     }
                                     // check if the field name is already in the projection list
-                                    let column_name = remove_brackets(&extract_column_name(&args[0]));
+                                    let column_name =
+                                        remove_brackets(&extract_column_name(&args[0]));
                                     let field_name =
                                         remove_brackets(format!("{}", args[0]).as_str());
                                     if field_names.contains(&field_name) {
@@ -123,7 +124,7 @@ impl VisitorMut for Rewrite {
                                         continue;
                                     }
                                     field_names.insert(field_name.clone());
-                                    *select_item = sqlparser::ast::SelectItem::ExprWithAlias{
+                                    *select_item = sqlparser::ast::SelectItem::ExprWithAlias {
                                         expr: Expr::Identifier(Ident::new(field_name)),
                                         alias: Ident::new(column_name),
                                     }
@@ -184,7 +185,7 @@ impl VisitorMut for Rewrite {
                                 }
                                 field_names.insert(field_name.clone());
 
-                                *select_item = sqlparser::ast::SelectItem::ExprWithAlias{
+                                *select_item = sqlparser::ast::SelectItem::ExprWithAlias {
                                     expr: Expr::Identifier(Ident::new(field_name)),
                                     alias: Ident::new(column_name),
                                 }
@@ -212,7 +213,7 @@ fn extract_column_name(args: &FunctionArg) -> String {
     match args {
         FunctionArg::Named { name, .. } => name.to_string(),
         FunctionArg::Unnamed(expr) => match expr {
-            FunctionArgExpr::Expr(expr) => expr_extect_column_name(&expr),
+            FunctionArgExpr::Expr(expr) => expr_extect_column_name(expr),
             _ => format!("{}", expr),
         },
     }
