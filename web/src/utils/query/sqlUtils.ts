@@ -196,28 +196,32 @@ export const getFieldsFromQuery = async (query: any) => {
 
   // Function to extract field names, aliases, and aggregation functions
   function extractFields(parsedAst: any) {
-    const fields = parsedAst.columns.map((column: any) => {
+    let fields = parsedAst.columns.map((column: any) => {
       const field = {
-        name: "",
+        column: "",
         alias: "",
-        aggregation: "",
+        aggregationFunction: "",
       };
 
       if (column.expr.type === "column_ref") {
-        field.name = column?.expr?.column;
+        field.column = column?.expr?.column ?? "_timestamp";
       } else if (column.expr.type === "aggr_func") {
-        field.name = column?.expr?.args?.expr?.column;
-        field.aggregation = column?.expr?.name?.toUpperCase();
+        field.column = column?.expr?.args?.expr?.column ?? "_timestamp";
+        field.aggregationFunction =
+          column?.expr?.name?.toLowerCase() ?? "count";
+      } else if (column.expr.type === "function") {
+        // histogram field
+        field.column = column?.expr?.args?.value[0]?.column ?? "_timestamp";
+        field.aggregationFunction =
+          column?.expr?.name?.toLowerCase() ?? "histogram";
       }
 
-      if (column.as) {
-        field.alias = column.as;
-      }
+      field.alias = column?.as ?? field?.column ?? "_timestamp";
 
       return field;
     });
 
-    // Check if all fields are selected
+    // Check if all fields are selected and remove the `*` entry
     const allFieldsSelected = parsedAst.columns.some(
       (column: any) => column.expr && column.expr.column === "*"
     );
@@ -225,9 +229,20 @@ export const getFieldsFromQuery = async (query: any) => {
     if (allFieldsSelected) {
       // Add histogram(_timestamp) and count(_timestamp) to the fields array
       fields.push(
-        { name: "_timestamp", alias: "", aggregation: "HISTOGRAM" },
-        { name: "_timestamp", alias: "", aggregation: "COUNT" }
+        {
+          column: "_timestamp",
+          alias: "x_axis_1",
+          aggregationFunction: "histogram",
+        },
+        {
+          column: "_timestamp",
+          alias: "y_axis_1",
+          aggregationFunction: "count",
+        }
       );
+
+      // Filter out the `*` entry from fields
+      fields = fields.filter((field: any) => field.column !== "*");
     }
 
     return fields;
@@ -306,7 +321,13 @@ export const getFieldsFromQuery = async (query: any) => {
     return conditions;
   }
 
+  // Function to extract the table name
+  function extractTableName(parsedAst: any) {
+    return parsedAst.from[0].table;
+  }
+
   const fields = extractFields(ast);
   const conditions = extractConditions(ast);
-  return { fields, conditions };
+  const streamName = extractTableName(ast);
+  return { fields, conditions, streamName };
 };
