@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 class="q-mr-sm data-retention-input"
                 @wheel.prevent
+                @change="formDirtyFlag = true"
                 @update:model-value="markFormDirty"
               />
             </div>
