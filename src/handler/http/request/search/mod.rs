@@ -522,7 +522,6 @@ pub async fn search(
 
     Ok(HttpResponse::Ok().json(res))
 }
-
 /// SearchAround
 #[utoipa::path(
     context_path = "/api",
@@ -1062,6 +1061,7 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+
     let mut uses_fn = false;
     let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
@@ -1355,6 +1355,7 @@ async fn values_v2(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+
     let mut query_sql = format!(
         "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
         stream_type, stream_name, field
