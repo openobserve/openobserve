@@ -65,6 +65,9 @@ pub async fn check_cache(
     if !is_aggregate && origin_sql.contains('*') {
         result_ts_col = Some(cfg.common.column_timestamp.clone());
     }
+    if !is_aggregate && origin_sql.contains('*') {
+        result_ts_col = Some(cfg.common.column_timestamp.clone());
+    }
 
     let result_ts_col = result_ts_col.unwrap();
     if let Some(interval) = meta.histogram_interval {
