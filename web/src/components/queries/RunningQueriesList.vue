@@ -56,7 +56,10 @@
 
       <template #top>
         <div class="flex justify-between items-center full-width">
-          <div class="text-h6 q-mx-md q-my-xs" data-test="log-stream-title-text">
+          <div
+            class="text-h6 q-mx-md q-my-xs"
+            data-test="log-stream-title-text"
+          >
             {{ t("queries.runningQueries") }}
           </div>
           <q-space />
@@ -126,18 +129,18 @@
 
       <template #bottom="scope">
         <q-btn
-            data-test="qm-multiple-cancel-query-btn"
-            class="text-bold"
-            outline
-            padding="sm lg"
-            color="red"
-            :disable="selectedRow.length === 0"
-            @click="handleMultiQueryCancel"
-            no-caps
-            :label="t('queries.cancelQuery')"
-          />
+          data-test="qm-multiple-cancel-query-btn"
+          class="text-bold"
+          outline
+          padding="sm lg"
+          color="red"
+          :disable="selectedRow.length === 0"
+          @click="handleMultiQueryCancel"
+          no-caps
+          :label="t('queries.cancelQuery')"
+        />
         <q-space />
-        <div style="width: auto;">
+        <div style="width: auto">
           <q-table-pagination
             data-test="query-stream-table-pagination"
             :scope="scope"
@@ -155,7 +158,7 @@
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
       :message="deleteDialog.message"
-      @update:ok="handleDeleteQuery"
+      @update:ok="deleteQuery"
       @update:cancel="deleteDialog.show = false"
     />
     <q-dialog
@@ -405,10 +408,10 @@ export default defineComponent({
         const currentTime = Date.now() * 1000; // Convert current time to microseconds
 
         const timeMap: any = {
-          gt_1s: 1 * 1000000,             // greater than 1 second
-          gt_5s: 5 * 1000000,             // greater than 5 seconds
-          gt_15s: 15 * 1000000,           // greater than 15 seconds
-          gt_30s: 30 * 1000000,           // greater than 30 seconds
+          gt_1s: 1 * 1000000, // greater than 1 second
+          gt_5s: 5 * 1000000, // greater than 5 seconds
+          gt_15s: 15 * 1000000, // greater than 15 seconds
+          gt_30s: 30 * 1000000, // greater than 30 seconds
           gt_1m: 1 * 60 * 1000000, // 1 minute
           gt_5m: 5 * 60 * 1000000, // 5 minutes
           gt_10m: 10 * 60 * 1000000, // 10 minutes
@@ -501,34 +504,22 @@ export default defineComponent({
         });
     };
 
-    const handleDeleteQuery = () => {
-      // alert(JSON.parse(JSON.stringify(deleteDialog.value.data)))
-      const data = deleteDialog.value.data.split(",");
-      deleteRowCount.value = data.length;
-      for (let traceID of data) {
-        setTimeout(() => {
-          deleteQuery(traceID);
-        }, 100);
-      }
-    };
-
-    const deleteQuery = (traceID: string) => {
-      SearchService.delete_running_query(store.state.zoConfig.meta_org, traceID)
+    const deleteQuery = () => {
+      SearchService.delete_running_queries(
+        store.state.zoConfig.meta_org,
+        deleteDialog.value.data
+      )
         .then(() => {
-          deleteRowCount.value--;
           getRunningQueries();
           deleteDialog.value.show = false;
-          if (deleteRowCount.value === 0) {
-            q.notify({
-              message: "Running query deleted successfully",
-              color: "positive",
-              position: "bottom",
-              timeout: 1500,
-            });
-          }
+          q.notify({
+            message: "Running query deleted successfully",
+            color: "positive",
+            position: "bottom",
+            timeout: 1500,
+          });
         })
         .catch((error: any) => {
-          deleteRowCount.value--;
           q.notify({
             message:
               error.response?.data?.message || "Failed to delete running query",
@@ -536,19 +527,21 @@ export default defineComponent({
             position: "bottom",
             timeout: 1500,
           });
+        })
+        .finally(() => {
+          deleteDialog.value.data = [];
         });
     };
 
     const confirmDeleteAction = (props: any) => {
-      deleteDialog.value.data = props.row.trace_id;
+      deleteDialog.value.data = [props.row.trace_id];
       deleteDialog.value.show = true;
     };
 
     const handleMultiQueryCancel = () => {
-      const selectedRowsTraceID = selectedRow.value.map(
-        (row: any) => row.trace_id
-      );
-      deleteDialog.value.data = selectedRowsTraceID.join(",");
+      deleteDialog.value.data = [
+        ...(selectedRow.value?.map((row: any) => row.trace_id) || []),
+      ];
       deleteDialog.value.show = true;
     };
 
@@ -607,7 +600,6 @@ export default defineComponent({
       filteredQueries,
       selectedRow,
       handleMultiQueryCancel,
-      handleDeleteQuery,
       selectedSearchField,
       searchFieldOptions,
       otherFieldOptions,
