@@ -192,7 +192,7 @@ pub async fn search(
             {
                 req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
                 range_error = format!(
-                    "Query duration is modified with start time as {:?} - end time {:?} , due to query range restriction of {} hours",
+                    "Query duration is modified due to query range restriction of {} hours",
                     req.query.end_time, req.query.start_time, max_query_range
                 );
             }
