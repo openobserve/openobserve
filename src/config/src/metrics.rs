@@ -24,7 +24,10 @@ use prometheus::{
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
-
+pub const SPAN_METRICS_BUCKET: [f64; 15] = [
+    0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
+    60000.0,
+];
 // http latency
 pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -568,10 +571,7 @@ pub static SPAN_DURATION_MILLISECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new("span_duration_milliseconds", "span duration milliseconds")
             .namespace(NAMESPACE)
-            .buckets(vec![
-                0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0,
-                10000.0, 60000.0,
-            ])
+            .buckets(SPAN_METRICS_BUCKET.to_vec())
             .const_labels(create_const_labels()),
         &[
             "organization",

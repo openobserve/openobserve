@@ -19,7 +19,7 @@ use config::{
     cluster, get_config,
     meta::{cluster::Role, stream::StreamType},
     metrics,
-    metrics::NAMESPACE,
+    metrics::{NAMESPACE, SPAN_METRICS_BUCKET},
     utils::file::scan_files,
 };
 use hashbrown::HashMap;
@@ -34,8 +34,9 @@ use opentelemetry::{
 use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::{
     metrics::{
+        new_view,
         reader::{DefaultAggregationSelector, DefaultTemporalitySelector},
-        PeriodicReader, SdkMeterProvider,
+        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream,
     },
     runtime, Resource,
 };
@@ -71,7 +72,7 @@ pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
     let meter = opentelemetry::global::meter("o2");
     meter
         .f64_histogram(format!("{}_span_duration_milliseconds", NAMESPACE))
-        .with_unit(Unit::new("us"))
+        .with_unit(Unit::new("ms"))
         .with_description("span duration milliseconds")
         .init()
 });
@@ -315,7 +316,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
         )?;
 
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
-        .with_interval(Duration::from_secs(5))
+        .with_interval(Duration::from_secs(60))
         .build();
     let provider = SdkMeterProvider::builder()
         .with_reader(reader)
@@ -323,6 +324,13 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
             "service.name",
             "openobserve",
         )]))
+        .with_view(new_view(
+            Instrument::new().name(format!("{}_span_duration_milliseconds", NAMESPACE)),
+            Stream::new().aggregation(Aggregation::ExplicitBucketHistogram {
+                boundaries: SPAN_METRICS_BUCKET.to_vec(),
+                record_min_max: false,
+            }),
+        )?)
         .build();
     global::set_meter_provider(provider.clone());
     Ok(provider)
