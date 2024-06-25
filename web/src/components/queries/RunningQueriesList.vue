@@ -423,8 +423,6 @@ export default defineComponent({
           gt_1d: 24 * 60 * 60 * 1000000, // 1 day
           gt_1w: 7 * 24 * 60 * 60 * 1000000, // 1 week
           gt_1M: 30 * 24 * 60 * 60 * 1000000, // 1 month (approx.)
-          gt_1d: 24 * 60 * 60 * 1000000, // greater than 1 day
-          gt_1M: 30 * 24 * 60 * 60 * 1000000, // greater than 1 month (approx.)
         };
 
         return queries.value.filter((item: any) => {
