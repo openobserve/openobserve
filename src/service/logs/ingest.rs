@@ -26,7 +26,6 @@ use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    DISTINCT_FIELDS,
 };
 use flate2::read::GzDecoder;
 use infra::schema::SchemaCache;
@@ -40,15 +39,11 @@ use crate::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
             IngestionRequest, IngestionResponse, KinesisFHIngestionResponse, StreamStatus,
         },
-        stream::{SchemaRecords, StreamParams},
+        stream::StreamParams,
     },
     service::{
-        get_formatted_stream_name,
-        ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
-        logs::StreamMeta,
-        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::get_upto_discard_error,
-        usage::report_request_usage_stats,
+        get_formatted_stream_name, ingestion::check_ingestion_allowed,
+        schema::get_upto_discard_error, usage::report_request_usage_stats,
     },
 };
 
@@ -109,21 +104,6 @@ pub async fn ingest(
     .await;
     // End get user defined schema
 
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut distinct_values = Vec::with_capacity(16);
-    let mut trigger: Option<TriggerAlertData> = None;
-
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-
-    let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
-
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (ep, data) = match in_req {
         IngestionRequest::JSON(req) => {
@@ -141,6 +121,8 @@ pub async fn ingest(
         ),
     };
 
+    let mut stream_status = StreamStatus::new(stream_name);
+    let mut json_data = Vec::new(); // REFACTORME(taiming): get size and use capacity
     for ret in data.iter() {
         let item = match ret {
             Ok(item) => item,
@@ -175,76 +157,45 @@ pub async fn ingest(
             local_val = crate::service::logs::refactor_map(local_val, fields);
         }
 
-        if let Err(e) = handle_timestamp(&mut local_val, min_ts) {
-            stream_status.status.failed += 1;
-            stream_status.status.error = e.to_string();
-            continue;
-        }
-
-        let mut to_add_distinct_values = vec![];
-        // get distinct_value item
-        for field in DISTINCT_FIELDS.iter() {
-            if let Some(val) = local_val.get(field) {
-                if !val.is_null() {
-                    to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                        stream_type: StreamType::Logs,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.as_str().unwrap().to_string(),
-                        filter_name: "".to_string(),
-                        filter_value: "".to_string(),
-                    }));
-                }
-            }
-        }
-
-        let local_trigger = match super::add_valid_record(
-            &StreamMeta {
-                org_id: org_id.to_string(),
-                stream_name: stream_name.to_string(),
-                partition_keys: &partition_keys,
-                partition_time_level: &partition_time_level,
-                stream_alerts_map: &stream_alerts_map,
-            },
-            &mut stream_schema_map,
-            &mut stream_status.status,
-            &mut write_buf,
-            local_val,
-            trigger.is_none(),
-        )
-        .await
-        {
-            Ok(v) => v,
+        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+            Ok(ts) => ts,
             Err(e) => {
                 stream_status.status.failed += 1;
                 stream_status.status.error = e.to_string();
                 continue;
             }
         };
-        if local_trigger.is_some() {
-            trigger = local_trigger;
+
+        json_data.push((timestamp, local_val));
+    }
+
+    let mut stream_status = StreamStatus::new(stream_name);
+    if json_data.is_empty() {
+        return Ok(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ));
+    }
+
+    let mut req_stats = match super::write_logs(
+        org_id,
+        stream_name,
+        &mut stream_schema_map,
+        &mut stream_alerts_map,
+        &mut stream_status.status,
+        json_data,
+    )
+    .await
+    {
+        Ok(rs) => rs,
+        Err(e) => {
+            log::error!("Error while writing logs: {}", e);
+            return Ok(IngestionResponse::new(
+                http::StatusCode::OK.into(),
+                vec![stream_status],
+            ));
         }
-
-        // add distinct values
-        distinct_values.extend(to_add_distinct_values);
-    }
-
-    // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
-    let mut req_stats = write_file(&writer, stream_name, write_buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
-
-    // send distinct_values
-    if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
-    }
-
-    // only one trigger per request
-    evaluate_trigger(trigger).await;
+    };
 
     // update ingestion metrics
     let time = start.elapsed().as_secs_f64();
@@ -326,7 +277,7 @@ pub fn apply_functions<'a>(
 pub fn handle_timestamp(
     local_val: &mut json::Map<String, json::Value>,
     min_ts: i64,
-) -> Result<(), anyhow::Error> {
+) -> Result<i64, anyhow::Error> {
     let cfg = get_config();
     // handle timestamp
     let timestamp = match local_val.get(&cfg.common.column_timestamp) {
@@ -344,7 +295,7 @@ pub fn handle_timestamp(
         cfg.common.column_timestamp.clone(),
         json::Value::Number(timestamp.into()),
     );
-    Ok(())
+    Ok(timestamp)
 }
 
 impl<'a> Iterator for IngestionDataIter<'a> {

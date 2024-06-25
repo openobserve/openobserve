@@ -23,15 +23,22 @@ use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     get_config,
-    meta::stream::{PartitionTimeLevel, StreamPartition, StreamType},
+    meta::{
+        stream::{PartitionTimeLevel, StreamPartition, StreamType},
+        usage::RequestStats,
+    },
     utils::{
         json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Number, Value},
         schema_ext::SchemaExt,
     },
+    DISTINCT_FIELDS,
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
-use super::ingestion::TriggerAlertData;
+use super::{
+    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
+};
 use crate::{
     common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
     service::{ingestion::get_wal_time_key, schema::check_for_schema},
@@ -435,6 +442,173 @@ async fn add_record(
     let record_value = Value::Object(record_val.clone());
     hour_buf.records.push(Arc::new(record_value));
     Ok(())
+}
+
+async fn write_logs(
+    org_id: &str,
+    stream_name: &str,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
+    status: &mut RecordStatus,
+    json_data: Vec<(i64, Map<String, Value>)>,
+) -> Result<RequestStats> {
+    let cfg = get_config();
+
+    // start check for schema
+    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
+    let schema_evolution = check_for_schema(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+        stream_schema_map,
+        json_data.iter().map(|(_, v)| v).collect(),
+        *min_timestamp,
+    )
+    .await?;
+
+    // get schema
+    let rec_schema = stream_schema_map
+        .get(stream_name)
+        .unwrap()
+        .schema()
+        .clone()
+        .with_metadata(HashMap::new());
+    let rec_schema = Arc::new(rec_schema);
+    let schema_key = rec_schema.hash_key();
+
+    // QUESTION(taiming): check schema by request -> not compatible -> entire request failed?
+    if !schema_evolution.schema_compatible {
+        status.failed += json_data.len() as u32;
+        return Err(anyhow::anyhow!("Schema not compatible"));
+    }
+
+    let mut distinct_values = Vec::with_capacity(16);
+    let mut trigger: Option<TriggerAlertData> = None;
+
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
+
+    let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
+
+    for (timestamp, mut record_val) in json_data {
+        // validate record
+        let valid_record = match &schema_evolution.types_delta {
+            None => true,
+            Some(delta) => {
+                let ret_val = if !cfg.common.widening_schema_evolution
+                    || !schema_evolution.is_schema_changed
+                {
+                    cast_to_type(&mut record_val, delta.to_owned())
+                } else {
+                    let local_delta = delta
+                        .iter()
+                        .filter_map(|x| {
+                            if x.metadata().contains_key("zo_cast") {
+                                Some(x.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    if !local_delta.is_empty() {
+                        cast_to_type(&mut record_val, local_delta)
+                    } else {
+                        Ok(())
+                    }
+                };
+                match ret_val {
+                    Ok(_) => true,
+                    Err(e) => {
+                        status.failed += 1;
+                        status.error = e.to_string();
+                        false
+                    }
+                }
+            }
+        };
+        if !valid_record {
+            continue;
+        }
+
+        // start check for alert trigger
+        if trigger.is_none() && !stream_alerts_map.is_empty() {
+            let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+            if let Some(alerts) = stream_alerts_map.get(&key) {
+                let mut trigger_alerts: TriggerAlertData = Vec::new();
+                for alert in alerts {
+                    if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
+                        trigger_alerts.push((alert.clone(), v));
+                    }
+                }
+                trigger = Some(trigger_alerts);
+            }
+        }
+        // end check for alert triggers
+
+        // get distinct_value items
+        let mut to_add_distinct_values = vec![];
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = record_val.get(field) {
+                to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_string(),
+                    field_name: field.to_string(),
+                    field_value: val.as_str().unwrap().to_string(),
+                    filter_name: "".to_string(),
+                    filter_value: "".to_string(),
+                }));
+            }
+        }
+
+        // get hour key
+        let hour_key = get_wal_time_key(
+            timestamp,
+            &partition_keys,
+            unwrap_partition_time_level(partition_time_level, StreamType::Logs),
+            &record_val,
+            Some(&schema_key),
+        );
+
+        let hour_buf = write_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema_key: schema_key.clone(),
+            schema: rec_schema.clone(),
+            records: vec![],
+            records_size: 0,
+        });
+        let record_val = Value::Object(record_val);
+        let record_size = estimate_json_bytes(&record_val);
+        hour_buf.records.push(Arc::new(record_val));
+        hour_buf.records_size += record_size;
+        status.successful += 1;
+
+        // add distinct values
+        distinct_values.extend(to_add_distinct_values);
+    }
+
+    // write data to wal
+    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
+    let req_stats = write_file(&writer, stream_name, write_buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
+
+    // send distinct_values
+    if !distinct_values.is_empty() {
+        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
+    // only one trigger per request
+    evaluate_trigger(trigger).await;
+
+    Ok(req_stats)
 }
 
 struct StreamMeta<'a> {
