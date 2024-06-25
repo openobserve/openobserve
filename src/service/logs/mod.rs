@@ -476,7 +476,7 @@ pub fn refactor_map(
 
     if has_elements {
         new_map.insert(
-            get_config().common.all_fields_name.to_string(),
+            get_config().common.column_all.to_string(),
             Value::String(String::from_utf8(non_schema_map).unwrap()),
         );
     }
