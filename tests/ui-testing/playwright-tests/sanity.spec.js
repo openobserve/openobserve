@@ -862,7 +862,7 @@ test.describe("Sanity testcases", () => {
       .click();
       console.log("step3")
     await page.waitForTimeout(3000);
-    await page.locator('[data-test="selected-chart-table-item"] img').click();
+    await page.locator('[data-test="dashboard-addpanel-chart-selection-icon"] img').click({force: true});
     await page.locator('[data-test="index-dropdown-stream"]').click();
     await page
       .locator('[data-test="index-dropdown-stream"]')
