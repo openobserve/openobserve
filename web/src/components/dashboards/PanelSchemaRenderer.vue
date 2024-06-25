@@ -220,6 +220,7 @@ export default defineComponent({
     "updated:data-zoom",
     "error",
     "metadata-update",
+    "result-metadata-update",
     "update:initialVariableValues",
   ],
   setup(props, { emit }) {
@@ -242,14 +243,15 @@ export default defineComponent({
       searchType,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } = usePanelDataLoader(
-      panelSchema,
-      selectedTimeObj,
-      variablesData,
-      chartPanelRef,
-      forceLoad,
-      searchType,
-    );
+    let { data, loading, errorDetail, metadata, resultMetaData } =
+      usePanelDataLoader(
+        panelSchema,
+        selectedTimeObj,
+        variablesData,
+        chartPanelRef,
+        forceLoad,
+        searchType
+      );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -322,6 +324,10 @@ export default defineComponent({
     // when we get the new metadata from the apis, emit the metadata update
     watch(metadata, () => {
       emit("metadata-update", metadata.value);
+    });
+
+    watch(resultMetaData, () => {
+      emit("result-metadata-update", resultMetaData.value);
     });
 
     const handleNoData = (panelType: any) => {
