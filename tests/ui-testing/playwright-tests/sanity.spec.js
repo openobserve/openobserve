@@ -845,12 +845,13 @@ test.describe("Sanity testcases", () => {
     // Sending first request
     const response1 = await sendRequest(page, ingestionUrl, payload1, headers);
     console.log(response1);
-
+    console.log("step1")
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await page.waitForTimeout(5000);
     await page.locator('[data-test="dashboard-add"]').click();
     await page.waitForTimeout(5000);
     await page.locator('[data-test="add-dashboard-name"]').click();
+    console.log("step2")
 
     await page.locator('[data-test="add-dashboard-name"]').fill(dashboardName);
     await page.locator('[data-test="dashboard-add-submit"]').click();
@@ -858,6 +859,7 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .click();
+      console.log("step3")
     await page.waitForTimeout(3000);
     await page.locator('[data-test="selected-chart-table-item"] img').click();
     await page.locator('[data-test="index-dropdown-stream"]').click();
@@ -867,6 +869,7 @@ test.describe("Sanity testcases", () => {
       await page.waitForTimeout(4000);
     await page.getByRole("option", { name: "e2e_tabledashboard" }).click({force: true});
     await page.waitForTimeout(6000);
+    console.log("step4")
 
     await page
       .locator(
@@ -883,12 +886,14 @@ test.describe("Sanity testcases", () => {
         '[data-test="field-list-item-logs-e2e_tabledashboard-_timestamp"] [data-test="dashboard-add-x-data"]'
       )
       .click();
+      console.log("step5")
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
     await page.waitForTimeout(2000);
     await page.locator('[data-test="dashboard-panel-save"]').click();
     await page.waitForTimeout(2000);
+    console.log("step6")
 
     // // Change timezone to Asia/Calcutta
     await page.locator('[data-test="date-time-btn"]').click();
@@ -898,6 +903,7 @@ test.describe("Sanity testcases", () => {
       .fill("Asia/Calcutta");
       await page.getByText("Asia/Calcutta", { exact: true }).click();
       await page.waitForTimeout(200);
+      console.log("step7")
 
     // NOTE: pass selected timezone
     const calcuttaTime = toZonedTime(new Date(timestamp), "Asia/Calcutta");
