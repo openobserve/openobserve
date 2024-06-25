@@ -8,7 +8,7 @@ const streamName = `stream${Date.now()}`
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+//  await page.getByText('Login as internal user').click();
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
@@ -107,8 +107,13 @@ test.describe("Schema testcases", () => {
     await page.locator('button').filter({ hasText: 'close' }).click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(1000);
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-tab"]').click();
+    await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.getByText(/^arrow_drop_down_all:.*$/).click();
+    await page.waitForTimeout(1000);
+    await page.getByText(/^arrow_drop_down_all:.*$/).click({force:true});
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
@@ -123,6 +128,11 @@ test.describe("Schema testcases", () => {
     await ingestion(page);
     await page.waitForTimeout(5000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
+    await page.waitForTimeout(3000);
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-tab"]').click();
+    await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.getByText('{ arrow_drop_down_timestamp:').click();
  
