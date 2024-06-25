@@ -1241,26 +1241,40 @@ export default defineComponent({
     };
 
     const updateDateTime = async (value: object) => {
-      if (value.valueType == "absolute" && searchObj.data.stream.selectedStream.length > 0 && searchObj.data.datetime.queryRangeRestrictionInHour > 0 && value.hasOwnProperty("selectedDate") && value.hasOwnProperty("selectedTime") && value.selectedDate.hasOwnProperty("from") && value.selectedTime.hasOwnProperty("startTime")) {
+      if (
+        value.valueType == "absolute" &&
+        searchObj.data.stream.selectedStream.length > 0 &&
+        searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
+        value.hasOwnProperty("selectedDate") &&
+        value.hasOwnProperty("selectedTime") &&
+        value.selectedDate.hasOwnProperty("from") &&
+        value.selectedTime.hasOwnProperty("startTime")
+      ) {
         // Convert hours to microseconds
-        value.startTime =
-          value.endTime - (searchObj.data.datetime.queryRangeRestrictionInHour *
-          60 *
-          60 *
-          1000000);
-        value.selectedDate.from = timestampToTimezoneDate(
-          value.startTime / 1000,
-          store.state.timezone,
-          "yyyy/MM/DD"
-        );
-        value.selectedTime.startTime = timestampToTimezoneDate(
-          value.startTime / 1000,
-          store.state.timezone,
-          "HH:mm"
-        );
+        let newStartTime =
+          parseInt(value.endTime) -
+          searchObj.data.datetime.queryRangeRestrictionInHour *
+            60 *
+            60 *
+            1000000;
 
-        dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
-        dateTimeRef.value.setDateType("absolute");
+        if (parseInt(newStartTime) > parseInt(value.startTime)) {
+          value.startTime = newStartTime;
+
+          value.selectedDate.from = timestampToTimezoneDate(
+            value.startTime / 1000,
+            store.state.timezone,
+            "yyyy/MM/DD"
+          );
+          value.selectedTime.startTime = timestampToTimezoneDate(
+            value.startTime / 1000,
+            store.state.timezone,
+            "HH:mm"
+          );
+
+          dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+          dateTimeRef.value.setDateType("absolute");
+        }
       }
       searchObj.data.datetime = {
         startTime: value.startTime,
