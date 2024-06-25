@@ -1864,6 +1864,13 @@ const useLogs = () => {
             searchObj.data.datetime.startTime = res.data.new_start_time;
             searchObj.data.datetime.endTime = res.data.new_end_time;
             searchObj.data.datetime.type = "absolute";
+            queryReq.query.start_time = res.data.new_start_time;
+            queryReq.query.end_time = res.data.new_end_time;
+            searchObj.data.histogramQuery.query.start_time = res.data.new_start_time;
+            searchObj.data.histogramQuery.query.end_time = res.data.new_end_time;
+            if(searchObj.data.queryResults.partitionDetail.partitions.length == 1) {
+              searchObj.data.queryResults.partitionDetail.partitions[0].start_time = res.data.new_start_time;
+            }
             updateUrlQueryParams();
           }
           searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
