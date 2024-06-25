@@ -486,7 +486,7 @@ const useLogs = () => {
       } else {
         query["period"] = date.relativeTimePeriod;
       }
-    } else {
+    } else if(date.type == "absolute") {
       query["from"] = date.startTime;
       query["to"] = date.endTime;
     }
