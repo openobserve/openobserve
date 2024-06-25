@@ -508,8 +508,10 @@ export default defineComponent({
         deleteDialog.value.data
       )
         .then(() => {
+          selectedRow.value = [];
+
           getRunningQueries();
-          deleteDialog.value.show = false;
+
           q.notify({
             message: "Running query deleted successfully",
             color: "positive",
@@ -527,6 +529,7 @@ export default defineComponent({
           });
         })
         .finally(() => {
+          deleteDialog.value.show = false;
           deleteDialog.value.data = [];
         });
     };
