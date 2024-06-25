@@ -518,10 +518,10 @@ pub async fn get_stream_routing(
         "{}/{}/{}",
         &stream_params.org_id, stream_params.stream_type, &stream_params.stream_name,
     )) {
-        let res: Vec<Routing> = pipeline
-            .routing
-            .as_ref()
-            .unwrap()
+        let Some(routing) = pipeline.routing.as_ref() else {
+            return;
+        };
+        let res: Vec<Routing> = routing
             .iter()
             .map(|(k, v)| Routing {
                 destination: k.to_string(),

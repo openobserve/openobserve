@@ -345,7 +345,9 @@ export default defineComponent({
         case "line":
         case "scatter":
         case "gauge":
-        case "table": {
+        case "table":
+        case "pie":
+        case "donut": {
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
             data.value[0]?.length > 1 ||
@@ -368,13 +370,6 @@ export default defineComponent({
             (xAlias.every((x: any) => data.value[0][0][x] != null) &&
               yAlias.every((y: any) => data.value[0][0][y] != null) &&
               zAlias.every((z: any) => data.value[0][0][z]) != null)
-          );
-        }
-        case "pie":
-        case "donut": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => data.value[0][0][y] != null)
           );
         }
         case "sankey": {
