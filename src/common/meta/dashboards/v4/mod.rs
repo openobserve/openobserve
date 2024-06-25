@@ -98,6 +98,8 @@ pub struct PanelFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub z: Option<Vec<AxisItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub breakdown: Option<AxisItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub latitude: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub longitude: Option<AxisItem>,
