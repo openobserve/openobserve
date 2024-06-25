@@ -112,7 +112,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.getByText(/^arrow_drop_down_all:.*$/).click();
+    await page.getByText(/^arrow_drop_down_all:.*$/).click({force:true});
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
