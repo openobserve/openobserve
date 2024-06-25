@@ -99,18 +99,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
-            <q-btn
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
-              size="sm"
-              no-caps
-              icon="refresh"
-              @click="refreshData"
-              data-test="dashboard-refresh-btn"
-              :disable="disableDateTimeRefresh"
-            >
-              <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
-            </q-btn>
+            <q-btn-group class="dashboard-icons q-ml-sm hideOnPrintMode">
+              <q-btn
+                size="sm"
+                no-caps
+                icon="refresh"
+                @click="refreshData"
+                data-test="dashboard-refresh-btn"
+                :disable="disableDateTimeRefresh"
+                style="width: 80%"
+              >
+                <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                size="sm"
+                no-caps
+                icon="cancel"
+                @click="refreshData"
+                data-test="dashboard-cancel-btn"
+                :disable="disableDateTimeRefresh"
+                style="width: 20%"
+              >
+                <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+              </q-btn>
+            </q-btn-group>
             <ExportDashboard
               v-if="!isFullscreen"
               class="hideOnPrintMode"
