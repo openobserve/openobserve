@@ -83,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
               v-if="selectedDate"
-              v-show="store.state.printMode === false"
+              v-show="
+                store.state.printMode === false && !disableDateTimeRefresh
+              "
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
@@ -105,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="refresh"
               @click="refreshData"
               data-test="dashboard-refresh-btn"
+              :disable="disableDateTimeRefresh"
             >
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
@@ -201,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
+        @panelsValues="getPanelsValues"
       />
 
       <q-dialog
@@ -291,6 +295,15 @@ export default defineComponent({
     const showScheduledReportsDialog = ref(false);
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+    const disableDateTimeRefresh = ref(false);
+
+    const getPanelsValues = computed(() => {
+      return (data) => {
+        console.log("getPanelsValues", data);
+        disableDateTimeRefresh.value = data.some((item) => item === true);
+        console.log("disableDateTimeRefresh", disableDateTimeRefresh.value);
+      };
+    });
     let moment: any = () => {};
 
     const importMoment = async () => {
@@ -846,6 +859,8 @@ export default defineComponent({
       folderId,
       tabId,
       outlinedDescription,
+      getPanelsValues,
+      disableDateTimeRefresh,
     };
   },
 });
