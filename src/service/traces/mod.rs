@@ -314,8 +314,7 @@ pub async fn handle_trace_request(
         }
 
         // send to metrics job
-        let tmc = crate::job::metrics::TRACE_METRICS_CHAN.0.write().await;
-        if let Err(e) = tmc.try_send(m) {
+        if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
             log::error!("traces metrics item send to job fail : {e}")
         }
     }

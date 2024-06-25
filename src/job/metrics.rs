@@ -58,13 +58,13 @@ pub struct TraceMetricsItem {
 }
 
 pub type TraceMetricsChan = (
-    RwLock<tokio::sync::mpsc::Sender<TraceMetricsItem>>,
+    tokio::sync::mpsc::Sender<TraceMetricsItem>,
     RwLock<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
 );
 
 pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
     let (tx, rx) = tokio::sync::mpsc::channel(2048);
-    (RwLock::new(tx), RwLock::new(rx))
+    (tx, RwLock::new(rx))
 });
 
 pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
