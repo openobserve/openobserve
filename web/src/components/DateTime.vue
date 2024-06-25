@@ -875,6 +875,7 @@ export default defineComponent({
       setDateType,
       getConsumableDateTime,
       relativeDatesInHour,
+      setAbsoluteTime,
     };
   },
 });
