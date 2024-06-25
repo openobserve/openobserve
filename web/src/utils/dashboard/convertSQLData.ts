@@ -1702,7 +1702,7 @@ export const convertSQLData = async (
     options.series = options.series.filter((it: any) => it.data?.length);
     if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
       options.xAxis = options.series.length ? options.xAxis : {};
-    } else {
+    } else if (!["pie", "donut"].includes(panelSchema.type)) {
       options.yAxis = options.series.length ? options.yAxis : {};
     }
   }
