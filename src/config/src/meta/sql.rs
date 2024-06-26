@@ -466,6 +466,9 @@ fn parse_expr_for_field(
                 let eq = parse_expr_check_field_name(&ident.value, field);
                 if ident.value == field || (eq && next_op == SqlOperator::Eq) {
                     let val = get_value_from_expr(right);
+                    if matches!(right.as_ref(), SqlExpr::Subquery(_)) {
+                        return Ok(());
+                    }
                     if val.is_none() {
                         return Err(anyhow::anyhow!(
                             "SqlExpr::Identifier: We only support Identifier at the moment"

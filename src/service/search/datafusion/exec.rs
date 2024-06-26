@@ -774,6 +774,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
     // handle select *
     let mut fields = new_fields;
     if fields.len() == 1 && sel_fields_has_star {
+        sql = rewrite::remove_where_clause(&sql)?;
         return Ok(sql);
     }
     if sel_fields_has_star {
