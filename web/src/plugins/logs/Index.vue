@@ -58,7 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
-                      searchObj.data.stream.selectedStream.join(',') || 'default'
+                      searchObj.data.stream.selectedStream.join(',') ||
+                      'default'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -97,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning"
-size="10rem" /><br />
+                    <q-icon name="warning" color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -838,12 +838,19 @@ export default defineComponent({
     };
 
     const setFieldsAndConditions = async () => {
+      // set fields and conditions for first time only
+      if (dashboardPanelData.data.queries[0].query) {
+        return;
+      }
+
       const { fields, conditions, streamName } = await getFieldsFromQuery(
         searchObj.data.query ?? ""
       );
 
-      // set stream Name
+      // set stream type and stream name
       if (streamName) {
+        dashboardPanelData.data.queries[0].fields.stream_type =
+          searchObj.data.stream.streamType ?? "logs";
         dashboardPanelData.data.queries[0].fields.stream = streamName;
       }
 
@@ -885,33 +892,35 @@ export default defineComponent({
             // currently not supported
             break;
           }
-          // case "is null": {
-          //   condition.type = "condition";
-          //   condition.values = [];
-          //   condition.operator = "Is Null";
-          //   condition.value = null;
+          case "is null": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Is Null";
+            condition.value = null;
 
-          //   break;
-          // }
-          // case "is not null": {
-          //   condition.type = "condition";
-          //   condition.values = [];
-          //   condition.operator = "Is Not Null";
-          //   condition.value = null;
-          //   break;
-          // }
+            break;
+          }
+          case "is not null": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Is Not Null";
+            condition.value = null;
+            break;
+          }
           case "like": {
             condition.type = "condition";
             condition.values = [];
             condition.operator = "Contains";
-            condition.value = null;
+            // remove % from the start and end
+            condition.value = condition?.value?.replace(/^%|%$/g, "");
             break;
           }
           case "not like": {
             condition.type = "condition";
             condition.values = [];
             condition.operator = "Not Contains";
-            condition.value = null;
+            // remove % from the start and end
+            condition.value = condition?.value?.replace(/^%|%$/g, "");
             break;
           }
           case "<>":
@@ -961,7 +970,10 @@ export default defineComponent({
           //   searchObj.data.stream.selectedStream.value ?? "default";
           // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
 
-          setFieldsAndConditions();
+          await setFieldsAndConditions();
+
+          // run query
+          handleRunQueryFn();
         }
       }
     );
