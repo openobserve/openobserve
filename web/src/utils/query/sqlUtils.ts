@@ -190,7 +190,10 @@ export const isGivenFieldInOrderBy = async (
   return null;
 };
 
-export const getFieldsFromQuery = async (query: any) => {
+export const getFieldsFromQuery = async (
+  query: any,
+  timeField: string = "_timestamp"
+) => {
   try {
     await importSqlParser();
     const ast: any = parser.astify(query);
@@ -205,19 +208,19 @@ export const getFieldsFromQuery = async (query: any) => {
         };
 
         if (column.expr.type === "column_ref") {
-          field.column = column?.expr?.column ?? "_timestamp";
+          field.column = column?.expr?.column ?? timeField;
         } else if (column.expr.type === "aggr_func") {
-          field.column = column?.expr?.args?.expr?.column ?? "_timestamp";
+          field.column = column?.expr?.args?.expr?.column ?? timeField;
           field.aggregationFunction =
             column?.expr?.name?.toLowerCase() ?? "count";
         } else if (column.expr.type === "function") {
           // histogram field
-          field.column = column?.expr?.args?.value[0]?.column ?? "_timestamp";
+          field.column = column?.expr?.args?.value[0]?.column ?? timeField;
           field.aggregationFunction =
             column?.expr?.name?.toLowerCase() ?? "histogram";
         }
 
-        field.alias = column?.as ?? field?.column ?? "_timestamp";
+        field.alias = column?.as ?? field?.column ?? timeField;
 
         return field;
       });
@@ -231,12 +234,12 @@ export const getFieldsFromQuery = async (query: any) => {
         // Add histogram(_timestamp) and count(_timestamp) to the fields array
         fields.push(
           {
-            column: "_timestamp",
+            column: timeField,
             alias: "x_axis_1",
             aggregationFunction: "histogram",
           },
           {
-            column: "_timestamp",
+            column: timeField,
             alias: "y_axis_1",
             aggregationFunction: "count",
           }
@@ -348,12 +351,12 @@ export const getFieldsFromQuery = async (query: any) => {
     return {
       fields: [
         {
-          column: "_timestamp",
+          column: timeField,
           alias: "x_axis_1",
           aggregationFunction: "histogram",
         },
         {
-          column: "_timestamp",
+          column: timeField,
           alias: "y_axis_1",
           aggregationFunction: "count",
         },

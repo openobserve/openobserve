@@ -217,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
+              @update:stream-list="streamListUpdated"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -844,7 +845,8 @@ export default defineComponent({
       }
 
       const { fields, conditions, streamName } = await getFieldsFromQuery(
-        searchObj.data.query ?? ""
+        searchObj.data.query ?? "",
+        store.state.zoConfig.timestamp_column ?? "_timestamp1"
       );
 
       // set stream type and stream name
@@ -971,9 +973,6 @@ export default defineComponent({
           // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
 
           await setFieldsAndConditions();
-
-          // run query
-          handleRunQueryFn();
         }
       }
     );
@@ -1013,6 +1012,18 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
+    let firstTimeVisualizeFlag = true;
+    const streamListUpdated = () => {
+      if (
+        searchObj.meta.logsVisualizeToggle == "visualize" &&
+        firstTimeVisualizeFlag
+      ) {
+        firstTimeVisualizeFlag = false;
+        // run query
+        handleRunQueryFn();
+      }
+    };
+
     return {
       t,
       store,
@@ -1049,6 +1060,7 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
+      streamListUpdated,
     };
   },
   computed: {
