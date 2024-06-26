@@ -30,7 +30,6 @@ use opentelemetry::{
     metrics::{Histogram, Unit},
     KeyValue,
 };
-use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::{
     metrics::{
         new_view,
@@ -40,15 +39,15 @@ use opentelemetry_sdk::{
     runtime, Resource,
 };
 use tokio::{sync::RwLock, time};
-use tonic::{
-    metadata::{MetadataMap, MetadataValue},
-    Status,
-};
 
 use crate::{
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
-    service::db,
+    service::{
+        db,
+        exporter::otlp_o2_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
+    },
 };
+
 #[derive(Debug)]
 pub struct TraceMetricsItem {
     pub organization: String,
@@ -291,29 +290,11 @@ async fn update_memory_usage() -> Result<(), anyhow::Error> {
 }
 
 pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
-    let export_config = opentelemetry_otlp::ExportConfig {
-        endpoint: "http://127.0.0.1:5081".to_string(),
-        timeout: Duration::from_secs(3),
-        protocol: Protocol::Grpc,
-    };
-
-    let mut metadata = MetadataMap::new();
-    let token: MetadataValue<_> = crate::common::infra::cluster::get_internal_grpc_token()
-        .parse()
-        .map_err(|_| Status::internal("invalid token".to_string()))?;
-
-    metadata.insert("authorization", token);
-    metadata.insert("organization", "default".parse().unwrap());
-
-    let exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
-        .with_export_config(export_config)
-        .with_metadata(metadata)
-        .build_metrics_exporter(
-            Box::new(DefaultAggregationSelector::new()),
-            Box::new(DefaultTemporalitySelector::new()),
-        )?;
-
+    let exporter = O2MetricsExporter::new(
+        O2MetricsClient::new(),
+        Box::new(DefaultTemporalitySelector::new()),
+        Box::new(DefaultAggregationSelector::new()),
+    );
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
         .with_interval(Duration::from_secs(
             get_config().common.traces_span_metrics_export_interval,
