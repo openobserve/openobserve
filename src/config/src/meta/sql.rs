@@ -262,6 +262,12 @@ impl<'a> TryFrom<Source<'a>> for (String, Option<Query>) {
                     }
                 };
 
+                if table_with_joins.len() != 1 {
+                    return Err(anyhow::anyhow!(
+                        "We only support single data source at the moment"
+                    ));
+                }
+
                 let table = &table_with_joins[0];
                 if !table.joins.is_empty() {
                     return Err(anyhow::anyhow!(
