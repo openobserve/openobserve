@@ -275,8 +275,8 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
         let mut fields = Vec::new();
         for item in projection.0 {
             let field = match item {
-                SelectItem::UnnamedExpr(expr) => get_field_name_from_expr(expr),
-                SelectItem::ExprWithAlias { expr, alias: _ } => get_field_name_from_expr(expr),
+                SelectItem::UnnamedExpr(expr) => get_field_name_from_expr(expr)?,
+                SelectItem::ExprWithAlias { expr, alias: _ } => get_field_name_from_expr(expr)?,
                 _ => None,
             };
             if let Some(field) = field {
@@ -401,7 +401,7 @@ impl<'a> TryFrom<Where<'a>> for Vec<String> {
     fn try_from(selection: Where<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         match selection.0 {
-            Some(expr) => fields.extend(get_field_name_from_expr(expr).unwrap_or_default()),
+            Some(expr) => fields.extend(get_field_name_from_expr(expr)?.unwrap_or_default()),
             None => {}
         }
         Ok(fields)
@@ -801,23 +801,23 @@ fn get_value_from_expr(expr: &SqlExpr) -> Option<SqlValue> {
     }
 }
 
-fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
+fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyhow::Error> {
     match expr {
-        SqlExpr::Identifier(ident) => Some(vec![ident.value.to_string()]),
+        SqlExpr::Identifier(ident) => Ok(Some(vec![ident.value.to_string()])),
         SqlExpr::BinaryOp { left, op: _, right } => {
             let mut fields = Vec::new();
-            if let Some(v) = get_field_name_from_expr(left) {
+            if let Some(v) = get_field_name_from_expr(left)? {
                 fields.extend(v);
             }
-            if let Some(v) = get_field_name_from_expr(right) {
+            if let Some(v) = get_field_name_from_expr(right)? {
                 fields.extend(v);
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::Function(f) => {
             let args = match &f.args {
-                FunctionArguments::None => return None,
-                FunctionArguments::Subquery(_) => return None,
+                FunctionArguments::None => return Ok(None),
+                FunctionArguments::Subquery(_) => return Ok(None),
                 FunctionArguments::List(args) => &args.args,
             };
             let mut fields = Vec::with_capacity(args.len());
@@ -828,19 +828,19 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
                         arg: FunctionArgExpr::Expr(expr),
                         operator: _operator,
                     } => {
-                        if let Some(v) = get_field_name_from_expr(expr) {
+                        if let Some(v) = get_field_name_from_expr(expr)? {
                             fields.extend(v);
                         }
                     }
                     FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) => {
-                        if let Some(v) = get_field_name_from_expr(expr) {
+                        if let Some(v) = get_field_name_from_expr(expr)? {
                             fields.extend(v);
                         }
                     }
                     _ => {}
                 }
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::Nested(expr) => get_field_name_from_expr(expr),
         SqlExpr::IsFalse(expr) => get_field_name_from_expr(expr),
@@ -855,13 +855,13 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::Between { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Like { expr, pattern, .. } | SqlExpr::ILike { expr, pattern, .. } => {
             let mut fields = Vec::new();
-            if let Some(expr) = get_field_name_from_expr(expr) {
+            if let Some(expr) = get_field_name_from_expr(expr)? {
                 fields.extend(expr);
             }
-            if let Some(pattern) = get_field_name_from_expr(pattern) {
+            if let Some(pattern) = get_field_name_from_expr(pattern)? {
                 fields.extend(pattern);
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::Cast { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Case {
@@ -872,18 +872,41 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         } => {
             let mut fields = Vec::new();
             for expr in conditions.iter() {
-                if let Some(v) = get_field_name_from_expr(expr) {
+                if let Some(v) = get_field_name_from_expr(expr)? {
                     fields.extend(v);
                 }
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
         SqlExpr::CompositeAccess { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Subscript { expr, .. } => get_field_name_from_expr(expr),
-        _ => None,
+        SqlExpr::Subquery(q) => {
+            let Select {
+                from: _table_with_joins,
+                selection,
+                projection,
+                group_by: _groups,
+                having: _,
+                ..
+            } = match &q.body.as_ref() {
+                SetExpr::Select(statement) => statement.as_ref(),
+                _ => return Ok(None),
+            };
+
+            let mut fields: Vec<String> = Projection(projection).try_into()?;
+            let selection = selection.as_ref().cloned();
+            let where_fields: Vec<String> = Where(&selection).try_into()?;
+
+            fields.extend(where_fields);
+            fields.sort();
+            fields.dedup();
+
+            Ok(Some(fields))
+        }
+        _ => Ok(None),
     }
 }
 
