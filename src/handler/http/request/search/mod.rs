@@ -266,7 +266,7 @@ pub async fn search(
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let mut c_resp: CachedQueryResponse = if use_cache {
+    let mut c_resp: CachedQueryResponse = if use_cache && cfg.common.result_cache_enabled {
         check_cache(
             &mut rpc_req,
             &mut req,
@@ -488,7 +488,8 @@ pub async fn search(
     .await;
 
     // result cache save changes start
-    if should_exec_query
+    if cfg.common.result_cache_enabled
+        && should_exec_query
         && c_resp.cache_query_response
         && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
     {

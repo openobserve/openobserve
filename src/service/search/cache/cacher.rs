@@ -40,14 +40,6 @@ pub async fn check_cache(
     };
     let sql_mode: SqlMode = meta.sql_mode;
 
-    let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error parsing sql: {:?}", e);
-            return CachedQueryResponse::default();
-        }
-    };
-
     // skip the count queries
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
