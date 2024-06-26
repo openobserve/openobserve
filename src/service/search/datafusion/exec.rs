@@ -675,7 +675,7 @@ fn merge_rewrite_sql(
     is_subquery: bool,
 ) -> Result<String> {
     if is_subquery && !is_final_phase {
-        let sql = rewrite::add_group_by_order_by_field_to_select(&sql)?;
+        let sql = rewrite::add_group_by_order_by_field_to_select(sql)?;
         return Ok(sql.to_string());
     }
 
