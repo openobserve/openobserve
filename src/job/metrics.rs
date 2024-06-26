@@ -23,7 +23,6 @@ use config::{
     utils::file::scan_files,
 };
 use hashbrown::HashMap;
-use http_auth_basic::Credentials;
 use infra::{cache, db::get_db};
 use once_cell::sync::Lazy;
 use opentelemetry::{
@@ -41,7 +40,10 @@ use opentelemetry_sdk::{
     runtime, Resource,
 };
 use tokio::{sync::RwLock, time};
-use tonic::metadata::MetadataMap;
+use tonic::{
+    metadata::{MetadataMap, MetadataValue},
+    Status,
+};
 
 use crate::{
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
@@ -81,11 +83,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
-    tokio::spawn(async {
-        if let Err(e) = traces_metrics_collect().await {
-            log::error!("Error traces_metrics_collect metrics: {}", e);
-        }
-    });
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE) {
+        tokio::spawn(async {
+            if let Err(e) = traces_metrics_collect().await {
+                log::error!("Error traces_metrics_collect metrics: {}", e);
+            }
+        });
+    }
 
     // update metrics every 60 seconds
     let mut interval = time::interval(time::Duration::from_secs(60));
@@ -294,16 +298,11 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
     };
 
     let mut metadata = MetadataMap::new();
-    let cfg = get_config();
-    let credentials = Credentials::new(
-        cfg.auth.root_user_email.as_str(),
-        cfg.auth.root_user_password.as_str(),
-    );
+    let token: MetadataValue<_> = crate::common::infra::cluster::get_internal_grpc_token()
+        .parse()
+        .map_err(|_| Status::internal("invalid token".to_string()))?;
 
-    metadata.insert(
-        "authorization",
-        format!("Basic {}", credentials.encode()).parse().unwrap(),
-    );
+    metadata.insert("authorization", token);
     metadata.insert("organization", "default".parse().unwrap());
 
     let exporter = opentelemetry_otlp::new_exporter()
