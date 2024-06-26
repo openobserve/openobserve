@@ -11,7 +11,9 @@ use infra::cache::{
 
 use crate::{
     common::meta::search::{CachedQueryResponse, QueryDelta},
-    service::search::sql::{SqlMode, RE_SELECT_FROM, TS_WITH_ALIAS},
+    service::search::sql::{
+        generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM, TS_WITH_ALIAS,
+    },
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -65,7 +67,7 @@ pub async fn check_cache(
                 &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
             );
         }
-        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+        req.query.sql = origin_sql.clone();
         result_ts_col = Some(cfg.common.column_timestamp.clone());
     }
     if !is_aggregate && origin_sql.contains('*') {
@@ -75,6 +77,28 @@ pub async fn check_cache(
     let result_ts_col = result_ts_col.unwrap();
     if let Some(interval) = meta.histogram_interval {
         *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
+
+        let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
+        let attrs = caps
+            .get(1)
+            .unwrap()
+            .as_str()
+            .split(',')
+            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+            .collect::<Vec<&str>>();
+
+        let interval = match attrs.get(1) {
+            Some(v) => match v.parse::<u16>() {
+                Ok(v) => generate_histogram_interval(parsed_sql.time_range, v),
+                Err(_) => v.to_string(),
+            },
+            None => generate_histogram_interval(parsed_sql.time_range, 0),
+        };
+        *origin_sql = origin_sql.replace(
+            caps.get(0).unwrap().as_str(),
+            &format!("histogram(_timestamp,'{}')", interval),
+        );
+        req.query.sql = origin_sql.clone();
     };
     let query_key = file_path.replace('/', "_");
 
