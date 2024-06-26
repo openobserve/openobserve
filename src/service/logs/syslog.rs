@@ -22,13 +22,12 @@ use config::{
     cluster,
     meta::stream::StreamType,
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    DISTINCT_FIELDS,
+    utils::{flatten, json},
 };
 use infra::schema::SchemaCache;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use super::StreamMeta;
+use super::ingest::handle_timestamp;
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
@@ -36,16 +35,11 @@ use crate::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
             ingestion::{IngestionResponse, StreamStatus},
-            stream::{SchemaRecords, StreamParams},
+            stream::StreamParams,
             syslog::SyslogRoute,
         },
     },
-    service::{
-        db, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::get_upto_discard_error,
-    },
+    service::{db, get_formatted_stream_name},
 };
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
@@ -68,7 +62,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
+    // check stream
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
@@ -91,22 +85,21 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         );
     }
 
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut distinct_values = Vec::with_capacity(16);
+    let cfg = config::get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
-    let mut trigger: Option<TriggerAlertData> = None;
-
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+    // Start Register Transforms for stream
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
         stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
+    );
+    // End Register Transforms for stream
 
     // Start get stream alerts
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::service::ingestion::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
@@ -118,21 +111,16 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     .await;
     // End get stream alert
 
-    // Start Register Transforms for stream
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    );
-    // End Register Transforms for stream
+    let mut stream_status = StreamStatus::new(stream_name);
 
-    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
-
-    let cfg = config::get_config();
+    // parse msg to json::Value
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
+
+    // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
+    // Start row based transform
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
             &local_trans,
@@ -160,88 +148,39 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     };
 
     // handle timestamp
-    let timestamp = match local_val.get(&cfg.common.column_timestamp) {
-        Some(v) => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => Utc::now().timestamp_micros(),
-        },
-        None => Utc::now().timestamp_micros(),
-    };
-    // check ingestion time
-    let earlest_time = Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap();
-    if timestamp < earlest_time.timestamp_micros() {
-        stream_status.status.failed += 1; // to old data, just discard
-        stream_status.status.error = get_upto_discard_error().to_string();
-    }
-
-    local_val.insert(
-        cfg.common.column_timestamp.clone(),
-        json::Value::Number(timestamp.into()),
-    );
-
-    let mut to_add_distinct_values = vec![];
-    // get distinct_value item
-    for field in DISTINCT_FIELDS.iter() {
-        if let Some(val) = local_val.get(field) {
-            if !val.is_null() {
-                to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    field_name: field.to_string(),
-                    field_value: val.as_str().unwrap().to_string(),
-                    filter_name: "".to_string(),
-                    filter_value: "".to_string(),
-                }));
-            }
+    let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+        Ok(ts) => ts,
+        Err(e) => {
+            stream_status.status.failed += 1;
+            stream_status.status.error = e.to_string();
+            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+                http::StatusCode::OK.into(),
+                vec![stream_status],
+            ))); // just return
         }
-    }
+    };
 
-    let local_trigger = match super::add_valid_record(
-        &StreamMeta {
+    let _ = match super::write_logs(
+        &super::StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
-            partition_keys: &partition_keys,
-            partition_time_level: &partition_time_level,
             stream_alerts_map: &stream_alerts_map,
         },
         &mut stream_schema_map,
         &mut stream_status.status,
-        &mut buf,
-        local_val,
-        trigger.is_none(),
+        vec![(timestamp, local_val)],
     )
     .await
     {
-        Ok(v) => v,
+        Ok(rs) => rs,
         Err(e) => {
-            stream_status.status.failed += 1;
-            stream_status.status.error = e.to_string();
-            None
+            log::error!("Error while writing logs: {}", e);
+            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+                http::StatusCode::OK.into(),
+                vec![stream_status],
+            ))); // just return
         }
     };
-    if local_trigger.is_some() {
-        trigger = local_trigger;
-    }
-
-    // get distinct_value item
-    distinct_values.extend(to_add_distinct_values);
-
-    // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
-    write_file(&writer, stream_name, buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
-
-    // only one trigger per request, as it updates etcd
-    evaluate_trigger(trigger).await;
-
-    // send distinct_values
-    if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
-    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -262,6 +201,13 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
+
+    // drop variables
+    drop(runtime);
+    drop(stream_schema_map);
+    drop(stream_vrl_map);
+    drop(stream_params);
+    drop(stream_alerts_map);
 
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),

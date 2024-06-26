@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{BufRead, BufReader},
 };
 
@@ -24,23 +24,19 @@ use chrono::{Duration, Utc};
 use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    DISTINCT_FIELDS,
+    utils::{flatten, json},
 };
 use infra::schema::SchemaCache;
 
+use super::ingest::handle_timestamp;
 use crate::{
     common::meta::{
         alerts::Alert,
         ingestion::{IngestionResponse, StreamStatus},
-        stream::{SchemaRecords, StreamParams},
+        stream::StreamParams,
     },
     service::{
-        get_formatted_stream_name,
-        ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
-        logs::StreamMeta,
-        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::get_upto_discard_error,
+        get_formatted_stream_name, ingestion::check_ingestion_allowed,
         usage::report_request_usage_stats,
     },
 };
@@ -69,24 +65,19 @@ async fn ingest_inner(
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let cfg = config::get_config();
 
+    // check stream
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
-
     check_ingestion_allowed(org_id, Some(stream_name))?;
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
 
+    let cfg = config::get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: Option<TriggerAlertData> = None;
-
     // Start Register Transforms for stream
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
@@ -94,28 +85,30 @@ async fn ingest_inner(
     );
     // End Register Transforms for stream
 
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
+    let stream_param = StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_name: stream_name.to_owned().into(),
+        stream_type: StreamType::Logs,
+    };
 
     // Start get stream alerts
-    crate::service::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    crate::service::ingestion::get_stream_alerts(&[stream_param.clone()], &mut stream_alerts_map)
+        .await;
     // End get stream alert
 
-    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
+    crate::service::ingestion::get_user_defined_schema(
+        &[stream_param],
+        &mut user_defined_schema_map,
+    )
+    .await;
+    // End get user defined schema
+
+    let mut stream_status = StreamStatus::new(stream_name);
+    let mut json_data = Vec::new(); // TODO(taiming): get size and use capacity
+
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
         let line = line?;
@@ -131,8 +124,8 @@ async fn ingest_inner(
 
         // JSON Flattening
         value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
-        // Start row based transform
 
+        // Start row based transform
         if !local_trans.is_empty() {
             value = crate::service::ingestion::apply_stream_functions(
                 &local_trans,
@@ -156,94 +149,54 @@ async fn ingest_inner(
             _ => unreachable!(),
         };
 
+        if let Some(fields) = user_defined_schema_map.get(stream_name) {
+            local_val = crate::service::logs::refactor_map(local_val, fields);
+        }
+
         // handle timestamp
-        let timestamp = match local_val.get(&cfg.common.column_timestamp) {
-            Some(v) => match parse_timestamp_micro_from_value(v) {
-                Ok(t) => t,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    continue;
-                }
-            },
-            None => Utc::now().timestamp_micros(),
-        };
-        // check ingestion time
-        if timestamp < min_ts {
-            stream_status.status.failed += 1; // to old data, just discard
-            stream_status.status.error = get_upto_discard_error().to_string();
-            continue;
-        }
-        local_val.insert(
-            cfg.common.column_timestamp.clone(),
-            json::Value::Number(timestamp.into()),
-        );
-
-        let mut to_add_distinct_values = vec![];
-        // get distinct_value item
-        for field in DISTINCT_FIELDS.iter() {
-            if let Some(val) = local_val.get(field) {
-                if !val.is_null() {
-                    to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                        stream_type: StreamType::Logs,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.as_str().unwrap().to_string(),
-                        filter_name: "".to_string(),
-                        filter_value: "".to_string(),
-                    }));
-                }
-            }
-        }
-
-        // write data
-        let local_trigger = match super::add_valid_record(
-            &StreamMeta {
-                org_id: org_id.to_string(),
-                stream_name: stream_name.to_string(),
-                partition_keys: &partition_keys,
-                partition_time_level: &partition_time_level,
-                stream_alerts_map: &stream_alerts_map,
-            },
-            &mut stream_schema_map,
-            &mut stream_status.status,
-            &mut buf,
-            local_val,
-            trigger.is_none(),
-        )
-        .await
-        {
-            Ok(v) => v,
+        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+            Ok(ts) => ts,
             Err(e) => {
                 stream_status.status.failed += 1;
                 stream_status.status.error = e.to_string();
                 continue;
             }
         };
-        if local_trigger.is_some() {
-            trigger = local_trigger;
+
+        json_data.push((timestamp, local_val));
+    }
+
+    // QUESTION(taiming): return directly when no data?
+    // if no data, fast return
+    if json_data.is_empty() {
+        return Ok(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ));
+    }
+
+    let mut req_stats = match super::write_logs(
+        &super::StreamMeta {
+            org_id: org_id.to_string(),
+            stream_name: stream_name.to_string(),
+            stream_alerts_map: &stream_alerts_map,
+        },
+        &mut stream_schema_map,
+        &mut stream_status.status,
+        json_data,
+    )
+    .await
+    {
+        Ok(rs) => rs,
+        Err(e) => {
+            log::error!("Error while writing logs: {}", e);
+            // QUESTION(taiming): return directly when error?
+            return Ok(IngestionResponse::new(
+                http::StatusCode::OK.into(),
+                vec![stream_status],
+            ));
         }
-
-        // add distinct values
-        distinct_values.extend(to_add_distinct_values);
-    }
-
-    // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
-    let mut req_stats = write_file(&writer, stream_name, buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
-
-    // only one trigger per request, as it updates etcd
-    evaluate_trigger(trigger).await;
-
-    // send distinct_values
-    if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
-    }
+    };
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     // metric + data usage
@@ -276,6 +229,13 @@ async fn ingest_inner(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
+
+    // drop variables
+    drop(runtime);
+    drop(stream_schema_map);
+    drop(stream_vrl_map);
+    drop(stream_params);
+    drop(stream_alerts_map);
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

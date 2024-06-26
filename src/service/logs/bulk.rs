@@ -34,7 +34,7 @@ use config::{
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
-use super::{add_record, cast_to_schema_v1, StreamMeta};
+use super::{add_record, cast_to_schema_v1};
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -374,18 +374,7 @@ pub async fn ingest(
 
             // this is for schema inference at stream level , which avoids locks in case schema
             // changes are frequent within request
-            if let Err(e) = add_record(
-                &StreamMeta {
-                    org_id: org_id.to_string(),
-                    stream_name: stream_name.clone(),
-                    partition_keys: &partition_keys,
-                    partition_time_level: &partition_time_level,
-                    stream_alerts_map: &stream_alerts_map,
-                },
-                buf,
-                local_val,
-            )
-            .await
+            if let Err(e) = add_record(&partition_keys, &partition_time_level, buf, local_val).await
             {
                 bulk_res.errors = true;
                 add_record_status(

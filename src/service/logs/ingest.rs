@@ -83,6 +83,7 @@ pub async fn ingest(
     );
     // End Register Transforms for stream
 
+    // QUESTION(taiming): why do we need another [StreamParams] here?
     let stream_param = StreamParams {
         org_id: org_id.to_owned().into(),
         stream_name: stream_name.to_owned().into(),
@@ -122,7 +123,7 @@ pub async fn ingest(
     };
 
     let mut stream_status = StreamStatus::new(stream_name);
-    let mut json_data = Vec::new(); // REFACTORME(taiming): get size and use capacity
+    let mut json_data = Vec::new(); // TODO(taiming): get size and use capacity
     for ret in data.iter() {
         let item = match ret {
             Ok(item) => item,
@@ -132,6 +133,7 @@ pub async fn ingest(
             }
         };
 
+        // Start row based transform
         let mut res = match apply_functions(
             item,
             &local_trans,
@@ -152,11 +154,13 @@ pub async fn ingest(
             json::Value::Object(val) => val,
             _ => unreachable!(),
         };
+        // end row based transform
 
         if let Some(fields) = user_defined_schema_map.get(stream_name) {
             local_val = crate::service::logs::refactor_map(local_val, fields);
         }
 
+        // handle timestamp
         let timestamp = match handle_timestamp(&mut local_val, min_ts) {
             Ok(ts) => ts,
             Err(e) => {
@@ -169,7 +173,8 @@ pub async fn ingest(
         json_data.push((timestamp, local_val));
     }
 
-    let mut stream_status = StreamStatus::new(stream_name);
+    // QUESTION(taiming): return directly when no data?
+    // if no data, fast return
     if json_data.is_empty() {
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
@@ -178,10 +183,12 @@ pub async fn ingest(
     }
 
     let mut req_stats = match super::write_logs(
-        org_id,
-        stream_name,
+        &super::StreamMeta {
+            org_id: org_id.to_string(),
+            stream_name: stream_name.to_string(),
+            stream_alerts_map: &stream_alerts_map,
+        },
         &mut stream_schema_map,
-        &mut stream_alerts_map,
         &mut stream_status.status,
         json_data,
     )
@@ -190,6 +197,7 @@ pub async fn ingest(
         Ok(rs) => rs,
         Err(e) => {
             log::error!("Error while writing logs: {}", e);
+            // QUESTION(taiming): return directly when error?
             return Ok(IngestionResponse::new(
                 http::StatusCode::OK.into(),
                 vec![stream_status],

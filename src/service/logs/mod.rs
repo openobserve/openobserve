@@ -284,123 +284,6 @@ pub fn cast_to_schema_v1(
     }
 }
 
-async fn add_valid_record(
-    stream_meta: &StreamMeta<'_>,
-    stream_schema_map: &mut HashMap<String, SchemaCache>,
-    status: &mut RecordStatus,
-    write_buf: &mut HashMap<String, SchemaRecords>,
-    mut record_val: Map<String, Value>,
-    need_trigger: bool,
-) -> Result<Option<TriggerAlertData>> {
-    let cfg = get_config();
-    let mut trigger: TriggerAlertData = Vec::new();
-    let timestamp: i64 = record_val
-        .get(&cfg.common.column_timestamp)
-        .unwrap()
-        .as_i64()
-        .unwrap();
-
-    // check schema
-    let schema_evolution = check_for_schema(
-        &stream_meta.org_id,
-        &stream_meta.stream_name,
-        StreamType::Logs,
-        stream_schema_map,
-        vec![&record_val],
-        timestamp,
-    )
-    .await?;
-
-    // get schema
-    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
-    let schema_key = rec_schema.hash_key();
-
-    // get hour key
-    let hour_key = get_wal_time_key(
-        timestamp,
-        stream_meta.partition_keys,
-        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
-        &record_val,
-        Some(schema_key),
-    );
-
-    if !schema_evolution.schema_compatible {
-        status.failed += 1;
-        return Ok(None);
-    }
-
-    let valid_record = match schema_evolution.types_delta {
-        None => true,
-        Some(delta) => {
-            let ret_val =
-                if !cfg.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
-                    cast_to_type(&mut record_val, delta)
-                } else {
-                    let local_delta = delta
-                        .into_iter()
-                        .filter(|x| x.metadata().contains_key("zo_cast"))
-                        .collect::<Vec<_>>();
-                    if !local_delta.is_empty() {
-                        cast_to_type(&mut record_val, local_delta)
-                    } else {
-                        Ok(())
-                    }
-                };
-            match ret_val {
-                Ok(_) => true,
-                Err(e) => {
-                    status.failed += 1;
-                    status.error = e.to_string();
-                    false
-                }
-            }
-        }
-    };
-    if !valid_record {
-        return Ok(None);
-    }
-
-    if need_trigger && !stream_meta.stream_alerts_map.is_empty() {
-        // Start check for alert trigger
-        let key = format!(
-            "{}/{}/{}",
-            &stream_meta.org_id,
-            StreamType::Logs,
-            &stream_meta.stream_name
-        );
-        if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
-            for alert in alerts {
-                if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
-                    trigger.push((alert.clone(), v));
-                }
-            }
-        }
-        // End check for alert trigger
-    }
-
-    let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-        let schema = Arc::new(rec_schema.schema().clone().with_metadata(HashMap::new()));
-        let schema_key = schema.hash_key();
-        SchemaRecords {
-            schema_key,
-            schema,
-            records: vec![],
-            records_size: 0,
-        }
-    });
-    let record_val = Value::Object(record_val);
-    let record_size = estimate_json_bytes(&record_val);
-    hour_buf.records.push(Arc::new(record_val));
-    hour_buf.records_size += record_size;
-    status.successful += 1;
-
-    if trigger.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(trigger))
-    }
-}
-
 fn set_parsing_error(parse_error: &mut String, field: &Field) {
     parse_error.push_str(&format!(
         "Failed to cast {} to type {} ",
@@ -410,7 +293,8 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
 }
 
 async fn add_record(
-    stream_meta: &StreamMeta<'_>,
+    partition_keys: &Vec<StreamPartition>,
+    partition_time_level: &Option<PartitionTimeLevel>,
     write_buf: &mut HashMap<String, SchemaRecords>,
     record_val: Map<String, Value>,
 ) -> Result<()> {
@@ -423,8 +307,8 @@ async fn add_record(
     // get hour key
     let hour_key = get_wal_time_key(
         timestamp,
-        stream_meta.partition_keys,
-        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
+        partition_keys,
+        unwrap_partition_time_level(*partition_time_level, StreamType::Logs),
         &record_val,
         None,
     );
@@ -445,10 +329,8 @@ async fn add_record(
 }
 
 async fn write_logs(
-    org_id: &str,
-    stream_name: &str,
+    stream_meta: &StreamMeta<'_>,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
-    stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
     status: &mut RecordStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
 ) -> Result<RequestStats> {
@@ -457,8 +339,8 @@ async fn write_logs(
     // start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
     let schema_evolution = check_for_schema(
-        org_id,
-        stream_name,
+        &stream_meta.org_id,
+        &stream_meta.stream_name,
         StreamType::Logs,
         stream_schema_map,
         json_data.iter().map(|(_, v)| v).collect(),
@@ -468,7 +350,7 @@ async fn write_logs(
 
     // get schema
     let rec_schema = stream_schema_map
-        .get(stream_name)
+        .get(&stream_meta.stream_name)
         .unwrap()
         .schema()
         .clone()
@@ -486,9 +368,9 @@ async fn write_logs(
     let mut trigger: Option<TriggerAlertData> = None;
 
     let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
+        &stream_meta.org_id,
         &StreamType::Logs,
-        stream_name,
+        &stream_meta.stream_name,
     )
     .await;
     let partition_keys = partition_det.partition_keys;
@@ -537,9 +419,14 @@ async fn write_logs(
         }
 
         // start check for alert trigger
-        if trigger.is_none() && !stream_alerts_map.is_empty() {
-            let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-            if let Some(alerts) = stream_alerts_map.get(&key) {
+        if trigger.is_none() && !stream_meta.stream_alerts_map.is_empty() {
+            let key = format!(
+                "{}/{}/{}",
+                &stream_meta.org_id,
+                StreamType::Logs,
+                &stream_meta.stream_name
+            );
+            if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                 let mut trigger_alerts: TriggerAlertData = Vec::new();
                 for alert in alerts {
                     if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
@@ -557,7 +444,7 @@ async fn write_logs(
             if let Some(val) = record_val.get(field) {
                 to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
                     stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
+                    stream_name: stream_meta.stream_name.to_string(),
                     field_name: field.to_string(),
                     field_value: val.as_str().unwrap().to_string(),
                     filter_name: "".to_string(),
@@ -592,15 +479,26 @@ async fn write_logs(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
-    let req_stats = write_file(&writer, stream_name, write_buf).await;
+    let writer = ingester::get_writer(
+        &stream_meta.org_id,
+        &StreamType::Logs.to_string(),
+        &stream_meta.stream_name,
+    )
+    .await;
+    let req_stats = write_file(&writer, &stream_meta.stream_name, write_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
+        if let Err(e) = write(
+            &stream_meta.org_id,
+            MetadataType::DistinctValues,
+            distinct_values,
+        )
+        .await
+        {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
@@ -614,8 +512,6 @@ async fn write_logs(
 struct StreamMeta<'a> {
     org_id: String,
     stream_name: String,
-    partition_keys: &'a Vec<StreamPartition>,
-    partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
