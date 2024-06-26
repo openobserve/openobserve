@@ -79,6 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="item"
                 >
                   <q-btn
+                    :disable="
+                      relativeDatesInHour[period.value][item_index] >
+                        queryRangeRestrictionInHour &&
+                      queryRangeRestrictionInHour > 0
+                    "
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     :class="
                       selectedType == 'relative' &&
@@ -93,12 +98,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     @click="setRelativeDate(period.value, item)"
                     :key="'period_' + item_index"
-                  />
+                  >
+                    <q-tooltip
+                      style="z-index: 10001; font-size: 14px"
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                      v-if="
+                        relativeDatesInHour[period.value][item_index] >
+                          queryRangeRestrictionInHour &&
+                        queryRangeRestrictionInHour > 0
+                      "
+                    >
+                      {{ queryRangeRestrictionMsg }}
+                    </q-tooltip>
+                  </q-btn>
                 </div>
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
                 <div class="relative-period-name">Custom</div>
+                <q-tooltip
+                  style="z-index: 10001; font-size: 14px"
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  v-if="queryRangeRestrictionInHour > 0"
+                >
+                  {{ queryRangeRestrictionMsg }}
+                </q-tooltip>
 
                 <div class="row q-gutter-sm">
                   <div class="col">
@@ -109,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       min="1"
                       @update:model-value="onCustomPeriodSelect"
+                      :disable="queryRangeRestrictionInHour > 0"
                     />
                   </div>
                   <div class="col">
@@ -120,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       emit-value
                       @update:modelValue="onCustomPeriodSelect"
                       popup-content-style="z-index: 10002"
+                      :disable="queryRangeRestrictionInHour > 0"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel }}</div>
@@ -132,6 +162,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tab-panel>
           <q-tab-panel name="absolute" class="q-pa-none">
             <div class="date-time-table">
+              <q-tooltip
+                anchor="center right"
+                self="center left"
+                max-width="300px"
+                v-if="queryRangeRestrictionInHour > 0"
+              >
+                <span style="font-size: 14px">
+                  {{ queryRangeRestrictionMsg }}</span
+                ></q-tooltip
+              >
               <div class="flex justify-center q-pa-none">
                 <q-date
                   size="sm"
@@ -285,6 +325,7 @@ import {
 import { date, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { utcToZonedTime } from "date-fns-tz";
 
 export default defineComponent({
@@ -308,6 +349,14 @@ export default defineComponent({
     initialTimezone: {
       required: false,
       default: null,
+    },
+    queryRangeRestrictionMsg: {
+      type: String,
+      default: "",
+    },
+    queryRangeRestrictionInHour: {
+      type: Number,
+      default: 0,
     },
   },
 
@@ -336,6 +385,7 @@ export default defineComponent({
     });
     const browserTime =
       "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const router = useRouter();
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
@@ -383,6 +433,14 @@ export default defineComponent({
       d: [1, 2, 3, 4, 5, 6],
       w: [1, 2, 3, 4, 5, 6],
       M: [1, 2, 3, 4, 5, 6],
+    };
+
+    const relativeDatesInHour = {
+      m: [1, 1, 1, 1, 1, 1],
+      h: [1, 2, 3, 6, 8, 12],
+      d: [24, 48, 72, 96, 120, 144],
+      w: [168, 336, 504, 672, 840, 1008],
+      M: [744, 1488, 2232, 2976, 3720, 4464],
     };
 
     const datetimeBtn = ref(null);
@@ -441,6 +499,23 @@ export default defineComponent({
           selectedType.value === "absolute" &&
           store.state.savedViewFlag == false
         ) {
+          saveDate("absolute");
+        }
+      },
+      { deep: true }
+    );
+
+    watch(
+      () => {
+        router.currentRoute.value.query?.from;
+      },
+      () => {
+        if(router.currentRoute.value.query.hasOwnProperty("from") && router.currentRoute.value.query.hasOwnProperty("to")) {
+          selectedType.value = "absolute";
+          selectedTime.value.startTime = timestampToTimezoneDate(router.currentRoute.value.query?.from/1000, store.state.timezone, "HH:mm");
+          selectedTime.value.endTime = timestampToTimezoneDate(router.currentRoute.value.query?.to/1000, store.state.timezone, "HH:mm");
+          selectedDate.value.from = timestampToTimezoneDate(router.currentRoute.value.query?.from/1000, store.state.timezone, "yyyy/MM/dd");
+          selectedDate.value.to = timestampToTimezoneDate(router.currentRoute.value.query?.to/1000, store.state.timezone, "yyyy/MM/dd");
           saveDate("absolute");
         }
       },
@@ -799,6 +874,8 @@ export default defineComponent({
       optionsFn,
       setDateType,
       getConsumableDateTime,
+      relativeDatesInHour,
+      setAbsoluteTime,
     };
   },
 });

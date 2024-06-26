@@ -251,6 +251,8 @@ pub async fn handle_grpc_request(
     in_stream_name: Option<&str>,
     user_email: &str,
 ) -> Result<HttpResponse> {
+    let started_at = Utc::now().timestamp_micros();
+
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -393,7 +395,11 @@ pub async fn handle_grpc_request(
                 }
 
                 rec[cfg.common.column_timestamp.clone()] = ts.into();
-                rec["severity"] = log_record.severity_text.to_owned().into();
+                rec["severity"] = if !log_record.severity_text.is_empty() {
+                    log_record.severity_text.to_owned().into()
+                } else {
+                    log_record.severity_number.into()
+                };
                 // rec["name"] = log_record.name.to_owned().into();
                 rec["body"] = get_val(&log_record.body.as_ref());
                 for item in &log_record.attributes {
@@ -553,6 +559,7 @@ pub async fn handle_grpc_request(
         StreamType::Logs,
         UsageType::Json,
         0,
+        started_at,
     )
     .await;
     let res = ExportLogsServiceResponse {

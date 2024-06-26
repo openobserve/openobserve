@@ -94,6 +94,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-btn>
+        <q-btn
+          v-if="maxQueryRange.length > 0"
+          :icon="outlinedWarning"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-max-duration-warning"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            <div style="white-space: pre-wrap">
+              {{ maxQueryRange.join("\n\n") }}
+            </div>
+          </q-tooltip>
+        </q-btn>
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           dense
@@ -178,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :forceLoad="props.forceLoad"
       :searchType="searchType"
       @metadata-update="metaDataValue"
+      @result-metadata-update="handleResultMetadataUpdate"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
       @update:initial-variable-values="
         (...args) => $emit('update:initial-variable-values', ...args)
@@ -218,6 +234,7 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
+import { getFunctionErrorMessage } from "@/utils/zincutils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -263,6 +280,29 @@ export default defineComponent({
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
+
+    const maxQueryRange: any = ref([]);
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      const combinedWarnings: any[] = [];
+      metadata.forEach((query: any) => {
+        if (
+          query.function_error &&
+          query.new_start_time &&
+          query.new_end_time
+        ) {
+          const combinedMessage = getFunctionErrorMessage(
+            query.function_error,
+            query.new_start_time,
+            query.new_end_time,
+            store.state.timezone
+          );
+          combinedWarnings.push(combinedMessage);
+        }
+      });
+      maxQueryRange.value = combinedWarnings;
+    };
+
     const showText = ref(false);
 
     // need PanleSchemaRendererRef for table download as a csv
@@ -374,6 +414,8 @@ export default defineComponent({
       outlinedWarning,
       store,
       metaDataValue,
+      handleResultMetadataUpdate,
+      maxQueryRange,
       metaData,
       showViewPanel,
       dependentAdHocVariable,
@@ -412,5 +454,9 @@ export default defineComponent({
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.warning {
+  color: var(--q-warning);
 }
 </style>

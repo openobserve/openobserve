@@ -48,6 +48,7 @@ use crate::{
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
+    let started_at = chrono::Utc::now().timestamp_micros();
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
@@ -311,6 +312,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             StreamType::Metrics,
             UsageType::JsonMetrics,
             0,
+            started_at,
         )
         .await;
     }

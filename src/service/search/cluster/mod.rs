@@ -281,51 +281,15 @@ pub async fn search(
     } else {
         dist_lock::lock(&locker_key, req.timeout as u64).await?
     };
+
     // check global concurrency
     #[cfg(feature = "enterprise")]
-    loop {
-        if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
-            dist_lock::unlock(&locker).await?;
-            return Err(Error::Message(format!(
-                "[trace_id {trace_id}] search: timeout in queue"
-            )));
-        }
-        match work_group.as_ref().unwrap().need_wait(None).await {
-            Ok(true) => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
-            Ok(false) => {
-                break;
-            }
-            Err(e) => {
-                dist_lock::unlock(&locker).await?;
-                return Err(Error::Message(e.to_string()));
-            }
-        }
-    }
+    work_group_checking(trace_id, start, &req, &work_group, &locker, None).await?;
+
     // check user concurrency
     #[cfg(feature = "enterprise")]
     if user_id.is_some() {
-        loop {
-            if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
-                dist_lock::unlock(&locker).await?;
-                return Err(Error::Message(format!(
-                    "[trace_id {trace_id}] search: timeout in queue"
-                )));
-            }
-            match work_group.as_ref().unwrap().need_wait(user_id).await {
-                Ok(true) => {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                }
-                Ok(false) => {
-                    break;
-                }
-                Err(e) => {
-                    dist_lock::unlock(&locker).await?;
-                    return Err(Error::Message(e.to_string()));
-                }
-            }
-        }
+        work_group_checking(trace_id, start, &req, &work_group, &locker, user_id).await?;
     }
 
     // 3. process the search in the work group
@@ -340,7 +304,15 @@ pub async fn search(
         return Err(Error::Message(e.to_string()));
     }
     #[cfg(feature = "enterprise")]
-    dist_lock::unlock(&locker).await?;
+    if let Err(e) = dist_lock::unlock(&locker).await {
+        work_group
+            .as_ref()
+            .unwrap()
+            .done(trace_id, user_id)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        return Err(e);
+    }
     // done in the queue
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
     log::info!(
@@ -620,6 +592,17 @@ pub async fn search(
     }
     if succeed == 0 || results.iter().map(|(_, v)| v.total).sum::<i64>() == 0 {
         if let Some(err) = last_error {
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
             return Err(err);
         }
     }
@@ -659,6 +642,79 @@ pub async fn search(
     }
 
     Ok((merge_batches, scan_stats, took_wait, is_partial))
+}
+
+#[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "work_group:checking", skip_all, fields(user_id = user_id))]
+async fn work_group_checking(
+    trace_id: &str,
+    start: std::time::Instant,
+    req: &cluster_rpc::SearchRequest,
+    work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
+    locker: &Option<dist_lock::Locker>,
+    user_id: Option<&str>,
+) -> Result<()> {
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    if super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
+        ))));
+    }
+    tokio::select! {
+        res = work_group_need_wait(trace_id, start, req, work_group, locker, user_id) => {
+            match res {
+                Ok(_) => {
+                    return Ok(());
+                },
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+        _ = async {
+            let _ = abort_receiver.await;
+        } => {
+            log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "work_group:need_wait", skip_all, fields(user_id = user_id))]
+async fn work_group_need_wait(
+    trace_id: &str,
+    start: std::time::Instant,
+    req: &cluster_rpc::SearchRequest,
+    work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
+    locker: &Option<dist_lock::Locker>,
+    user_id: Option<&str>,
+) -> Result<()> {
+    loop {
+        if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
+            dist_lock::unlock(locker).await?;
+            return Err(Error::Message(format!(
+                "[trace_id {trace_id}] search: request timeout in queue"
+            )));
+        }
+        match work_group.as_ref().unwrap().need_wait(user_id).await {
+            Ok(true) => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+            Ok(false) => {
+                return Ok(());
+            }
+            Err(e) => {
+                dist_lock::unlock(locker).await?;
+                return Err(Error::Message(e.to_string()));
+            }
+        }
+    }
 }
 
 async fn merge_grpc_result(

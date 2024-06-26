@@ -62,6 +62,7 @@ pub async fn remote_write(
     body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
@@ -432,6 +433,7 @@ pub async fn remote_write(
             StreamType::Metrics,
             UsageType::Metrics,
             fns_length as u16,
+            started_at,
         )
         .await;
     }

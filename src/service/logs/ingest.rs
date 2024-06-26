@@ -59,6 +59,7 @@ pub async fn ingest(
     user_email: &str,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     // check stream
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
@@ -276,6 +277,7 @@ pub async fn ingest(
         StreamType::Logs,
         UsageType::Json,
         local_trans.len() as u16,
+        started_at,
     )
     .await;
 

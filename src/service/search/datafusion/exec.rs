@@ -653,12 +653,29 @@ fn merge_write_recordbatch(batches: &[RecordBatch], work_dir: &Directory) -> Res
             continue;
         }
         i += 1;
-        let row_schema = row.schema();
-        schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
+
+        // strip prefix "tbl." for field name
+        let mut fields = vec![];
+        for field in row.schema().fields() {
+            if field.name().starts_with("tbl.") {
+                let new_field = Field::new(
+                    field.name().strip_prefix("tbl.").unwrap(),
+                    field.data_type().clone(),
+                    field.is_nullable(),
+                );
+                fields.push(Arc::new(new_field));
+            } else {
+                fields.push(field.clone());
+            }
+        }
+        let batch_schema = Arc::new(Schema::new(fields));
+        let batch = RecordBatch::try_new(batch_schema.clone(), row.columns().to_vec())?;
+
+        schema = Schema::try_merge(vec![schema, batch_schema.as_ref().clone()])?;
         let file_name = format!("{}{i}.parquet", work_dir.name());
         let mut buf_parquet = Vec::new();
-        let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
-        writer.write(row)?;
+        let mut writer = ArrowWriter::try_new(&mut buf_parquet, batch_schema, None)?;
+        writer.write(&batch)?;
         writer.close()?;
         work_dir
             .set(&file_name, buf_parquet.into())

@@ -206,6 +206,11 @@ pub async fn list() -> Result<Vec<(String, FileMeta)>> {
 }
 
 #[inline]
+#[tracing::instrument(
+    name = "infra:file_list:query_db",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
 pub async fn query(
     org_id: &str,
     stream_type: StreamType,

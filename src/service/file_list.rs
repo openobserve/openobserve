@@ -44,6 +44,11 @@ use crate::{
     service::{db, search::MetadataMap},
 };
 
+#[tracing::instrument(
+    name = "service::file_list::query",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
 pub async fn query(
     org_id: &str,
     stream_name: &str,
@@ -270,6 +275,11 @@ pub async fn query(
 }
 
 #[inline]
+#[tracing::instrument(
+    name = "service:file_list:query_inner",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
 async fn query_inner(
     org_id: &str,
     stream_name: &str,

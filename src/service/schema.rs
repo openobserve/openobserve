@@ -317,8 +317,8 @@ pub fn generate_schema_for_defined_schema_fields(
     if !fields.contains(&cfg.common.column_timestamp) {
         fields.insert(&cfg.common.column_timestamp);
     }
-    if !fields.contains(&cfg.common.all_fields_name) {
-        fields.insert(&cfg.common.all_fields_name);
+    if !fields.contains(&cfg.common.column_all) {
+        fields.insert(&cfg.common.column_all);
     }
     let mut new_fields = Vec::with_capacity(fields.len());
     for field in fields {

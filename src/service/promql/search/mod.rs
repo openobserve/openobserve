@@ -70,6 +70,7 @@ async fn search_in_cluster(
     user_email: &str,
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
+    let started_at = chrono::Utc::now().timestamp_micros();
 
     // get querier nodes from cluster
     let mut nodes = cluster::get_cached_online_querier_nodes().await.unwrap();
@@ -298,6 +299,7 @@ async fn search_in_cluster(
         StreamType::Metrics,
         UsageType::MetricSearch,
         0,
+        started_at,
     )
     .await;
     Ok(values)

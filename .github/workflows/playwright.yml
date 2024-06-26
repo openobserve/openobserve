@@ -23,7 +23,7 @@ env:
   ZO_QUICK_MODE_STRATEGY : first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
   ZO_INGEST_ALLOWED_UPTO: 5
-
+  ZO_FEATURE_QUERY_EXCLUDE_ALL: false
 
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js"]
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
        
     steps:
       - name: Remove unused tools
