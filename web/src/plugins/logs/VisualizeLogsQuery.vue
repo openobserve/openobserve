@@ -55,7 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
                 </div>
                 <div class="col" style="width: 100%">
-                  <FieldList :editMode="true" />
+                  <FieldList
+                    :editMode="true"
+                    @update:stream-list="streamListUpdated"
+                  />
                 </div>
               </div>
             </div>
@@ -223,7 +226,7 @@ export default defineComponent({
     CustomHTMLEditor,
     CustomMarkdownEditor,
   },
-  emits: ["handleChartApiError"],
+  emits: ["handleChartApiError", "update:streamList"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -327,6 +330,10 @@ export default defineComponent({
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    const streamListUpdated = () => {
+      emit("update:streamList");
+    };
+
     return {
       t,
       layoutSplitterUpdated,
@@ -339,6 +346,7 @@ export default defineComponent({
       metaDataValue,
       metaData,
       chartData,
+      streamListUpdated,
     };
   },
 });
