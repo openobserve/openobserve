@@ -838,15 +838,50 @@ export default defineComponent({
       }
     };
 
+    function buildSqlQuery(tableName, fields, whereClause) {
+      let query = "SELECT ";
+
+      // If the fields array is empty, use *, otherwise join the fields with commas
+      if (fields.length === 0) {
+        query += "*";
+      } else {
+        query += fields.join(", ");
+      }
+
+      // Add the table name
+      query += ` FROM "${tableName}"`;
+
+      // If the whereClause is not empty, add it
+      if (whereClause.trim() !== "") {
+        query += " WHERE " + whereClause;
+      }
+
+      // Return the constructed query
+      return query;
+    }
+
     const setFieldsAndConditions = async () => {
       // set fields and conditions for first time only
       if (dashboardPanelData.data.queries[0].query) {
         return;
       }
 
+      let logsQuery = searchObj.data.query ?? "";
+
+      // if sql mode is off, then need to make query
+      if (searchObj.meta.sqlMode == false) {
+        logsQuery = buildSqlQuery(
+          searchObj.data.stream.selectedStream[0],
+          searchObj.meta.quickMode
+            ? searchObj.data.stream.interestingFieldList
+            : [],
+          logsQuery
+        );
+      }
+
       const { fields, conditions, streamName } = await getFieldsFromQuery(
-        searchObj.data.query ?? "",
-        store.state.zoConfig.timestamp_column ?? "_timestamp1"
+        logsQuery ?? "",
+        store.state.zoConfig.timestamp_column ?? "_timestamp"
       );
 
       // set stream type and stream name
