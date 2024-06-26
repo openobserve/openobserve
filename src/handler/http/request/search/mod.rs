@@ -268,7 +268,7 @@ pub async fn search(
 
     let mut c_resp: CachedQueryResponse = if use_cache && cfg.common.result_cache_enabled {
         check_cache(
-            &mut rpc_req,
+            &rpc_req,
             &mut req,
             &mut origin_sql,
             &parsed_sql,
