@@ -858,8 +858,6 @@ export default defineComponent({
 
       // set fields
       fields.forEach((field) => {
-        console.log(field);
-
         field.alias = field.alias ?? field.column;
         field.label = generateLabelFromName(field.column);
 
@@ -874,13 +872,10 @@ export default defineComponent({
         }
       });
 
-      console.log(JSON.parse(JSON.stringify(conditions)));
-
       // set conditions
       conditions.forEach((condition) => {
         condition.operator = condition.operator.toLowerCase();
 
-        console.log(JSON.stringify(condition));
         switch (condition.operator) {
           case "in": {
             condition.type = "list";
