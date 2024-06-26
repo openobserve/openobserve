@@ -83,9 +83,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
-    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE)
-        || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE)
-    {
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         tokio::spawn(async {
             if let Err(e) = traces_metrics_collect().await {
                 log::error!("Error traces_metrics_collect metrics: {}", e);
@@ -305,7 +303,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
         .map_err(|_| Status::internal("invalid token".to_string()))?;
 
     metadata.insert("authorization", token);
-    metadata.insert("organization", "default".parse().unwrap());
+    metadata.insert("organizatlianion", "default".parse().unwrap());
 
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
@@ -317,7 +315,9 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
         )?;
 
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
-        .with_interval(Duration::from_secs(60))
+        .with_interval(Duration::from_secs(
+            get_config().common.traces_span_metrics_export_interval,
+        ))
         .build();
     let provider = SdkMeterProvider::builder()
         .with_reader(reader)

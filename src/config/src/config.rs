@@ -700,6 +700,12 @@ pub struct Common {
         help = "enable span metrics for traces"
     )]
     pub traces_span_metrics_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_EXPORT_INTERVAL",
+        default = 60,
+        help = "traces span metrics export interval, unit seconds"
+    )]
+    pub traces_span_metrics_export_interval: u64,
 }
 
 #[derive(EnvConfig)]
