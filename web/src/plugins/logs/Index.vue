@@ -410,6 +410,9 @@ export default defineComponent({
     const expandedLogs = ref({});
     const splitterModel = ref(10);
 
+    // flag to know if it is the first time visualize
+    let firstTimeVisualizeFlag = false;
+
     watch(
       () => splitterModel.value,
       (val) => {
@@ -885,7 +888,10 @@ export default defineComponent({
       );
 
       // set stream type and stream name
-      if (streamName) {
+      if (streamName && streamName != "undefined") {
+        // set firstTimeVisualizeFlag as true
+        firstTimeVisualizeFlag = true;
+
         dashboardPanelData.data.queries[0].fields.stream_type =
           searchObj.data.stream.streamType ?? "logs";
         dashboardPanelData.data.queries[0].fields.stream = streamName;
@@ -1042,7 +1048,6 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
-    let firstTimeVisualizeFlag = true;
     const streamListUpdated = () => {
       if (
         searchObj.meta.logsVisualizeToggle == "visualize" &&
