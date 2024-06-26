@@ -358,12 +358,6 @@ async fn write_logs(
     let rec_schema = Arc::new(rec_schema);
     let schema_key = rec_schema.hash_key();
 
-    // QUESTION(taiming): check schema by request -> not compatible -> entire request failed?
-    if !schema_evolution.schema_compatible {
-        status.failed += json_data.len() as u32;
-        return Err(anyhow::anyhow!("Schema not compatible"));
-    }
-
     let mut distinct_values = Vec::with_capacity(16);
     let mut trigger: Option<TriggerAlertData> = None;
 
