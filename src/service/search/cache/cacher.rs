@@ -100,6 +100,9 @@ pub async fn check_cache(
         );
         req.query.sql = origin_sql.clone();
     };
+    if req.query.size >= 0 {
+        *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
+    }
     let query_key = file_path.replace('/', "_");
 
     let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
