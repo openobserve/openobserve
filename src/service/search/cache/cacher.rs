@@ -18,7 +18,7 @@ use crate::{
 
 #[allow(clippy::too_many_arguments)]
 pub async fn check_cache(
-    rpc_req: &mut proto::cluster_rpc::SearchRequest,
+    rpc_req: &proto::cluster_rpc::SearchRequest,
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
     parsed_sql: &config::meta::sql::Sql,
@@ -70,6 +70,20 @@ pub async fn check_cache(
     if let Some(interval) = meta.histogram_interval {
         *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
 
+        let mut req_time_range = (req.query.start_time, req.query.end_time);
+        if req_time_range.1 == 0 {
+            req_time_range.1 = chrono::Utc::now().timestamp_micros();
+        }
+
+        let meta_time_range_is_empty =
+            parsed_sql.time_range.is_none() || parsed_sql.time_range == Some((0, 0));
+        let q_time_range =
+            if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
+                Some(req_time_range)
+            } else {
+                parsed_sql.time_range
+            };
+
         let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
         let attrs = caps
             .get(1)
@@ -81,10 +95,10 @@ pub async fn check_cache(
 
         let interval = match attrs.get(1) {
             Some(v) => match v.parse::<u16>() {
-                Ok(v) => generate_histogram_interval(parsed_sql.time_range, v),
+                Ok(v) => generate_histogram_interval(q_time_range, v),
                 Err(_) => v.to_string(),
             },
-            None => generate_histogram_interval(parsed_sql.time_range, 0),
+            None => generate_histogram_interval(q_time_range, 0),
         };
         *origin_sql = origin_sql.replace(
             caps.get(0).unwrap().as_str(),
