@@ -322,7 +322,7 @@ function extractConditions(parsedAst: any) {
 function extractTableName(parsedAst: any) {
   console.log(parsedAst);
 
-  return parsedAst.from[0].table;
+  return parsedAst.from[0].table ?? null;
 }
 
 export const getFieldsFromQuery = async (
@@ -334,11 +334,9 @@ export const getFieldsFromQuery = async (
 
     const ast: any = parser.astify(query);
 
-    const streamName = extractTableName(ast);
+    const streamName = extractTableName(ast) ?? null;
     const fields = extractFields(ast, timeField);
     const conditions = extractConditions(ast);
-
-    console.log("after", streamName);
 
     // filter fields and conditions
     const filteredFields = fields.filter((field: any) => field.column);
