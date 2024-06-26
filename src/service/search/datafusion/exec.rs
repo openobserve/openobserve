@@ -674,6 +674,11 @@ fn merge_rewrite_sql(
     is_final_phase: bool,
     is_subquery: bool,
 ) -> Result<String> {
+    if is_subquery && !is_final_phase {
+        let sql = rewrite::add_group_by_order_by_field_to_select(&sql)?;
+        return Ok(sql.to_string());
+    }
+
     // special case for count distinct
     if RE_COUNT_DISTINCT.is_match(sql) {
         let sql = rewrite::rewrite_count_distinct_merge_sql(sql)?;
@@ -787,9 +792,7 @@ fn merge_rewrite_sql(
     // handle select *
     let mut fields = new_fields;
     if fields.len() == 1 && sel_fields_has_star {
-        if !is_subquery || is_final_phase {
-            sql = rewrite::remove_where_clause(&sql)?;
-        }
+        sql = rewrite::remove_where_clause(&sql)?;
         return Ok(sql);
     }
     if sel_fields_has_star {
@@ -901,9 +904,7 @@ fn merge_rewrite_sql(
         }
     }
 
-    if !is_subquery || is_final_phase {
-        sql = rewrite::remove_where_clause(&sql)?;
-    }
+    sql = rewrite::remove_where_clause(&sql)?;
     Ok(sql)
 }
 
