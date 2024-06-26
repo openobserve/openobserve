@@ -277,6 +277,8 @@ export const getFieldsFromQuery = async (query: any) => {
             condition.value = node.right.value.map(
               (item: any) => item.value || item.column
             );
+          } else if (node.right.type === "null") {
+            condition.operator += " NULL";
           }
 
           conditions.push(condition);
