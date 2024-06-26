@@ -303,7 +303,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
         .map_err(|_| Status::internal("invalid token".to_string()))?;
 
     metadata.insert("authorization", token);
-    metadata.insert("organizatlianion", "default".parse().unwrap());
+    metadata.insert("organization", "default".parse().unwrap());
 
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
@@ -339,6 +339,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
 
 async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
     let mut receiver = TRACE_METRICS_CHAN.1.write().await;
+
     while let Some(item) = receiver.recv().await {
         // Record measurements using the histogram instrument.
         TRACE_METRICS_SPAN_HISTOGRAM.record(
