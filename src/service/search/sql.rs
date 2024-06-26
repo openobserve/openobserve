@@ -665,6 +665,12 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
+        // suppport for subquery in from clause
+        if meta.subquery.is_some() {
+            let re = Regex::new(r"(from\s+)\(.*?\)").unwrap();
+            origin_sql = re.replace(origin_sql.as_str(), "${1}tbl").to_string();
+        }
+
         Ok(Sql {
             origin_sql,
             rewrite_sql,
