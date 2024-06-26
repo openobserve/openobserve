@@ -58,7 +58,7 @@ pub async fn delete(
             if file.1 {
                 Some(format!(
                     "files{}/{}",
-                    config::get_config().common.all_fields_name,
+                    config::get_config().common.column_all,
                     file.0.strip_prefix("files/").unwrap()
                 ))
             } else {

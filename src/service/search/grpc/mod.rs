@@ -430,8 +430,8 @@ fn generate_select_start_search_schema(
         if !fields.contains(&cfg.common.column_timestamp) {
             fields.insert(cfg.common.column_timestamp.to_string());
         }
-        if !fields.contains(&cfg.common.all_fields_name) {
-            fields.insert(cfg.common.all_fields_name.to_string());
+        if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
+            fields.insert(cfg.common.column_all.to_string());
         }
         let new_fields = fields
             .iter()

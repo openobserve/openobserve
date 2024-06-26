@@ -24,7 +24,7 @@ pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
 pub const HASH_LABEL: &str = "__hash__";
 pub const VALUE_LABEL: &str = "value";
-pub const LE_LABEL: &str = "le";
+pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 

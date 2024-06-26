@@ -505,20 +505,18 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
             // If cookie was set but access token is still empty
             // we check auth_ext cookie to get the token.
             auth_ext_cookie(req)
-        } else {
-            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
-                access_token
-            } else if access_token.starts_with("session") {
-                let session_key = access_token.strip_prefix("session ").unwrap().to_string();
-                match USER_SESSIONS.get(&session_key) {
-                    Some(token) => {
-                        format!("Bearer {}", *token)
-                    }
-                    None => access_token,
+        } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+            access_token
+        } else if access_token.starts_with("session") {
+            let session_key = access_token.strip_prefix("session ").unwrap().to_string();
+            match USER_SESSIONS.get(&session_key) {
+                Some(token) => {
+                    format!("Bearer {}", *token)
                 }
-            } else {
-                format!("Bearer {}", access_token)
+                None => access_token,
             }
+        } else {
+            format!("Bearer {}", access_token)
         }
     } else if let Some(cookie) = req.cookie("auth_ext") {
         cookie.value().to_string()

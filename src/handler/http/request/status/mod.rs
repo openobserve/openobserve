@@ -267,7 +267,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         meta_org: cfg.common.usage_org.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
-        all_fields_name: cfg.common.all_fields_name.to_string(),
+        all_fields_name: cfg.common.column_all.to_string(),
     }))
 }
 

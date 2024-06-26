@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::{
@@ -125,8 +125,9 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let org_id = org_id.into_inner();
-
+    let mut range_error = String::new();
     let cfg = get_config();
     let mut http_span = None;
     let trace_id = if cfg.common.tracing_enabled {
@@ -178,6 +179,25 @@ pub async fn search(
             );
         }
     };
+
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let stream_schema = r.get(format!("{}/{}/{}", org_id, stream_type, stream_name).as_str());
+    if let Some(det) = stream_schema {
+        let local_schema = det.schema();
+        if let Some(settings) = infra::schema::unwrap_stream_settings(local_schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
+                    > max_query_range
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "Query duration is modified due to query range restriction of {} hours",
+                    max_query_range
+                );
+            }
+        }
+    }
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
@@ -243,7 +263,7 @@ pub async fn search(
     let took_wait = start.elapsed().as_millis() as usize;
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
-    log::info!("http search API wait in queue took: {} ms", took_wait);
+    log::info!("http search API wait in local queue took: {} ms", took_wait);
 
     let search_fut = SearchService::search(
         &trace_id,
@@ -282,6 +302,16 @@ pub async fn search(
                 .inc();
             res.set_trace_id(trace_id.clone());
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+            if !range_error.is_empty() {
+                res.is_partial = true;
+                res.function_error = if res.function_error.is_empty() {
+                    range_error
+                } else {
+                    format!("{} \n {}", range_error, res.function_error)
+                };
+                res.new_start_time = Some(req.query.start_time);
+                res.new_end_time = Some(req.query.end_time);
+            }
 
             let req_stats = RequestStats {
                 records: res.hits.len() as i64,
@@ -304,6 +334,7 @@ pub async fn search(
                 StreamType::Logs,
                 UsageType::Search,
                 num_fn,
+                started_at,
             )
             .await;
             Ok(HttpResponse::Ok().json(res))
@@ -400,6 +431,7 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
     let (org_id, stream_name) = path.into_inner();
     let cfg = get_config();
     let mut http_span = None;
@@ -723,6 +755,7 @@ pub async fn around(
         StreamType::Logs,
         UsageType::SearchAround,
         num_fn,
+        started_at,
     )
     .await;
 
@@ -885,6 +918,7 @@ async fn values_v1(
     http_span: Option<Span>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -1157,6 +1191,7 @@ async fn values_v1(
         StreamType::Logs,
         UsageType::SearchTopNValues,
         num_fn,
+        started_at,
     )
     .await;
 
@@ -1177,6 +1212,7 @@ async fn values_v2(
     http_span: Option<Span>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
 
     let mut query_sql = format!(
         "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
@@ -1384,6 +1420,7 @@ async fn values_v2(
         StreamType::Logs,
         UsageType::SearchTopNValues,
         num_fn,
+        started_at,
     )
     .await;
 

@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::{
-    common::meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},
+    common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
     service::promql::value::{
         signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
     },
@@ -67,14 +67,15 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         // histograms. Each float sample must have a label `le` where the label
         // value denotes the inclusive upper bound of the bucket. *Float samples
         // without such a label are silently ignored.*
-        let upper_bound: f64 = match labels.get_value(LE_LABEL).parse() {
+        let upper_bound: f64 = match labels.get_value(BUCKET_LABEL).parse() {
             Ok(u) => u,
             Err(_) => continue,
         };
 
-        let sig = signature_without_labels(&labels, &[HASH_LABEL, NAME_LABEL, LE_LABEL]);
+        let sig = signature_without_labels(&labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
         let entry = metrics_with_buckets.entry(sig).or_insert_with(|| {
-            labels.retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != LE_LABEL);
+            labels
+                .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
             MetricWithBuckets {
                 labels,
                 buckets: Vec::new(),

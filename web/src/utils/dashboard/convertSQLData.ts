@@ -1697,12 +1697,12 @@ export const convertSQLData = async (
   }
 
   //check if is there any data else filter out axis or series data
-  // for metric we does not have data field
-  if (panelSchema.type != "metric") {
+  // for metric, gauge we does not have data field
+  if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
     if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
       options.xAxis = options.series.length ? options.xAxis : {};
-    } else {
+    } else if (!["pie", "donut"].includes(panelSchema.type)) {
       options.yAxis = options.series.length ? options.yAxis : {};
     }
   }

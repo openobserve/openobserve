@@ -60,6 +60,7 @@ pub struct TriggerData {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UsageData {
+    pub _timestamp: i64,
     pub event: UsageEvent,
     pub year: i32,
     pub month: u32,

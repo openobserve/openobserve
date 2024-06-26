@@ -110,10 +110,9 @@ impl Partition {
             let (bloom_filter_fields, full_text_search_fields) =
                 if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
                     let bloom_filter_fields =
-                        infra::schema::get_stream_setting_bloom_filter_fields(self.schema.as_ref())
-                            .unwrap();
+                        infra::schema::get_stream_setting_bloom_filter_fields(self.schema.as_ref());
                     let full_text_search_fields =
-                        infra::schema::get_stream_setting_fts_fields(self.schema.as_ref()).unwrap();
+                        infra::schema::get_stream_setting_fts_fields(self.schema.as_ref());
                     (bloom_filter_fields, full_text_search_fields)
                 } else {
                     (vec![], vec![])
