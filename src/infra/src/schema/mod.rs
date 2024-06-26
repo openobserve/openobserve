@@ -20,7 +20,7 @@ use config::{
     get_config,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    RwAHashMap,
+    RwAHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::{StreamExt, TryStreamExt};
@@ -266,17 +266,31 @@ pub fn unwrap_partition_time_level(
     }
 }
 
-pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>> {
+pub fn get_stream_setting_fts_fields(schema: &Schema) -> Vec<String> {
+    let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
     match unwrap_stream_settings(schema) {
-        Some(setting) => Ok(setting.full_text_search_keys),
-        None => Ok(vec![]),
+        Some(setting) => {
+            let mut fields = setting.full_text_search_keys;
+            fields.extend(default_fields);
+            fields.sort();
+            fields.dedup();
+            fields
+        }
+        None => default_fields,
     }
 }
 
-pub fn get_stream_setting_bloom_filter_fields(schema: &Schema) -> Result<Vec<String>> {
+pub fn get_stream_setting_bloom_filter_fields(schema: &Schema) -> Vec<String> {
+    let default_fields = BLOOM_FILTER_DEFAULT_FIELDS.clone();
     match unwrap_stream_settings(schema) {
-        Some(setting) => Ok(setting.bloom_filter_fields),
-        None => Ok(vec![]),
+        Some(setting) => {
+            let mut fields = setting.bloom_filter_fields;
+            fields.extend(default_fields);
+            fields.sort();
+            fields.dedup();
+            fields
+        }
+        None => default_fields,
     }
 }
 
@@ -737,6 +751,6 @@ mod tests {
     fn test_get_stream_setting_fts_fields() {
         let sch = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
         let res = get_stream_setting_fts_fields(&sch);
-        assert!(res.is_ok());
+        assert!(!res.is_empty());
     }
 }

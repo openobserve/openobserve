@@ -25,7 +25,7 @@ use config::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamType},
     },
-    QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    QUICK_MODEL_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -389,15 +389,7 @@ impl Sql {
 
         // fetch fts fields
         let mut fts_terms = HashSet::new();
-        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
-        let match_all_fields = if !fts_fields.is_empty() {
-            fts_fields.iter().map(|v| v.to_lowercase()).collect()
-        } else {
-            SQL_FULL_TEXT_SEARCH_FIELDS
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<String>>()
-        };
+        let fts_fields = get_stream_setting_fts_fields(&schema);
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
@@ -415,7 +407,7 @@ impl Sql {
             } else {
                 None
             };
-            let fields = generate_quick_mode_fields(&schema, cached_fields, &match_all_fields);
+            let fields = generate_quick_mode_fields(&schema, cached_fields, &fts_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -462,7 +454,7 @@ impl Sql {
 
         // use full text search instead if inverted index feature is not enabled but it's an
         // inverted index search
-        let rerouted = if !cfg.common.inverted_index_enabled & fulltext.is_empty() {
+        let ignore_case = if !cfg.common.inverted_index_enabled && fulltext.is_empty() {
             fulltext = std::mem::take(&mut indexed_text);
             true
         } else {
@@ -473,17 +465,15 @@ impl Sql {
         for item in indexed_text.iter() {
             let mut indexed_search = Vec::new();
             for field in &schema_fields {
-                if !match_all_fields.contains(&field.name().to_lowercase()) {
+                if !fts_fields.contains(&field.name().to_lowercase()) {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
                 indexed_search.push(format!("\"{}\" LIKE '%{}%'", field.name(), item.1));
-
                 // add full text field to meta fields
                 meta.fields.push(field.name().to_string());
-
                 fts_terms.insert(item.1.clone());
             }
             if indexed_search.is_empty() {
@@ -496,14 +486,14 @@ impl Sql {
         for item in fulltext.iter() {
             let mut fulltext_search = Vec::new();
             for field in &schema_fields {
-                if !match_all_fields.contains(&field.name().to_lowercase()) {
+                if !fts_fields.contains(&field.name().to_lowercase()) {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
                 let mut func = "LIKE";
-                if rerouted || item.0.to_lowercase().contains("_ignore_case") {
+                if ignore_case || item.0.to_lowercase().contains("_ignore_case") {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
@@ -515,44 +505,6 @@ impl Sql {
             }
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
-        }
-
-        // Hack: str_match
-        for key in [
-            "match",
-            "match_ignore_case",
-            // "str_match"             // use UDF will get better result
-            // "str_match_ignore_case" // use UDF will get better result
-        ] {
-            let re_str_match = Regex::new(&format!(r"(?i)\b{key}\b\(([^\)]*)\)")).unwrap();
-            let re_fn = if key == "match" || key == "str_match" {
-                "LIKE"
-            } else {
-                "ILIKE"
-            };
-            for token in &where_tokens {
-                if !token.to_lowercase().starts_with("match")
-                    && !token.to_lowercase().starts_with("str_match")
-                {
-                    continue;
-                }
-                for cap in re_str_match.captures_iter(token.as_str()) {
-                    let attrs = cap
-                        .get(1)
-                        .unwrap()
-                        .as_str()
-                        .splitn(2, ',')
-                        .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-                        .collect::<Vec<&str>>();
-                    let field = attrs.first().unwrap();
-                    let value = attrs.last().unwrap();
-                    origin_sql = origin_sql.replace(
-                        cap.get(0).unwrap().as_str(),
-                        &format!("\"{field}\" {re_fn} '%{value}%'"),
-                    );
-                    fts_terms.insert(value.to_string());
-                }
-            }
         }
 
         // Hack for histogram

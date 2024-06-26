@@ -646,12 +646,29 @@ fn merge_write_recordbatch(batches: &[RecordBatch], work_dir: &Directory) -> Res
             continue;
         }
         i += 1;
-        let row_schema = row.schema();
-        schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
+
+        // strip prefix "tbl." for field name
+        let mut fields = vec![];
+        for field in row.schema().fields() {
+            if field.name().starts_with("tbl.") {
+                let new_field = Field::new(
+                    field.name().strip_prefix("tbl.").unwrap(),
+                    field.data_type().clone(),
+                    field.is_nullable(),
+                );
+                fields.push(Arc::new(new_field));
+            } else {
+                fields.push(field.clone());
+            }
+        }
+        let batch_schema = Arc::new(Schema::new(fields));
+        let batch = RecordBatch::try_new(batch_schema.clone(), row.columns().to_vec())?;
+
+        schema = Schema::try_merge(vec![schema, batch_schema.as_ref().clone()])?;
         let file_name = format!("{}{i}.parquet", work_dir.name());
         let mut buf_parquet = Vec::new();
-        let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
-        writer.write(row)?;
+        let mut writer = ArrowWriter::try_new(&mut buf_parquet, batch_schema, None)?;
+        writer.write(&batch)?;
         writer.close()?;
         work_dir
             .set(&file_name, buf_parquet.into())
@@ -1071,8 +1088,10 @@ pub async fn merge_parquet_files(
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
+    let cfg = get_config();
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
+        .with_target_partitions(cfg.limit.query_thread_num)
         .with_information_schema(true);
     config = config.set_bool(
         "datafusion.execution.listing_table_ignore_subdirectory",
@@ -1082,7 +1101,6 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
     }
-    let cfg = get_config();
     if cfg.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", true);
     }
@@ -1219,14 +1237,12 @@ pub async fn register_table(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
                 .with_collect_stat(true)
         }
         _ => {

@@ -10,7 +10,7 @@ const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText("Login as internal user").click();
+  //  await page.getByText("Login as internal user").click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -864,8 +864,9 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="index-dropdown-stream"]')
       .fill("e2e_tabledashboard");
-    await page.getByRole("option", { name: "e2e_tabledashboard" }).click();
-    await page.waitForTimeout(5000);
+      await page.waitForTimeout(4000);
+    await page.getByRole("option", { name: "e2e_tabledashboard" }).click({force: true});
+    await page.waitForTimeout(6000);
 
     await page
       .locator(

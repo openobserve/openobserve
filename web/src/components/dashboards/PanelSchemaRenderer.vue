@@ -220,6 +220,7 @@ export default defineComponent({
     "updated:data-zoom",
     "error",
     "metadata-update",
+    "result-metadata-update",
     "update:initialVariableValues",
   ],
   setup(props, { emit }) {
@@ -242,14 +243,15 @@ export default defineComponent({
       searchType,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } = usePanelDataLoader(
-      panelSchema,
-      selectedTimeObj,
-      variablesData,
-      chartPanelRef,
-      forceLoad,
-      searchType,
-    );
+    let { data, loading, errorDetail, metadata, resultMetaData } =
+      usePanelDataLoader(
+        panelSchema,
+        selectedTimeObj,
+        variablesData,
+        chartPanelRef,
+        forceLoad,
+        searchType
+      );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -324,6 +326,10 @@ export default defineComponent({
       emit("metadata-update", metadata.value);
     });
 
+    watch(resultMetaData, () => {
+      emit("result-metadata-update", resultMetaData.value);
+    });
+
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
         (it: any) => it.alias
@@ -344,7 +350,10 @@ export default defineComponent({
         case "h-stacked":
         case "line":
         case "scatter":
-        case "table": {
+        case "gauge":
+        case "table":
+        case "pie":
+        case "donut": {
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
             data.value[0]?.length > 1 ||
@@ -352,7 +361,6 @@ export default defineComponent({
               yAlias.every((y: any) => data.value[0][0][y]) != null)
           );
         }
-        case "gauge":
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
@@ -368,13 +376,6 @@ export default defineComponent({
             (xAlias.every((x: any) => data.value[0][0][x] != null) &&
               yAlias.every((y: any) => data.value[0][0][y] != null) &&
               zAlias.every((z: any) => data.value[0][0][z]) != null)
-          );
-        }
-        case "pie":
-        case "donut": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => data.value[0][0][y] != null)
           );
         }
         case "sankey": {

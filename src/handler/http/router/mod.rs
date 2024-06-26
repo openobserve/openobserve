@@ -384,6 +384,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(prom::format_query_post)
             .service(enrichment_table::save_enrichment_table)
             .service(search::search)
+            .service(search::job::cancel_multiple_query)
             .service(search::job::cancel_query)
             .service(search::job::query_status)
             .service(search::search_partition)

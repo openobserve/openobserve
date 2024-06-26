@@ -188,7 +188,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let full_text_search_fields = stream_setting.full_text_search_keys;
     let new_file = format!(
         "files{}/{}",
-        get_config().common.all_fields_name,
+        get_config().common.column_all,
         file.key.strip_prefix("files/").unwrap()
     );
     let new_schema = new_batches.first().unwrap().schema();
@@ -227,7 +227,7 @@ fn generate_vertical_partition_recordbatch(
     if records_len == 0 {
         return Ok(Vec::new());
     }
-    let Ok(all_field_idx) = schema.index_of(&get_config().common.all_fields_name) else {
+    let Ok(all_field_idx) = schema.index_of(&get_config().common.column_all) else {
         return Ok(vec![batches]);
     };
 
