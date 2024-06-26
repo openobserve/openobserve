@@ -60,7 +60,8 @@ static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwra
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
-static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
+pub static RE_HISTOGRAM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
@@ -849,7 +850,7 @@ pub(crate) fn generate_quick_mode_fields(
     fields
 }
 
-fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
