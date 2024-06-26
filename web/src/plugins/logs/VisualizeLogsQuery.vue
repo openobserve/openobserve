@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
                 </div>
                 <div class="col" style="width: 100%">
-                  <FieldList :editMode="false" />
+                  <FieldList :editMode="true" />
                 </div>
               </div>
             </div>
