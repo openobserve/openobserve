@@ -257,12 +257,6 @@ pub async fn search(
         org_id, stream_type, stream_name, hashed_query
     );
 
-    let file_name = format!(
-        "{}_{}_{}.json",
-        req.query.start_time,
-        req.query.end_time,
-        if is_aggregate { 1 } else { 0 }
-    );
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
@@ -493,6 +487,23 @@ pub async fn search(
         && c_resp.cache_query_response
         && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
     {
+        let last_rec_ts = get_ts_value(&c_resp.ts_column, res.hits.last().unwrap());
+        let file_name = if last_rec_ts > 0 && last_rec_ts < req.query.end_time {
+            format!(
+                "{}_{}_{}.json",
+                req.query.start_time,
+                last_rec_ts,
+                if is_aggregate { 1 } else { 0 }
+            )
+        } else {
+            format!(
+                "{}_{}_{}.json",
+                req.query.start_time,
+                req.query.end_time,
+                if is_aggregate { 1 } else { 0 }
+            )
+        };
+
         let res_cache = json::to_string(&res).unwrap();
         tokio::spawn(async move {
             let query_key = file_path.replace('/', "_");
