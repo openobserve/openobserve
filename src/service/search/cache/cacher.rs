@@ -210,10 +210,7 @@ pub async fn get_cached_results(
                                                 && hit_ts < delta.delta_end_time)
                                                 && (hit_ts <= end_time && hit_ts >= start_time)
                                             {
-                                                println!("hit is {:?}", hit);
                                                 to_retain.push(hit.clone());
-                                            } else {
-                                                println!("Not considered hit is {:?}", hit);
                                             }
                                         }
                                         None => return None,
