@@ -44,7 +44,7 @@ pub struct Sql {
     pub time_range: Option<(i64, i64)>,
     pub quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
     pub field_alias: Vec<(String, String)>,             // alias for select field
-    pub subquery: Option<Query>,                        // subquery in data source
+    pub subquery: Option<String>,                       // subquery in data source
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -163,6 +163,12 @@ impl TryFrom<&Statement> for Sql {
                 fields.extend(where_fields);
                 fields.sort();
                 fields.dedup();
+
+                let subquery = if let Some(subquery) = subquery {
+                    Some(subquery.to_string())
+                } else {
+                    None
+                };
 
                 Ok(Sql {
                     fields,

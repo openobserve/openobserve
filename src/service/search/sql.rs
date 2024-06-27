@@ -39,7 +39,10 @@ use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{common::meta::stream::StreamParams, service::search::match_source};
+use crate::{
+    common::meta::stream::StreamParams,
+    service::search::{self, match_source},
+};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -230,8 +233,44 @@ impl Sql {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
         }
         origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
+        // replace table for subquery
+        if meta.subquery.is_some() {
+            meta.subquery = Some(
+                re.replace_all(&meta.subquery.clone().unwrap(), " FROM tbl ")
+                    .to_string(),
+            );
+        }
 
-        // Hack select for _timestamp
+        // remove subquery in from clause
+        if meta.subquery.is_some() {
+            origin_sql =
+                search::datafusion::rewrite::replace_data_source_to_tbl(origin_sql.as_str())?;
+        }
+
+        if meta.subquery.is_some() {
+            // Hack select in subquery for _timestamp, add _timestamp to select clause
+            let re = Regex::new(r"(?i)\b(avg|count|min|max|sum|group_concat)\b").unwrap();
+            let has_aggregate_function = re.is_match(meta.subquery.as_ref().unwrap());
+            if !has_aggregate_function && !RE_ONLY_GROUPBY.is_match(meta.subquery.as_ref().unwrap())
+            {
+                let caps = RE_SELECT_FROM
+                    .captures(meta.subquery.as_ref().unwrap())
+                    .unwrap();
+                let cap_str = caps.get(1).unwrap().as_str();
+                if !cap_str.contains(&cfg.common.column_timestamp) {
+                    meta.subquery = Some(meta.subquery.as_ref().unwrap().replace(
+                        cap_str,
+                        &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                    ));
+                }
+            } else {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Subquery sql current not support aggregate function".to_string(),
+                )));
+            }
+        }
+
+        // Hack select for _timestamp, add _timestamp to select clause
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
@@ -272,11 +311,17 @@ impl Sql {
             )));
         }
 
-        // Hack time_range for sql
+        // Hack time_range for sql, add time range to where clause
         let meta_time_range_is_empty = meta.time_range.is_none() || meta.time_range == Some((0, 0));
         if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
             meta.time_range = Some(req_time_range); // update meta
         };
+
+        let mut rewrite_time_range_sql = origin_sql.clone();
+        if meta.subquery.is_some() {
+            rewrite_time_range_sql = meta.subquery.clone().unwrap();
+        }
+
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -294,7 +339,7 @@ impl Sql {
                 "".to_string()
             };
             if !time_range_sql.is_empty() && meta_time_range_is_empty {
-                match RE_WHERE.captures(origin_sql.as_str()) {
+                match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
                         if !meta.group_by.is_empty() {
@@ -318,22 +363,28 @@ impl Sql {
                                 [0..where_str.to_lowercase().rfind(" offset ").unwrap()]
                                 .to_string();
                         }
-                        let pos_start = origin_sql.find(where_str.as_str()).unwrap();
+                        let pos_start = rewrite_time_range_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
-                        origin_sql = format!(
+                        rewrite_time_range_sql = format!(
                             "{}{} AND ({}){}",
-                            &origin_sql[0..pos_start],
+                            &rewrite_time_range_sql[0..pos_start],
                             time_range_sql,
                             where_str,
-                            &origin_sql[pos_end..]
+                            &rewrite_time_range_sql[pos_end..]
                         );
                     }
                     None => {
-                        origin_sql = origin_sql
+                        rewrite_time_range_sql = rewrite_time_range_sql
                             .replace(" FROM tbl", &format!(" FROM tbl WHERE {time_range_sql}"));
                     }
                 };
             }
+        }
+
+        if meta.subquery.is_some() {
+            meta.subquery = Some(rewrite_time_range_sql);
+        } else {
+            origin_sql = rewrite_time_range_sql;
         }
 
         // Hack offset limit and sort by for sql
@@ -664,12 +715,6 @@ impl Sql {
         } else {
             Some(req_query.query_fn.clone())
         };
-
-        // suppport for subquery in from clause
-        if meta.subquery.is_some() {
-            let re = Regex::new(r"(from\s+)\(.*?\)").unwrap();
-            origin_sql = re.replace(origin_sql.as_str(), "${1}tbl").to_string();
-        }
 
         Ok(Sql {
             origin_sql,
