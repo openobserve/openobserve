@@ -488,19 +488,25 @@ pub async fn search(
         && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
     {
         let last_rec_ts = get_ts_value(&c_resp.ts_column, res.hits.last().unwrap());
-        let file_name = if last_rec_ts > 0 && last_rec_ts < req.query.end_time {
-            format!(
-                "{}_{}_{}.json",
-                req.query.start_time,
+        let (file_name, cache_end_time) = if last_rec_ts > 0 && last_rec_ts < req.query.end_time {
+            (
+                format!(
+                    "{}_{}_{}.json",
+                    req.query.start_time,
+                    last_rec_ts,
+                    if is_aggregate { 1 } else { 0 }
+                ),
                 last_rec_ts,
-                if is_aggregate { 1 } else { 0 }
             )
         } else {
-            format!(
-                "{}_{}_{}.json",
-                req.query.start_time,
+            (
+                format!(
+                    "{}_{}_{}.json",
+                    req.query.start_time,
+                    req.query.end_time,
+                    if is_aggregate { 1 } else { 0 }
+                ),
                 req.query.end_time,
-                if is_aggregate { 1 } else { 0 }
             )
         };
 
@@ -519,7 +525,7 @@ pub async fn search(
                         .or_insert_with(Vec::new)
                         .push(ResultCacheMeta {
                             start_time: req.query.start_time,
-                            end_time: req.query.end_time,
+                            end_time: cache_end_time,
                             is_aggregate,
                         });
                     drop(w);
