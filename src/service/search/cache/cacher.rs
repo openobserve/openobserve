@@ -154,7 +154,6 @@ pub async fn get_cached_results(
     file_path: &str,
     result_ts_column: &str,
 ) -> Option<CachedQueryResponse> {
-    let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
     let is_cached = r.get(&query_key).cloned();
@@ -164,15 +163,9 @@ pub async fn get_cached_results(
         match cache_metas
             .iter()
             .filter(|cache_meta| {
-                // to make sure there is overlap between cache time range and query time range &
-                // cache can at least serve query_cache_min_contribution
+                // to make sure there is overlap between cache time range and query time range
 
-                let cached_duration = cache_meta.end_time - cache_meta.start_time;
-                let query_duration = end_time - start_time;
-
-                cached_duration > query_duration / cfg.limit.query_cache_min_contribution
-                    && cache_meta.start_time <= end_time
-                    && cache_meta.end_time >= start_time
+                cache_meta.start_time <= end_time && cache_meta.end_time >= start_time
             })
             .max_by_key(|result| result.end_time.min(end_time) - result.start_time.max(start_time))
         {
@@ -217,7 +210,10 @@ pub async fn get_cached_results(
                                                 && hit_ts < delta.delta_end_time)
                                                 && (hit_ts <= end_time && hit_ts >= start_time)
                                             {
+                                                println!("hit is {:?}", hit);
                                                 to_retain.push(hit.clone());
+                                            } else {
+                                                println!("Not considered hit is {:?}", hit);
                                             }
                                         }
                                         None => return None,
