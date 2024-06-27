@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div>
+  <div style="height: 100%; width: 100%">
     <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
+    <div class="row" style="height: 100%">
       <div
         class="col scroll"
         style="
@@ -46,15 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div
-              class="col scroll"
-              style="height: calc(100vh - 115px); overflow-y: auto"
-            >
+            <div class="col scroll" style="height: 100%; overflow-y: auto">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
                 </div>
-                <div class="col" style="width: 100%">
+                <div class="col" style="width: 100%; height: 100%">
                   <FieldList
                     :editMode="true"
                     @update:stream-list="streamListUpdated"
@@ -74,10 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div
-              class="row"
-              style="height: calc(100vh - 115px); overflow-y: auto"
-            >
+            <div class="row" style="height: 100%">
               <div class="col" style="height: 100%">
                 <q-splitter
                   class="query-editor-splitter"

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden"
+            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
             v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-splitter>
           </div>
-          <div else>
+          <div else :style="`height: calc(100vh - ${splitterModel}vh);`">
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
@@ -1303,7 +1303,7 @@ $navbarHeight: 64px;
     width: 100%;
   }
 
-  .q-field__control-container {
+  .logsPageMainSection > .q-field__control-container {
     padding-top: 0px !important;
   }
 
