@@ -441,6 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.user_defined_schemas_enabled &&
               dashboardPanelData.meta.stream.userDefinedSchema.length > 0
             "
+            class="fieldList-pagination"
           >
             <q-btn-toggle
               no-caps
@@ -1366,5 +1367,10 @@ export default defineComponent({
 
 .q-table__bottom .q-table__control {
   min-height: 80px !important;
+}
+
+.fieldList-pagination {
+  // min-height: 80px;
+  display: flex;
 }
 </style>
