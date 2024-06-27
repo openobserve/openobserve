@@ -332,18 +332,19 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
 }
 
 fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<String> {
-    let mut result_ts_col = None;
-
     for (original, alias) in &parsed_sql.field_alias {
-        if TS_WITH_ALIAS.is_match(original) {
-            if alias == ts_col {
-                result_ts_col = Some(ts_col.to_string());
-            }
-            if original.contains("histogram") {
-                result_ts_col = Some(alias.clone());
-            }
+        if TS_WITH_ALIAS.is_match(original) && alias == ts_col {
+            return Some(ts_col.to_string());
+        }
+        if original.contains("histogram") {
+            return Some(alias.clone());
         }
     }
+    if parsed_sql.fields.contains(&ts_col.to_owned())
+        || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col))
+    {
+        return Some(ts_col.to_string());
+    }
 
-    result_ts_col
+    None
 }
