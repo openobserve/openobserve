@@ -404,7 +404,8 @@ impl Sql {
                             .split(" from ")
                             .next()
                             .unwrap_or_default()
-                            .contains('(')))
+                            .contains('('))
+                        && !origin_sql.to_lowercase().contains("distinct"))
             {
                 let sort_by = if req_query.sort_by.is_empty() {
                     meta.order_by = vec![(cfg.common.column_timestamp.to_string(), true)];
