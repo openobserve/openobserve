@@ -728,18 +728,20 @@ async fn list_objects(
     user_id: &str,
     permission: &str,
     object_type: &str,
+    org_id: &str,
 ) -> Result<Vec<String>, anyhow::Error> {
     o2_enterprise::enterprise::openfga::authorizer::authz::list_objects(
         user_id,
         permission,
         object_type,
+        org_id,
     )
     .await
 }
 
 #[cfg(feature = "enterprise")]
 pub(crate) async fn list_objects_for_user(
-    _org_id: &str,
+    org_id: &str,
     user_id: &str,
     permission: &str,
     object_type: &str,
@@ -748,8 +750,13 @@ pub(crate) async fn list_objects_for_user(
 
     if !is_root_user(user_id) && O2_CONFIG.openfga.enabled && O2_CONFIG.openfga.list_only_permitted
     {
-        match crate::handler::http::auth::validator::list_objects(user_id, permission, object_type)
-            .await
+        match crate::handler::http::auth::validator::list_objects(
+            user_id,
+            permission,
+            object_type,
+            org_id,
+        )
+        .await
         {
             Ok(resp) => Ok(Some(resp)),
             Err(_) => Err(ErrorForbidden("Unauthorized Access")),
