@@ -65,7 +65,8 @@ pub type TraceMetricsChan = (
 );
 
 pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
-    let (tx, rx) = tokio::sync::mpsc::channel(2048);
+    let (tx, rx) =
+        tokio::sync::mpsc::channel(get_config().common.traces_span_metrics_channel_buffer);
     (tx, RwLock::new(rx))
 });
 
