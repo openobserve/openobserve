@@ -393,7 +393,7 @@ impl Sql {
             meta.limit = if req_query.size >= 0 {
                 req_query.size as i64
             } else {
-                cfg.limit.query_default_limit
+                cfg.limit.query_default_limit * std::cmp::max(1, meta.group_by.len())
             };
             origin_sql = if meta.order_by.is_empty()
                 && (!sql_mode.eq(&SqlMode::Full)
