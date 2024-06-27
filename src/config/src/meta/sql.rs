@@ -164,11 +164,7 @@ impl TryFrom<&Statement> for Sql {
                 fields.sort();
                 fields.dedup();
 
-                let subquery = if let Some(subquery) = subquery {
-                    Some(subquery.to_string())
-                } else {
-                    None
-                };
+                let subquery = subquery.map(|subquery| subquery.to_string());
 
                 Ok(Sql {
                     fields,
