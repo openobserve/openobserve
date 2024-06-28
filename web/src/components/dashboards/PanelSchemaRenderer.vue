@@ -609,7 +609,7 @@ export default defineComponent({
           };
         }
 
-        variablesData.value.values.forEach((variable: any) => {
+        variablesData?.value?.values?.forEach((variable: any) => {
           if (variable.type != "dynamic_filters") {
             drilldownVariables[variable.name] = variable.value;
           }
