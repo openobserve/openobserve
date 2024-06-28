@@ -28,12 +28,10 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
 use flate2::read::GzDecoder;
-use infra::schema::SchemaCache;
 use vrl::compiler::runtime::Runtime;
 
 use crate::{
     common::meta::{
-        alerts::Alert,
         functions::{StreamTransform, VRLResultResolver},
         ingestion::{
             AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
@@ -43,8 +41,8 @@ use crate::{
         stream::StreamParams,
     },
     service::{
-        get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        schema::get_upto_discard_error, usage::report_request_usage_stats,
+        format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
+        usage::report_request_usage_stats,
     },
 };
 
@@ -53,23 +51,15 @@ pub async fn ingest(
     in_stream_name: &str,
     in_req: IngestionRequest<'_>,
     user_email: &str,
+    extend_json: Option<&HashMap<String, serde_json::Value>>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    // check stream
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
-    let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
-    check_ingestion_allowed(org_id, Some(stream_name))?;
 
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Ok(IngestionResponse {
-            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
-            status: vec![],
-            error: Some(e.to_string()),
-        });
-    }
+    // check stream
+    let stream_name = format_stream_name(in_stream_name);
+    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    check_ingestion_allowed(org_id, Some(&stream_name))?;
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
@@ -80,42 +70,18 @@ pub async fn ingest(
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
-        stream_name,
+        &stream_name,
     );
     // End Register Transforms for stream
-
-    // QUESTION(taiming): why do we need another [StreamParams] here?
-    let stream_param = StreamParams {
-        org_id: org_id.to_owned().into(),
-        stream_name: stream_name.to_owned().into(),
-        stream_type: StreamType::Logs,
-    };
-
-    // Start get stream alerts
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(&[stream_param.clone()], &mut stream_alerts_map)
-        .await;
-    // End get stream alerts
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
-        &[stream_param],
+        &[stream_params],
         &mut user_defined_schema_map,
     )
     .await;
     // End get user defined schema
-
-    // Start get partition details
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-    // End get partition details
 
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (ep, data) = match in_req {
@@ -134,10 +100,10 @@ pub async fn ingest(
         ),
     };
 
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut json_data = Vec::new(); // TODO(taiming): get size and use capacity
+    let mut stream_status = StreamStatus::new(&stream_name);
+    let mut json_data = Vec::new();
     for ret in data.iter() {
-        let item = match ret {
+        let mut item = match ret {
             Ok(item) => item,
             Err(e) => {
                 log::error!("IngestionError: {:?}", e);
@@ -145,13 +111,19 @@ pub async fn ingest(
             }
         };
 
+        if let Some(extend) = extend_json.as_ref() {
+            for (key, val) in extend.iter() {
+                item[key] = val.clone();
+            }
+        }
+
         // Start row based transform
         let mut res = match apply_functions(
             item,
             &local_trans,
             &stream_vrl_map,
             org_id,
-            stream_name,
+            &stream_name,
             &mut runtime,
         ) {
             Ok(res) => res,
@@ -168,7 +140,7 @@ pub async fn ingest(
         };
         // end row based transform
 
-        if let Some(fields) = user_defined_schema_map.get(stream_name) {
+        if let Some(fields) = user_defined_schema_map.get(&stream_name) {
             local_val = crate::service::logs::refactor_map(local_val, fields);
         }
 
@@ -185,7 +157,6 @@ pub async fn ingest(
         json_data.push((timestamp, local_val));
     }
 
-    // QUESTION(taiming): return directly when no data?
     // if no data, fast return
     if json_data.is_empty() {
         return Ok(IngestionResponse::new(
@@ -195,23 +166,10 @@ pub async fn ingest(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let mut req_stats = match super::write_logs(
-        &super::StreamMeta {
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            partition_keys: &partition_keys,
-            partition_time_level: &partition_time_level,
-            stream_alerts_map: &stream_alerts_map,
-        },
-        &mut stream_schema_map,
-        &mut status,
-        json_data,
-    )
-    .await
+    let mut req_stats = match super::write_logs(org_id, &stream_name, &mut status, json_data).await
     {
         Ok(rs) => rs,
         Err(e) => {
-            // QUESTION(taiming): return directly when error?
             log::error!("Error while writing logs: {}", e);
             stream_status.status = match status {
                 IngestionStatus::Record(status) => status,
@@ -231,7 +189,7 @@ pub async fn ingest(
             ep,
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
@@ -240,18 +198,22 @@ pub async fn ingest(
             ep,
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
     req_stats.response_time = start.elapsed().as_secs_f64();
-    req_stats.user_email = Some(user_email.to_string());
+    req_stats.user_email = if user_email.is_empty() {
+        None
+    } else {
+        Some(user_email.to_string())
+    };
 
     // report data usage
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::Logs,
         UsageType::Json,
         local_trans.len() as u16,
@@ -261,10 +223,8 @@ pub async fn ingest(
 
     // drop variables
     drop(runtime);
-    drop(stream_schema_map);
     drop(stream_vrl_map);
-    drop(stream_params);
-    drop(stream_alerts_map);
+    drop(user_defined_schema_map);
 
     stream_status.status = match status {
         IngestionStatus::Record(status) => status,

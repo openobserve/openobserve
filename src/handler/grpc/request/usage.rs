@@ -17,6 +17,8 @@ use async_trait::async_trait;
 use proto::cluster_rpc::{usage_server::Usage, UsageRequest, UsageResponse};
 use tonic::{Request, Response, Status};
 
+use crate::common::meta::ingestion::IngestionRequest;
+
 #[derive(Debug, Default)]
 pub struct UsageServerImpl;
 
@@ -31,10 +33,12 @@ impl Usage for UsageServerImpl {
         let report_to_stream = req.stream_name;
         let report_to_org_id = metadata.get(&config::get_config().grpc.org_header_key);
         let in_data = req.data.unwrap_or_default();
-        let resp = crate::service::logs::otlp_grpc::usage_ingest(
+        let resp = crate::service::logs::ingest::ingest(
             report_to_org_id.unwrap().to_str().unwrap(),
             &report_to_stream,
-            in_data.data.into(),
+            IngestionRequest::JSON(&in_data.data.into()),
+            "",
+            None,
         )
         .await;
 

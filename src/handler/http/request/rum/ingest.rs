@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{prelude::*, Error},
-};
+use std::io::{prelude::*, Error};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{post, web, HttpResponse};
@@ -25,7 +22,10 @@ use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse, ingestion::IngestionRequest,
+        middleware_data::RumExtraData,
+    },
     service::logs,
 };
 
@@ -113,7 +113,20 @@ pub async fn data(
 ) -> Result<HttpResponse, Error> {
     let org_id: String = path.into_inner();
     let extend_json = &rum_query_data.data;
-    ingest_multi_json(&org_id, RUM_DATA_STREAM, body, extend_json).await
+    Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            RUM_DATA_STREAM,
+            IngestionRequest::Multi(&body),
+            "",
+            Some(extend_json),
+        )
+        .await
+        {
+            Ok(v) => MetaHttpResponse::json(v),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        },
+    )
 }
 
 /// Rum log ingestion API
@@ -141,7 +154,20 @@ pub async fn log(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let extend_json = &rum_query_data.data;
-    ingest_multi_json(&org_id, RUM_LOG_STREAM, body, extend_json).await
+    Ok(
+        match logs::ingest::ingest(
+            &org_id,
+            RUM_LOG_STREAM,
+            IngestionRequest::Multi(&body),
+            "",
+            Some(extend_json),
+        )
+        .await
+        {
+            Ok(v) => MetaHttpResponse::json(v),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        },
+    )
 }
 
 /// Rum session-replay ingestion API
@@ -184,19 +210,18 @@ pub async fn sessionreplay(
         event,
     };
 
-    let extend_json = &rum_query_data.data;
     let body = json::to_vec(&ingestion_payload).unwrap();
-    ingest_multi_json(&org_id, RUM_SESSION_REPLAY_STREAM, body.into(), extend_json).await
-}
-
-async fn ingest_multi_json(
-    org_id: &str,
-    stream_name: &str,
-    body: web::Bytes,
-    extend_json: &HashMap<String, serde_json::Value>,
-) -> Result<HttpResponse, Error> {
+    let extend_json = &rum_query_data.data;
     Ok(
-        match logs::multi::ingest_with_keys(org_id, stream_name, body, extend_json).await {
+        match logs::ingest::ingest(
+            &org_id,
+            RUM_SESSION_REPLAY_STREAM,
+            IngestionRequest::Multi(&body.into()),
+            "",
+            Some(extend_json),
+        )
+        .await
+        {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => MetaHttpResponse::bad_request(e),
         },

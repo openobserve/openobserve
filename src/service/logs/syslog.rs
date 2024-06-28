@@ -13,18 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+};
 
 use actix_web::{http, HttpResponse};
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    get_config,
     meta::stream::StreamType,
     metrics,
     utils::{flatten, json},
 };
-use infra::schema::SchemaCache;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::ingest::handle_timestamp;
@@ -32,14 +34,13 @@ use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
         meta::{
-            alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
             ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             stream::StreamParams,
             syslog::SyslogRoute,
         },
     },
-    service::{db, get_formatted_stream_name},
+    service::{format_stream_name, ingestion::check_ingestion_allowed},
 };
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
@@ -63,29 +64,18 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let org_id = &route.org_id;
 
     // check stream
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
-    let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    let stream_name = format_stream_name(in_stream_name);
+    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
+                e.to_string(),
             )),
         );
-    }
+    };
 
-    // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, stream_name, None) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{stream_name}] is being deleted"),
-            )),
-        );
-    }
-
-    let cfg = config::get_config();
+    let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
@@ -94,35 +84,20 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
-        stream_name,
+        &stream_name,
     );
     // End Register Transforms for stream
 
-    // Start get stream alerts
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
+    crate::service::ingestion::get_user_defined_schema(
+        &[stream_params],
+        &mut user_defined_schema_map,
     )
     .await;
-    // End get stream alert
+    // End get user defined schema
 
-    // Start get partition details
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-    // End get partition details
-
-    let mut stream_status = StreamStatus::new(stream_name);
+    let mut stream_status = StreamStatus::new(&stream_name);
 
     // parse msg to json::Value
     let parsed_msg = syslog_loose::parse_message(msg);
@@ -138,7 +113,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             value,
             &stream_vrl_map,
             org_id,
-            stream_name,
+            &stream_name,
             &mut runtime,
         )?;
     }
@@ -158,6 +133,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         _ => unreachable!(),
     };
 
+    if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+        local_val = crate::service::logs::refactor_map(local_val, fields);
+    }
+
     // handle timestamp
     let timestamp = match handle_timestamp(&mut local_val, min_ts) {
         Ok(ts) => ts,
@@ -173,14 +152,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     let mut status = IngestionStatus::Record(stream_status.status);
     if let Err(e) = super::write_logs(
-        &super::StreamMeta {
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            partition_keys: &partition_keys,
-            partition_time_level: &partition_time_level,
-            stream_alerts_map: &stream_alerts_map,
-        },
-        &mut stream_schema_map,
+        org_id,
+        &stream_name,
         &mut status,
         vec![(timestamp, local_val)],
     )
@@ -203,7 +176,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
@@ -212,17 +185,15 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
 
     // drop variables
     drop(runtime);
-    drop(stream_schema_map);
     drop(stream_vrl_map);
-    drop(stream_params);
-    drop(stream_alerts_map);
+    drop(user_defined_schema_map);
 
     stream_status.status = match status {
         IngestionStatus::Record(status) => status,

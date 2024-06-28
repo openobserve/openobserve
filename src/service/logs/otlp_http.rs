@@ -16,15 +16,15 @@
 use std::collections::{HashMap, HashSet};
 
 use actix_web::{http, web, HttpResponse};
+use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    get_config,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json},
 };
-use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -33,16 +33,15 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
-        db, get_formatted_stream_name,
-        ingestion::get_val_for_attr,
-        schema::{get_upto_discard_error, stream_schema_exists},
+        format_stream_name,
+        ingestion::{check_ingestion_allowed, get_val_for_attr},
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };
@@ -55,7 +54,7 @@ pub async fn logs_proto_handler(
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
-) -> Result<HttpResponse, std::io::Error> {
+) -> Result<HttpResponse> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
     match super::otlp_grpc::handle_grpc_request(org_id, request, false, in_stream_name, user_email)
         .await
@@ -80,59 +79,19 @@ pub async fn logs_json_handler(
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
-) -> Result<HttpResponse, std::io::Error> {
+) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    // Start check stream
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
+    // check stream
     let stream_name = match in_stream_name {
-        Some(name) => {
-            get_formatted_stream_name(
-                &mut StreamParams::new(org_id, name, StreamType::Logs),
-                &mut stream_schema_map,
-            )
-            .await
-        }
-        None => {
-            let _schema_exists =
-                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
-                    .await;
-            "default".to_owned()
-        }
+        Some(name) => format_stream_name(name),
+        None => "default".to_owned(),
     };
-    let stream_name = &stream_name;
+    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    check_ingestion_allowed(org_id, Some(&stream_name))?;
 
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-    // End check stream
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
-    }
-
-    let cfg = config::get_config();
+    let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
@@ -141,41 +100,21 @@ pub async fn logs_json_handler(
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
-        stream_name,
+        &stream_name,
     );
     // End Register Transforms for stream
-
-    let stream_param = StreamParams {
-        org_id: org_id.to_owned().into(),
-        stream_name: stream_name.to_owned().into(),
-        stream_type: StreamType::Logs,
-    };
-
-    // Start get stream alerts
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(&[stream_param.clone()], &mut stream_alerts_map)
-        .await;
-    // End get stream alert
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
-        &[stream_param],
+        &[stream_params],
         &mut user_defined_schema_map,
     )
     .await;
     // End get user defined schema
 
-    // Start get partition details
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-    // End get partition details
+    let mut stream_status = StreamStatus::new(&stream_name);
+    let mut json_data = Vec::new();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -215,9 +154,6 @@ pub async fn logs_json_handler(
             }
         },
     };
-
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut json_data = Vec::new(); // TODO(taiming): get size and use capacity
 
     for res_log in logs.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
@@ -361,7 +297,7 @@ pub async fn logs_json_handler(
                         value,
                         &stream_vrl_map,
                         org_id,
-                        stream_name,
+                        &stream_name,
                         &mut runtime,
                     )
                     .unwrap();
@@ -373,7 +309,7 @@ pub async fn logs_json_handler(
                     _ => unreachable!(),
                 };
 
-                if let Some(fields) = user_defined_schema_map.get(stream_name) {
+                if let Some(fields) = user_defined_schema_map.get(&stream_name) {
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
@@ -386,7 +322,6 @@ pub async fn logs_json_handler(
         partial_success: None,
     };
 
-    // QUESTION(taiming): return directly when no data?
     // if no data, fast return
     if json_data.is_empty() {
         let mut out = BytesMut::with_capacity(res.encoded_len());
@@ -398,19 +333,7 @@ pub async fn logs_json_handler(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let mut req_stats = match super::write_logs(
-        &super::StreamMeta {
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            partition_keys: &partition_keys,
-            partition_time_level: &partition_time_level,
-            stream_alerts_map: &stream_alerts_map,
-        },
-        &mut stream_schema_map,
-        &mut status,
-        json_data,
-    )
-    .await
+    let mut req_stats = match super::write_logs(org_id, &stream_name, &mut status, json_data).await
     {
         Ok(rs) => rs,
         Err(e) => {
@@ -419,7 +342,6 @@ pub async fn logs_json_handler(
                 IngestionStatus::Record(status) => status,
                 IngestionStatus::Bulk(_) => unreachable!(),
             };
-            // QUESTION(taiming): return directly when error?
             res.partial_success = Some(ExportLogsPartialSuccess {
                 rejected_log_records: stream_status.status.failed as i64,
                 error_message: stream_status.status.error,
@@ -439,7 +361,7 @@ pub async fn logs_json_handler(
             "/api/org/v1/logs",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
@@ -448,7 +370,7 @@ pub async fn logs_json_handler(
             "/api/org/v1/logs",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
@@ -459,9 +381,9 @@ pub async fn logs_json_handler(
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::Logs,
-        UsageType::Json,
+        UsageType::Logs,
         0,
         started_at,
     )

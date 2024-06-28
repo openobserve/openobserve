@@ -19,33 +19,27 @@ use std::{
 };
 
 use actix_web::web;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config,
+    get_config,
     meta::{
-        stream::{PartitioningDetails, Routing, StreamType},
+        stream::{Routing, StreamType},
         usage::UsageType,
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     BLOCKED_STREAMS,
 };
-use infra::schema::SchemaCache;
 
 use crate::{
     common::meta::{
-        alerts::Alert,
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus,
-            StreamSchemaChk,
-        },
+        ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
         stream::StreamParams,
     },
     service::{
-        db, format_stream_name,
-        schema::{get_upto_discard_error, stream_schema_exists},
+        db, format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };
@@ -62,21 +56,8 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Err(anyhow::anyhow!("not an ingester"));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Err(anyhow::anyhow!(
-            "Quota exceeded for this organization [{}]",
-            org_id
-        ));
-    }
-
-    // check memtable
-    ingester::check_memtable_size().map_err(|e| Error::msg(e.to_string()))?;
+    // check system resource
+    check_ingestion_allowed(org_id, None)?;
 
     // let mut errors = false;
     let mut bulk_res = BulkResponse {
@@ -92,25 +73,17 @@ pub async fn ingest(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-
     let mut stream_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
-    let mut stream_partition_keys_map: HashMap<String, (StreamSchemaChk, PartitioningDetails)> =
-        HashMap::new();
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
     let mut doc_id = String::from("");
 
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
-
     let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
-
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
 
     let mut json_data_by_stream = HashMap::new();
-
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
@@ -188,36 +161,6 @@ pub async fn ingest(
             )
             .await;
             // End Register functions for index
-
-            // Start get stream alerts
-            crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
-            // End get stream alert
-
-            for stream in streams {
-                let local_stream_name = stream.stream_name.to_string();
-                if let std::collections::hash_map::Entry::Vacant(e) =
-                    stream_partition_keys_map.entry(local_stream_name.to_owned())
-                {
-                    let stream_schema = stream_schema_exists(
-                        org_id,
-                        &local_stream_name,
-                        StreamType::Logs,
-                        &mut stream_schema_map,
-                    )
-                    .await;
-                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                        org_id,
-                        &StreamType::Logs,
-                        &local_stream_name,
-                    )
-                    .await;
-                    e.insert((stream_schema, partition_det));
-                }
-            }
-
-            json_data_by_stream
-                .entry(stream_name.clone())
-                .or_insert_with(Vec::new);
         } else {
             next_line_is_data = false;
 
@@ -235,9 +178,6 @@ pub async fn ingest(
                         }
                         if is_routed && !val.is_empty() {
                             stream_name = route.destination.clone();
-                            json_data_by_stream
-                                .entry(stream_name.clone())
-                                .or_insert_with(Vec::new);
                             break;
                         }
                     }
@@ -283,13 +223,13 @@ pub async fn ingest(
                 _ => unreachable!(),
             };
 
-            if let Some(fields) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::service::logs::refactor_map(local_val, fields);
-            }
-
             // set _id
             if !doc_id.is_empty() {
                 local_val.insert("_id".to_string(), json::Value::String(doc_id.clone()));
+            }
+
+            if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                local_val = crate::service::logs::refactor_map(local_val, fields);
             }
 
             // handle timestamp
@@ -312,6 +252,7 @@ pub async fn ingest(
                 },
                 None => Utc::now().timestamp_micros(),
             };
+
             // check ingestion time
             if timestamp < min_ts {
                 bulk_res.errors = true;
@@ -352,29 +293,8 @@ pub async fn ingest(
             continue; // skip
         }
 
-        let (partition_keys, partition_time_level) =
-            match stream_partition_keys_map.get(&stream_name) {
-                Some((_, partition_det)) => (
-                    partition_det.partition_keys.clone(),
-                    partition_det.partition_time_level,
-                ),
-                None => (vec![], None),
-            };
-
         // write json data by stream
-        let mut req_stats = super::write_logs(
-            &super::StreamMeta {
-                org_id: org_id.to_string(),
-                stream_name: stream_name.clone(),
-                partition_keys: &partition_keys,
-                partition_time_level: &partition_time_level,
-                stream_alerts_map: &stream_alerts_map,
-            },
-            &mut stream_schema_map,
-            &mut status,
-            json_data,
-        )
-        .await?;
+        let mut req_stats = super::write_logs(org_id, &stream_name, &mut status, json_data).await?;
 
         req_stats.response_time += time;
         req_stats.user_email = Some(user_email.to_string());
