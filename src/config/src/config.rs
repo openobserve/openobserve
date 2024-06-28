@@ -846,9 +846,6 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
-    #[env_config(name = "ZO_QUERY_CACHE_MIN_CONTRIBUTION_PERCENTAGE", default = "20%")] //
-    pub query_cache_min_contribution_percentage: String,
-    pub query_cache_min_contribution: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1172,9 +1169,6 @@ pub fn init() -> Config {
     if cfg.limit.consistent_hash_vnodes == 0 {
         cfg.limit.consistent_hash_vnodes = 3;
     }
-
-    cfg.limit.query_cache_min_contribution =
-        parse_percentage(&cfg.limit.query_cache_min_contribution_percentage).unwrap_or(20) as i64;
 
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
@@ -1605,15 +1599,6 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
-}
-
-fn parse_percentage(s: &str) -> Result<u64, anyhow::Error> {
-    let s = s.trim_end_matches('%');
-    let n = s.parse::<u64>()?;
-    if n > 100 {
-        return Err(anyhow::anyhow!("{} is greater than 100", s));
-    }
-    Ok(n)
 }
 
 #[cfg(test)]

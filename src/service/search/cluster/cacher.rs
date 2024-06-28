@@ -205,19 +205,12 @@ pub async fn get_cached_results(
         results.push((local_node.unwrap(), local_resp));
     }
 
-    let cfg = config::get_config();
     match results
         .iter()
         .filter(|(_, cache_meta)| {
             // to make sure there is overlap between cache time range and query time range &
-            // cache can at least serve query_cache_min_contribution
 
-            let cached_duration = cache_meta.response_end_time - cache_meta.response_start_time;
-            let query_duration = end_time - start_time;
-
-            cached_duration > query_duration / cfg.limit.query_cache_min_contribution
-                && cache_meta.response_start_time <= end_time
-                && cache_meta.response_end_time >= start_time
+            cache_meta.response_start_time <= end_time && cache_meta.response_end_time >= start_time
         })
         .max_by_key(|(_, result)| {
             result.response_end_time.min(end_time) - result.response_start_time.max(start_time)
