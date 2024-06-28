@@ -254,19 +254,13 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> j
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use datafusion::{
-        arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
-            record_batch::RecordBatch,
-        },
+        arrow::{array::Int64Array, datatypes::Schema, record_batch::RecordBatch},
         datasource::MemTable,
         prelude::SessionContext,
     };
 
-    use crate::service::search::datafusion::transform_udf::get_udf_vrl;
+    use super::*;
 
     #[tokio::test]
     async fn vrl_udf_test() {
