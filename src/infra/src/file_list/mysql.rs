@@ -604,7 +604,7 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         match sqlx::query(
-            "INSERT IGNORE INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES (?, ?, ?, ?, '', 0);",
+            "INSERT IGNORE INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at) VALUES (?, ?, ?, ?, '', 0, 0);",
         )
         .bind(org_id)
         .bind(stream_key)
@@ -661,13 +661,15 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             return Ok(Vec::new());
         }
         let sql = format!(
-            "UPDATE file_list_jobs SET status = ?, node = ?, updated_at = ? WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = ?, node = ?, started_at = ?, updated_at = ? WHERE id IN ({});",
             ids.join(",")
         );
+        let now = config::utils::time::now_micros();
         if let Err(e) = sqlx::query(&sql)
             .bind(super::FileListJobStatus::Running)
             .bind(node)
-            .bind(config::utils::time::now_micros())
+            .bind(now)
+            .bind(now)
             .execute(&mut *tx)
             .await
         {
@@ -941,6 +943,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     offsets    BIGINT not null,
     status     INT not null,
     node       VARCHAR(100) not null,
+    started_at BIGINT not null,
     updated_at BIGINT not null
 );
         "#,
@@ -968,9 +971,16 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
 
     // create column flattened for old version <= 0.10.5
-    add_column_flattened("file_list").await?;
-    add_column_flattened("file_list_history").await?;
-    add_column_flattened("file_list_deleted").await?;
+    let column = "flattened";
+    let data_type = "BOOLEAN default false not null";
+    add_column("file_list", column, data_type).await?;
+    add_column("file_list_history", column, data_type).await?;
+    add_column("file_list_deleted", column, data_type).await?;
+
+    // create column started_at for old version <= 0.10.8
+    let column = "started_at";
+    let data_type = "BIGINT not null";
+    add_column("file_list_jobs", column, data_type).await?;
 
     Ok(())
 }
@@ -1075,9 +1085,8 @@ pub async fn create_table_index() -> Result<()> {
     Ok(())
 }
 
-async fn add_column_flattened(table: &str) -> Result<()> {
+async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT.clone();
-    let column = "flattened";
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );
@@ -1088,8 +1097,7 @@ async fn add_column_flattened(table: &str) -> Result<()> {
         return Ok(());
     }
 
-    let alert_sql =
-        format!("ALTER TABLE {table} ADD COLUMN {column} BOOLEAN default false not null;");
+    let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     let mut tx = pool.begin().await?;
     if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
         if !e.to_string().contains("Duplicate column name") {
