@@ -77,7 +77,7 @@ pub async fn ingest(
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
-    let mut doc_id = String::from("");
+    let mut doc_id = None;
 
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
     let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
@@ -202,7 +202,7 @@ pub async fn ingest(
                         bulk_res.errors = true;
                         add_record_status(
                             stream_name.clone(),
-                            doc_id.clone(),
+                            &doc_id,
                             action.clone(),
                             Some(value),
                             &mut bulk_res,
@@ -224,8 +224,8 @@ pub async fn ingest(
             };
 
             // set _id
-            if !doc_id.is_empty() {
-                local_val.insert("_id".to_string(), json::Value::String(doc_id.clone()));
+            if let Some(doc_id) = &doc_id {
+                local_val.insert("_id".to_string(), json::Value::String(doc_id.to_owned()));
             }
 
             if let Some(fields) = user_defined_schema_map.get(&stream_name) {
@@ -240,7 +240,7 @@ pub async fn ingest(
                         bulk_res.errors = true;
                         add_record_status(
                             stream_name.clone(),
-                            doc_id.clone(),
+                            &doc_id,
                             action.clone(),
                             Some(value),
                             &mut bulk_res,
@@ -259,7 +259,7 @@ pub async fn ingest(
                 let failure_reason = Some(get_upto_discard_error().to_string());
                 add_record_status(
                     stream_name.clone(),
-                    doc_id.clone(),
+                    &doc_id,
                     action.clone(),
                     Some(value),
                     &mut bulk_res,
@@ -340,7 +340,7 @@ pub async fn ingest(
 
 pub fn add_record_status(
     stream_name: String,
-    doc_id: String,
+    doc_id: &Option<String>,
     action: String,
     value: Option<json::Value>,
     bulk_res: &mut BulkResponse,
@@ -352,6 +352,11 @@ pub fn add_record_status(
         "index".to_string()
     } else {
         action
+    };
+
+    let doc_id = match doc_id {
+        Some(doc_id) => doc_id.to_owned(),
+        None => "".to_string(),
     };
 
     match failure_type {
@@ -401,7 +406,7 @@ mod tests {
         };
         add_record_status(
             "olympics".to_string(),
-            "1".to_string(),
+            &Some("1".to_string()),
             "create".to_string(),
             None,
             &mut bulk_res,

@@ -57,7 +57,7 @@ pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
-fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
+fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     let local_val = v.as_object().unwrap();
     for action in BULK_OPERATORS {
         if local_val.contains_key(action) {
@@ -66,10 +66,9 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
                 Some(v) => v.as_str().unwrap().to_string(),
                 None => return None,
             };
-            let doc_id = match local_val.get("_id") {
-                Some(v) => v.as_str().unwrap().to_string(),
-                None => String::from(""),
-            };
+            let doc_id = local_val
+                .get("_id")
+                .map(|v| v.as_str().unwrap().to_string());
             return Some((action.to_string(), index, doc_id));
         };
     }
@@ -405,7 +404,7 @@ async fn write_logs(
                         bulk_res.errors = true;
                         bulk::add_record_status(
                             stream_name.to_string(),
-                            doc_id.unwrap(),
+                            &doc_id,
                             "".to_string(),
                             Some(Value::Object(record_val.clone())),
                             bulk_res,
@@ -476,7 +475,7 @@ async fn write_logs(
             IngestionStatus::Bulk(bulk_res) => {
                 bulk::add_record_status(
                     stream_name.to_string(),
-                    doc_id.unwrap(),
+                    &doc_id,
                     "".to_string(),
                     None,
                     bulk_res,
