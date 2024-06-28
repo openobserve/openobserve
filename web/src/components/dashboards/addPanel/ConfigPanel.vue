@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div style="padding-bottom: 30px;">
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}

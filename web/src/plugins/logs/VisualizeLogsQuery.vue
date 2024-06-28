@@ -140,10 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
-                    style="margin-bottom: 40px"
-                  />
+                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
                 </PanelSidebar>
               </div>
             </div>
