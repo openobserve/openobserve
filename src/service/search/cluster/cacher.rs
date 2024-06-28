@@ -1,6 +1,6 @@
 use config::cluster::{is_querier, LOCAL_NODE_UUID};
 use infra::errors::{Error, ErrorCodes};
-use proto::cluster_rpc::{self, QueryCacheRequest};
+use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 
@@ -232,4 +232,155 @@ pub async fn get_cached_results(
         }
         None => None,
     }
+}
+
+pub async fn delete_cached_results(path: String) -> bool {
+    let trace_id = path.clone();
+    let mut delete_response = true;
+    // get nodes from cluster
+    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+        .await
+        .unwrap();
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+
+    nodes.sort_by_key(|x| x.id);
+
+    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE_UUID.as_str()).await;
+    nodes.retain(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()));
+
+    let querier_num = nodes.len();
+    if querier_num == 0 && local_node.is_none() {
+        log::error!("no querier node online");
+        return false;
+    };
+
+    let mut tasks = Vec::new();
+
+    for node in nodes {
+        let cfg = config::get_config();
+        let node_addr = node.grpc_addr.clone();
+
+        let grpc_span = info_span!(
+            "service:search:cluster:cacher:delete_cached_results",
+            trace_id,
+            node_id = node.id,
+            node_addr = node_addr.as_str(),
+        );
+
+        let trace_id = trace_id.clone();
+        let local_path = path.clone();
+        let task = tokio::task::spawn(
+            async move {
+                let req = DeleteResultCacheRequest {
+                   path: local_path.clone(),
+                };
+
+                let request = tonic::Request::new(req);
+
+                log::info!(
+                    "[trace_id {trace_id}] delete_cached_results->grpc: request node: {}",
+                    &node_addr
+                );
+
+                let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
+                    .parse()
+                    .map_err(|_| Error::Message("invalid token".to_string()))?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, connect err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        super::super::server_internal_error("connect search node error")
+                    })?;
+                let mut client =
+                    cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
+                        channel,
+                        move |mut req: Request<()>| {
+                            req.metadata_mut().insert("authorization", token.clone());
+
+                            Ok(req)
+                        },
+                    );
+                client = client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let response = match client.delete_result_cache(request).await {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, get_cached_results err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        if err.code() == tonic::Code::Internal {
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                        return Err(super::super::server_internal_error("querier node error"));
+                    }
+                };
+
+                Ok((node.clone(), response))
+            }
+            .instrument(grpc_span),
+        );
+        tasks.push(task);
+    }
+    match crate::service::search::cache::cacher::delete_cache(&path).await {
+        Ok(_) => {
+            log::info!(
+                "[trace_id {trace_id}] delete_cached_results->grpc: local node delete success"
+            );
+        }
+        Err(e) => {
+            delete_response = false;
+            log::error!(
+                "[trace_id {trace_id}] delete_cached_results->grpc: local node delete error: {e}"
+            );
+        }
+    };
+
+    for task in tasks {
+        match task.await {
+            Ok(res) => match res {
+                Ok((node, node_res)) => match node_res.deleted {
+                    true => {
+                        log::debug!(
+                            "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, delete success",
+                            &node.grpc_addr
+                        );
+                    }
+                    false => {
+                        delete_response = false;
+                        log::error!(
+                            "[trace_id {trace_id}] delete_cached_results->grpc: node delete error: node: {}",
+                            &node.grpc_addr
+                        );
+                    }
+                },
+                Err(err) => {
+                    delete_response = false;
+                    log::error!(
+                        "[trace_id {trace_id}] delete_cached_results->grpc: node delete error: {err}"
+                    );
+                }
+            },
+            Err(e) => {
+                delete_response = false;
+                log::error!(
+                    "[trace_id {trace_id}] delete_cached_results-> grpc: node delete error: {e}"
+                );
+            }
+        }
+    }
+    delete_response
 }

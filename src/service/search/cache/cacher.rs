@@ -2,7 +2,7 @@ use bytes::Bytes;
 use config::{
     get_config,
     meta::search::Response,
-    utils::{json, time::parse_str_to_timestamp_micros_as_option},
+    utils::{file::scan_files, json, time::parse_str_to_timestamp_micros_as_option},
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -347,4 +347,40 @@ fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<Strin
     }
 
     None
+}
+
+#[tracing::instrument]
+pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
+    let root_dir = disk::get_dir().await;
+    let pattern = format!("{}/results/{}", root_dir, path);
+    let prefix = format!("{}/", root_dir);
+    let files = scan_files(&pattern, "json", None).unwrap_or_default();
+    let mut remove_files: Vec<String> = vec![];
+    for file in files {
+        match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
+            Ok(_) => remove_files.push(file),
+            Err(e) => {
+                log::error!("Error deleting cache: {:?}", e);
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Error deleting cache",
+                ));
+            }
+        }
+    }
+    for file in remove_files {
+        let columns = file
+            .strip_prefix(&prefix)
+            .unwrap()
+            .split('/')
+            .collect::<Vec<&str>>();
+
+        let query_key = format!(
+            "{}_{}_{}_{}",
+            columns[1], columns[2], columns[3], columns[4]
+        );
+        let mut r = QUERY_RESULT_CACHE.write().await;
+        r.remove(&query_key);
+    }
+    Ok(true)
 }
