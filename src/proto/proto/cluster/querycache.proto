@@ -40,7 +40,15 @@ message QueryCacheRes {
 message QueryCacheResponse {
     optional QueryCacheRes response  = 1;   
 }
+message DeleteResultCacheRequest {
+    string  path = 1; 
+}
+
+message DeleteResultCacheResponse {
+    bool deleted = 1;  
+}
 
 service QueryCache {
     rpc GetCachedResult (QueryCacheRequest) returns (QueryCacheResponse) {}
+    rpc DeleteResultCache (DeleteResultCacheRequest) returns (DeleteResultCacheResponse) {}
 }

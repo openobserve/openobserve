@@ -15,8 +15,8 @@
 
 use async_trait::async_trait;
 use proto::cluster_rpc::{
-    query_cache_server::QueryCache, QueryCacheRequest, QueryCacheRes, QueryCacheResponse,
-    QueryDelta, QueryResponse,
+    query_cache_server::QueryCache, DeleteResultCacheRequest, DeleteResultCacheResponse,
+    QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryDelta, QueryResponse,
 };
 use tonic::{Request, Response, Status};
 
@@ -70,5 +70,15 @@ impl QueryCache for QueryCacheServerImpl {
             }
             None => Ok(Response::new(QueryCacheResponse { response: None })),
         }
+    }
+
+    async fn delete_result_cache(
+        &self,
+        request: Request<DeleteResultCacheRequest>,
+    ) -> Result<Response<DeleteResultCacheResponse>, Status> {
+        let req: DeleteResultCacheRequest = request.into_inner();
+        let deleted = cacher::delete_cache(&req.path).await.is_ok();
+
+        Ok(Response::new(DeleteResultCacheResponse { deleted }))
     }
 }

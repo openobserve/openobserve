@@ -169,6 +169,37 @@ impl FileData {
         Ok(())
     }
 
+    async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+        log::debug!(
+            "[trace_id {trace_id}] File memory cache remove file {}",
+            file
+        );
+
+        let item = self.data.remove_key(file);
+        if item.is_none() {
+            log::error!("[trace_id {trace_id}] File disk memory is corrupt, it shouldn't be none");
+        }
+        let (key, data_size) = item.unwrap();
+
+        // metrics
+        let columns = key.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::QUERY_DISK_CACHE_FILES
+                .with_label_values(&[columns[1], columns[2]])
+                .dec();
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2]])
+                .sub(data_size as i64);
+        }
+
+        self.cur_size -= data_size;
+        log::info!(
+            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
+            data_size
+        );
+        Ok(())
+    }
+
     fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
@@ -238,6 +269,16 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
         return Ok(());
     }
     files.set(trace_id, file, data).await
+}
+
+#[inline]
+pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+    if !get_config().memory_cache.enabled {
+        return Ok(());
+    }
+    let idx = get_bucket_idx(file);
+    let mut files = FILES[idx].write().await;
+    files.remove(trace_id, file).await
 }
 
 async fn gc() -> Result<(), anyhow::Error> {
