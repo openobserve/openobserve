@@ -16,14 +16,14 @@
 use async_trait::async_trait;
 use config::{
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    utils::parquet::parse_file_key_columns,
+    utils::{hash::Sum64, parquet::parse_file_key_columns},
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::{
     db::mysql::CLIENT,
-    errors::{Error, Result},
+    errors::{DbError, Error, Result},
 };
 
 pub struct MysqlFileList {}
@@ -624,6 +624,39 @@ UPDATE stream_stats
     }
 
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+        let lock_pool = CLIENT.clone();
+        let lock_key = "file_list_jobs:get_pending_jobs";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_sql = format!(
+            "SELECT GET_LOCK('{}', {})",
+            lock_id,
+            config::get_config().limit.meta_transaction_lock_timeout
+        );
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let mut lock_tx = lock_pool.begin().await?;
+        match sqlx::query_scalar::<_, i64>(&lock_sql)
+            .fetch_one(&mut *lock_tx)
+            .await
+        {
+            Ok(v) => {
+                if v != 1 {
+                    if let Err(e) = lock_tx.rollback().await {
+                        log::error!("[MYSQL] rollback lock for get_pending_jobs error: {}", e);
+                    }
+                    return Err(Error::from(DbError::DBOperError(
+                        "LockTimeout".to_string(),
+                        lock_key.to_string(),
+                    )));
+                }
+            }
+            Err(e) => {
+                if let Err(e) = lock_tx.rollback().await {
+                    log::error!("[MYSQL] rollback lock for get_pending_jobs error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         // get pending jobs group by stream and order by num desc
@@ -634,8 +667,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     WHERE status = ? 
     GROUP BY stream 
     ORDER BY num DESC 
-    LIMIT ? 
-    FOR UPDATE;"#,
+    LIMIT ?;"#,
         )
         .bind(super::FileListJobStatus::Pending)
         .bind(limit)
@@ -649,6 +681,12 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                         "[MYSQL] rollback select file_list_jobs pending jobs for update error: {e}"
                     );
                 }
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                }
                 return Err(e.into());
             }
         };
@@ -657,6 +695,12 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         if ids.is_empty() {
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback select file_list_jobs pending jobs error: {e}");
+            }
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
             }
             return Ok(Vec::new());
         }
@@ -676,6 +720,12 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback update file_list_jobs status error: {e}");
             }
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+            }
             return Err(e.into());
         }
         // get jobs by ids
@@ -692,12 +742,24 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                 if let Err(e) = tx.rollback().await {
                     log::error!("[MYSQL] rollback select file_list_jobs by ids error: {e}");
                 }
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                }
                 return Err(e.into());
             }
         };
         if let Err(e) = tx.commit().await {
             log::error!("[MYSQL] commit select file_list_jobs pending jobs error: {e}");
             return Err(e.into());
+        }
+        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+            log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+        }
+        if let Err(e) = lock_tx.commit().await {
+            log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
         }
         Ok(ret)
     }
