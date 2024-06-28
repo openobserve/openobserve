@@ -1041,7 +1041,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
 
     // create column started_at for old version <= 0.10.8
     let column = "started_at";
-    let data_type = "BIGINT not null";
+    let data_type = "BIGINT default 0 not null";
     add_column("file_list_jobs", column, data_type).await?;
 
     Ok(())
