@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-splitter>
           </div>
-          <div else :style="`height: calc(100vh - ${splitterModel}vh);`">
+          <div else :style="`height: calc(100vh - ${splitterModel}vh - 28px);`">
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
