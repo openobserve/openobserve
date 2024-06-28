@@ -758,7 +758,13 @@ pub(crate) async fn list_objects_for_user(
         )
         .await
         {
-            Ok(resp) => Ok(Some(resp)),
+            Ok(resp) => {
+                log::debug!(
+                    "list_objects_for_user for user {user_id} from {org_id} org returns: {:#?}",
+                    resp
+                );
+                Ok(Some(resp))
+            }
             Err(_) => Err(ErrorForbidden("Unauthorized Access")),
         }
     } else {
