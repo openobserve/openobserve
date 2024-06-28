@@ -369,6 +369,7 @@ export default defineComponent({
       folderId: any,
       panelTitle: any
     ) => {
+      showAddToDashboardDialog.value = false;
       let dismiss = $q.notify({
         message: "Please wait while we add the panel to the dashboard",
         type: "ongoing",
@@ -380,7 +381,6 @@ export default defineComponent({
       // to create panel dashboard id, paneldata and folderId is required
       addPanel(store, dashboardId, dashboardPanelData.data, folderId, "default")
         .then(() => {
-          showAddToDashboardDialog.value = false;
           $q.notify({
             message: "Panel added to dashboard",
             type: "positive",
@@ -389,7 +389,7 @@ export default defineComponent({
           });
           router.push({
             name: "viewDashboard",
-            query: { dashboard: dashboardId, folder: folderId },
+            query: { dashboard: dashboardId, folder: folderId, tab: "default" },
           });
         })
         .catch((err) => {
