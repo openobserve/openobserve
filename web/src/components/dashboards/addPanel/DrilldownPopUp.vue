@@ -327,7 +327,9 @@ export default defineComponent({
     },
     variablesData: {
       type: Object,
-      default: false,
+      default: () => {
+        return { isVariablesLoading: false, values: [] };
+      },
     },
   },
   emits: ["close"],
