@@ -20,7 +20,7 @@ use std::{
 };
 
 use anyhow::Result;
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::{DataType, Field};
 use config::{
     get_config,
     meta::{
@@ -40,7 +40,7 @@ use super::{
     metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
 };
 use crate::{
-    common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
+    common::meta::{alerts::Alert, ingestion::IngestionStatus, stream::SchemaRecords},
     service::{ingestion::get_wal_time_key, schema::check_for_schema},
 };
 
@@ -292,46 +292,10 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
-async fn add_record(
-    partition_keys: &Vec<StreamPartition>,
-    partition_time_level: &Option<PartitionTimeLevel>,
-    write_buf: &mut HashMap<String, SchemaRecords>,
-    record_val: Map<String, Value>,
-) -> Result<()> {
-    let cfg = get_config();
-    let timestamp: i64 = record_val
-        .get(&cfg.common.column_timestamp)
-        .unwrap()
-        .as_i64()
-        .unwrap();
-    // get hour key
-    let hour_key = get_wal_time_key(
-        timestamp,
-        partition_keys,
-        unwrap_partition_time_level(*partition_time_level, StreamType::Logs),
-        &record_val,
-        None,
-    );
-
-    let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-        let schema = Arc::new(Schema::empty());
-        let schema_key = schema.hash_key();
-        SchemaRecords {
-            schema_key,
-            schema,
-            records: vec![],
-            records_size: 0,
-        }
-    });
-    let record_value = Value::Object(record_val.clone());
-    hour_buf.records.push(Arc::new(record_value));
-    Ok(())
-}
-
 async fn write_logs(
     stream_meta: &StreamMeta<'_>,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
-    status: &mut RecordStatus,
+    status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
 ) -> Result<RequestStats> {
     let cfg = get_config();
@@ -361,25 +325,22 @@ async fn write_logs(
     let mut distinct_values = Vec::with_capacity(16);
     let mut trigger: Option<TriggerAlertData> = None;
 
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        &stream_meta.org_id,
-        &StreamType::Logs,
-        &stream_meta.stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
+    let partition_keys = stream_meta.partition_keys;
+    let partition_time_level =
+        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs);
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     for (timestamp, mut record_val) in json_data {
+        let doc_id = match record_val.get("_id") {
+            Some(v) => v.as_str().unwrap().to_string(),
+            None => "".to_string(),
+        }; // to update bulk response
+
         // validate record
-        let valid_record = match &schema_evolution.types_delta {
-            None => true,
-            Some(delta) => {
-                let ret_val = if !cfg.common.widening_schema_evolution
-                    || !schema_evolution.is_schema_changed
-                {
+        if let Some(delta) = &schema_evolution.types_delta {
+            let ret_val =
+                if !cfg.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
                     cast_to_type(&mut record_val, delta.to_owned())
                 } else {
                     let local_delta = delta
@@ -398,18 +359,27 @@ async fn write_logs(
                         Ok(())
                     }
                 };
-                match ret_val {
-                    Ok(_) => true,
-                    Err(e) => {
+            if let Err(e) = ret_val {
+                // update status(fail)
+                match status {
+                    IngestionStatus::Record(status) => {
                         status.failed += 1;
                         status.error = e.to_string();
-                        false
+                    }
+                    IngestionStatus::Bulk(bulk_res) => {
+                        bulk_res.errors = true;
+                        bulk::add_record_status(
+                            stream_meta.stream_name.to_string(),
+                            doc_id.clone(),
+                            "".to_string(),
+                            Some(Value::Object(record_val.clone())),
+                            bulk_res,
+                            Some(bulk::SCHEMA_CONFORMANCE_FAILED.to_string()),
+                            Some(e.to_string()),
+                        );
                     }
                 }
             }
-        };
-        if !valid_record {
-            continue;
         }
 
         // start check for alert trigger
@@ -450,8 +420,8 @@ async fn write_logs(
         // get hour key
         let hour_key = get_wal_time_key(
             timestamp,
-            &partition_keys,
-            unwrap_partition_time_level(partition_time_level, StreamType::Logs),
+            partition_keys,
+            partition_time_level,
             &record_val,
             Some(&schema_key),
         );
@@ -466,7 +436,24 @@ async fn write_logs(
         let record_size = estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
-        status.successful += 1;
+
+        // update status(success)
+        match status {
+            IngestionStatus::Record(status) => {
+                status.successful += 1;
+            }
+            IngestionStatus::Bulk(bulk_res) => {
+                bulk::add_record_status(
+                    stream_meta.stream_name.to_string(),
+                    doc_id,
+                    "".to_string(),
+                    None,
+                    bulk_res,
+                    None,
+                    None,
+                );
+            }
+        }
 
         // add distinct values
         distinct_values.extend(to_add_distinct_values);
@@ -506,6 +493,8 @@ async fn write_logs(
 struct StreamMeta<'a> {
     org_id: String,
     stream_name: String,
+    partition_keys: &'a Vec<StreamPartition>,
+    partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 

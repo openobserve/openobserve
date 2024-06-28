@@ -37,7 +37,7 @@ use crate::{
     common::meta::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionResponse, StreamStatus},
+        ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_PROTO,
@@ -98,6 +98,17 @@ pub async fn usage_ingest(
     .await;
     // End get stream alert
 
+    // Start get partition details
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
+    // End get partition details
+
     let mut stream_status = StreamStatus::new(stream_name);
     let mut json_data = Vec::new();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
@@ -136,28 +147,32 @@ pub async fn usage_ingest(
         ));
     }
 
-    let _ = match super::write_logs(
+    let mut status = IngestionStatus::Record(stream_status.status);
+    if let Err(e) = super::write_logs(
         &super::StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
+            partition_keys: &partition_keys,
+            partition_time_level: &partition_time_level,
             stream_alerts_map: &stream_alerts_map,
         },
         &mut stream_schema_map,
-        &mut stream_status.status,
+        &mut status,
         json_data,
     )
     .await
     {
-        Ok(rs) => rs,
-        Err(e) => {
-            log::error!("Error while writing logs: {}", e);
-            // QUESTION(taiming): return directly when error?
-            return Ok(IngestionResponse::new(
-                http::StatusCode::OK.into(),
-                vec![stream_status],
-            ));
-        }
-    };
+        // QUESTION(taiming): return directly when error?
+        log::error!("Error while writing logs: {}", e);
+        stream_status.status = match status {
+            IngestionStatus::Record(status) => status,
+            IngestionStatus::Bulk(_) => unreachable!(),
+        };
+        return Ok(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ));
+    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -183,6 +198,10 @@ pub async fn usage_ingest(
     drop(stream_schema_map);
     drop(stream_alerts_map);
 
+    stream_status.status = match status {
+        IngestionStatus::Record(status) => status,
+        IngestionStatus::Bulk(_) => unreachable!(),
+    };
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],
@@ -278,6 +297,17 @@ pub async fn handle_grpc_request(
     )
     .await;
     // End get user defined schema
+
+    // Start get partition details
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
+    // End get partition details
 
     let mut stream_status = StreamStatus::new(stream_name);
     let mut json_data = Vec::new(); // TODO(taiming): get size and use capacity
@@ -412,14 +442,17 @@ pub async fn handle_grpc_request(
             .body(out)); // just return
     }
 
+    let mut status = IngestionStatus::Record(stream_status.status);
     let mut req_stats = match super::write_logs(
         &super::StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
+            partition_keys: &partition_keys,
+            partition_time_level: &partition_time_level,
             stream_alerts_map: &stream_alerts_map,
         },
         &mut stream_schema_map,
-        &mut stream_status.status,
+        &mut status,
         json_data,
     )
     .await
@@ -427,6 +460,10 @@ pub async fn handle_grpc_request(
         Ok(rs) => rs,
         Err(e) => {
             log::error!("Error while writing logs: {}", e);
+            stream_status.status = match status {
+                IngestionStatus::Record(status) => status,
+                IngestionStatus::Bulk(_) => unreachable!(),
+            };
             res.partial_success = Some(ExportLogsPartialSuccess {
                 rejected_log_records: stream_status.status.failed as i64,
                 error_message: stream_status.status.error,

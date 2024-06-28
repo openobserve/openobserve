@@ -34,7 +34,7 @@ use crate::{
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, StreamStatus},
+            ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             stream::StreamParams,
             syslog::SyslogRoute,
         },
@@ -111,6 +111,17 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     .await;
     // End get stream alert
 
+    // Start get partition details
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
+    // End get partition details
+
     let mut stream_status = StreamStatus::new(stream_name);
 
     // parse msg to json::Value
@@ -160,26 +171,30 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         }
     };
 
-    let _ = match super::write_logs(
+    let mut status = IngestionStatus::Record(stream_status.status);
+    if let Err(e) = super::write_logs(
         &super::StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
+            partition_keys: &partition_keys,
+            partition_time_level: &partition_time_level,
             stream_alerts_map: &stream_alerts_map,
         },
         &mut stream_schema_map,
-        &mut stream_status.status,
+        &mut status,
         vec![(timestamp, local_val)],
     )
     .await
     {
-        Ok(rs) => rs,
-        Err(e) => {
-            log::error!("Error while writing logs: {}", e);
-            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
-                http::StatusCode::OK.into(),
-                vec![stream_status],
-            ))); // just return
-        }
+        log::error!("Error while writing logs: {}", e);
+        stream_status.status = match status {
+            IngestionStatus::Record(status) => status,
+            IngestionStatus::Bulk(_) => unreachable!(),
+        };
+        return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ))); // just return
     };
 
     let time = start.elapsed().as_secs_f64();
@@ -209,6 +224,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     drop(stream_params);
     drop(stream_alerts_map);
 
+    stream_status.status = match status {
+        IngestionStatus::Record(status) => status,
+        IngestionStatus::Bulk(_) => unreachable!(),
+    };
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],

@@ -33,7 +33,9 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts::Alert, http::HttpResponse as MetaHttpResponse, ingestion::StreamStatus,
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_JSON,
@@ -163,6 +165,17 @@ pub async fn logs_json_handler(
     )
     .await;
     // End get user defined schema
+
+    // Start get partition details
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
+    // End get partition details
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -384,14 +397,17 @@ pub async fn logs_json_handler(
             .body(out)); // just return
     }
 
+    let mut status = IngestionStatus::Record(stream_status.status);
     let mut req_stats = match super::write_logs(
         &super::StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
+            partition_keys: &partition_keys,
+            partition_time_level: &partition_time_level,
             stream_alerts_map: &stream_alerts_map,
         },
         &mut stream_schema_map,
-        &mut stream_status.status,
+        &mut status,
         json_data,
     )
     .await
@@ -399,6 +415,10 @@ pub async fn logs_json_handler(
         Ok(rs) => rs,
         Err(e) => {
             log::error!("Error while writing logs: {}", e);
+            stream_status.status = match status {
+                IngestionStatus::Record(status) => status,
+                IngestionStatus::Bulk(_) => unreachable!(),
+            };
             // QUESTION(taiming): return directly when error?
             res.partial_success = Some(ExportLogsPartialSuccess {
                 rejected_log_records: stream_status.status.failed as i64,
@@ -447,6 +467,10 @@ pub async fn logs_json_handler(
     )
     .await;
 
+    stream_status.status = match status {
+        IngestionStatus::Record(status) => status,
+        IngestionStatus::Bulk(_) => unreachable!(),
+    };
     let res = ExportLogsServiceResponse {
         partial_success: Some(ExportLogsPartialSuccess {
             rejected_log_records: stream_status.status.failed as i64,

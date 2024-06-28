@@ -32,7 +32,7 @@ use super::ingest::handle_timestamp;
 use crate::{
     common::meta::{
         alerts::Alert,
-        ingestion::{IngestionResponse, StreamStatus},
+        ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
     service::{
@@ -106,6 +106,17 @@ async fn ingest_inner(
     .await;
     // End get user defined schema
 
+    // Start get partition details
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
+    let partition_keys = partition_det.partition_keys;
+    let partition_time_level = partition_det.partition_time_level;
+    // End get partition details
+
     let mut stream_status = StreamStatus::new(stream_name);
     let mut json_data = Vec::new(); // TODO(taiming): get size and use capacity
 
@@ -175,22 +186,29 @@ async fn ingest_inner(
         ));
     }
 
+    let mut status = IngestionStatus::Record(stream_status.status);
     let mut req_stats = match super::write_logs(
         &super::StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
+            partition_keys: &partition_keys,
+            partition_time_level: &partition_time_level,
             stream_alerts_map: &stream_alerts_map,
         },
         &mut stream_schema_map,
-        &mut stream_status.status,
+        &mut status,
         json_data,
     )
     .await
     {
         Ok(rs) => rs,
         Err(e) => {
-            log::error!("Error while writing logs: {}", e);
             // QUESTION(taiming): return directly when error?
+            log::error!("Error while writing logs: {}", e);
+            stream_status.status = match status {
+                IngestionStatus::Record(status) => status,
+                IngestionStatus::Bulk(_) => unreachable!(),
+            };
             return Ok(IngestionResponse::new(
                 http::StatusCode::OK.into(),
                 vec![stream_status],
@@ -237,6 +255,10 @@ async fn ingest_inner(
     drop(stream_params);
     drop(stream_alerts_map);
 
+    stream_status.status = match status {
+        IngestionStatus::Record(status) => status,
+        IngestionStatus::Bulk(_) => unreachable!(),
+    };
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],

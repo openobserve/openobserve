@@ -128,6 +128,11 @@ pub struct BulkResponseItem {
     pub original_record: Option<json::Value>,
 }
 
+pub enum IngestionStatus {
+    Record(RecordStatus),
+    Bulk(BulkResponse),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ShardResponse {
     pub total: i64,
