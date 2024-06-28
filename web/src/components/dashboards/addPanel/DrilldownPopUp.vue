@@ -328,7 +328,7 @@ export default defineComponent({
     variablesData: {
       type: Object,
       default: () => {
-        return { isVariablesLoading: false, values: [] };
+        return {};
       },
     },
   },
@@ -568,12 +568,13 @@ export default defineComponent({
     //want label for dropdown in input and value for its input value
     const selectedValue = computed(() => {
       let selectedValues: any = [];
-      const variableListName = props.variablesData.values
-        .filter((variable: any) => variable.type !== "dynamic_filters")
-        .map((variable: any) => ({
-          label: variable.name,
-          value: "${" + variable.name + "}",
-        }));
+      const variableListName =
+        props?.variablesData?.values
+          ?.filter((variable: any) => variable.type !== "dynamic_filters")
+          ?.map((variable: any) => ({
+            label: variable.name,
+            value: "${" + variable.name + "}",
+          })) ?? [];
 
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
