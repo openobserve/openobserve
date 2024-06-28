@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{fs::File, io::Write, str::FromStr, sync::Arc};
 
+use arrow::util::pretty::pretty_format_batches;
 use arrow_schema::Field;
 use config::{
     get_config,
@@ -34,7 +35,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{FileType, GetExt},
+    common::{Column, FileType, GetExt},
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
@@ -319,6 +320,12 @@ async fn exec_query(
             return Err(e);
         }
     };
+
+    let result = df.clone().explain(false, false)?.collect().await?;
+    let mut file = File::create("output.txt")?;
+    let data = pretty_format_batches(&result)?.to_string();
+    file.write_all(data.as_bytes())?;
+    file.flush()?;
 
     if !rules.is_empty() {
         let mut exprs = Vec::with_capacity(df.schema().fields().len());
@@ -1252,7 +1259,7 @@ pub async fn register_table(
 
     let cfg = get_config();
     // Configure listing options
-    let listing_options = match file_type {
+    let mut listing_options = match file_type {
         FileType::PARQUET => {
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
@@ -1273,6 +1280,14 @@ pub async fn register_table(
             )));
         }
     };
+
+    listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
+        datafusion::logical_expr::SortExpr {
+            expr: Box::new(Expr::Column(Column::new_unqualified("_timestamp"))),
+            asc: true,
+            nulls_first: false,
+        },
+    )]]);
 
     let schema_key = schema.hash_key();
     let prefix = if session.storage_type == StorageType::Memory {
