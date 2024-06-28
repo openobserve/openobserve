@@ -97,6 +97,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-separator />
 
                       <div style="flex: 1">
+                        <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
+                          <q-btn
+                            size="md"
+                            class="q-px-sm no-border"
+                            no-caps
+                            dense
+                            color="primary"
+                            @click="addToDashboard"
+                            title="Add To Dashboard"
+                            >Add To Dashboard</q-btn
+                          >
+                        </div>
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
@@ -160,6 +172,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
     </div>
+    <q-dialog
+      v-model="showAddToDashboardDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <add-to-dashboard @save="addPanelToDashboard" />
+    </q-dialog>
   </div>
 </template>
 
@@ -184,6 +204,9 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import { provide } from "vue";
 import { toRefs } from "vue";
 import { inject } from "vue";
+import { addPanel, getPanelId } from "@/utils/commons";
+import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -195,6 +218,10 @@ const CustomHTMLEditor = defineAsyncComponent(() => {
 
 const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
+});
+
+const AddToDashboard = defineAsyncComponent(() => {
+  return import("./../metrics/AddToDashboard.vue");
 });
 
 export default defineComponent({
@@ -219,9 +246,12 @@ export default defineComponent({
     PanelSchemaRenderer,
     CustomHTMLEditor,
     CustomMarkdownEditor,
+    AddToDashboard,
   },
   emits: ["handleChartApiError", "update:streamList"],
   setup(props, { emit }) {
+    const $q = useQuasar();
+    const router = useRouter();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "logs"
@@ -237,6 +267,8 @@ export default defineComponent({
 
     const { visualizeChartData }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
+
+    const showAddToDashboardDialog = ref(false);
 
     watch(
       () => visualizeChartData.value,
@@ -328,6 +360,51 @@ export default defineComponent({
       emit("update:streamList");
     };
 
+    const addToDashboard = () => {
+      showAddToDashboardDialog.value = true;
+    };
+
+    const addPanelToDashboard = (
+      dashboardId: any,
+      folderId: any,
+      panelTitle: any
+    ) => {
+      let dismiss = $q.notify({
+        message: "Please wait while we add the panel to the dashboard",
+        type: "ongoing",
+        position: "bottom",
+      });
+      dashboardPanelData.data.id = getPanelId();
+      // panel name will come from add to dashboard component
+      dashboardPanelData.data.title = panelTitle;
+      // to create panel dashboard id, paneldata and folderId is required
+      addPanel(store, dashboardId, dashboardPanelData.data, folderId, "default")
+        .then(() => {
+          showAddToDashboardDialog.value = false;
+          $q.notify({
+            message: "Panel added to dashboard",
+            type: "positive",
+            position: "bottom",
+            timeout: 3000,
+          });
+          router.push({
+            name: "viewDashboard",
+            query: { dashboard: dashboardId, folder: folderId },
+          });
+        })
+        .catch((err) => {
+          $q.notify({
+            message: "Error while adding panel",
+            type: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+        })
+        .finally(() => {
+          dismiss();
+        });
+    };
+
     return {
       t,
       layoutSplitterUpdated,
@@ -341,6 +418,9 @@ export default defineComponent({
       metaData,
       chartData,
       streamListUpdated,
+      showAddToDashboardDialog,
+      addPanelToDashboard,
+      addToDashboard,
     };
   },
 });
