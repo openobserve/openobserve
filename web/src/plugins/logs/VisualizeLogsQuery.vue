@@ -96,19 +96,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <DashboardQueryBuilder :dashboardData="{}" />
                       <q-separator />
 
+                      <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
+                        <q-btn
+                          size="md"
+                          class="q-px-sm no-border"
+                          no-caps
+                          dense
+                          color="primary"
+                          @click="addToDashboard"
+                          title="Add To Dashboard"
+                          >Add To Dashboard</q-btn
+                        >
+                      </div>
                       <div style="flex: 1">
-                        <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
-                          <q-btn
-                            size="md"
-                            class="q-px-sm no-border"
-                            no-caps
-                            dense
-                            color="primary"
-                            @click="addToDashboard"
-                            title="Add To Dashboard"
-                            >Add To Dashboard</q-btn
-                          >
-                        </div>
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
