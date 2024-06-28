@@ -89,7 +89,7 @@
               behavior="menu"
               color="input-border"
               bg-color="input-bg"
-              class="q-pl-md no-case"
+              class="q-pl-md no-case showLabelOnTop"
               stack-label
               outlined
               filled

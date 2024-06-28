@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       borderless
       dense
-      class="q-mb-xs"
+      class="q-mb-xs showLabelOnTop"
       style="width: 88%"
     >
     </q-select>
