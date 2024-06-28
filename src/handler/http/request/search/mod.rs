@@ -487,54 +487,16 @@ pub async fn search(
         && c_resp.cache_query_response
         && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
     {
-        let last_rec_ts = get_ts_value(&c_resp.ts_column, res.hits.last().unwrap());
-        let (file_name, cache_end_time) = if last_rec_ts > 0 && last_rec_ts < req.query.end_time {
-            (
-                format!(
-                    "{}_{}_{}.json",
-                    req.query.start_time,
-                    last_rec_ts,
-                    if is_aggregate { 1 } else { 0 }
-                ),
-                last_rec_ts,
-            )
-        } else {
-            (
-                format!(
-                    "{}_{}_{}.json",
-                    req.query.start_time,
-                    req.query.end_time,
-                    if is_aggregate { 1 } else { 0 }
-                ),
-                req.query.end_time,
-            )
-        };
-
-        let res_cache = json::to_string(&res).unwrap();
-        tokio::spawn(async move {
-            let query_key = file_path.replace('/', "_");
-
-            match SearchService::cache::cacher::cache_results_to_disk(
-                &trace_id, &file_path, &file_name, res_cache,
-            )
-            .await
-            {
-                Ok(_) => {
-                    let mut w = QUERY_RESULT_CACHE.write().await;
-                    w.entry(query_key)
-                        .or_insert_with(Vec::new)
-                        .push(ResultCacheMeta {
-                            start_time: req.query.start_time,
-                            end_time: cache_end_time,
-                            is_aggregate,
-                        });
-                    drop(w);
-                }
-                Err(e) => {
-                    println!("Cache results to disk failed: {:?}", e);
-                }
-            }
-        });
+        write_results(
+            &c_resp.ts_column,
+            req.query.start_time,
+            req.query.end_time,
+            &res,
+            file_path,
+            is_aggregate,
+            trace_id,
+        )
+        .await;
     }
     // result cache save changes Ends
 
@@ -1780,4 +1742,57 @@ fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
         serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
         _ => 0_i64,
     }
+}
+
+async fn write_results(
+    ts_column: &str,
+    req_query_start_time: i64,
+    req_query_end_time: i64,
+    res: &config::meta::search::Response,
+    file_path: String,
+    is_aggregate: bool,
+    trace_id: String,
+) {
+    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
+    let cache_end_time = if last_rec_ts > 0 && last_rec_ts < req_query_end_time {
+        last_rec_ts
+    } else {
+        req_query_end_time
+    };
+    let file_name = format!(
+        "{}_{}_{}.json",
+        req_query_start_time,
+        cache_end_time,
+        if is_aggregate { 1 } else { 0 }
+    );
+
+    let res_cache = json::to_string(&res).unwrap();
+    let query_key = file_path.replace('/', "_");
+    tokio::spawn(async move {
+        let file_path_local = file_path.clone();
+
+        match SearchService::cache::cacher::cache_results_to_disk(
+            &trace_id,
+            &file_path_local,
+            &file_name,
+            res_cache,
+        )
+        .await
+        {
+            Ok(_) => {
+                let mut w = QUERY_RESULT_CACHE.write().await;
+                w.entry(query_key)
+                    .or_insert_with(Vec::new)
+                    .push(ResultCacheMeta {
+                        start_time: req_query_start_time,
+                        end_time: cache_end_time,
+                        is_aggregate,
+                    });
+                drop(w);
+            }
+            Err(e) => {
+                log::error!("Cache results to disk failed: {:?}", e);
+            }
+        }
+    });
 }
