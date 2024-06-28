@@ -364,10 +364,10 @@ export default defineComponent({
       },
     });
     const drilldownData = ref(
-      props.isEditMode
+      props?.isEditMode
         ? JSON.parse(
             JSON.stringify(
-              dashboardPanelData.data.config.drilldown[props.drilldownDataIndex]
+              dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex]
             )
           )
         : getDefaultDrilldownData()
@@ -546,8 +546,8 @@ export default defineComponent({
     const saveDrilldown = () => {
       // if editmode then made changes
       // else add new drilldown
-      if (props.isEditMode) {
-        dashboardPanelData.data.config.drilldown[props.drilldownDataIndex] =
+      if (props?.isEditMode) {
+        dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
           drilldownData.value;
       } else {
         dashboardPanelData.data.config.drilldown.push(drilldownData.value);
