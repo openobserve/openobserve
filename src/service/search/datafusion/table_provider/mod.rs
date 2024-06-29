@@ -52,13 +52,10 @@ use datafusion::{
 };
 use datafusion_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType};
 use futures::{future, stream, StreamExt};
-use helpers::{expr_applicable_for_cols, pruned_partition_list, split_files};
+use helpers::{expr_applicable_for_cols, list_files, split_files};
 use object_store::ObjectStore;
 
 mod helpers;
-
-#[cfg(test)]
-mod test_util;
 
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,
@@ -129,7 +126,6 @@ impl NewListingTable {
     async fn list_files_for_scan<'a>(
         &'a self,
         ctx: &'a SessionState,
-        filters: &'a [Expr],
         limit: Option<usize>,
     ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
         let store = if let Some(url) = self.table_paths.first() {
@@ -137,17 +133,12 @@ impl NewListingTable {
         } else {
             return Ok((vec![], Statistics::new_unknown(&self.file_schema)));
         };
-        // list files (with partitions)
-        let file_list = future::try_join_all(self.table_paths.iter().map(|table_path| {
-            pruned_partition_list(
-                ctx,
-                store.as_ref(),
-                table_path,
-                filters,
-                &self.options.file_extension,
-                &self.options.table_partition_cols,
-            )
-        }))
+        // list files
+        let file_list = future::try_join_all(
+            self.table_paths
+                .iter()
+                .map(|table_path| list_files(store.as_ref(), table_path)),
+        )
         .await?;
         let file_list = stream::iter(file_list).flatten();
         // collect the statistics if required by the config
@@ -231,7 +222,7 @@ impl TableProvider for NewListingTable {
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let (mut partitioned_file_lists, statistics) =
-            self.list_files_for_scan(state, filters, limit).await?;
+            self.list_files_for_scan(state, limit).await?;
 
         let projected_schema = project_schema(&self.schema(), projection)?;
 
