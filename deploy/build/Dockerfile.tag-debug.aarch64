@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.19.0-bookworm as webBuilder
+FROM public.ecr.aws/docker/library/node:18.19.0-bookworm AS webBuilder
 WORKDIR /web
 COPY ./web /web/
 
@@ -7,7 +7,7 @@ RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bookworm as builder
-FROM public.ecr.aws/zinclabs/rust:bookworm-sccache as builder
+FROM public.ecr.aws/zinclabs/rust:bookworm-sccache AS builder
 # RUN apt-get update
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
@@ -28,7 +28,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
 RUN cargo build --profile release-prod --features mimalloc --target aarch64-unknown-linux-gnu
 RUN mv /openobserve/target/aarch64-unknown-linux-gnu/release-prod/openobserve /openobserve/target/release/openobserve
 
-FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
+FROM public.ecr.aws/debian/debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3
 RUN update-ca-certificates
