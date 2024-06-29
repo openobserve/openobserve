@@ -1984,7 +1984,7 @@ const useLogs = () => {
 
             setTimeout(async () => {
               await getPaginatedData(queryReq, true);
-            });
+            }, 0);
           }
 
           updateFieldValues();
