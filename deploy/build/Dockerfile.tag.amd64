@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.19.0-bookworm as webBuilder
+FROM public.ecr.aws/docker/library/node:18.19.0-bookworm AS webBuilder
 WORKDIR /web
 COPY ./web /web/
 
@@ -7,7 +7,7 @@ RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bookworm as builder
-FROM public.ecr.aws/zinclabs/rust:bookworm-sccache as builder
+FROM public.ecr.aws/zinclabs/rust:bookworm-sccache AS builder
 # RUN apt-get update
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
@@ -25,7 +25,7 @@ RUN mkdir -p /openobserve/target/release/
 RUN cargo build --profile release-prod --features mimalloc --target x86_64-unknown-linux-gnu
 RUN mv /openobserve/target/x86_64-unknown-linux-gnu/release-prod/openobserve /openobserve/target/release/openobserve
 
-FROM gcr.io/distroless/cc-debian12 as runtime
+FROM gcr.io/distroless/cc-debian12 AS runtime
 COPY --from=builder /openobserve/target/release/openobserve /
 COPY --from=builder /lib/x86_64-linux-gnu/liblzma.so.5 /lib/x86_64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
