@@ -37,7 +37,7 @@ use datafusion::{
     common::{FileType, GetExt},
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
-        listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+        listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
         MemTable,
     },
@@ -60,7 +60,9 @@ use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
-use super::{storage::file_list, transform_udf::get_all_transform};
+use super::{
+    storage::file_list, table_provider::NewListingTable, udf::transform_udf::get_all_transform,
+};
 use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{datafusion::rewrite, sql::Sql, RE_SELECT_WILDCARD},
@@ -615,7 +617,7 @@ pub async fn merge(
         }
     };
 
-    let table = ListingTable::try_new(config)?;
+    let table = NewListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
     // register UDF
@@ -982,7 +984,7 @@ pub async fn convert_parquet_file(
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
 
-    let table = ListingTable::try_new(config)?;
+    let table = NewListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
     // get all sorted data
@@ -1088,7 +1090,7 @@ pub async fn merge_parquet_files(
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
-    let table = Arc::new(ListingTable::try_new(config)?);
+    let table = Arc::new(NewListingTable::try_new(config)?);
     ctx.register_table("tbl", table.clone())?;
 
     let df = ctx.sql(&query_sql).await?;
@@ -1209,23 +1211,23 @@ pub async fn prepare_datafusion_context(
 }
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
-    ctx.register_udf(super::match_udf::MATCH_UDF.clone());
-    ctx.register_udf(super::match_udf::MATCH_IGNORE_CASE_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEX_MATCH_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
-    ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
-    ctx.register_udf(super::date_format_udf::DATE_FORMAT_UDF.clone());
-    ctx.register_udf(super::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
-    ctx.register_udf(super::arrzip_udf::ARR_ZIP_UDF.clone());
-    ctx.register_udf(super::arrindex_udf::ARR_INDEX_UDF.clone());
-    ctx.register_udf(super::arr_descending_udf::ARR_DESCENDING_UDF.clone());
-    ctx.register_udf(super::arrjoin_udf::ARR_JOIN_UDF.clone());
-    ctx.register_udf(super::arrcount_udf::ARR_COUNT_UDF.clone());
-    ctx.register_udf(super::arrsort_udf::ARR_SORT_UDF.clone());
-    ctx.register_udf(super::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
-    ctx.register_udf(super::spath_udf::SPATH_UDF.clone());
-    ctx.register_udf(super::to_arr_string_udf::TO_ARR_STRING.clone());
+    ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
+    ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
+    ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
+    ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
+    ctx.register_udf(super::udf::arrzip_udf::ARR_ZIP_UDF.clone());
+    ctx.register_udf(super::udf::arrindex_udf::ARR_INDEX_UDF.clone());
+    ctx.register_udf(super::udf::arr_descending_udf::ARR_DESCENDING_UDF.clone());
+    ctx.register_udf(super::udf::arrjoin_udf::ARR_JOIN_UDF.clone());
+    ctx.register_udf(super::udf::arrcount_udf::ARR_COUNT_UDF.clone());
+    ctx.register_udf(super::udf::arrsort_udf::ARR_SORT_UDF.clone());
+    ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
+    ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
+    ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
 
     {
         let udf_list = get_all_transform(_org_id).await;
@@ -1306,7 +1308,7 @@ pub async fn register_table(
     } else {
         config = config.with_schema(schema);
     }
-    let mut table = ListingTable::try_new(config)?;
+    let mut table = NewListingTable::try_new(config)?;
     if session.storage_type != StorageType::Tmpfs {
         table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
     }
