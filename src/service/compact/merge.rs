@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Write, sync::Arc};
 
-use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
+use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
@@ -38,7 +38,8 @@ use infra::{
     cache, dist_lock, file_list as infra_file_list,
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        unwrap_partition_time_level, unwrap_stream_settings, SchemaCache,
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+        SchemaCache,
     },
     storage,
 };
@@ -51,7 +52,9 @@ use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::generate_index_on_compactor,
     service::{
-        db, file_list, schema::generate_schema_for_defined_schema_fields, search::datafusion,
+        db, file_list,
+        schema::generate_schema_for_defined_schema_fields,
+        search::datafusion::{self, file_type::FileType},
         stream,
     },
 };
@@ -631,8 +634,10 @@ pub async fn merge_files(
         infra::schema::get_versions(org_id, stream_name, stream_type, Some((min_ts, max_ts)))
             .await?;
     let schema_latest_id = schema_versions.len() - 1;
-    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_latest);
-    let full_text_search_fields = get_stream_setting_fts_fields(&schema_latest);
+    let schema_settings = unwrap_stream_settings(&schema_latest);
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_settings);
+    let full_text_search_fields = get_stream_setting_fts_fields(&schema_settings);
+    let index_fields = get_stream_setting_index_fields(&schema_settings);
     if cfg.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in new_file_list.iter() {
             // get the schema version of the file
@@ -766,6 +771,7 @@ pub async fn merge_files(
         &new_batches,
         stream_type,
         &full_text_search_fields,
+        &index_fields,
     );
 
     let id = ider::generate();
@@ -790,6 +796,8 @@ pub async fn merge_files(
                     new_file_key.clone(),
                     org_id,
                     stream_name,
+                    &full_text_search_fields,
+                    &index_fields,
                 )
                 .await
                 .map_err(|e| {
@@ -1013,23 +1021,27 @@ pub fn generate_inverted_idx_recordbatch(
     batches: &[RecordBatch],
     stream_type: StreamType,
     full_text_search_fields: &[String],
+    index_fields: &[String],
 ) -> Vec<RecordBatch> {
     let cfg = get_config();
     if !cfg.common.inverted_index_enabled || batches.is_empty() || stream_type != StreamType::Logs {
         return Vec::new();
     }
 
-    let mut inverted_idx_columns = if !full_text_search_fields.is_empty() {
-        full_text_search_fields.to_vec()
-    } else {
-        config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-    };
-
     let schema_fields = schema
         .fields()
         .iter()
         .map(|f| f.name())
         .collect::<HashSet<_>>();
+
+    let mut inverted_idx_columns = if !full_text_search_fields.is_empty() {
+        full_text_search_fields.to_vec()
+    } else {
+        config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+    };
+    inverted_idx_columns.extend(index_fields.to_vec());
+    inverted_idx_columns.sort();
+    inverted_idx_columns.dedup();
     inverted_idx_columns.retain(|f| schema_fields.contains(f));
     if inverted_idx_columns.is_empty() {
         return Vec::new();

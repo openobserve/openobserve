@@ -22,13 +22,14 @@ use std::{
 
 use arrow::{
     array::{
-        ArrayRef, BooleanArray, BooleanBuilder, Int64Array, Int64Builder, StringArray,
-        StringBuilder,
+        ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
+        StringArray, StringBuilder,
     },
     datatypes::Field,
     record_batch::RecordBatch,
 };
 use arrow_schema::{DataType, Schema, SchemaRef};
+use bitvec::prelude::*;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
@@ -47,10 +48,17 @@ use config::{
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
     },
-    FxIndexMap,
+    FxIndexMap, INDEX_SEGMENT_LENGTH,
 };
 use hashbrown::HashSet;
-use infra::{cache::tmpfs, schema::SchemaCache, storage};
+use infra::{
+    cache::tmpfs,
+    schema::{
+        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, SchemaCache,
+    },
+    storage,
+};
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use tokio::{
@@ -540,12 +548,14 @@ async fn merge_files(
     let file_name = columns[4].to_string();
 
     // merge files
-    let stream_setting = infra::schema::get_settings(&org_id, &stream_name, stream_type)
-        .await
+    let stream_setting = infra::schema::get_settings(&org_id, &stream_name, stream_type).await;
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_setting);
+    let full_text_search_fields = get_stream_setting_fts_fields(&stream_setting);
+    let index_fields = get_stream_setting_index_fields(&stream_setting);
+    let defined_schema_fields = stream_setting
+        .unwrap_or_default()
+        .defined_schema_fields
         .unwrap_or_default();
-    let bloom_filter_fields = stream_setting.bloom_filter_fields;
-    let full_text_search_fields = stream_setting.full_text_search_keys;
-    let defined_schema_fields = stream_setting.defined_schema_fields.unwrap_or_default();
     let schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema =
@@ -641,6 +651,7 @@ async fn merge_files(
         &new_batches,
         stream_type,
         &full_text_search_fields,
+        &index_fields,
     );
 
     // upload file
@@ -653,6 +664,8 @@ async fn merge_files(
                     new_file_key.clone(),
                     &org_id,
                     &stream_name,
+                    &full_text_search_fields,
+                    &index_fields,
                 )
                 .await
                 .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
@@ -669,12 +682,21 @@ pub(crate) async fn generate_index_on_ingester(
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
-    let record_batches = prepare_index_record_batches(batches, org_id, stream_name, &new_file_key)
-        .await
-        .map_err(|e| anyhow::anyhow!("prepare_index_record_batches error: {}", e))?;
+    let record_batches = prepare_index_record_batches(
+        batches,
+        org_id,
+        stream_name,
+        &new_file_key,
+        full_text_search_fields,
+        index_fields,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("prepare_index_record_batches error: {}", e))?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok(());
     }
@@ -763,9 +785,18 @@ pub(crate) async fn generate_index_on_compactor(
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
 ) -> Result<(String, FileMeta), anyhow::Error> {
-    let mut record_batches =
-        prepare_index_record_batches(batches, org_id, stream_name, &new_file_key).await?;
+    let mut record_batches = prepare_index_record_batches(
+        batches,
+        org_id,
+        stream_name,
+        &new_file_key,
+        full_text_search_fields,
+        index_fields,
+    )
+    .await?;
     if record_batches.is_empty() || record_batches.iter().all(|b| b.num_rows() == 0) {
         return Ok((String::new(), FileMeta::default()));
     }
@@ -817,6 +848,8 @@ async fn prepare_index_record_batches(
     org_id: &str,
     stream_name: &str,
     new_file_key: &str,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
 ) -> Result<Vec<RecordBatch>, anyhow::Error> {
     if batches.is_empty() {
         return Ok(vec![]);
@@ -848,10 +881,12 @@ async fn prepare_index_record_batches(
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
+        Field::new("field", DataType::Utf8, false),
         Field::new("term", DataType::Utf8, true),
         Field::new("file_name", DataType::Utf8, false),
         Field::new("_count", DataType::Int64, false),
         Field::new("deleted", DataType::Boolean, false),
+        Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
@@ -869,14 +904,16 @@ async fn prepare_index_record_batches(
     };
 
     let num_rows = new_batch.num_rows();
+    // process full text search fields
     for column in schema.fields().iter() {
-        if column.data_type() != &DataType::Utf8 {
+        let column_name = column.name();
+        if index_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
             continue;
         }
 
         // get full text search column
         let Some(column_data) = new_batch
-            .column_by_name(column.name())
+            .column_by_name(column_name)
             .unwrap()
             .as_any()
             .downcast_ref::<StringArray>()
@@ -889,7 +926,7 @@ async fn prepare_index_record_batches(
             .flat_map(|i| {
                 split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
                     .into_iter()
-                    .map(|s| (s, time_data.value(i)))
+                    .map(|s| (s, i))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -899,17 +936,21 @@ async fn prepare_index_record_batches(
 
         // unique terms and get the min _timestamp
         let mut uniq_terms = BTreeMap::new();
-        for term in terms {
-            let (time, cnt) = uniq_terms.entry(term.0.to_string()).or_insert((term.1, 0));
-            if *time > term.1 {
-                *time = term.1;
+        for (term, idx) in terms {
+            let term_time = time_data.value(idx);
+            let (time, ids) = uniq_terms
+                .entry(term.to_string())
+                .or_insert((term_time, Vec::new()));
+            if *time > term_time {
+                *time = term_time;
             }
-            *cnt += 1;
+            ids.push(idx);
         }
 
         // build record batch
         let records_len = uniq_terms.len();
         let mut field_timestamp = Int64Builder::with_capacity(records_len);
+        let mut field_field = StringBuilder::with_capacity(records_len, "_all".len() * records_len);
         let mut field_term = StringBuilder::with_capacity(
             records_len,
             uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
@@ -918,27 +959,137 @@ async fn prepare_index_record_batches(
             StringBuilder::with_capacity(records_len, file_name_without_prefix.len() * records_len);
         let mut field_count = Int64Builder::with_capacity(records_len);
         let mut field_deleted = BooleanBuilder::with_capacity(records_len);
-        for (term, (time, count)) in uniq_terms {
+        let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
+        for (term, (time, ids)) in uniq_terms {
             field_timestamp.append_value(time);
+            field_field.append_value("_all");
             field_term.append_value(term);
             field_file_name.append_value(file_name_without_prefix);
-            field_count.append_value(count);
+            field_count.append_value(ids.len() as i64);
             field_deleted.append_value(false);
+            // calculate segment ids
+            let segment_ids = ids
+                .iter()
+                .map(|i| (i / INDEX_SEGMENT_LENGTH) as u8)
+                .collect::<Vec<u8>>();
+            let max_segment_id = segment_ids.iter().max().unwrap_or(&0);
+            println!("fts segment_ids: {:?}", segment_ids);
+            let mut bv = BitVec::<u8>::with_capacity(*max_segment_id as usize + 1);
+            for i in 0..=*max_segment_id {
+                bv.push(segment_ids.contains(&i));
+            }
+            println!("fts byte: {:?}", bv.clone().into_vec());
+            println!("fts bits: {:?}", bv.clone().to_bitvec());
+            field_segment_ids.append_value(bv.into_vec());
         }
 
         let record_batch = RecordBatch::try_new(
             new_schema.clone(),
             vec![
                 Arc::new(field_timestamp.finish()),
+                Arc::new(field_field.finish()),
                 Arc::new(field_term.finish()),
                 Arc::new(field_file_name.finish()),
                 Arc::new(field_count.finish()),
                 Arc::new(field_deleted.finish()),
+                Arc::new(field_segment_ids.finish()),
             ],
         )
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
         indexed_record_batches_to_merge.push(record_batch);
     }
+
+    // process index fields
+    for column in schema.fields().iter() {
+        let column_name = column.name();
+        if full_text_search_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
+            continue;
+        }
+
+        // get index column
+        let Some(column_data) = new_batch
+            .column_by_name(column_name)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+        else {
+            continue;
+        };
+
+        // split the column into terms
+        let terms = (0..num_rows)
+            .map(|i| (column_data.value(i), i))
+            .collect::<Vec<_>>();
+        if terms.is_empty() {
+            continue;
+        }
+
+        // unique terms and get the min _timestamp
+        let mut uniq_terms = BTreeMap::new();
+        for (term, idx) in terms {
+            let term_time = time_data.value(idx);
+            let (time, ids) = uniq_terms
+                .entry(term.to_string())
+                .or_insert((term_time, Vec::new()));
+            if *time > term_time {
+                *time = term_time;
+            }
+            ids.push(idx);
+        }
+
+        // build record batch
+        let records_len = uniq_terms.len();
+        let mut field_timestamp = Int64Builder::with_capacity(records_len);
+        let mut field_field =
+            StringBuilder::with_capacity(records_len, column_name.len() * records_len);
+        let mut field_term = StringBuilder::with_capacity(
+            records_len,
+            uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
+        );
+        let mut field_file_name =
+            StringBuilder::with_capacity(records_len, file_name_without_prefix.len() * records_len);
+        let mut field_count = Int64Builder::with_capacity(records_len);
+        let mut field_deleted = BooleanBuilder::with_capacity(records_len);
+        let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
+        for (term, (time, ids)) in uniq_terms {
+            field_timestamp.append_value(time);
+            field_field.append_value(column_name);
+            field_term.append_value(term);
+            field_file_name.append_value(file_name_without_prefix);
+            field_count.append_value(ids.len() as i64);
+            field_deleted.append_value(false);
+            // calculate segment ids
+            let segment_ids = ids
+                .iter()
+                .map(|i| (i / INDEX_SEGMENT_LENGTH) as u8)
+                .collect::<Vec<u8>>();
+            let max_segment_id = segment_ids.iter().max().unwrap_or(&0);
+            println!("index segment_ids: {:?}", segment_ids);
+            let mut bv = BitVec::<u8>::with_capacity(*max_segment_id as usize + 1);
+            for i in 0..=*max_segment_id {
+                bv.push(segment_ids.contains(&i));
+            }
+            println!("index byte: {:?}", bv.clone().into_vec());
+            println!("index bits: {:?}", bv.clone().to_bitvec());
+            field_segment_ids.append_value(bv.into_vec());
+        }
+
+        let record_batch = RecordBatch::try_new(
+            new_schema.clone(),
+            vec![
+                Arc::new(field_timestamp.finish()),
+                Arc::new(field_field.finish()),
+                Arc::new(field_term.finish()),
+                Arc::new(field_file_name.finish()),
+                Arc::new(field_count.finish()),
+                Arc::new(field_deleted.finish()),
+                Arc::new(field_segment_ids.finish()),
+            ],
+        )
+        .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
+        indexed_record_batches_to_merge.push(record_batch);
+    }
+
     Ok(indexed_record_batches_to_merge)
 }
 

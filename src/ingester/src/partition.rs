@@ -109,10 +109,11 @@ impl Partition {
             // write into parquet buf
             let (bloom_filter_fields, full_text_search_fields) =
                 if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
+                    let settings = infra::schema::unwrap_stream_settings(self.schema.as_ref());
                     let bloom_filter_fields =
-                        infra::schema::get_stream_setting_bloom_filter_fields(self.schema.as_ref());
+                        infra::schema::get_stream_setting_bloom_filter_fields(&settings);
                     let full_text_search_fields =
-                        infra::schema::get_stream_setting_fts_fields(self.schema.as_ref());
+                        infra::schema::get_stream_setting_fts_fields(&settings);
                     (bloom_filter_fields, full_text_search_fields)
                 } else {
                     (vec![], vec![])

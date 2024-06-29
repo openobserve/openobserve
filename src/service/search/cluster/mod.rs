@@ -135,10 +135,13 @@ pub async fn search(
             .max_by_key(|key| key.len())
             .unwrap_or(&String::new())
             .to_string()];
-        let search_condition = format!("term LIKE '%{}%'", terms[0]);
+        let search_condition = format!(
+            "(field is NULL OR field='_all') AND term LIKE '%{}%'",
+            terms[0]
+        );
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
+            "SELECT file_name, field, term, _count, _timestamp, deleted, segment_ids FROM \"{}\" WHERE {}",
             meta.stream_name, search_condition
         );
 

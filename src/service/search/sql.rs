@@ -440,10 +440,11 @@ impl Sql {
             Err(_) => Schema::empty(),
         };
         let schema_fields = schema.fields().to_vec();
+        let stream_settings = infra::schema::unwrap_stream_settings(&schema);
 
         // fetch fts fields
         let mut fts_terms = HashSet::new();
-        let fts_fields = get_stream_setting_fts_fields(&schema);
+        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`

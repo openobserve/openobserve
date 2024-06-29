@@ -34,7 +34,6 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{FileType, GetExt},
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -61,7 +60,10 @@ use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
 use super::{
-    storage::file_list, table_provider::NewListingTable, udf::transform_udf::get_all_transform,
+    file_type::{FileType, GetExt},
+    storage::file_list,
+    table_provider::NewListingTable,
+    udf::transform_udf::get_all_transform,
 };
 use crate::{
     common::meta::functions::VRLResultResolver,
