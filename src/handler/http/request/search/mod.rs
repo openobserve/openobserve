@@ -1538,6 +1538,7 @@ fn merge_response(
                 .collect();
         }
     }
+    cache_response.cached_ratio /= search_response.len() + 1;
 }
 
 fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
