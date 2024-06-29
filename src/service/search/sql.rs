@@ -54,19 +54,23 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
-static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
+pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
-static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
+pub static RE_HISTOGRAM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+
+pub static TS_WITH_ALIAS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -389,7 +393,7 @@ impl Sql {
             meta.limit = if req_query.size >= 0 {
                 req_query.size as i64
             } else {
-                cfg.limit.query_default_limit
+                cfg.limit.query_default_limit * std::cmp::max(1, meta.group_by.len() as i64)
             };
             origin_sql = if meta.order_by.is_empty()
                 && (!sql_mode.eq(&SqlMode::Full)
@@ -846,7 +850,7 @@ pub(crate) fn generate_quick_mode_fields(
     fields
 }
 
-fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
