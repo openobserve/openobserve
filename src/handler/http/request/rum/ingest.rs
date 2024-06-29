@@ -117,7 +117,7 @@ pub async fn data(
         match logs::ingest::ingest(
             &org_id,
             RUM_DATA_STREAM,
-            IngestionRequest::Multi(&body),
+            IngestionRequest::RUM(&body),
             "",
             Some(extend_json),
         )
@@ -158,7 +158,7 @@ pub async fn log(
         match logs::ingest::ingest(
             &org_id,
             RUM_LOG_STREAM,
-            IngestionRequest::Multi(&body),
+            IngestionRequest::RUM(&body),
             "",
             Some(extend_json),
         )
@@ -216,7 +216,7 @@ pub async fn sessionreplay(
         match logs::ingest::ingest(
             &org_id,
             RUM_SESSION_REPLAY_STREAM,
-            IngestionRequest::Multi(&body.into()),
+            IngestionRequest::RUM(&body.into()),
             "",
             Some(extend_json),
         )
