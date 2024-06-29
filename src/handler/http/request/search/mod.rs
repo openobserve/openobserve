@@ -374,12 +374,30 @@ pub async fn search(
                             ])
                             .inc();
                         log::error!("search error: {:?}", err);
-                        return Ok(HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error(
-                                StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                err.to_string(),
+                        return Ok(match err {
+                            errors::Error::ErrorCode(code) => match code {
+                                errors::ErrorCodes::SearchCancelQuery(_) => {
+                                    HttpResponse::TooManyRequests().json(
+                                        meta::http::HttpResponse::error_code_with_trace_id(
+                                            code,
+                                            Some(trace_id),
+                                        ),
+                                    )
+                                }
+                                _ => HttpResponse::InternalServerError().json(
+                                    meta::http::HttpResponse::error_code_with_trace_id(
+                                        code,
+                                        Some(trace_id),
+                                    ),
+                                ),
+                            },
+                            _ => HttpResponse::InternalServerError().json(
+                                meta::http::HttpResponse::error(
+                                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    err.to_string(),
+                                ),
                             ),
-                        ));
+                        });
                     }
                 },
                 Err(err) => {
