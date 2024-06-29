@@ -376,7 +376,11 @@ pub async fn logs_json_handler(
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    req_stats.user_email = Some(user_email.to_string());
+    req_stats.user_email = if user_email.is_empty() {
+        None
+    } else {
+        Some(user_email.to_string())
+    };
     // metric + data usage
     report_request_usage_stats(
         req_stats,
@@ -384,7 +388,7 @@ pub async fn logs_json_handler(
         &stream_name,
         StreamType::Logs,
         UsageType::Logs,
-        0,
+        local_trans.len() as u16,
         started_at,
     )
     .await;

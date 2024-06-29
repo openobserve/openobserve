@@ -281,9 +281,7 @@ pub async fn ingest(
     }
 
     // metric + data usage
-    let time = start.elapsed().as_secs_f64();
-    let fns_length: usize = stream_functions_map.values().map(|v| v.len()).sum();
-
+    let took_time = start.elapsed().as_secs_f64();
     let mut status = IngestionStatus::Bulk(bulk_res);
     for (stream_name, json_data) in json_data_by_stream {
         // check if we are allowed to ingest
@@ -296,9 +294,18 @@ pub async fn ingest(
         // write json data by stream
         let mut req_stats = super::write_logs(org_id, &stream_name, &mut status, json_data).await?;
 
-        req_stats.response_time += time;
-        req_stats.user_email = Some(user_email.to_string());
+        req_stats.response_time += took_time;
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
 
+        let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+        let fns_length = stream_functions_map
+            .get(&key)
+            .map(|v| v.len())
+            .unwrap_or_default();
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -319,7 +326,7 @@ pub async fn ingest(
             "",
             StreamType::Logs.to_string().as_str(),
         ])
-        .observe(time);
+        .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",
