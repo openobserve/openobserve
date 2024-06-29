@@ -354,25 +354,7 @@ pub async fn search(
                 Ok(res) => match res {
                     Ok(res) => results.push(res),
                     Err(err) => {
-                        let time = start.elapsed().as_secs_f64();
-                        metrics::HTTP_RESPONSE_TIME
-                            .with_label_values(&[
-                                "/api/org/_search",
-                                "500",
-                                &org_id,
-                                "",
-                                stream_type.to_string().as_str(),
-                            ])
-                            .observe(time);
-                        metrics::HTTP_INCOMING_REQUESTS
-                            .with_label_values(&[
-                                "/api/org/_search",
-                                "500",
-                                &org_id,
-                                "",
-                                stream_type.to_string().as_str(),
-                            ])
-                            .inc();
+                        report_metrics(start, &org_id, stream_type, "", "500", "_search");
                         log::error!("search error: {:?}", err);
                         return Ok(match err {
                             errors::Error::ErrorCode(code) => match code {
@@ -401,25 +383,8 @@ pub async fn search(
                     }
                 },
                 Err(err) => {
-                    let time = start.elapsed().as_secs_f64();
-                    metrics::HTTP_RESPONSE_TIME
-                        .with_label_values(&[
-                            "/api/org/_search",
-                            "500",
-                            &org_id,
-                            "",
-                            stream_type.to_string().as_str(),
-                        ])
-                        .observe(time);
-                    metrics::HTTP_INCOMING_REQUESTS
-                        .with_label_values(&[
-                            "/api/org/_search",
-                            "500",
-                            &org_id,
-                            "",
-                            stream_type.to_string().as_str(),
-                        ])
-                        .inc();
+                    report_metrics(start, &org_id, stream_type, "", "500", "_search");
+                    log::error!("search error: {:?}", err);
                     log::error!("search error: {:?}", err);
                     return Ok(HttpResponse::InternalServerError().json(
                         meta::http::HttpResponse::error(
@@ -441,26 +406,8 @@ pub async fn search(
     };
 
     // do search
-
     let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/api/org/_search",
-            "200",
-            &org_id,
-            "",
-            stream_type.to_string().as_str(),
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/api/org/_search",
-            "200",
-            &org_id,
-            "",
-            stream_type.to_string().as_str(),
-        ])
-        .inc();
+    report_metrics(start, &org_id, stream_type, "", "200", "_search");
     res.set_trace_id(trace_id.clone());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
     if !range_error.is_empty() {
@@ -722,25 +669,7 @@ pub async fn around(
     let resp_forward = match search_res {
         Ok(res) => res,
         Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
+            report_metrics(start, &org_id, stream_type, &stream_name, "500", "_around");
             log::error!("search around error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -795,25 +724,7 @@ pub async fn around(
     let resp_backward = match search_res {
         Ok(res) => res,
         Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
+            report_metrics(start, &org_id, stream_type, &stream_name, "500", "_around");
             log::error!("search around error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -852,24 +763,7 @@ pub async fn around(
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
     let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/api/org/_around",
-            "200",
-            &org_id,
-            &stream_name,
-            stream_type.to_string().as_str(),
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/api/org/_around",
-            "200",
-            &org_id,
-            &stream_name,
-            stream_type.to_string().as_str(),
-        ])
-        .inc();
+    report_metrics(start, &org_id, stream_type, &stream_name, "200", "_around");
 
     let user_id = match in_req.headers().get("user_id") {
         Some(v) => v.to_str().unwrap(),
@@ -1236,25 +1130,7 @@ async fn values_v1(
     let resp_search = match search_res {
         Ok(res) => res,
         Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_values/v1",
-                    "500",
-                    org_id,
-                    stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_values/v1",
-                    "500",
-                    org_id,
-                    stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
+            report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v1");
             log::error!("search values error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -1291,24 +1167,7 @@ async fn values_v1(
     resp.cached_ratio = resp_search.cached_ratio;
 
     let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/api/org/_values/v1",
-            "200",
-            org_id,
-            stream_name,
-            stream_type.to_string().as_str(),
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/api/org/_values/v1",
-            "200",
-            org_id,
-            stream_name,
-            stream_type.to_string().as_str(),
-        ])
-        .inc();
+    report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v1");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
@@ -1466,25 +1325,7 @@ async fn values_v2(
     let resp_search = match search_res {
         Ok(res) => res,
         Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_values/v2",
-                    "500",
-                    org_id,
-                    stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_values/v2",
-                    "500",
-                    org_id,
-                    stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
+            report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v2");
             log::error!("search values error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -1520,24 +1361,7 @@ async fn values_v2(
     resp.cached_ratio = resp_search.cached_ratio;
 
     let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/api/org/_values/v2",
-            "200",
-            org_id,
-            stream_name,
-            stream_type.to_string().as_str(),
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/api/org/_values/v2",
-            "200",
-            org_id,
-            stream_name,
-            stream_type.to_string().as_str(),
-        ])
-        .inc();
+    report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v2");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
@@ -1646,47 +1470,11 @@ pub async fn search_partition(
     // do search
     match search_res {
         Ok(res) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_search_partition",
-                    "200",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_search_partition",
-                    "200",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
+            report_metrics(start, &org_id, stream_type, "", "200", "_search_partition");
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_search_partition",
-                    "500",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_search_partition",
-                    "500",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
+            report_metrics(start, &org_id, stream_type, "", "500", "_search_partition");
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
@@ -1813,4 +1601,35 @@ async fn write_results(
             }
         }
     });
+}
+
+#[inline]
+fn report_metrics(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    code: &str,
+    uri: &str,
+) {
+    let time = start.elapsed().as_secs_f64();
+    let uri = format!("/api/org/{}", uri);
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
 }
