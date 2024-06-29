@@ -1915,6 +1915,7 @@ const useLogs = () => {
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
           refreshPartitionPagination(regeratePaginationFlag);
 
+          console.log(res.data.from, searchObj.data.queryResults.subpage)
           if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult) {
               searchObj.data.queryResults.from += res.data.from;
