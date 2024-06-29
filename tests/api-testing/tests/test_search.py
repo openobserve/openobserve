@@ -661,7 +661,7 @@ def test_e2e_distinctquery(create_session, base_url):
     response_data = resp_get_distinctquery.json()
 
 
-def test_e2e_cacheddata(create_session, base_url):
+def test_e2e_cachedscenario(create_session, base_url):
     """Running an E2E test for valid SQL query."""
 
     session = create_session

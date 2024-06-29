@@ -825,7 +825,7 @@ test.describe("Sanity testcases", () => {
     const seconds = String(date.getSeconds()).padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
-  test.skip("should compare time displayed in table dashboard after changing timezone and then delete it ", async ({ page }) => {
+  test.skip("should compare time displayed in table dashboards after changing timezone and then delete it ", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_tabledashboard";
     const headers = getHeaders();
