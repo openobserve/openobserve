@@ -36,7 +36,7 @@ impl Usage for UsageServerImpl {
         let resp = crate::service::logs::ingest::ingest(
             report_to_org_id.unwrap().to_str().unwrap(),
             &report_to_stream,
-            IngestionRequest::JSON(&in_data.data.into()),
+            IngestionRequest::Usage(&in_data.data.into()),
             "",
             None,
         )

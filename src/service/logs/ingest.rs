@@ -54,7 +54,8 @@ pub async fn ingest(
     extend_json: Option<&HashMap<String, serde_json::Value>>,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
-    let started_at = Utc::now().timestamp_micros();
+    let started_at: i64 = Utc::now().timestamp_micros();
+    let mut need_usage_report = true;
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
@@ -84,20 +85,51 @@ pub async fn ingest(
     // End get user defined schema
 
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
-    let (ep, data) = match in_req {
+    let (endpoint, usage_type, data) = match in_req {
         IngestionRequest::JSON(req) => {
             json_req = json::from_slice(req).unwrap_or({
                 let val: json::Value = json::from_slice(req)?;
                 vec![val]
             });
-            ("/api/org/ingest/logs/_json", IngestionData::JSON(&json_req))
+            (
+                "/api/org/ingest/logs/_json",
+                UsageType::Json,
+                IngestionData::JSON(&json_req),
+            )
         }
-        IngestionRequest::GCP(req) => ("/api/org/ingest/logs/_gcs", IngestionData::GCP(req)),
-        IngestionRequest::Multi(req) => ("/api/org/ingest/logs/_multi", IngestionData::Multi(req)),
+        IngestionRequest::Multi(req) => (
+            "/api/org/ingest/logs/_multi",
+            UsageType::Multi,
+            IngestionData::Multi(req),
+        ),
+        IngestionRequest::GCP(req) => (
+            "/api/org/ingest/logs/_gcs",
+            UsageType::GCPSubscription,
+            IngestionData::GCP(req),
+        ),
         IngestionRequest::KinesisFH(req) => (
             "/api/org/ingest/logs/_kinesis",
+            UsageType::KinesisFirehose,
             IngestionData::KinesisFH(req),
         ),
+        IngestionRequest::RUM(req) => (
+            "/api/org/ingest/logs/_rum",
+            UsageType::RUM,
+            IngestionData::Multi(req),
+        ),
+        IngestionRequest::Usage(req) => {
+            // no need to report usage for usage data
+            need_usage_report = false;
+            json_req = json::from_slice(req).unwrap_or({
+                let val: json::Value = json::from_slice(req)?;
+                vec![val]
+            });
+            (
+                "/api/org/ingest/logs/_usage",
+                UsageType::Json,
+                IngestionData::JSON(&json_req),
+            )
+        }
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
@@ -186,7 +218,7 @@ pub async fn ingest(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            ep,
+            endpoint,
             "200",
             org_id,
             &stream_name,
@@ -195,7 +227,7 @@ pub async fn ingest(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            ep,
+            endpoint,
             "200",
             org_id,
             &stream_name,
@@ -210,16 +242,18 @@ pub async fn ingest(
     };
 
     // report data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        &stream_name,
-        StreamType::Logs,
-        UsageType::Json,
-        local_trans.len() as u16,
-        started_at,
-    )
-    .await;
+    if need_usage_report {
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            StreamType::Logs,
+            usage_type,
+            local_trans.len() as u16,
+            started_at,
+        )
+        .await;
+    }
 
     // drop variables
     drop(runtime);
