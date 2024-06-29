@@ -312,3 +312,40 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     indices.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(HttpResponse::Ok().json(ListStream { list: indices }))
 }
+
+#[delete("/{org_id}/streams/{stream_name}/cache/results")]
+async fn delete_stream_cache(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    let path = if stream_name.eq("_all") {
+        org_id
+    } else {
+        format!("{}/{}/{}", org_id, stream_type, stream_name)
+    };
+
+    match crate::service::search::cluster::cacher::delete_cached_results(path).await {
+        true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "cache deleted".to_string(),
+        ))),
+        false => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Error deleting cache, please retry".to_string(),
+        ))),
+    }
+}

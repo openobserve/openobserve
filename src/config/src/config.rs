@@ -695,6 +695,12 @@ pub struct Common {
         help = "Streams for which dedicated MemTable will be used as comma separated values"
     )]
     pub mem_table_individual_streams: String,
+    #[env_config(
+        name = "ZO_RESULT_CACHE_ENABLED",
+        default = "false",
+        help = "Enable result cache for query results"
+    )]
+    pub result_cache_enabled: bool,
 }
 
 #[derive(EnvConfig)]
