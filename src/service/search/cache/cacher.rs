@@ -209,6 +209,7 @@ pub async fn get_cached_results(
                                             if !(hit_ts >= delta.delta_start_time
                                                 && hit_ts < delta.delta_end_time)
                                                 && (hit_ts <= end_time && hit_ts >= start_time)
+                                                && hit_ts < matching_cache_meta.end_time
                                             {
                                                 to_retain.push(hit.clone());
                                             }
