@@ -1982,7 +1982,9 @@ const useLogs = () => {
 
             searchObj.data.queryResults.subpage++;
 
-            await getPaginatedData(queryReq, true);
+            setTimeout(async () => {
+              await getPaginatedData(queryReq, true);
+            });
           }
 
           updateFieldValues();
