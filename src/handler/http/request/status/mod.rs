@@ -70,7 +70,7 @@ use crate::{
     },
     service::{
         db,
-        search::datafusion::{storage::file_statistics_cache, DEFAULT_FUNCTIONS},
+        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
     },
 };
 
