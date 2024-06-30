@@ -285,7 +285,7 @@ pub async fn search(
         })
     }
 
-    println!("c_resp deltas are: {:?}", c_resp.deltas);
+    log::info!("query deltas are: {:?}", c_resp.deltas);
     // Result caching check ends
     let mut results = Vec::new();
     let mut res = if should_exec_query {
