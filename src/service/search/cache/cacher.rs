@@ -185,6 +185,12 @@ pub async fn get_cached_results(
             .max_by_key(|result| result.end_time.min(end_time) - result.start_time.max(start_time))
         {
             Some(matching_meta) => {
+                let file_name = format!(
+                    "{}_{}_{}.json",
+                    matching_meta.start_time,
+                    matching_meta.end_time,
+                    if is_aggregate { 1 } else { 0 }
+                );
                 let mut matching_cache_meta = matching_meta.clone();
                 // calculate delta time range to fetch the delta data using search query
                 let cfg = get_config();
@@ -207,12 +213,6 @@ pub async fn get_cached_results(
                 let remove_hits: Vec<&QueryDelta> =
                     deltas.iter().filter(|d| d.delta_removed_hits).collect();
 
-                let file_name = format!(
-                    "{}_{}_{}.json",
-                    matching_cache_meta.start_time,
-                    matching_cache_meta.end_time,
-                    if is_aggregate { 1 } else { 0 }
-                );
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
