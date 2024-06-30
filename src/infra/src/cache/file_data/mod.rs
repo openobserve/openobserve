@@ -93,6 +93,27 @@ impl CacheStrategy {
             CacheStrategy::Fifo((queue, _)) => queue.is_empty(),
         }
     }
+
+    fn remove_key(&mut self, key: &str) -> Option<(String, usize)> {
+        match self {
+            CacheStrategy::Lru(cache) => cache.remove_entry(key),
+            CacheStrategy::Fifo((queue, set)) => {
+                if queue.is_empty() {
+                    return None;
+                }
+                let mut index = 0;
+                while index < queue.len() {
+                    if queue[index].0 == key {
+                        let (k, v) = queue.remove(index).unwrap();
+                        set.remove(&k);
+                        return Some((k, v));
+                    }
+                    index += 1;
+                }
+                None
+            }
+        }
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {

@@ -23,7 +23,7 @@ use config::{
     get_config,
     meta::{
         sql::{Sql as MetaSql, SqlOperator},
-        stream::{FileKey, StreamPartition, StreamType},
+        stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
     QUICK_MODEL_FIELDS,
 };
@@ -38,6 +38,7 @@ use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
 use crate::{
     common::meta::stream::StreamParams,
@@ -53,19 +54,23 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
-static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
+pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
-static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
+pub static RE_HISTOGRAM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+
+pub static TS_WITH_ALIAS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -78,8 +83,9 @@ pub struct Sql {
     pub fulltext: Vec<(String, String)>,
     pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
     pub sql_mode: SqlMode,
-    pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
-                          * data from the latest file */
+    pub fast_mode: bool, /* there is no group by, no aggregatioin,
+                          * no where or only 1 equality where clause with term as a partition
+                          * key, we can just get data from the latest file */
     pub schema: Schema,
     pub query_context: String,
     pub uses_zo_fn: bool,
@@ -146,17 +152,13 @@ impl Sql {
             }
         };
 
+        // Hack for table name
+        // DataFusion disallow use `k8s-logs-2022.09.11` as table name
+        let stream_name = meta.source.clone();
+        let mut fast_mode =
+            is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
+
         let cfg = get_config();
-        // need check some things:
-        // 1. no where
-        // 2. no aggregation
-        // 3. no group by
-        let mut fast_mode = meta.selection.is_none()
-            && meta.group_by.is_empty()
-            && (meta.order_by.is_empty() || meta.order_by[0].0 == cfg.common.column_timestamp)
-            && !meta.fields.iter().any(|f| f.contains('('))
-            && !meta.field_alias.iter().any(|f| f.0.contains('('))
-            && !origin_sql.to_lowercase().contains("distinct");
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -223,9 +225,6 @@ impl Sql {
             }
         }
 
-        // Hack for table name
-        // DataFusion disallow use `k8s-logs-2022.09.11` as table name
-        let stream_name = meta.source.clone();
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{stream_name}[ '"]?"#)).unwrap();
 
         // Check if at least one match exists
@@ -394,7 +393,7 @@ impl Sql {
             meta.limit = if req_query.size >= 0 {
                 req_query.size as i64
             } else {
-                cfg.limit.query_default_limit
+                cfg.limit.query_default_limit * std::cmp::max(1, meta.group_by.len() as i64)
             };
             origin_sql = if meta.order_by.is_empty()
                 && (!sql_mode.eq(&SqlMode::Full)
@@ -851,7 +850,7 @@ pub(crate) fn generate_quick_mode_fields(
     fields
 }
 
-fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
@@ -1023,6 +1022,56 @@ fn split_sql_token(text: &str) -> Vec<String> {
         }
     }
     tokens
+}
+
+/// need check some things:
+///  1. no where or 1 equality where clause and term is partition key
+///  2. no aggregation
+///  3. no group by
+async fn is_fast_mode(
+    meta: &MetaSql,
+    origin_sql: &str,
+    org_id: &str,
+    stream_type: &StreamType,
+    stream_name: &str,
+) -> bool {
+    let cfg = get_config();
+    if meta.group_by.is_empty()
+        && (meta.order_by.is_empty() || meta.order_by[0].0 == cfg.common.column_timestamp)
+        && !meta.fields.iter().any(|f| f.contains('('))
+        && !meta.field_alias.iter().any(|f| f.0.contains('('))
+        && !origin_sql.to_lowercase().contains("distinct")
+    {
+        match &meta.selection {
+            None => true,
+            Some(selection) => match selection {
+                Expr::BinaryOp { left, op, right: _ } => match (left.as_ref(), op) {
+                    (
+                        Expr::Identifier(Ident {
+                            value,
+                            quote_style: _,
+                        }),
+                        BinaryOperator::Eq,
+                    ) => {
+                        let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                            org_id,
+                            stream_type,
+                            stream_name,
+                        )
+                        .await;
+                        partition_det.partition_keys.iter().any(|stream_partition| {
+                            stream_partition.types == StreamPartitionType::Value
+                                && stream_partition.field == *value
+                        })
+                    }
+                    _ => false,
+                },
+                _ => false,
+            },
+        }
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]

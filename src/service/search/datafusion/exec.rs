@@ -37,7 +37,7 @@ use datafusion::{
     common::{FileType, GetExt},
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
-        listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+        listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
         MemTable,
     },
@@ -60,7 +60,9 @@ use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
-use super::{storage::file_list, transform_udf::get_all_transform};
+use super::{
+    storage::file_list, table_provider::NewListingTable, udf::transform_udf::get_all_transform,
+};
 use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{datafusion::rewrite, sql::Sql, RE_SELECT_WILDCARD},
@@ -594,7 +596,7 @@ pub async fn merge(
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(cfg.limit.cpu_num);
+        .with_target_partitions(ctx.state().config().target_partitions());
     let list_url = format!("tmpfs:///{}/", work_dir.name());
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
@@ -615,7 +617,7 @@ pub async fn merge(
         }
     };
 
-    let table = ListingTable::try_new(config)?;
+    let table = NewListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
     // register UDF
@@ -954,13 +956,13 @@ pub async fn convert_parquet_file(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(ctx.state().config().target_partitions())
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(ctx.state().config().target_partitions())
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
@@ -982,7 +984,7 @@ pub async fn convert_parquet_file(
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
 
-    let table = ListingTable::try_new(config)?;
+    let table = NewListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
     // get all sorted data
@@ -1051,16 +1053,6 @@ pub async fn merge_parquet_files(
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(cfg.limit.cpu_num);
-    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema.clone());
-    let table = Arc::new(ListingTable::try_new(config)?);
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
@@ -1084,9 +1076,21 @@ pub async fn merge_parquet_files(
         )
     };
 
+    // create datafusion context
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+
+    // Configure listing options
+    let file_format = ParquetFormat::default();
+    let listing_options = ListingOptions::new(Arc::new(file_format))
+        .with_file_extension(FileType::PARQUET.get_ext())
+        .with_target_partitions(ctx.state().config().target_partitions());
+    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
+    let config = ListingTableConfig::new(prefix)
+        .with_listing_options(listing_options)
+        .with_schema(schema.clone());
+    let table = Arc::new(NewListingTable::try_new(config)?);
     ctx.register_table("tbl", table.clone())?;
 
     let df = ctx.sql(&query_sql).await?;
@@ -1207,23 +1211,23 @@ pub async fn prepare_datafusion_context(
 }
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
-    ctx.register_udf(super::match_udf::MATCH_UDF.clone());
-    ctx.register_udf(super::match_udf::MATCH_IGNORE_CASE_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEX_MATCH_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
-    ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
-    ctx.register_udf(super::date_format_udf::DATE_FORMAT_UDF.clone());
-    ctx.register_udf(super::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
-    ctx.register_udf(super::arrzip_udf::ARR_ZIP_UDF.clone());
-    ctx.register_udf(super::arrindex_udf::ARR_INDEX_UDF.clone());
-    ctx.register_udf(super::arr_descending_udf::ARR_DESCENDING_UDF.clone());
-    ctx.register_udf(super::arrjoin_udf::ARR_JOIN_UDF.clone());
-    ctx.register_udf(super::arrcount_udf::ARR_COUNT_UDF.clone());
-    ctx.register_udf(super::arrsort_udf::ARR_SORT_UDF.clone());
-    ctx.register_udf(super::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
-    ctx.register_udf(super::spath_udf::SPATH_UDF.clone());
-    ctx.register_udf(super::to_arr_string_udf::TO_ARR_STRING.clone());
+    ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
+    ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
+    ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
+    ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
+    ctx.register_udf(super::udf::arrzip_udf::ARR_ZIP_UDF.clone());
+    ctx.register_udf(super::udf::arrindex_udf::ARR_INDEX_UDF.clone());
+    ctx.register_udf(super::udf::arr_descending_udf::ARR_DESCENDING_UDF.clone());
+    ctx.register_udf(super::udf::arrjoin_udf::ARR_JOIN_UDF.clone());
+    ctx.register_udf(super::udf::arrcount_udf::ARR_COUNT_UDF.clone());
+    ctx.register_udf(super::udf::arrsort_udf::ARR_SORT_UDF.clone());
+    ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
+    ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
+    ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
 
     {
         let udf_list = get_all_transform(_org_id).await;
@@ -1255,12 +1259,14 @@ pub async fn register_table(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
+                .with_target_partitions(ctx.state().config().target_partitions())
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
+                .with_target_partitions(ctx.state().config().target_partitions())
                 .with_collect_stat(true)
         }
         _ => {
@@ -1302,7 +1308,7 @@ pub async fn register_table(
     } else {
         config = config.with_schema(schema);
     }
-    let mut table = ListingTable::try_new(config)?;
+    let mut table = NewListingTable::try_new(config)?;
     if session.storage_type != StorageType::Tmpfs {
         table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
     }

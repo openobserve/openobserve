@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,30 +13,5 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
-pub mod exec;
-pub mod rewrite;
-pub mod storage;
-pub mod table_provider;
-pub mod udf;
-
-#[derive(PartialEq, Debug)]
-pub enum MemoryPoolType {
-    Greedy,
-    Fair,
-    None,
-}
-
-impl FromStr for MemoryPoolType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "greedy" => Ok(MemoryPoolType::Greedy),
-            "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
-            "none" | "off" => Ok(MemoryPoolType::None),
-            _ => Err(format!("Invalid memory pool type '{}'", s)),
-        }
-    }
-}
+pub mod cacher;
+pub mod result_utils;
