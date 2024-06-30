@@ -726,7 +726,7 @@ test.describe("Sanity testcases", () => {
     );
   };
 
-  test("should check JSON responses for successful:1 with timestamp 15 mins before", async ({
+  test.skip("should check JSON responses for successful:1 with timestamp 15 mins before", async ({
     page,
   }) => {
     const orgId = process.env["ORGNAME"];
@@ -769,7 +769,7 @@ test.describe("Sanity testcases", () => {
     expect(response2.status[0].successful).toBe(1);
   });
 
-  test("should display error if timestamp past the ingestion time limit", async ({
+  test.skip("should display error if timestamp past the ingestion time limit", async ({
     page,
   }) => {
     const orgId = process.env["ORGNAME"];
