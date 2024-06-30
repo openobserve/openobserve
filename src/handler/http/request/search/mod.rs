@@ -34,6 +34,7 @@ use infra::{
     schema::STREAM_SCHEMAS_LATEST,
 };
 use opentelemetry::{global, trace::TraceContextExt};
+use regex_syntax::ast::print;
 use tracing::{Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -284,6 +285,8 @@ pub async fn search(
             delta_removed_hits: false,
         })
     }
+
+    println!("c_resp deltas are: {:?}", c_resp.deltas);
     // Result caching check ends
     let mut results = Vec::new();
     let mut res = if should_exec_query {
