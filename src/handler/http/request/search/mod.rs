@@ -284,6 +284,8 @@ pub async fn search(
             delta_removed_hits: false,
         })
     }
+
+    log::info!("query deltas are: {:?}", c_resp.deltas);
     // Result caching check ends
     let mut results = Vec::new();
     let mut res = if should_exec_query {
@@ -321,6 +323,14 @@ pub async fn search(
         let search_tracing = !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled;
         let mut tasks = Vec::new();
 
+        if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
+            log::info!(
+                "Query original start time: {}, end time : {}",
+                req.query.start_time,
+                req.query.end_time
+            );
+        }
+
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let http_span_local = http_span.clone();
             let mut req = req.clone();
@@ -332,6 +342,15 @@ pub async fn search(
                 let trace_id = trace_id.clone();
                 req.query.start_time = delta.delta_start_time;
                 req.query.end_time = delta.delta_end_time;
+                let cfg = get_config();
+
+                if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
+                    log::info!(
+                        "Query new start time: {}, end time : {}",
+                        req.query.start_time,
+                        req.query.end_time
+                    );
+                }
 
                 let search_fut = SearchService::search(
                     &trace_id,
@@ -384,7 +403,6 @@ pub async fn search(
                 },
                 Err(err) => {
                     report_metrics(start, &org_id, stream_type, "", "500", "_search");
-                    log::error!("search error: {:?}", err);
                     log::error!("search error: {:?}", err);
                     return Ok(HttpResponse::InternalServerError().json(
                         meta::http::HttpResponse::error(
