@@ -34,7 +34,6 @@ use infra::{
     schema::STREAM_SCHEMAS_LATEST,
 };
 use opentelemetry::{global, trace::TraceContextExt};
-use regex_syntax::ast::print;
 use tracing::{Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
