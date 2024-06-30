@@ -1811,6 +1811,20 @@ const useLogs = () => {
     });
   };
 
+  const processPostPaginationData = () => {
+    updateFieldValues();
+
+    //extract fields from query response
+    extractFields();
+
+    //update grid columns
+    updateGridColumns();
+
+    filterHitsColumns();
+
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+  }
+
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false
@@ -1982,34 +1996,21 @@ const useLogs = () => {
 
             searchObj.data.queryResults.subpage++;
 
+            setTimeout(async () => {
+              processPostPaginationData();
+
+              searchObj.data.functionError = "";
+              if (
+                res.data.hasOwnProperty("function_error") &&
+                res.data.function_error
+              ) {
+                searchObj.data.functionError = res.data.function_error;
+              }
+            }, 0);
             await getPaginatedData(queryReq, true);
           }
-
-          updateFieldValues();
-
-          //extract fields from query response
-          extractFields();
-
-          //update grid columns
-          updateGridColumns();
-
-          filterHitsColumns();
-
-          // disabled histogram case, generate histogram histogram title
-          // also calculate the total based on the partitions total
-          // if (
-          //   searchObj.meta.showHistogram == false ||
-          //   searchObj.meta.sqlMode == true
-          // ) {
-          //   searchObj.data.queryResults.total = 0;
-          //   for (const totalNumber of searchObj.data.queryResults
-          //     .partitionDetail.partitionTotal) {
-          //     if (totalNumber > 0) {
-          //       searchObj.data.queryResults.total += totalNumber;
-          //     }
-          //   }
-          // }
-          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          
+          await processPostPaginationData();
 
           searchObj.data.functionError = "";
           if (
@@ -2026,7 +2027,8 @@ const useLogs = () => {
               searchObjDebug["paginatedDataReceivedEndTime"] -
               searchObjDebug["paginatedDataReceivedStartTime"]
             } milliseconds to complete`
-          );
+          );            
+
           resolve(true);
         })
         .catch((err) => {

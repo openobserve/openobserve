@@ -27,12 +27,14 @@ use config::{
         asynchronism::file::*,
         hash::{gxhash, Sum64},
     },
+    RwAHashMap,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
 use super::CacheStrategy;
-use crate::storage;
+use crate::{cache::meta::ResultCacheMeta, storage};
 
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
@@ -42,6 +44,9 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     }
     files
 });
+
+pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
+    Lazy::new(Default::default);
 
 pub struct FileData {
     max_size: usize,
@@ -194,6 +199,47 @@ impl FileData {
         Ok(())
     }
 
+    async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+        log::debug!("[trace_id {trace_id}] File disk cache remove file {}", file);
+
+        let item = self.data.remove_key(file);
+        if item.is_none() {
+            log::error!("[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none");
+        }
+        let (key, data_size) = item.unwrap();
+        // delete file from local disk
+        let file_path = format!(
+            "{}{}{}",
+            self.root_dir,
+            self.choose_multi_dir(key.as_str()),
+            key
+        );
+        if let Err(e) = fs::remove_file(&file_path).await {
+            log::error!(
+                "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
+                file_path,
+                e
+            );
+        }
+        // metrics
+        let columns = key.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::QUERY_DISK_CACHE_FILES
+                .with_label_values(&[columns[1], columns[2]])
+                .dec();
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[columns[1], columns[2]])
+                .sub(data_size as i64);
+        }
+
+        self.cur_size -= data_size;
+        log::info!(
+            "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
+            data_size
+        );
+        Ok(())
+    }
+
     fn choose_multi_dir(&self, file: &str) -> String {
         if self.multi_dir.is_empty() {
             return "".to_string();
@@ -284,9 +330,22 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     files.set(trace_id, file, data).await
 }
 
+#[inline]
+pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+    if !get_config().disk_cache.enabled || is_local_disk_storage() {
+        return Ok(());
+    }
+    let idx = get_bucket_idx(file);
+    let mut files = FILES[idx].write().await;
+    files.remove(trace_id, file).await
+}
+
 #[async_recursion]
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
+
+    let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
+
     loop {
         match entries.next_entry().await {
             Err(e) => return Err(e.into()),
@@ -346,6 +405,21 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                     // metrics
                     let columns = file_key.split('/').collect::<Vec<&str>>();
+                    if columns[0] == "results" {
+                        let query_key = format!(
+                            "{}_{}_{}_{}",
+                            columns[1], columns[2], columns[3], columns[4]
+                        );
+                        let meta = columns[5].split('_').collect::<Vec<&str>>();
+                        let is_aggregate = meta[2] == "1";
+                        result_cache.entry(query_key).or_insert_with(Vec::new).push(
+                            ResultCacheMeta {
+                                start_time: meta[0].parse().unwrap(),
+                                end_time: meta[1].parse().unwrap(),
+                                is_aggregate,
+                            },
+                        );
+                    };
                     metrics::QUERY_DISK_CACHE_FILES
                         .with_label_values(&[columns[1], columns[2]])
                         .inc();
@@ -356,6 +430,8 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             }
         }
     }
+    // write all data from result_cache to QUERY_RESULT_CACHE
+    QUERY_RESULT_CACHE.write().await.extend(result_cache);
     Ok(())
 }
 
@@ -410,6 +486,10 @@ pub async fn is_empty() -> bool {
         }
     }
     true
+}
+#[inline]
+pub async fn get_dir() -> String {
+    FILES[0].read().await.root_dir.clone()
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
