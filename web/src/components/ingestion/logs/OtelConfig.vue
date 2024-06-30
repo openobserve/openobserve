@@ -68,7 +68,7 @@ const getOtelGrpcConfig = computed(() => {
 const getOtelHttpConfig = computed(() => {
   return `exporters:
   otlphttp/openobserve:
-    endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}/
+    endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}
     headers:
       Authorization: Basic ${accessKey.value}
       stream-name: default`;
