@@ -16,7 +16,7 @@
 use std::{fs::File, io::Write, str::FromStr, sync::Arc};
 
 use arrow::util::pretty::pretty_format_batches;
-use arrow_schema::Field;
+use arrow_schema::{Field, SchemaBuilder};
 use config::{
     get_config,
     meta::{
@@ -323,7 +323,7 @@ async fn exec_query(
         }
     };
 
-    let result = df.clone().explain(false, false)?.collect().await?;
+    let result = df.clone().explain(true, false)?.collect().await?;
     let mut file = File::create("output.txt")?;
     let data = pretty_format_batches(&result)?.to_string();
     file.write_all(data.as_bytes())?;
@@ -1126,6 +1126,9 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         "datafusion.execution.listing_table_ignore_subdirectory",
         false,
     );
+
+    config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
+
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
@@ -1321,7 +1324,19 @@ pub async fn register_table(
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {
-        config = config.with_schema(schema);
+        let mut build = SchemaBuilder::new();
+        for field in schema.fields() {
+            if field.name() != "_timestamp" {
+                build.push(Field::new(
+                    field.name(),
+                    field.data_type().clone(),
+                    field.is_nullable(),
+                ));
+            } else {
+                build.push(Field::new("_timestamp", DataType::Int64, false));
+            }
+        }
+        config = config.with_schema(build.finish().into());
     }
     let mut table = NewListingTable::try_new(config)?;
     if session.storage_type != StorageType::Tmpfs {
