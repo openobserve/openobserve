@@ -259,16 +259,16 @@ export default defineComponent({
       return isAllVariablesAndPanelsDataLoaded;
     });
 
-    watch(variablesAndPanelsDataLoadingState, () => {
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
-      );
-      console.log(
-        "isDashboardVariablesAndPanelsDataLoadedDebouncedValue",
-        panelsValues
-      );
-      emit("panelsValues", panelsValues);
-    });
+    watch(
+      variablesAndPanelsDataLoadingState,
+      (newValue) => {
+        const panelsValues = Object.values(newValue.panels);
+        console.log("panelsValues emitted from child:", panelsValues);
+        emit("panelsValues", panelsValues);
+      },
+      { deep: true }
+    );
+
     // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
     let {
       valueRef: isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
