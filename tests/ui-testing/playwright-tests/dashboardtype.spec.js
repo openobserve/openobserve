@@ -116,6 +116,7 @@ test.describe("dashboard testcases", () => {
         await page.waitForTimeout(3000)
         await page.locator('[data-test="selected-chart-area-item"] img').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-x-data"]').click();
+        await page.locator('[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="date-time-btn"]').click();

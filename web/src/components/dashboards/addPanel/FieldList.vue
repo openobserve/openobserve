@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     padding="sm"
                     :disabled="isAddBreakdownNotAllowed"
                     @click="addBreakDownAxisItem(props.row)"
-                    data-test="dashboard-add-x-data"
+                    data-test="dashboard-add-b-data"
                   >
                     <div>
                       {{
