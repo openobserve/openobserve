@@ -46,6 +46,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   name: "QueryList",
@@ -129,7 +130,15 @@ export default defineComponent({
 
         return formattedDuration;
       };
+      const originalSizeGB =
+        query?.original_size !== undefined
+          ? getUnitValue(query?.original_size, "megabytes", "", 2)
+          : { value: "", unit: "" };
 
+      const compressedSizeGB =
+        query?.compressed_size !== undefined
+          ? getUnitValue(query?.compressed_size, "megabytes", "", 2)
+          : { value: "", unit: "" };
       const rows: any[] = [
         ["Trace ID", query?.trace_id],
         ["Status", query?.status],
@@ -143,13 +152,19 @@ export default defineComponent({
         ["Query Range", queryRange(query?.start_time, query?.end_time)],
         ["Scan Records", query?.records],
         ["Files", query?.files],
-        ["Original Size", query?.original_size],
-        ["Compressed Size", query?.compressed_size],
+        [
+          "Original Size",
+          originalSizeGB.value ? `${originalSizeGB.value} GB` : "",
+        ],
+        [
+          "Compressed Size",
+          compressedSizeGB.value ? `${compressedSizeGB.value} GB` : "",
+        ],
       ];
-      
+
       return rows;
     };
-    
+
     return {
       queryData,
       t,
