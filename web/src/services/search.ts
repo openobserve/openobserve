@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { generateTraceContext } from "@/utils/zincutils";
 import http from "./http";
-import { propagation, context, trace, Span } from "@opentelemetry/api";
 
 const search = {
   search: (
@@ -27,11 +27,12 @@ const search = {
       org_identifier: string;
       query: any;
       page_type: string;
-      traceparent: string;
+      traceparent?: string;
     },
     search_type: string = "UI"
   ) => {
-    console.log("trace parent", traceparent);
+    if (!traceparent) traceparent = generateTraceContext()?.traceparent;
+
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     if (typeof query.query.sql != "string") {
@@ -47,6 +48,7 @@ const search = {
     }
     return http({ headers: { traceparent } }).post(url, query);
   },
+
   search_around: ({
     org_identifier,
     index,

@@ -19,7 +19,6 @@ import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, remove } from "lodash-es";
-import { tracer } from "@/utils/opentelemetry";
 
 import {
   useLocalLogFilterField,
@@ -35,6 +34,7 @@ import {
   convertToCamelCase,
   getFunctionErrorMessage,
   getUUID,
+  generateTraceContext,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -1838,7 +1838,7 @@ const useLogs = () => {
     filterHitsColumns();
 
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
-  }
+  };
 
   const getPaginatedData = async (
     queryReq: any,
@@ -2044,7 +2044,7 @@ const useLogs = () => {
             }, 0);
             await getPaginatedData(queryReq, true);
           }
-          
+
           await processPostPaginationData();
 
           searchObj.data.functionError = "";
@@ -2062,7 +2062,7 @@ const useLogs = () => {
               searchObjDebug["paginatedDataReceivedEndTime"] -
               searchObjDebug["paginatedDataReceivedStartTime"]
             } milliseconds to complete`
-          );            
+          );
 
           resolve(true);
         })
@@ -3590,17 +3590,6 @@ const useLogs = () => {
 
       store.dispatch("setRegionInfo", clusterData);
     });
-  };
-
-  const generateTraceContext = () => {
-    const traceId = getUUID().replace(/-/g, "");
-    const spanId = getUUID().replace(/-/g, "").slice(0, 16);
-
-    return {
-      traceparent: `00-${traceId}-${spanId}-01`,
-      traceId,
-      spanId,
-    };
   };
 
   const addTraceId = (traceId: string) => {
