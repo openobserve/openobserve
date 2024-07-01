@@ -129,7 +129,13 @@ pub async fn search(
         let terms = meta
             .fts_terms
             .iter()
-            .flat_map(|t| split_token(t, &cfg.common.inverted_index_split_chars))
+            .map(|t| {
+                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+                tokens
+                    .into_iter()
+                    .max_by_key(|key| key.len())
+                    .unwrap_or_default()
+            })
             .collect::<HashSet<String>>();
 
         let fts_condition = terms
