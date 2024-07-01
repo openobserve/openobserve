@@ -59,9 +59,9 @@ export const usePanelDataLoader = (
   folderId: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (true) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
   let runCount = 0;
 
@@ -205,6 +205,8 @@ export const usePanelDataLoader = (
         () => variablesData.value?.values,
         () => {
           if (ifPanelVariablesCompletedLoading()) {
+            console.log("---------------------");
+
             log(
               "waitForTheVariablesToLoad: variables are loaded (inside watch)",
             );
@@ -226,6 +228,7 @@ export const usePanelDataLoader = (
     try {
       log("loadData: entering...");
 
+      // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");
         abortController.abort();
@@ -327,6 +330,8 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
+            const signal = abortController.signal;
+
             return queryService
               .metrics_query_range({
                 org_identifier: store.state.selectedOrganization.identifier,
@@ -336,12 +341,16 @@ export const usePanelDataLoader = (
               })
               .then((res) => {
                 state.errorDetail = "";
-                // console.log("API response received");
                 return { result: res.data.data, metadata: metadata };
               })
               .catch((error) => {
-                // Process API error for "promql"
                 processApiError(error, "promql");
+                return { result: null, metadata: metadata };
+              })
+              .finally(() => {
+                if (signal.aborted) {
+                  return { result: null, metadata: metadata };
+                }
                 return { result: null, metadata: metadata };
               });
           },
@@ -398,6 +407,7 @@ export const usePanelDataLoader = (
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
           };
+            const signal = abortController.signal;
 
           try {
             // trace context
