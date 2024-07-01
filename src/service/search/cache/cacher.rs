@@ -26,9 +26,7 @@ use infra::cache::{
 
 use crate::{
     common::meta::search::{CachedQueryResponse, QueryDelta},
-    service::search::sql::{
-        generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM, TS_WITH_ALIAS,
-    },
+    service::search::sql::{generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -59,7 +57,7 @@ pub async fn check_cache(
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
-    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp);
+    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
     if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
         return CachedQueryResponse::default();
     }
@@ -369,17 +367,19 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<String> {
+fn get_ts_col(
+    parsed_sql: &config::meta::sql::Sql,
+    ts_col: &str,
+    is_aggregate: bool,
+) -> Option<String> {
     for (original, alias) in &parsed_sql.field_alias {
-        if TS_WITH_ALIAS.is_match(original) && alias == ts_col {
-            return Some(ts_col.to_string());
-        }
         if original.contains("histogram") {
             return Some(alias.clone());
         }
     }
-    if parsed_sql.fields.contains(&ts_col.to_owned())
-        || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col))
+    if !is_aggregate
+        && (parsed_sql.fields.contains(&ts_col.to_owned())
+            || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
     {
         return Some(ts_col.to_string());
     }
