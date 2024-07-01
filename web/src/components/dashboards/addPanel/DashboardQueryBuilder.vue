@@ -345,11 +345,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="bLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-x-item-${itemB?.column}`"
+                    :data-test="`dashboard-b-item-${itemB?.column}`"
                   >
                     <q-menu
                       class="q-pa-md"
-                      :data-test="`dashboard-x-item-${itemB?.column}-menu`"
+                      :data-test="`dashboard-b-item-${itemB?.column}-menu`"
                     >
                       <div>
                         <div class="">
@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-x-item-${itemB?.column}-remove`"
+                    :data-test="`dashboard-b-item-${itemB?.column}-remove`"
                     @click="removeBreakdownItem(itemB?.column)"
                     icon="close"
                   />
