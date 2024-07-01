@@ -142,7 +142,6 @@ impl NewListingTable {
         .await?;
         let file_list = stream::iter(file_list).flatten();
         // collect the statistics if required by the config
-        println!("table_paths: {:?}", self.table_paths);
         let files = file_list
             .map(|part_file| async {
                 let mut part_file = part_file?;

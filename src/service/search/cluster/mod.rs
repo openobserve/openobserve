@@ -106,7 +106,8 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled && !meta.fts_terms.is_empty();
+    let is_inverted_index = cfg.common.inverted_index_enabled
+        && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
         "[trace_id {trace_id}] search: is_agg_query {:?} is_inverted_index {:?}",
@@ -130,15 +131,37 @@ pub async fn search(
             .flat_map(|t| split_token(t, &cfg.common.inverted_index_split_chars))
             .collect::<HashSet<String>>();
 
-        let terms = [terms
+        let fts_condition = terms
             .iter()
-            .max_by_key(|key| key.len())
-            .unwrap_or(&String::new())
-            .to_string()];
-        let search_condition = format!(
-            "(field is NULL OR field='_all') AND term LIKE '%{}%'",
-            terms[0]
-        );
+            .map(|x| format!("term LIKE '%{x}%'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
+        let fts_condition = if fts_condition.is_empty() {
+            fts_condition
+        } else {
+            format!("(field is NULL OR field='_all') AND ({})", fts_condition)
+        };
+
+        // Process index terms
+        let index_terms = meta
+            .index_terms
+            .iter()
+            .map(|(field, values)| {
+                if values.len() > 1 {
+                    format!("(field='{field}' AND term IN ('{}'))", values.join("','"))
+                } else {
+                    format!("(field='{field}' AND term='{}')", values.first().unwrap())
+                }
+            })
+            .collect::<Vec<_>>();
+        let index_condition = index_terms.join(" OR ");
+        let search_condition = if fts_condition.is_empty() {
+            index_condition
+        } else if index_condition.is_empty() {
+            fts_condition
+        } else {
+            format!("{} OR {}", fts_condition, index_condition)
+        };
 
         let query = format!(
             "SELECT file_name, field, term, _count, _timestamp, deleted, segment_ids FROM \"{}\" WHERE {}",

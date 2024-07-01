@@ -31,7 +31,9 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{get_stream_setting_fts_fields, STREAM_SCHEMAS_FIELDS},
+    schema::{
+        get_stream_setting_fts_fields, get_stream_setting_index_fields, STREAM_SCHEMAS_FIELDS,
+    },
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -91,6 +93,7 @@ pub struct Sql {
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
+    pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
 }
 
@@ -442,9 +445,11 @@ impl Sql {
         let schema_fields = schema.fields().to_vec();
         let stream_settings = infra::schema::unwrap_stream_settings(&schema);
 
-        // fetch fts fields
+        // fetch inverted index fields
         let mut fts_terms = HashSet::new();
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+        let mut index_terms = HashMap::new();
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
@@ -560,6 +565,23 @@ impl Sql {
             }
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
+        }
+
+        // Hack for index fields
+        let filters = generate_filter_from_quick_text(&meta.quick_text);
+        if !index_fields.is_empty() && !filters.is_empty() {
+            let index_fields = index_fields.into_iter().collect::<HashSet<_>>();
+            for (key, value) in filters {
+                if !index_fields.contains(key) {
+                    continue;
+                }
+                let entry = index_terms
+                    .entry(key.to_string())
+                    .or_insert_with(HashSet::new);
+                for v in value {
+                    entry.insert(v);
+                }
+            }
         }
 
         // Hack for histogram
@@ -733,6 +755,10 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
+            index_terms: index_terms
+                .into_iter()
+                .map(|(k, v)| (k, v.into_iter().collect()))
+                .collect(),
             histogram_interval,
         })
     }

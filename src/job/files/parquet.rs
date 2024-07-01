@@ -730,7 +730,11 @@ pub(crate) async fn generate_index_on_ingester(
         };
         // update schema to enable bloomfilter for field: term, file_name
         let settings = StreamSettings {
-            bloom_filter_fields: vec!["term".to_string(), "file_name".to_string()],
+            bloom_filter_fields: vec![
+                "field".to_string(),
+                "term".to_string(),
+                "file_name".to_string(),
+            ],
             ..Default::default()
         };
         let mut metadata = schema.metadata().clone();
@@ -972,16 +976,13 @@ async fn prepare_index_record_batches(
             // calculate segment ids
             let segment_ids = ids
                 .iter()
-                .map(|i| (i / INDEX_SEGMENT_LENGTH) as u8)
-                .collect::<Vec<u8>>();
-            let max_segment_id = segment_ids.iter().max().unwrap_or(&0);
-            println!("fts segment_ids: {:?}", segment_ids);
-            let mut bv = BitVec::with_capacity(*max_segment_id as usize + 1);
-            for i in 0..=*max_segment_id {
+                .map(|i| i / INDEX_SEGMENT_LENGTH)
+                .collect::<Vec<_>>();
+            let segment_num = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+            let mut bv = BitVec::with_capacity(segment_num);
+            for i in 0..segment_num {
                 bv.push(segment_ids.contains(&i));
             }
-            println!("fts byte: {:?}", bv.clone().into_vec());
-            println!("fts bits: {:?}", bv.clone().to_bitvec());
             field_segment_ids.append_value(bv.into_vec());
         }
 
@@ -1063,16 +1064,13 @@ async fn prepare_index_record_batches(
             // calculate segment ids
             let segment_ids = ids
                 .iter()
-                .map(|i| (i / INDEX_SEGMENT_LENGTH) as u8)
-                .collect::<Vec<u8>>();
-            let max_segment_id = segment_ids.iter().max().unwrap_or(&0);
-            println!("index segment_ids: {:?}", segment_ids);
-            let mut bv = BitVec::with_capacity(*max_segment_id as usize + 1);
-            for i in 0..=*max_segment_id {
+                .map(|i| i / INDEX_SEGMENT_LENGTH)
+                .collect::<Vec<_>>();
+            let segment_num = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+            let mut bv = BitVec::with_capacity(segment_num);
+            for i in 0..segment_num {
                 bv.push(segment_ids.contains(&i));
             }
-            println!("index byte: {:?}", bv.clone().into_vec());
-            println!("index bits: {:?}", bv.clone().to_bitvec());
             field_segment_ids.append_value(bv.into_vec());
         }
 

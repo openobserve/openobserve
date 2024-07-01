@@ -53,10 +53,6 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
         }
     }
     FILES.write().insert(key.clone(), values);
-    println!(
-        "datafusion::storage::file_list::set_segment: key: {}, segment_data: {:?}",
-        key, segment_data
-    );
     SEGMENTS.write().insert(key, segment_data);
 }
 

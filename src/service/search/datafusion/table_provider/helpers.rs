@@ -172,10 +172,6 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     };
     let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
     let segment_count = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
-    println!("file path: {:?}", file.path().as_ref());
-    println!("segment_ids: {:?}", segment_ids);
-    println!("segment length: {:?}", segment_ids.len());
-    println!("row_group_count: {:?}", row_group_count);
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
     let mut selection = Vec::with_capacity(segment_ids.len());
     let mut last_group_id = 0;
@@ -184,29 +180,35 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
             break;
         }
         let row_group_id = (segment_id * INDEX_SEGMENT_LENGTH) / PARQUET_MAX_ROW_GROUP_SIZE;
-        if *val {
-            access_plan.scan(row_group_id);
-        }
         if row_group_id != last_group_id && !selection.is_empty() {
-            access_plan.scan_selection(row_group_id, RowSelection::from(selection.clone()));
+            if selection.iter().any(|s: &RowSelector| !s.skip) {
+                access_plan.scan(last_group_id);
+                access_plan.scan_selection(last_group_id, RowSelection::from(selection.clone()));
+            }
             selection.clear();
             last_group_id = row_group_id;
         }
-        let offset = if (segment_id + 1) * INDEX_SEGMENT_LENGTH > num_rows {
+        let length = if (segment_id + 1) * INDEX_SEGMENT_LENGTH > num_rows {
             num_rows % INDEX_SEGMENT_LENGTH
         } else {
             INDEX_SEGMENT_LENGTH
         };
         if *val {
-            selection.push(RowSelector::select(offset));
+            selection.push(RowSelector::select(length));
         } else {
-            selection.push(RowSelector::skip(offset));
+            selection.push(RowSelector::skip(length));
         }
     }
-    if !selection.is_empty() {
+    if !selection.is_empty() && selection.iter().any(|s: &RowSelector| !s.skip) {
+        access_plan.scan(last_group_id);
         access_plan.scan_selection(last_group_id, RowSelection::from(selection));
     }
-    println!("access_plan: {:?}", access_plan);
+    log::debug!(
+        "file path: {:?}, row_group_count: {}, access_plan: {:?}",
+        file.path().as_ref(),
+        row_group_count,
+        access_plan
+    );
     Some(Arc::new(access_plan))
 }
 
