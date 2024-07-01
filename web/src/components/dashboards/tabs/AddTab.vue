@@ -96,7 +96,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
-import { addTab } from "@/utils/commons";
+import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 
@@ -120,30 +120,42 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    dashboardData: {
-      type: Object,
+    dashboardId: {
+      type: String,
       required: true,
+    },
+    folderId: {
+      required: false,
     },
   },
   emits: ["refresh"],
   setup(props: any, { emit }) {
-    const store: any = useStore();
-    const addTabForm: any = ref(null);
-    const tabData: any = ref(
-      props.editMode
-        ? JSON.parse(
-            JSON.stringify(
-              props?.dashboardData?.tabs.find(
-                (tab: any) => tab.tabId === props.tabId
-              )
-            )
-          )
-        : defaultValue()
-    );
-    const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const $q = useQuasar();
     const route = useRoute();
+    const store: any = useStore();
+    const addTabForm: any = ref(null);
+    let dashboardData: any = ref({});
+    const isValidIdentifier: any = ref(true);
+    const tabData: any = ref(defaultValue());
+
+    const loadDashboardData = async () => {
+      if (props.editMode) {
+        dashboardData.value = await getDashboard(
+          store,
+          props.dashboardId,
+          props.folderId ?? route.query.folder ?? "default"
+        );
+        tabData.value = JSON.parse(
+          JSON.stringify(
+            dashboardData?.value?.tabs?.find(
+              (tab: any) => tab.tabId === props.tabId
+            )
+          )
+        );
+      }
+    };
+    loadDashboardData();
 
     const onSubmit = useLoading(async () => {
       await addTabForm.value.validate().then(async (valid: any) => {
@@ -157,8 +169,8 @@ export default defineComponent({
             // only allowed to edit name
             const updatedTab = await editTab(
               store,
-              props.dashboardData.dashboardId,
-              route.query.folder ?? "default",
+              props.dashboardId,
+              props.folderId ?? route.query.folder ?? "default",
               tabData.value.tabId,
               tabData.value
             );
@@ -176,8 +188,8 @@ export default defineComponent({
           else {
             const newTab = await addTab(
               store,
-              props.dashboardData.dashboardId,
-              route.query.folder ?? "default",
+              props.dashboardId,
+              props.folderId ?? route.query.folder ?? "default",
               tabData.value
             );
 
