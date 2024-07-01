@@ -50,7 +50,7 @@ use config::{
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
     },
-    FxIndexMap, INDEX_SEGMENT_LENGTH,
+    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH,
 };
 use hashbrown::HashSet;
 use infra::{
@@ -956,7 +956,8 @@ async fn prepare_index_record_batches(
         // build record batch
         let records_len = uniq_terms.len();
         let mut field_timestamp = Int64Builder::with_capacity(records_len);
-        let mut field_field = StringBuilder::with_capacity(records_len, "_all".len() * records_len);
+        let mut field_field =
+            StringBuilder::with_capacity(records_len, INDEX_FIELD_NAME_FOR_ALL.len() * records_len);
         let mut field_term = StringBuilder::with_capacity(
             records_len,
             uniq_terms.iter().map(|x| x.0.len()).sum::<usize>(),
@@ -968,7 +969,7 @@ async fn prepare_index_record_batches(
         let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
         for (term, (time, ids)) in uniq_terms {
             field_timestamp.append_value(time);
-            field_field.append_value("_all");
+            field_field.append_value(INDEX_FIELD_NAME_FOR_ALL);
             field_term.append_value(term);
             field_file_name.append_value(file_name_without_prefix);
             field_count.append_value(ids.len() as i64);

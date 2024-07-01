@@ -28,6 +28,7 @@ use config::{
         },
     },
     utils::{inverted_index::split_token, json},
+    INDEX_FIELD_NAME_FOR_ALL,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -139,7 +140,10 @@ pub async fn search(
         let fts_condition = if fts_condition.is_empty() {
             fts_condition
         } else {
-            format!("(field is NULL OR field='_all') AND ({})", fts_condition)
+            format!(
+                "(field is NULL OR field='{}') AND ({})",
+                INDEX_FIELD_NAME_FOR_ALL, fts_condition
+            )
         };
 
         // Process index terms

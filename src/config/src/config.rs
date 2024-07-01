@@ -61,6 +61,8 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
+pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
+
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
