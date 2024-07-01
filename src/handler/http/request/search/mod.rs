@@ -285,7 +285,10 @@ pub async fn search(
         })
     }
 
-    log::info!("query deltas are: {:?}", c_resp.deltas);
+    log::info!(
+        "[trace_id {trace_id}]  query deltas are: {:?}",
+        c_resp.deltas
+    );
     // Result caching check ends
     let mut results = Vec::new();
     let mut res = if should_exec_query {
@@ -325,7 +328,7 @@ pub async fn search(
 
         if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
             log::info!(
-                "Query original start time: {}, end time : {}",
+                "[trace_id {trace_id}]  Query original start time: {}, end time : {}",
                 req.query.start_time,
                 req.query.end_time
             );
@@ -346,7 +349,7 @@ pub async fn search(
 
                 if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
                     log::info!(
-                        "Query new start time: {}, end time : {}",
+                        "[trace_id {trace_id}]  Query new start time: {}, end time : {}",
                         req.query.start_time,
                         req.query.end_time
                     );

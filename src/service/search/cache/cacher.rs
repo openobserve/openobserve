@@ -168,6 +168,7 @@ pub async fn get_cached_results(
     is_aggregate: bool,
     file_path: &str,
     result_ts_column: &str,
+    trace_id: &str,
 ) -> Option<CachedQueryResponse> {
     let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
@@ -249,7 +250,12 @@ pub async fn get_cached_results(
                             cached_response.hits = to_retain;
                         };
 
-                        log::info!("Get results from disk success for query key: {}", query_key);
+                        log::info!(
+                            "[trace_id {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
+                            query_key,
+                            matching_cache_meta.start_time,
+                            matching_cache_meta.end_time
+                        );
                         Some(CachedQueryResponse {
                             cached_response,
                             deltas,
@@ -262,7 +268,10 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!("Get results from disk failed : {:?}", e);
+                        log::error!(
+                            "[trace_id {trace_id}] Get results from disk failed : {:?}",
+                            e
+                        );
                         None
                     }
                 }
