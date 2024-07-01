@@ -130,14 +130,14 @@ export default defineComponent({
 
         return formattedDuration;
       };
-      const originalSizeGB =
+      const originalSize =
         query?.original_size !== undefined
-          ? getUnitValue(query?.original_size, "megabytes", "", 2)
+          ? getUnitValue(query?.original_size, "bytes", "", 2)
           : { value: "", unit: "" };
 
-      const compressedSizeGB =
+      const compressedSize =
         query?.compressed_size !== undefined
-          ? getUnitValue(query?.compressed_size, "megabytes", "", 2)
+          ? getUnitValue(query?.compressed_size, "bytes", "", 2)
           : { value: "", unit: "" };
       const rows: any[] = [
         ["Trace ID", query?.trace_id],
@@ -154,11 +154,11 @@ export default defineComponent({
         ["Files", query?.files],
         [
           "Original Size",
-          originalSizeGB.value ? `${originalSizeGB.value} GB` : "",
+          originalSize.value ? `${originalSize.value} ${originalSize.unit}` : "",
         ],
         [
           "Compressed Size",
-          compressedSizeGB.value ? `${compressedSizeGB.value} GB` : "",
+          compressedSize.value ? `${compressedSize.value} ${compressedSize.unit}` : "",
         ],
       ];
 
