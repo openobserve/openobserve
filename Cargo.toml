@@ -1,3 +1,4 @@
+cargo-features = ["workspace-inheritance"]
 [package]
 description = "OpenObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces."
 edition = "2021"
