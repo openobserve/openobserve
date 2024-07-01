@@ -30,7 +30,7 @@
         ></q-toggle>
       </q-card-section>
       <q-card-section>
-        <q-form ref="addToDashboardForm" @submit="addPanelToDashboard">
+        <q-form ref="addToDashboardForm" @submit="onSubmit.execute">
           <template v-if="shouldCreateNewDashboard">
             <!-- select folder or create new folder and select -->
             <select-folder-dropdown @folder-selected="updateActiveFolderId" />
@@ -99,6 +99,7 @@
               hide-selected
               fill-input
               @filter="filterDashboards"
+              @update:model-value="updateSelectedDashboard"
             >
               <template #no-option>
                 <q-item>
@@ -106,6 +107,16 @@
                 </q-item>
               </template>
             </q-select>
+            <!-- select tab or create new tab and select -->
+            <select-tab-dropdown
+              v-if="
+                !shouldCreateNewDashboard && selectedDashboard && activeFolderId
+              "
+              @tab-selected="updateActiveTabId"
+              :folder-id="activeFolderId"
+              :dashboard-id="selectedDashboard?.id"
+              @tab-list-updated="onTabListUpdate"
+            />
             <q-input
               v-model.trim="panelTitle"
               :label="t('dashboard.panelTitle') + '*'"
@@ -140,6 +151,7 @@
               padding="sm xl"
               type="submit"
               no-caps
+              :loading="onSubmit.isLoading.value"
             />
           </div>
         </q-form>
@@ -158,33 +170,43 @@ import {
   getAllDashboards,
   getAllDashboardsByFolderId,
   getFoldersList,
+  getPanelId,
 } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import type store from "@/test/unit/helpers/store";
-import { useRoute } from "vue-router";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
+import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
+import { useRouter } from "vue-router";
+import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "AddToDashboard",
   components: {
     SelectFolderDropdown,
+    SelectTabDropdown,
+  },
+  props: {
+    dashboardPanelData: {
+      type: Object,
+      required: true,
+    },
   },
   emits: ["save"],
   setup(props, { emit }) {
     const store = useStore();
-    const route: any = useRoute();
+    const router = useRouter();
     const q = useQuasar();
     const dashboardList: Ref<any[]> = ref([]);
     const filteredDashboards: Ref<any[]> = ref([]);
-    const selectedDashboard: Ref<{ id: string | number } | null> = ref(null);
+    const selectedDashboard: any = ref(null);
     const shouldCreateNewDashboard = ref(false);
     const newDashboardForm = ref({
       name: "",
       description: "",
     });
     const activeFolderId = ref("default");
+    const activeTabId: any = ref(null);
     const { t } = useI18n();
     const panelTitle = ref("");
 
@@ -207,8 +229,26 @@ export default defineComponent({
       activeFolderId.value = selectedFolder.value;
       // also, set selecteddashboard to null. because list will be updated
       selectedDashboard.value = null;
+
+      // also, set activeTabId to null. because list will be updated
+      activeTabId.value = null;
+
       // only update if old dashboard is used
       !shouldCreateNewDashboard.value && updateDashboardOptions();
+    };
+
+    const updateSelectedDashboard = () => {
+      // also, set activeTabId to null. because list will be updated
+      activeTabId.value = null;
+    };
+
+    const updateActiveTabId = (selectedTab: any) => {
+      activeTabId.value = selectedTab.value;
+    };
+
+    const onTabListUpdate = () => {
+      // also, set activeTabId to null. because list will be updated
+      activeTabId.value = null;
     };
 
     const updateDashboardOptions = async () => {
@@ -226,6 +266,11 @@ export default defineComponent({
         });
       });
       filteredDashboards.value = [...dashboardList.value];
+
+      // select first dashboard
+      if (dashboardList.value.length > 0) {
+        selectedDashboard.value = dashboardList.value[0];
+      }
     };
 
     const filterDashboards = (val: string, update: any) => {
@@ -238,7 +283,59 @@ export default defineComponent({
       });
     };
 
-    const addPanelToDashboard = () => {
+    const addPanelToDashboard = async (
+      dashboardId: string,
+      folderId: string,
+      tabId: string,
+      panelTitle: string
+    ) => {
+      let dismiss = function () {};
+
+      console.log("addPanelToDashboard", dashboardId, folderId, tabId);
+
+      try {
+        dismiss = q.notify({
+          message: "Please wait while we add the panel to the dashboard",
+          type: "ongoing",
+          position: "bottom",
+        });
+        props.dashboardPanelData.data.id = getPanelId();
+        // panel name will come from add to dashboard component
+        props.dashboardPanelData.data.title = panelTitle;
+        // to create panel dashboard id, paneldata and folderId is required
+        await addPanel(
+          store,
+          dashboardId,
+          props.dashboardPanelData.data,
+          folderId,
+          tabId
+        );
+        q.notify({
+          message: "Panel added to dashboard",
+          type: "positive",
+          position: "bottom",
+          timeout: 3000,
+        });
+        router.push({
+          name: "viewDashboard",
+          query: { dashboard: dashboardId, folder: folderId },
+        });
+      } catch (err: any) {
+        console.log(err);
+
+        q.notify({
+          message: "Error while adding panel",
+          type: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+      } finally {
+        dismiss();
+        emit("save");
+      }
+    };
+
+    const onSubmit = useLoading(async () => {
       let dismiss = function () {};
       if (shouldCreateNewDashboard.value) {
         dismiss = q.notify({
@@ -280,23 +377,25 @@ export default defineComponent({
               newDashboard.data["v" + newDashboard.data.version]
             );
             // get all dashboards of active folder
-            getAllDashboards(store, activeFolderId.value).then(() => {
-              emit(
-                "save",
+            getAllDashboards(store, activeFolderId.value).then(async () => {
+              await addPanelToDashboard(
                 data.dashboardId,
                 activeFolderId.value,
-                panelTitle.value
+                activeTabId.value,
+                newDashboardForm.value.name
               );
             });
           })
-          .catch(() =>
+          .catch((err) => {
+            console.log(err);
+
             q.notify({
               message: "Error while adding panel",
               type: "negative",
               position: "bottom",
               timeout: 2000,
-            })
-          )
+            });
+          })
           .finally(() => {
             dismiss();
           });
@@ -309,16 +408,24 @@ export default defineComponent({
             position: "bottom",
             timeout: 2000,
           });
+        } else if (activeTabId.value == null) {
+          q.notify({
+            message: "Please select a tab",
+            type: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
         } else {
-          emit(
-            "save",
+          await addPanelToDashboard(
             selectedDashboard.value?.id,
             activeFolderId.value,
+            activeTabId.value,
             panelTitle.value
           );
         }
       }
-    };
+    });
+
     return {
       t,
       getImageURL,
@@ -328,11 +435,15 @@ export default defineComponent({
       filteredDashboards,
       shouldCreateNewDashboard,
       newDashboardForm,
-      addPanelToDashboard,
+      onSubmit,
       store,
       SelectFolderDropdown,
       updateActiveFolderId,
       panelTitle,
+      updateActiveTabId,
+      activeFolderId,
+      updateSelectedDashboard,
+      onTabListUpdate,
     };
   },
 });

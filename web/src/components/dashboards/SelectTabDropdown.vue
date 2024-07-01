@@ -1,0 +1,165 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="flex justify-center items-baseline">
+    <!-- select new tab -->
+    <q-select
+      v-model="selectedTab"
+      :label="t('dashboard.selectTabLabel')"
+      :options="tabList"
+      data-test="dashboard-dropdown-tab-selection"
+      input-debounce="0"
+      behavior="menu"
+      filled
+      borderless
+      dense
+      class="q-mb-xs showLabelOnTop"
+      style="width: 88%"
+    >
+    </q-select>
+
+    <q-btn
+      class="q-mb-md text-bold"
+      data-test="dashboard-tab-new-add"
+      label="+"
+      text-color="light-text"
+      padding="sm md"
+      no-caps
+      @click="
+        () => {
+          showAddTabDialog = true;
+        }
+      "
+    />
+  </div>
+  <!-- add/edit tab -->
+  <q-dialog
+    v-model="showAddTabDialog"
+    position="righ95t"
+    full-height
+    maximized
+    data-test="dashboard-tab-add-dialog"
+  >
+    <AddTab
+      :edit-mode="false"
+      :dashboard-id="dashboardId"
+      :folder-id="folderId"
+      @refresh="updateTabList"
+    />
+  </q-dialog>
+</template>
+
+<script lang="ts">
+import { defineComponent, onActivated, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import AddTab from "../../components/dashboards/tabs/AddTab.vue";
+import { useRoute } from "vue-router";
+import { values } from "lodash-es";
+import { getDashboard } from "@/utils/commons";
+import { onMounted } from "vue";
+
+export default defineComponent({
+  name: "SelectTabDropdown",
+  components: { AddTab },
+  emits: ["tab-selected", "tab-list-updated"],
+  props: {
+    folderId: {
+      type: String,
+      required: true,
+    },
+    dashboardId: {
+      required: true,
+    },
+  },
+  setup(props, { emit }) {
+    const store: any = useStore();
+    const route = useRoute();
+    const showAddTabDialog: any = ref(false);
+    const tabList: any = ref([]);
+
+    //dropdown selected folder index
+    const selectedTab: any = ref(null);
+    const { t } = useI18n();
+
+    const updateTabList = async (newTab: any) => {
+      showAddTabDialog.value = false;
+      await getTabList();
+      selectedTab.value = {
+        label: newTab.name,
+        value: newTab.tabId,
+      };
+    };
+
+    const getTabList = async () => {
+      if (!props.dashboardId || !props.folderId) return;
+
+      const dashboardData = await getDashboard(
+        store,
+        props.dashboardId,
+        props.folderId
+      );
+
+      tabList.value = dashboardData?.tabs?.map((tab: any) => ({
+        label: tab.name,
+        value: tab.tabId,
+      }));
+
+      22; // select first tab
+      if (tabList.value.length > 0) {
+        selectedTab.value = {
+          label: tabList?.value[0]?.label,
+          value: tabList?.value[0]?.value,
+        };
+      }
+
+      emit("tab-list-updated");
+    };
+
+    onMounted(() => {
+      getTabList();
+    });
+
+    onActivated(() => {
+      getTabList();
+    });
+
+    watch(
+      () => [props.folderId, props.dashboardId],
+      () => {
+        getTabList();
+      }
+    );
+
+    watch(
+      () => selectedTab.value,
+      () => {
+        emit("tab-selected", selectedTab.value);
+      }
+    );
+
+    return {
+      t,
+      store,
+      selectedTab,
+      updateTabList,
+      showAddTabDialog,
+      tabList,
+    };
+  },
+});
+</script>
