@@ -130,18 +130,17 @@ pub async fn search(
             .map(|t| {
                 let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
                 tokens
-                    .iter()
+                    .into_iter()
                     .max_by_key(|key| key.len())
-                    .unwrap_or(&String::new())
-                    .to_string()
+                    .unwrap_or_default()
             })
             .collect::<HashSet<String>>();
 
         let search_condition = terms
             .iter()
-            .map(|x| format!("term LIKE '%{x}%'"))
-            .collect::<Vec<String>>()
-            .join(" or ");
+            .map(|v| format!("term LIKE '%{v}%'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
 
         let query = format!(
             "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
