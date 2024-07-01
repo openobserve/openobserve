@@ -287,9 +287,9 @@ export default defineComponent({
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {
         if (
-          query.function_error &&
-          query.new_start_time &&
-          query.new_end_time
+          query?.function_error &&
+          query?.new_start_time &&
+          query?.new_end_time
         ) {
           const combinedMessage = getFunctionErrorMessage(
             query.function_error,

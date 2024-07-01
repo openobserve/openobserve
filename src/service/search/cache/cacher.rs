@@ -168,6 +168,7 @@ pub async fn get_cached_results(
     is_aggregate: bool,
     file_path: &str,
     result_ts_column: &str,
+    trace_id: &str,
 ) -> Option<CachedQueryResponse> {
     let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
@@ -184,22 +185,35 @@ pub async fn get_cached_results(
             })
             .max_by_key(|result| result.end_time.min(end_time) - result.start_time.max(start_time))
         {
-            Some(matching_cache_meta) => {
+            Some(matching_meta) => {
+                let file_name = format!(
+                    "{}_{}_{}.json",
+                    matching_meta.start_time,
+                    matching_meta.end_time,
+                    if is_aggregate { 1 } else { 0 }
+                );
+                let mut matching_cache_meta = matching_meta.clone();
                 // calculate delta time range to fetch the delta data using search query
+                let cfg = get_config();
+                let discard_duration = cfg.common.result_cache_discard_duration * 1000 * 1000;
+
+                let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
+                // return None if cache duration is less than 2 * discard_duration
+                if cache_duration <= discard_duration {
+                    return None;
+                }
+
+                // matching_cache_meta.start_time = matching_cache_meta.start_time +
+                // discard_duration; //discard the first discard_duration of cache
+                matching_cache_meta.end_time -= discard_duration; //discard the last discard_duration of cache
 
                 let mut deltas = vec![];
                 let has_pre_cache_delta =
-                    calculate_deltas_v1(matching_cache_meta, start_time, end_time, &mut deltas);
+                    calculate_deltas_v1(&matching_cache_meta, start_time, end_time, &mut deltas);
 
                 let remove_hits: Vec<&QueryDelta> =
                     deltas.iter().filter(|d| d.delta_removed_hits).collect();
 
-                let file_name = format!(
-                    "{}_{}_{}.json",
-                    matching_cache_meta.start_time,
-                    matching_cache_meta.end_time,
-                    if is_aggregate { 1 } else { 0 }
-                );
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
@@ -236,7 +250,12 @@ pub async fn get_cached_results(
                             cached_response.hits = to_retain;
                         };
 
-                        log::info!("Get results from disk success for query key: {}", query_key);
+                        log::info!(
+                            "[trace_id {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
+                            query_key,
+                            matching_cache_meta.start_time,
+                            matching_cache_meta.end_time
+                        );
                         Some(CachedQueryResponse {
                             cached_response,
                             deltas,
@@ -249,7 +268,10 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!("Get results from disk failed : {:?}", e);
+                        log::error!(
+                            "[trace_id {trace_id}] Get results from disk failed : {:?}",
+                            e
+                        );
                         None
                     }
                 }

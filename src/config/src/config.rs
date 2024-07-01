@@ -700,6 +700,12 @@ pub struct Common {
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_RESULT_CACHE_DISCARD_DURATION",
+        default = "60",
+        help = "Discard data of last n seconds from cached results"
+    )]
+    pub result_cache_discard_duration: i64,
 }
 
 #[derive(EnvConfig)]
