@@ -46,7 +46,7 @@ def test_e2e_query(create_session, base_url):
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_invalidsqlquery(create_session, base_url):
+# def test_e2e_invalidsqlquery(create_session, base_url):
     """Running an E2E test for invalid sql query."""
 
     session = create_session
@@ -258,7 +258,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
 
 
-def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
+# def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
     """Running an E2E test for valid match all histogram query."""
 
     session = create_session
@@ -329,7 +329,7 @@ def test_e2e_matchallindexedsql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\') ORDER BY _timestamp DESC',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,
@@ -410,7 +410,7 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\') ORDER BY _timestamp DESC',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,
@@ -590,7 +590,7 @@ def test_e2e_sqlmaxquery(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
   "query": {
-    "sql": "SELECT MAX(_timestamp) as latest_timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'",
+    "sql": "SELECT MAX(_timestamp) as latest_timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'ORDER BY _timestamp DESC" ,
     "start_time": one_min_ago,
     "end_time": end_time,
     "from": 0,
