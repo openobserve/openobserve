@@ -33,7 +33,6 @@ use infra::{
     errors,
     schema::STREAM_SCHEMAS_LATEST,
 };
-use opentelemetry::{global, trace::TraceContextExt};
 use tracing::{Instrument, Span};
 
 use crate::{
@@ -47,7 +46,7 @@ use crate::{
             functions,
             http::{
                 get_or_create_trace_id_and_span, get_search_type_from_request,
-                get_stream_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
             },
         },
     },
@@ -138,6 +137,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
+    let cfg = get_config();
     let (trace_id, http_span) =
         get_or_create_trace_id_and_span(in_req.headers(), format!("api/{org_id}/_search"));
 

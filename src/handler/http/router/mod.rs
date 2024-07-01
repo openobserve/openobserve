@@ -43,7 +43,6 @@ use super::{
     request::*,
 };
 use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
-use actix_http::header::HeaderName;
 
 pub mod openapi;
 pub mod ui;
@@ -56,7 +55,7 @@ fn get_cors() -> Rc<Cors> {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
-            HeaderName::from_lowercase(b"traceparent").unwrap()
+            HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
         .allow_any_origin()
         .supports_credentials()
