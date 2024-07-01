@@ -34,7 +34,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{FileType, GetExt},
+    common::{Column, FileType, GetExt},
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -1119,6 +1119,7 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         "datafusion.execution.listing_table_ignore_subdirectory",
         false,
     );
+    config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
@@ -1254,7 +1255,7 @@ pub async fn register_table(
 
     let cfg = get_config();
     // Configure listing options
-    let listing_options = match file_type {
+    let mut listing_options = match file_type {
         FileType::PARQUET => {
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
@@ -1275,6 +1276,17 @@ pub async fn register_table(
             )));
         }
     };
+
+    // specify sort columns for parquet file
+    listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
+        datafusion::logical_expr::SortExpr {
+            expr: Box::new(Expr::Column(Column::new_unqualified(
+                cfg.common.column_timestamp.clone(),
+            ))),
+            asc: true,
+            nulls_first: false,
+        },
+    )]]);
 
     let schema_key = schema.hash_key();
     let prefix = if session.storage_type == StorageType::Memory {
@@ -1306,6 +1318,25 @@ pub async fn register_table(
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {
+        // TODO: do this in generate schema
+        let new_schema = Schema::new(
+            schema
+                .fields()
+                .iter()
+                .filter(|x| x.name() != &cfg.common.column_timestamp)
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
+        let timestamp_schema = Schema::new(vec![Field::new(
+            cfg.common.column_timestamp.clone(),
+            DataType::Int64,
+            false,
+        )]);
+        let schema = Arc::new(
+            Schema::try_merge(vec![new_schema, timestamp_schema]).map_err(|e| {
+                datafusion::error::DataFusionError::Execution(format!("merge schema error: {e}",))
+            })?,
+        );
         config = config.with_schema(schema);
     }
     let mut table = NewListingTable::try_new(config)?;
