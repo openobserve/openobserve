@@ -589,15 +589,17 @@ def test_e2e_sqlmaxquery(create_session, base_url):
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
+  {
   "query": {
-    "sql": "SELECT MAX(_timestamp) as latest_timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'ORDER BY _timestamp DESC" ,
-    "start_time": one_min_ago,
-    "end_time": end_time,
+    "sql": "SELECT MAX(_timestamp) as _timestamp FROM \"e2e_automate\" WHERE kubernetes_container_name = 'ziox'",
+    "start_time": 1719219479924000,
+    "end_time": 1719824279924000,
     "from": 0,
     "size": 250,
-    "quick_mode": False,
+    "quick_mode": false,
     "sql_mode": "full"
   }
+}
 }
     resp_get_maxquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     assert (
