@@ -29,12 +29,14 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::{DataType, Schema, SchemaRef};
-use bitvec::prelude::*;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster, get_config,
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+    meta::{
+        bitvec::BitVec,
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
+    },
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
@@ -881,7 +883,7 @@ async fn prepare_index_record_batches(
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
-        Field::new("field", DataType::Utf8, false),
+        Field::new("field", DataType::Utf8, true),
         Field::new("term", DataType::Utf8, true),
         Field::new("file_name", DataType::Utf8, false),
         Field::new("_count", DataType::Int64, false),
@@ -974,7 +976,7 @@ async fn prepare_index_record_batches(
                 .collect::<Vec<u8>>();
             let max_segment_id = segment_ids.iter().max().unwrap_or(&0);
             println!("fts segment_ids: {:?}", segment_ids);
-            let mut bv = BitVec::<u8>::with_capacity(*max_segment_id as usize + 1);
+            let mut bv = BitVec::with_capacity(*max_segment_id as usize + 1);
             for i in 0..=*max_segment_id {
                 bv.push(segment_ids.contains(&i));
             }
@@ -1065,7 +1067,7 @@ async fn prepare_index_record_batches(
                 .collect::<Vec<u8>>();
             let max_segment_id = segment_ids.iter().max().unwrap_or(&0);
             println!("index segment_ids: {:?}", segment_ids);
-            let mut bv = BitVec::<u8>::with_capacity(*max_segment_id as usize + 1);
+            let mut bv = BitVec::with_capacity(*max_segment_id as usize + 1);
             for i in 0..=*max_segment_id {
                 bv.push(segment_ids.contains(&i));
             }

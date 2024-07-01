@@ -311,6 +311,14 @@ async fn exec_query(
         return Ok(vec![]);
     }
 
+    // explain the sql
+    let explain_sql = format!("EXPLAIN {}", query);
+    if let Ok(df) = q_ctx.sql(&explain_sql).await {
+        let batches = df.collect().await?;
+        let result = arrow::util::pretty::pretty_format_batches(&batches)?;
+        log::info!("[trace_id {trace_id}] Explain: \n{result}");
+    }
+
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {

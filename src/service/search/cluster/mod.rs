@@ -183,20 +183,26 @@ pub async fn search(
                 .filter_map(|hit| {
                     let term = hit.get("term").unwrap().as_str().unwrap().to_string();
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-                    let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    let segment_ids = hit
+                        .get("segment_ids")
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string();
+                    let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     if deleted_files.contains(&file_name) {
                         None
                     } else {
                         total_count += count;
-                        Some((term, file_name, count, timestamp))
+                        Some((term, file_name, count, segment_ids, timestamp))
                     }
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
-            let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
+            let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-            for (term, filename, count, _timestamp) in sorted_data {
+            for (term, filename, count, segment_ids, _timestamp) in sorted_data {
                 let term = term.as_str();
                 for search_term in terms.iter() {
                     if term.contains(search_term) {
@@ -206,7 +212,7 @@ pub async fn search(
                             term_map
                                 .entry(search_term.to_string())
                                 .or_insert_with(Vec::new)
-                                .push(filename.to_string());
+                                .push((filename.to_string(), segment_ids.to_string()));
                         }
                     }
                 }
@@ -223,22 +229,36 @@ pub async fn search(
                     hit.get("file_name")
                         .and_then(|value| value.as_str())
                         .filter(|&name| !deleted_files.contains(name))
-                        .map(String::from)
+                        .map(|v| {
+                            let segment_ids = hit
+                                .get("segment_ids")
+                                .unwrap()
+                                .as_str()
+                                .unwrap()
+                                .to_string();
+                            (v.to_string(), segment_ids)
+                        })
                 })
                 .collect::<HashSet<_>>()
         };
 
         let mut idx_file_list: Vec<FileKey> = vec![];
-        for filename in unique_files {
+        for (filename, segment_ids) in unique_files {
             let prefixed_filename = format!(
                 "files/{}/{}/{}/{}",
                 meta.org_id, stream_type, meta.stream_name, filename
             );
             if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
+                let segment_ids = if segment_ids.is_empty() {
+                    None
+                } else {
+                    hex::decode(segment_ids).ok()
+                };
                 idx_file_list.push(FileKey {
                     key: prefixed_filename.to_string(),
                     meta: file_meta,
                     deleted: false,
+                    segment_ids,
                 });
             }
         }

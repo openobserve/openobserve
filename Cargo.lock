@@ -2296,6 +2296,7 @@ dependencies = [
  "async-recursion",
  "async-walkdir",
  "base64 0.21.7",
+ "bitvec",
  "byteorder",
  "bytes",
  "chromiumoxide",
@@ -2849,7 +2850,6 @@ dependencies = [
  "datafusion-common",
  "datafusion-execution",
  "datafusion-expr",
- "datafusion-physical-expr",
  "hashbrown 0.14.5",
  "hex",
  "itertools 0.12.1",
@@ -2910,6 +2910,7 @@ dependencies = [
  "indexmap 2.1.0",
  "itertools 0.12.1",
  "log",
+ "paste",
  "regex-syntax 0.8.4",
 ]
 
@@ -2929,7 +2930,6 @@ dependencies = [
  "datafusion-common",
  "datafusion-execution",
  "datafusion-expr",
- "datafusion-functions-aggregate",
  "datafusion-physical-expr-common",
  "half",
  "hashbrown 0.14.5",
@@ -2946,9 +2946,11 @@ dependencies = [
 name = "datafusion-physical-expr-common"
 version = "39.0.0"
 dependencies = [
+ "ahash 0.8.11",
  "arrow",
  "datafusion-common",
  "datafusion-expr",
+ "hashbrown 0.14.5",
  "rand",
 ]
 
@@ -5434,9 +5436,7 @@ dependencies = [
  "csv",
  "dashmap",
  "datafusion",
- "datafusion-common",
  "datafusion-expr",
- "datafusion-physical-expr",
  "enrichment",
  "env_logger",
  "etcd-client",
@@ -5490,7 +5490,6 @@ dependencies = [
  "strum 0.25.0",
  "sysinfo",
  "syslog_loose 0.18.0",
- "tempfile",
  "thiserror",
  "tikv-jemallocator",
  "time",

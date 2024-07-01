@@ -713,8 +713,6 @@ pub struct Limit {
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
-    #[env_config(name = "ZO_PARQUET_MAX_ROW_GROUP_SIZE", default = 0)] // row count
-    pub parquet_max_row_group_size: usize,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk

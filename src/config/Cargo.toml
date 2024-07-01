@@ -19,6 +19,7 @@ arrow-schema.workspace = true
 async-recursion.workspace = true
 async-walkdir.workspace = true
 base64.workspace = true
+bitvec.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true

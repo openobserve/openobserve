@@ -22,9 +22,9 @@ use proto::cluster_rpc;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
-use super::usage::Stats;
 use crate::{
     get_config,
+    meta::usage::Stats,
     utils::{
         hash::{gxhash, Sum64},
         json::{self, Map, Value},
@@ -90,6 +90,7 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
+    pub segment_ids: Option<Vec<u8>>,
 }
 
 impl FileKey {
@@ -98,6 +99,7 @@ impl FileKey {
             key: key.to_string(),
             meta,
             deleted,
+            segment_ids: None,
         }
     }
 
@@ -106,7 +108,12 @@ impl FileKey {
             key: file.to_string(),
             meta: FileMeta::default(),
             deleted: false,
+            segment_ids: None,
         }
+    }
+
+    pub fn with_segment_ids(&mut self, segment_ids: Vec<u8>) {
+        self.segment_ids = Some(segment_ids);
     }
 }
 
@@ -361,6 +368,7 @@ impl From<&FileKey> for cluster_rpc::FileKey {
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
+            segment_ids: req.segment_ids.clone(),
         }
     }
 }
@@ -371,6 +379,7 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
+            segment_ids: req.segment_ids.clone(),
         }
     }
 }

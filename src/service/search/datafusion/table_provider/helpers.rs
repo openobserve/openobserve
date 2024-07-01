@@ -32,16 +32,26 @@
 
 //! Helper functions for the table implementation
 
+use std::sync::Arc;
+
+use config::{INDEX_SEGMENT_LENGTH, PARQUET_MAX_ROW_GROUP_SIZE};
 use datafusion::{
     common::{
+        stats::Precision,
         tree_node::{TreeNode, TreeNodeRecursion},
         Column, DataFusionError, Result,
     },
-    datasource::listing::{ListingTableUrl, PartitionedFile},
+    datasource::{
+        listing::{ListingTableUrl, PartitionedFile},
+        physical_plan::parquet::ParquetAccessPlan,
+    },
+    parquet::arrow::arrow_reader::{RowSelection, RowSelector},
 };
 use datafusion_expr::{Expr, Volatility};
 use futures::{stream::BoxStream, TryStreamExt};
 use object_store::ObjectStore;
+
+use crate::service::search::datafusion::storage;
 
 /// Check whether the given expression can be resolved using only the columns `col_names`.
 /// This means that if this function returns true:
@@ -152,6 +162,52 @@ pub fn split_files(
         .chunks(chunk_size)
         .map(|c| c.to_vec())
         .collect()
+}
+
+pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+    let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(num_rows) = stats.num_rows else {
+        return None;
+    };
+    let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
+    let segment_count = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+    println!("file path: {:?}", file.path().as_ref());
+    println!("segment_ids: {:?}", segment_ids);
+    println!("segment length: {:?}", segment_ids.len());
+    println!("row_group_count: {:?}", row_group_count);
+    let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
+    let mut selection = Vec::with_capacity(segment_ids.len());
+    let mut last_group_id = 0;
+    for (segment_id, val) in segment_ids.iter().enumerate() {
+        if segment_id >= segment_count {
+            break;
+        }
+        let row_group_id = (segment_id * INDEX_SEGMENT_LENGTH) / PARQUET_MAX_ROW_GROUP_SIZE;
+        if *val {
+            access_plan.scan(row_group_id);
+        }
+        if row_group_id != last_group_id && !selection.is_empty() {
+            access_plan.scan_selection(row_group_id, RowSelection::from(selection.clone()));
+            selection.clear();
+            last_group_id = row_group_id;
+        }
+        let offset = if (segment_id + 1) * INDEX_SEGMENT_LENGTH > num_rows {
+            num_rows % INDEX_SEGMENT_LENGTH
+        } else {
+            INDEX_SEGMENT_LENGTH
+        };
+        if *val {
+            selection.push(RowSelector::select(offset));
+        } else {
+            selection.push(RowSelector::skip(offset));
+        }
+    }
+    if !selection.is_empty() {
+        access_plan.scan_selection(last_group_id, RowSelection::from(selection));
+    }
+    println!("access_plan: {:?}", access_plan);
+    Some(Arc::new(access_plan))
 }
 
 #[cfg(test)]

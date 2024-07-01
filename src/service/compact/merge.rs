@@ -462,6 +462,7 @@ pub async fn merge_by_stream(
                     key: new_file_name.clone(),
                     meta: new_file_meta,
                     deleted: false,
+                    segment_ids: None,
                 });
                 for file in new_file_list.iter() {
                     stream_stats = stream_stats - file.meta.clone();
@@ -469,6 +470,7 @@ pub async fn merge_by_stream(
                         key: file.key.clone(),
                         meta: file.meta.clone(),
                         deleted: true,
+                        segment_ids: None,
                     });
                 }
                 events.sort_by(|a, b| a.key.cmp(&b.key));
@@ -819,6 +821,7 @@ pub async fn merge_files(
                             key: index_file_name.clone(),
                             meta: filemeta,
                             deleted: false,
+                            segment_ids: None,
                         }],
                     )
                     .await

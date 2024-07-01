@@ -171,9 +171,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 expect-test = "1.4"
 base64 = "0.21"
 float-cmp = "0.9"
-datafusion-common = { version = "39", path = "../../apache/datafusion/datafusion/common" }
-datafusion-physical-expr = { version = "39", path = "../../apache/datafusion/datafusion/physical-expr" }
-tempfile = "3"
 
 [workspace]
 members = [
