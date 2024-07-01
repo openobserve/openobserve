@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddTab
         :edit-mode="isTabEditMode"
         :tabId="selectedTabIdToEdit"
-        :dashboardData="currentDashboardData.data"
+        :dashboard-id="currentDashboardData.data.dashboardId"
         @refresh="refreshRequired"
       />
     </q-dialog>
