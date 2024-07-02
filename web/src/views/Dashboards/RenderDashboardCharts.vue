@@ -161,6 +161,7 @@ export default defineComponent({
     "updated:data-zoom",
     "refresh",
     "onMovePanel",
+    "panelsValues",
   ],
   props: {
     viewOnly: {},
@@ -257,6 +258,16 @@ export default defineComponent({
         panelsValues.every((value) => value === false);
       return isAllVariablesAndPanelsDataLoaded;
     });
+
+    watch(
+      variablesAndPanelsDataLoadingState,
+      (newValue) => {
+        const panelsValues = Object.values(newValue.panels);
+        console.log("panelsValues emitted from child:", panelsValues);
+        emit("panelsValues", panelsValues);
+      },
+      { deep: true }
+    );
 
     // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
     let {

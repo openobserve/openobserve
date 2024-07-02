@@ -83,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
               v-if="selectedDate"
-              v-show="store.state.printMode === false"
+              v-show="
+                store.state.printMode === false && !disableDateTimeRefresh
+              "
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
@@ -97,17 +99,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
-            <q-btn
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
-              size="sm"
-              no-caps
-              icon="refresh"
-              @click="refreshData"
-              data-test="dashboard-refresh-btn"
-            >
-              <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
-            </q-btn>
+            <q-btn-group class="dashboard-icons q-ml-sm hideOnPrintMode">
+              <q-btn
+                size="sm"
+                no-caps
+                icon="refresh"
+                @click="refreshData"
+                data-test="dashboard-refresh-btn"
+                :disable="disableDateTimeRefresh"
+                style="width: 80%"
+              >
+                <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                size="sm"
+                no-caps
+                icon="cancel"
+                @click="cancelAllApiCalls"
+                data-test="dashboard-cancel-btn"
+                style="width: 20%"
+              >
+                <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+              </q-btn>
+            </q-btn-group>
             <ExportDashboard
               v-if="!isFullscreen"
               class="hideOnPrintMode"
@@ -186,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
+        @panelsValues="handleEmittedData"
       />
 
       <q-dialog
@@ -253,6 +268,45 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+
+    const disableDateTimeRefresh = ref(false);
+    const receivedData = ref([]);
+    let abortController = new AbortController();
+
+    const handleEmittedData = (panelsValues) => {
+      console.log("handleEmittedData called with:", panelsValues);
+      receivedData.value = panelsValues;
+      disableDateTimeRefresh.value = panelsValues.some((item) => item === true);
+    };
+
+    const cancelAllApiCalls = () => {
+      console.log("cancelAllApiCalls called");
+
+      // Abort the ongoing API call
+      abortController.abort();
+      console.log("Aborted current AbortController instance");
+
+      // Create a new AbortController for future API calls
+      abortController = new AbortController();
+      console.log("Created new AbortController");
+
+      // Reset the received data
+      receivedData.value = receivedData.value.map((item) =>
+        item === true ? false : item
+      );
+      console.log("cancelAllApiCalls updated receivedData", receivedData.value);
+
+      nextTick(() => {
+        disableDateTimeRefresh.value = false;
+      });
+
+      console.log("cancelAllApiCalls done");
+
+      $q.notify({
+        type: "positive",
+        message: "All API calls cancelled successfully",
+      });
+    };
 
     let moment: any = () => {};
 
@@ -691,7 +745,7 @@ export default defineComponent({
           .catch(() => {
             isFullscreen.value = false;
           });
-      } else {        
+      } else {
         quasar.fullscreen
           .exit()
           .then(() => {
@@ -755,6 +809,10 @@ export default defineComponent({
       timeString,
       searchType,
       quasar,
+      // getPanelsValues,
+      disableDateTimeRefresh,
+      cancelAllApiCalls,
+      handleEmittedData,
     };
   },
 });
