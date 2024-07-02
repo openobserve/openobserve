@@ -27,38 +27,14 @@
 
           <!-- select folder or create new folder and select -->
           <select-dashboard-dropdown
+            v-if="activeFolderId"
             :folder-id="activeFolderId"
             @dashboard-selected="updateSelectedDashboard"
           />
-          <!-- <q-select
-              data-test="metrics-add-panel-to-dashboard"
-              v-model="selectedDashboard"
-              :label="t('dashboard.selectDashboard')"
-              :options="filteredDashboards"
-              input-debounce="300"
-              behavior="menu"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-pl-md no-case showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              borderless
-              use-input
-              hide-selected
-              fill-input
-              @filter="filterDashboards"
-              @update:model-value="updateSelectedDashboard"
-            >
-              <template #no-option>
-                <q-item>
-                  <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                </q-item>
-              </template>
-            </q-select> -->
+
           <!-- select tab or create new tab and select -->
           <select-tab-dropdown
+            v-if="activeFolderId && selectedDashboard"
             :folder-id="activeFolderId"
             :dashboard-id="selectedDashboard"
             @tab-selected="updateActiveTabId"

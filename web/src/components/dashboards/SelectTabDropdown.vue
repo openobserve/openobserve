@@ -115,10 +115,7 @@ export default defineComponent({
     };
 
     const getTabList = async () => {
-      if (!props.dashboardId || !props.folderId) {
-        selectedTab.value = null;
-        return;
-      }
+      if (!props.dashboardId || !props.folderId) return;
 
       const dashboardData = await getDashboard(
         store,
@@ -137,6 +134,8 @@ export default defineComponent({
           label: tabList?.value[0]?.label,
           value: tabList?.value[0]?.value,
         };
+      } else {
+        selectedTab.value = null;
       }
 
       emit("tab-list-updated");
