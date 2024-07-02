@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
+use chrono::Utc;
 use config::{
     get_config,
     meta::search::Response,
@@ -132,7 +133,13 @@ pub async fn check_cache(
                 log::debug!("cached response found");
                 *should_exec_query = false;
             };
-            cached_resp.deltas = search_delta;
+            if cached_resp.cached_response.total == (meta.meta.limit as usize) {
+                *should_exec_query = false;
+                cached_resp.deltas = vec![];
+            } else {
+                cached_resp.deltas = search_delta;
+            }
+
             cached_resp.cached_response.took = start.elapsed().as_millis() as usize;
             cached_resp
         }
@@ -209,15 +216,27 @@ pub async fn get_cached_results(
                             get_ts_value(result_ts_column, cached_response.hits.last().unwrap());
 
                         let discard_ts = if discard_interval > 0 {
+                            // for histogram
                             if first_ts < last_ts {
                                 last_ts
                             } else {
                                 first_ts
                             }
                         } else if first_ts < last_ts {
-                            round_down_to_nearest_minute(last_ts) - discard_duration
+                            // non-aggregate quer
+                            let m_last_ts = round_down_to_nearest_minute(last_ts);
+                            if Utc::now().timestamp_micros() - discard_duration < last_ts {
+                                m_last_ts - discard_duration
+                            } else {
+                                matching_cache_meta.end_time
+                            }
                         } else {
-                            round_down_to_nearest_minute(first_ts) - discard_duration
+                            let m_first_ts = round_down_to_nearest_minute(first_ts);
+                            if Utc::now().timestamp_micros() - discard_duration < m_first_ts {
+                                m_first_ts - discard_duration
+                            } else {
+                                matching_cache_meta.start_time
+                            }
                         };
 
                         if !remove_hits.is_empty() {
@@ -243,6 +262,7 @@ pub async fn get_cached_results(
 
                         // recalculate deltas
                         let mut deltas = vec![];
+
                         let has_pre_cache_delta = calculate_deltas_v1(
                             &matching_cache_meta,
                             start_time,
