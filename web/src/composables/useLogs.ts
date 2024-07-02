@@ -136,6 +136,7 @@ const defaultObject = {
     missingStreamMessage: "",
     additionalErrorMsg: "",
     savedViewFilterFields: "",
+    hasSearchDataTimestampField: false,
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -2538,6 +2539,7 @@ const useLogs = () => {
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
 
+            searchObj.data.hasSearchDataTimestampField = false;
             // check for user defined schema is false then only consider checking new fields from result set
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&
@@ -2570,6 +2572,9 @@ const useLogs = () => {
 
               // Object.keys(recordwithMaxAttribute).forEach((key) => {
               for (const key of Object.keys(recordwithMaxAttribute)) {
+                if(key == store.state.zoConfig.timestamp_column) {
+                  searchObj.data.hasSearchDataTimestampField = true;
+                }
                 if (
                   !schemaFields.includes(key) &&
                   !commonSchemaFields.includes(key) &&
@@ -2725,27 +2730,28 @@ const useLogs = () => {
         }
       } else {
         // searchObj.data.stream.selectedFields.forEach((field: any) => {
+          if(searchObj.data.hasSearchDataTimestampField ==true) {
+          searchObj.data.resultGrid.columns.unshift({
+            name: "@timestamp",
+            field: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS"
+              ),
+            prop: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS"
+              ),
+            label: t("search.timestamp") + ` (${store.state.timezone})`,
+            align: "left",
+            sortable: true,
+          });
+        }
         for (const field of searchObj.data.stream.selectedFields) {
-          if (field == store.state.zoConfig.timestamp_column) {
-            searchObj.data.resultGrid.columns.unshift({
-              name: "@timestamp",
-              field: (row: any) =>
-                timestampToTimezoneDate(
-                  row[store.state.zoConfig.timestamp_column] / 1000,
-                  store.state.timezone,
-                  "yyyy-MM-dd HH:mm:ss.SSS"
-                ),
-              prop: (row: any) =>
-                timestampToTimezoneDate(
-                  row[store.state.zoConfig.timestamp_column] / 1000,
-                  store.state.timezone,
-                  "yyyy-MM-dd HH:mm:ss.SSS"
-                ),
-              label: t("search.timestamp") + ` (${store.state.timezone})`,
-              align: "left",
-              sortable: true,
-            });
-          } else {
+          if (field != store.state.zoConfig.timestamp_column) {
             searchObj.data.resultGrid.columns.push({
               name: field,
               field: (row: { [x: string]: any; source: any }) => {
