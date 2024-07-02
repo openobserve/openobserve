@@ -743,7 +743,11 @@ impl Sql {
         // check if we can use inverted index
         // if there are some OR conditions in the where clause and not all of index field, we can't
         // use inverted index
-        let use_inverted_index = checking_inverted_index(&meta, &fts_fields, &index_fields);
+        let use_inverted_index = if stream_type == StreamType::Index {
+            false
+        } else {
+            checking_inverted_index(&meta, &fts_fields, &index_fields)
+        };
 
         Ok(Sql {
             origin_sql,

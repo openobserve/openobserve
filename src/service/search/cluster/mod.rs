@@ -107,7 +107,9 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled && meta.use_inverted_index;
+    let is_inverted_index = cfg.common.inverted_index_enabled
+        && meta.use_inverted_index
+        && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
         "[trace_id {trace_id}] search: is_agg_query {} is_inverted_index {}",
@@ -192,6 +194,7 @@ pub async fn search(
         idx_req.query.as_mut().unwrap().track_total_hits = false;
         idx_req.query.as_mut().unwrap().query_context = "".to_string();
         idx_req.query.as_mut().unwrap().query_fn = "".to_string();
+        idx_req.job.as_mut().unwrap().trace_id = format!("{}-index", trace_id);
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = http::search(idx_req).await?;

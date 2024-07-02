@@ -324,10 +324,10 @@ async fn exec_query(
         }
     };
 
-    // explain the sql
-    let explain_batches = df.clone().explain(true, true)?.collect().await?;
-    let result = arrow::util::pretty::pretty_format_batches(&explain_batches)?;
-    log::info!("[trace_id {trace_id}] Explain: \n{result}");
+    // Explain the sql
+    // let explain_batches = df.clone().explain(true, true)?.collect().await?;
+    // let result = arrow::util::pretty::pretty_format_batches(&explain_batches)?;
+    // log::info!("[trace_id {trace_id}] Explain: \n{result}");
 
     if !rules.is_empty() {
         let mut exprs = Vec::with_capacity(df.schema().fields().len());
