@@ -18,7 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use config::{
     get_config,
-    meta::stream::{StreamSettings, StreamType},
+    meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -97,12 +97,12 @@ pub async fn check_for_schema(
 
     let mut need_insert_new_latest = false;
     let is_new = schema.schema().fields().is_empty();
-    let stream_setting = get_settings(org_id, stream_name, stream_type).await;
     if !is_new {
         let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
+            let stream_setting = get_settings(org_id, stream_name, stream_type).await;
             let defined_schema_fields = stream_setting
                 .and_then(|s| s.defined_schema_fields)
                 .unwrap_or_default();
@@ -127,55 +127,6 @@ pub async fn check_for_schema(
                 }
             }
         }
-    }
-
-    // Automatically enable User-defined schema when
-    // 1. allow_user_defined_schemas is enabled
-    // 2. log ingestion
-    // 3. inferred schema fields count exceeds max_fields_activate_udschema
-    // 4. user defined schema is not already enabled
-    if cfg.common.allow_user_defined_schemas
-        && stream_type == StreamType::Logs
-        && (cfg.limit.max_fields_activate_udschema > 0
-            && inferred_schema.fields().len() > cfg.limit.max_fields_activate_udschema)
-        && (stream_setting.as_ref().map_or(true, |setting| {
-            setting
-                .defined_schema_fields
-                .as_ref()
-                .map_or(true, |ud_fields| ud_fields.is_empty())
-        }))
-    {
-        let inferred_fields_set = inferred_schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_owned())
-            .collect::<HashSet<_>>();
-        let mut ud_fields = inferred_schema
-            .fields()
-            .iter()
-            .take(cfg.limit.max_fields_activate_udschema)
-            .map(|field| field.name().to_owned())
-            .collect::<HashSet<_>>();
-        if !ud_fields.contains(&cfg.common.column_timestamp) {
-            ud_fields.insert(cfg.common.column_timestamp.to_owned());
-        }
-        if !ud_fields.contains(&cfg.common.column_all) {
-            ud_fields.insert(cfg.common.column_all.to_owned());
-        }
-        // add fts fields
-        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if inferred_fields_set.contains(field) && !ud_fields.contains(field) {
-                ud_fields.insert(field.to_owned());
-            }
-        }
-        let mut stream_setting = match stream_setting {
-            Some(setting) => setting,
-            None => StreamSettings::default(),
-        };
-        stream_setting.defined_schema_fields = Some(ud_fields.into_iter().collect());
-        // save the settings
-        super::stream::save_stream_settings(org_id, stream_name, stream_type, stream_setting)
-            .await?;
     }
 
     // slow path
@@ -310,7 +261,7 @@ async fn handle_diff_schema(
         );
         return Err(e);
     }
-    let Some((final_schema, field_datatype_delta)) = ret else {
+    let Some((mut final_schema, field_datatype_delta)) = ret else {
         return Ok(None);
     };
 
@@ -324,14 +275,75 @@ async fn handle_diff_schema(
     }
 
     // check defined_schema_fields
-    let stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
-    let defined_schema_fields = stream_setting
+    let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
+    let mut defined_schema_fields = stream_setting
         .defined_schema_fields
         .clone()
         .unwrap_or_default();
-    let final_schema = SchemaCache::new(final_schema);
+
+    // Automatically enable User-defined schema when
+    // 1. allow_user_defined_schemas is enabled
+    // 2. log ingestion
+    // 3. user defined schema is not already enabled
+    // 4. final schema fields count exceeds max_fields_activate_udschema
+    // user-defined schema does not include _timestamp or _all columns
+    let cfg = get_config();
+    let final_schema_field_count = {
+        let mut count = final_schema.fields().len();
+        if final_schema
+            .field_with_name(&cfg.common.column_timestamp)
+            .is_ok()
+        {
+            count -= 1;
+        }
+        if final_schema.field_with_name(&cfg.common.column_all).is_ok() {
+            count -= 1;
+        }
+
+        count
+    };
+    if cfg.common.allow_user_defined_schemas
+        && stream_type == StreamType::Logs
+        && defined_schema_fields.is_empty()
+        && (cfg.limit.max_fields_activate_udschema > 0
+            && final_schema_field_count > cfg.limit.max_fields_activate_udschema)
+    {
+        let mut ud_fields = HashSet::with_capacity(cfg.limit.max_fields_activate_udschema);
+        // add fts fields
+        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+            if final_schema.field_with_name(&field).is_ok() && !ud_fields.contains(field) {
+                ud_fields.insert(field.to_owned());
+            }
+        }
+        for field in final_schema.fields() {
+            let field_name = field.name();
+            // skip _timestamp and _all columns
+            if *field_name == cfg.common.column_timestamp || *field_name == cfg.common.column_all {
+                continue;
+            }
+            ud_fields.insert(field_name.to_owned());
+            if ud_fields.len() == cfg.limit.max_fields_activate_udschema {
+                break;
+            }
+        }
+        defined_schema_fields = ud_fields.iter().cloned().collect();
+        stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
+        final_schema.metadata.insert(
+            "settings".to_string(),
+            json::to_string(&stream_setting).unwrap(),
+        );
+        // save the new settings
+        super::stream::save_stream_settings(
+            org_id,
+            stream_name,
+            stream_type,
+            stream_setting.clone(),
+        )
+        .await?;
+    }
 
     // update node cache
+    let final_schema = SchemaCache::new(final_schema);
     let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
