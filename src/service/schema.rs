@@ -299,7 +299,6 @@ async fn handle_diff_schema(
         if final_schema.field_with_name(&cfg.common.column_all).is_ok() {
             count -= 1;
         }
-
         count
     };
     if cfg.common.allow_user_defined_schemas
@@ -311,7 +310,7 @@ async fn handle_diff_schema(
         let mut ud_fields = HashSet::with_capacity(cfg.limit.max_fields_activate_udschema);
         // add fts fields
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(&field).is_ok() && !ud_fields.contains(field) {
+            if final_schema.field_with_name(field).is_ok() && !ud_fields.contains(field) {
                 ud_fields.insert(field.to_owned());
             }
         }
