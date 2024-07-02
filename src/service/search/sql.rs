@@ -1140,13 +1140,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             pattern: _,
             escape_char: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => {
-            if f.name.to_string().starts_with("match_all") {
-                true
-            } else {
-                false
-            }
-        }
+        Expr::Function(f) => f.name.to_string().starts_with("match_all"),
         _ => false,
     }
 }
