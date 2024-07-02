@@ -19,7 +19,7 @@ import {
   useLocalCurrentUser,
   useLocalTimezone,
 } from "../utils/zincutils";
-import { Notification } from "@/ts/interfaces/notification";
+import type { Notification } from "@/ts/interfaces/notification";
 
 const pos = window.location.pathname.indexOf("/web/");
 
