@@ -791,13 +791,14 @@ pub async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if cfg.common.inverted_index_enabled && stream_type == StreamType::Logs {
+            if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
                     inverted_idx_batches,
                     new_file_key.clone(),
                     org_id,
                     stream_name,
+                    stream_type,
                     &full_text_search_fields,
                     &index_fields,
                 )

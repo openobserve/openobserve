@@ -146,7 +146,7 @@ pub async fn search(
             fts_condition
         } else {
             format!(
-                "(field is NULL OR field='{}') AND ({})",
+                "field='{}' AND ({})",
                 INDEX_FIELD_NAME_FOR_ALL, fts_condition
             )
         };
@@ -172,9 +172,10 @@ pub async fn search(
             format!("{} OR {}", fts_condition, index_condition)
         };
 
+        let index_stream_name = format!("{}_{}", meta.stream_name, stream_type);
         let query = format!(
-            "SELECT file_name, field, term, _count, _timestamp, deleted, segment_ids FROM \"{}\" WHERE {}",
-            meta.stream_name, search_condition
+            "SELECT file_name, field, term, _count, _timestamp, deleted, segment_ids FROM \"{index_stream_name}\" WHERE {}",
+            search_condition
         );
 
         // fast_mode is for 1st page optimization

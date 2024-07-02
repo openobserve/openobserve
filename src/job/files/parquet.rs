@@ -22,8 +22,8 @@ use std::{
 
 use arrow::{
     array::{
-        ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
-        StringArray, StringBuilder,
+        new_null_array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
+        Int64Builder, StringArray, StringBuilder,
     },
     datatypes::Field,
     record_batch::RecordBatch,
@@ -660,12 +660,13 @@ async fn merge_files(
     let buf = Bytes::from(buf);
     match storage::put(&new_file_key, buf).await {
         Ok(_) => {
-            if cfg.common.inverted_index_enabled && stream_type != StreamType::Index {
+            if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
                 generate_index_on_ingester(
                     inverted_idx_batches,
                     new_file_key.clone(),
                     &org_id,
                     &stream_name,
+                    stream_type,
                     &full_text_search_fields,
                     &index_fields,
                 )
@@ -679,16 +680,17 @@ async fn merge_files(
 }
 
 /// Create an inverted index file for the given file
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_ingester(
     batches: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
+    stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-
+    let index_stream_name = format!("{}_{}", stream_name, stream_type);
     let record_batches = prepare_index_record_batches(
         batches,
         org_id,
@@ -707,7 +709,7 @@ pub(crate) async fn generate_index_on_ingester(
     let mut schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let schema_chk = crate::service::schema::stream_schema_exists(
         org_id,
-        stream_name,
+        &index_stream_name,
         StreamType::Index,
         &mut schema_map,
     )
@@ -717,7 +719,7 @@ pub(crate) async fn generate_index_on_ingester(
         // create schema
         let Some((schema, _)) = db::schema::merge(
             org_id,
-            stream_name,
+            &index_stream_name,
             StreamType::Index,
             idx_schema.as_ref(),
             Some(Utc::now().timestamp_micros()),
@@ -739,7 +741,7 @@ pub(crate) async fn generate_index_on_ingester(
         };
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
-        db::schema::update_setting(org_id, stream_name, StreamType::Index, metadata).await?;
+        db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
     }
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
@@ -749,6 +751,8 @@ pub(crate) async fn generate_index_on_ingester(
         return Ok(());
     }
     let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
+
+    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     for record_val in recs {
         let timestamp: i64 = record_val
             .get(&get_config().common.column_timestamp)
@@ -775,8 +779,9 @@ pub(crate) async fn generate_index_on_ingester(
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-    let writer = ingester::get_writer(org_id, &StreamType::Index.to_string(), stream_name).await;
-    let _ = crate::service::ingestion::write_file(&writer, stream_name, data_buf).await;
+    let writer =
+        ingester::get_writer(org_id, &StreamType::Index.to_string(), &index_stream_name).await;
+    let _ = crate::service::ingestion::write_file(&writer, &index_stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
@@ -785,15 +790,18 @@ pub(crate) async fn generate_index_on_ingester(
 }
 
 /// Create an inverted index file for the given file
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
     batches: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
+    stream_type: StreamType,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(String, FileMeta), anyhow::Error> {
+    let index_stream_name = format!("{}_{}", stream_name, stream_type);
     let mut record_batches = prepare_index_record_batches(
         batches,
         org_id,
@@ -810,25 +818,42 @@ pub(crate) async fn generate_index_on_compactor(
 
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let len_of_columns_to_invalidate = file_list_to_invalidate.len();
-    let empty_terms: ArrayRef = Arc::new(StringArray::from(vec![
-        None::<String>;
-        len_of_columns_to_invalidate
-    ]));
-    let file_names: ArrayRef = Arc::new(StringArray::from(
-        file_list_to_invalidate
-            .iter()
-            .map(|x| x.key.trim_start_matches(&prefix_to_remove).to_string())
-            .collect::<Vec<String>>(),
-    ));
+
     let _timestamp: ArrayRef = Arc::new(Int64Array::from(
         file_list_to_invalidate
             .iter()
             .map(|x| x.meta.min_ts)
             .collect::<Vec<i64>>(),
     ));
+    let empty_fields: ArrayRef = Arc::new(new_null_array(
+        &DataType::Utf8,
+        len_of_columns_to_invalidate,
+    ));
+    let empty_terms: ArrayRef = Arc::new(new_null_array(
+        &DataType::Utf8,
+        len_of_columns_to_invalidate,
+    ));
+    let file_names: ArrayRef = Arc::new(StringArray::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.key.trim_start_matches(&prefix_to_remove).to_string())
+            .collect::<Vec<String>>(),
+    ));
     let count: ArrayRef = Arc::new(Int64Array::from(vec![0; len_of_columns_to_invalidate]));
     let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
-    let columns = vec![_timestamp, empty_terms, file_names, count, deleted];
+    let empty_segment: ArrayRef = Arc::new(new_null_array(
+        &DataType::Binary,
+        len_of_columns_to_invalidate,
+    ));
+    let columns = vec![
+        _timestamp,
+        empty_fields,
+        empty_terms,
+        file_names,
+        count,
+        deleted,
+        empty_segment,
+    ];
     let batch = RecordBatch::try_new(schema, columns)
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
@@ -838,7 +863,7 @@ pub(crate) async fn generate_index_on_compactor(
         record_batches,
         original_file_size,
         org_id,
-        stream_name,
+        &index_stream_name,
         StreamType::Index,
         &new_file_key,
         "index_creator",

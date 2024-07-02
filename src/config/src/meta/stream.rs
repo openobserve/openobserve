@@ -56,6 +56,15 @@ pub enum StreamType {
     Index,
 }
 
+impl StreamType {
+    pub fn create_inverted_index(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+    }
+}
+
 impl From<&str> for StreamType {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
