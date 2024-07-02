@@ -320,8 +320,6 @@ function extractConditions(parsedAst: any) {
 
 // Function to extract the table name
 function extractTableName(parsedAst: any) {
-  console.log(parsedAst);
-
   return parsedAst.from[0].table ?? null;
 }
 

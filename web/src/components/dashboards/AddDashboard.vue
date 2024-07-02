@@ -138,7 +138,9 @@ export default defineComponent({
   name: "ComponentAddDashboard",
   props: {
     activeFolderId: {
-      type: String,
+      validator: (value) => {
+        return typeof value === "string" || value === null;
+      },
       default: "default",
     },
   },
