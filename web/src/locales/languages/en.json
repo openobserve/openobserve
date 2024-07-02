@@ -116,7 +116,8 @@
     "allFieldsLabel": "All Fields",
     "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately.",
     "regionFilterMsg": "Search Region/Cluster",
-    "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit."
+    "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
+    "cancel": "Cancel query"
   },
   "menu": {
     "home": "Home",
@@ -549,6 +550,7 @@
     "oneFieldMessage": "Add 1 field here",
     "maxtwofieldMessage": "Add maximum 2 fields here",
     "twoFieldsMessage": "Add 2 fields here",
+    "zeroOrOneFieldMessage":"Add 0 or 1 label field here",
     "oneOrMoreFieldsMessage": "Add one or more fields here",
     "xaxisFieldNAMessage": "X-Axis field is not allowed",
     "oneLabelFieldMessage": "Add 1 label field here",
@@ -643,6 +645,7 @@
     "zAxis": "Z-Axis",
     "yAxis": "Y-Axis (Columns)",
     "xAxis": "X-Axis (Row)",
+    "breakdown": "Breakdown",
     "otherColumn": "Other Columns",
     "config": "Config",
     "filters": "Filters",
