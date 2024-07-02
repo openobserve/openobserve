@@ -288,19 +288,13 @@ async fn handle_diff_schema(
     // 4. final schema fields count exceeds max_fields_activate_udschema
     // user-defined schema does not include _timestamp or _all columns
     let cfg = get_config();
-    let final_schema_field_count = {
-        let mut count = final_schema.fields().len();
-        if final_schema
-            .field_with_name(&cfg.common.column_timestamp)
-            .is_ok()
-        {
-            count -= 1;
-        }
-        if final_schema.field_with_name(&cfg.common.column_all).is_ok() {
-            count -= 1;
-        }
-        count
-    };
+    let final_schema_field_count = final_schema
+        .fields()
+        .iter()
+        .filter(|field| {
+            *field.name() != cfg.common.column_timestamp && *field.name() != cfg.common.column_all
+        })
+        .count();
     if cfg.common.allow_user_defined_schemas
         && stream_type == StreamType::Logs
         && defined_schema_fields.is_empty()
