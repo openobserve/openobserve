@@ -95,6 +95,7 @@ pub struct Sql {
     pub fts_terms: Vec<String>,
     pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
+    pub use_inverted_index: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -570,9 +571,9 @@ impl Sql {
         // Hack for index fields
         let filters = generate_filter_from_quick_text(&meta.quick_text);
         if !index_fields.is_empty() && !filters.is_empty() {
-            let index_fields = index_fields.into_iter().collect::<HashSet<_>>();
+            let index_fields = index_fields.iter().collect::<HashSet<_>>();
             for (key, value) in filters {
-                if !index_fields.contains(key) {
+                if !index_fields.contains(&key.to_string()) {
                     continue;
                 }
                 let entry = index_terms
@@ -739,6 +740,11 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
+        // check if we can use inverted index
+        // if there are some OR conditions in the where clause and not all of index field, we can't
+        // use inverted index
+        let use_inverted_index = checking_inverted_index(&meta, &fts_fields, &index_fields);
+
         Ok(Sql {
             origin_sql,
             rewrite_sql,
@@ -760,6 +766,7 @@ impl Sql {
                 .map(|(k, v)| (k, v.into_iter().collect()))
                 .collect(),
             histogram_interval,
+            use_inverted_index,
         })
     }
 
@@ -1101,6 +1108,49 @@ async fn is_fast_mode(
     }
 }
 
+/// need check some things: all the conditions should be AND or all the fiels are index fields
+fn checking_inverted_index(meta: &MetaSql, fts_fields: &[String], index_fields: &[String]) -> bool {
+    let Some(selection) = &meta.selection else {
+        return false;
+    };
+    let index_fields =
+        itertools::chain(fts_fields.iter(), index_fields.iter()).collect::<HashSet<_>>();
+    checking_inverted_index_inner(&index_fields, selection)
+}
+
+fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
+    match expr {
+        Expr::Identifier(Ident {
+            value,
+            quote_style: _,
+        }) => index_fields.contains(value),
+        Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
+        Expr::BinaryOp { left, op, right } => match op {
+            BinaryOperator::And => true,
+            BinaryOperator::Or => {
+                checking_inverted_index_inner(index_fields, left)
+                    && checking_inverted_index_inner(index_fields, right)
+            }
+            BinaryOperator::Eq => checking_inverted_index_inner(index_fields, left),
+            _ => false,
+        },
+        Expr::Like {
+            negated: _,
+            expr,
+            pattern: _,
+            escape_char: _,
+        } => checking_inverted_index_inner(index_fields, expr),
+        Expr::Function(f) => {
+            if f.name.to_string().starts_with("match_all") {
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1394,6 +1444,82 @@ mod tests {
                     assert_eq!(resp.meta.limit, query.size);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_checking_inverted_index() {
+        let index_fields = vec!["log", "content", "namespace"];
+        let index_fields = index_fields
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<HashSet<_>>();
+        let index_fields = index_fields.iter().collect::<HashSet<_>>();
+        let sqls = vec![
+            ("SELECT * FROM tbl", false),
+            ("SELECT * FROM tbl WHERE log = 'abc'", true),
+            ("SELECT * FROM tbl WHERE match_all('abc')", true),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') AND f2='cba'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') OR f2='cba'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') AND namespace='cba'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') OR namespace='cba'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') AND str_match(log, 'abc')",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') OR match_all('cba')",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) AND
+            namespace='abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) AND f2='abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) OR
+            namespace='abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) OR f2='abc'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE log = 'abc' AND content = 'abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE log = 'abc' OR content = 'abc'",
+                true,
+            ),
+            ("SELECT * FROM tbl WHERE log = 'abc' AND f2 = 'abc'", true),
+            ("SELECT * FROM tbl WHERE log = 'abc' OR f2 = 'abc'", false),
+        ];
+        for (sql, ok) in sqls {
+            let meta = MetaSql::new(sql).unwrap();
+            println!("meta: {:?}", meta);
+            let Some(expr) = meta.selection else {
+                continue;
+            };
+            let res = checking_inverted_index_inner(&index_fields, &expr);
+            assert_eq!(res, ok);
         }
     }
 }
