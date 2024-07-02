@@ -23,7 +23,7 @@ use config::{
     get_config,
     meta::{
         sql::{Sql as MetaSql, SqlOperator},
-        stream::{FileKey, StreamPartition, StreamType},
+        stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
     QUICK_MODEL_FIELDS,
 };
@@ -38,8 +38,12 @@ use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
-use crate::{common::meta::stream::StreamParams, service::search::match_source};
+use crate::{
+    common::meta::stream::StreamParams,
+    service::search::{self, match_source},
+};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -50,19 +54,23 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
-static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
+pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
-static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
+pub static RE_HISTOGRAM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+
+pub static _TS_WITH_ALIAS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -75,8 +83,9 @@ pub struct Sql {
     pub fulltext: Vec<(String, String)>,
     pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
     pub sql_mode: SqlMode,
-    pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
-                          * data from the latest file */
+    pub fast_mode: bool, /* there is no group by, no aggregatioin,
+                          * no where or only 1 equality where clause with term as a partition
+                          * key, we can just get data from the latest file */
     pub schema: Schema,
     pub query_context: String,
     pub uses_zo_fn: bool,
@@ -134,22 +143,22 @@ impl Sql {
         let mut meta = match MetaSql::new(&origin_sql) {
             Ok(meta) => meta,
             Err(err) => {
-                log::error!("parse sql error: {}, sql: {}", err, origin_sql);
+                log::error!(
+                    "split_sql_token: parse sql error: {}, sql: {}",
+                    err,
+                    origin_sql
+                );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
             }
         };
 
+        // Hack for table name
+        // DataFusion disallow use `k8s-logs-2022.09.11` as table name
+        let stream_name = meta.source.clone();
+        let mut fast_mode =
+            is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
+
         let cfg = get_config();
-        // need check some things:
-        // 1. no where
-        // 2. no aggregation
-        // 3. no group by
-        let mut fast_mode = meta.selection.is_none()
-            && meta.group_by.is_empty()
-            && (meta.order_by.is_empty() || meta.order_by[0].0 == cfg.common.column_timestamp)
-            && !meta.fields.iter().any(|f| f.contains('('))
-            && !meta.field_alias.iter().any(|f| f.0.contains('('))
-            && !origin_sql.to_lowercase().contains("distinct");
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -216,19 +225,51 @@ impl Sql {
             }
         }
 
-        // Hack for table name
-        // DataFusion disallow use `k8s-logs-2022.09.11` as table name
-        let stream_name = meta.source.clone();
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{stream_name}[ '"]?"#)).unwrap();
-        let caps = match re.captures(origin_sql.as_str()) {
-            Some(caps) => caps,
-            None => {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
-            }
-        };
-        origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
-        // Hack select for _timestamp
+        // Check if at least one match exists
+        if re.captures(&origin_sql).is_none() {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+        }
+        origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
+        // replace table for subquery
+        if meta.subquery.is_some() {
+            meta.subquery = Some(
+                re.replace_all(&meta.subquery.clone().unwrap(), " FROM tbl ")
+                    .to_string(),
+            );
+        }
+
+        // remove subquery in from clause
+        if meta.subquery.is_some() {
+            origin_sql =
+                search::datafusion::rewrite::replace_data_source_to_tbl(origin_sql.as_str())?;
+        }
+
+        if meta.subquery.is_some() {
+            // Hack select in subquery for _timestamp, add _timestamp to select clause
+            let re = Regex::new(r"(?i)\b(avg|count|min|max|sum|group_concat)\b").unwrap();
+            let has_aggregate_function = re.is_match(meta.subquery.as_ref().unwrap());
+            if !has_aggregate_function && !RE_ONLY_GROUPBY.is_match(meta.subquery.as_ref().unwrap())
+            {
+                let caps = RE_SELECT_FROM
+                    .captures(meta.subquery.as_ref().unwrap())
+                    .unwrap();
+                let cap_str = caps.get(1).unwrap().as_str();
+                if !cap_str.contains(&cfg.common.column_timestamp) {
+                    meta.subquery = Some(meta.subquery.as_ref().unwrap().replace(
+                        cap_str,
+                        &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                    ));
+                }
+            } else {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Subquery sql current not support aggregate function".to_string(),
+                )));
+            }
+        }
+
+        // Hack select for _timestamp, add _timestamp to select clause
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
@@ -269,11 +310,17 @@ impl Sql {
             )));
         }
 
-        // Hack time_range for sql
+        // Hack time_range for sql, add time range to where clause
         let meta_time_range_is_empty = meta.time_range.is_none() || meta.time_range == Some((0, 0));
         if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
             meta.time_range = Some(req_time_range); // update meta
         };
+
+        let mut rewrite_time_range_sql = origin_sql.clone();
+        if meta.subquery.is_some() {
+            rewrite_time_range_sql = meta.subquery.clone().unwrap();
+        }
+
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -291,7 +338,7 @@ impl Sql {
                 "".to_string()
             };
             if !time_range_sql.is_empty() && meta_time_range_is_empty {
-                match RE_WHERE.captures(origin_sql.as_str()) {
+                match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
                         if !meta.group_by.is_empty() {
@@ -315,22 +362,28 @@ impl Sql {
                                 [0..where_str.to_lowercase().rfind(" offset ").unwrap()]
                                 .to_string();
                         }
-                        let pos_start = origin_sql.find(where_str.as_str()).unwrap();
+                        let pos_start = rewrite_time_range_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
-                        origin_sql = format!(
+                        rewrite_time_range_sql = format!(
                             "{}{} AND ({}){}",
-                            &origin_sql[0..pos_start],
+                            &rewrite_time_range_sql[0..pos_start],
                             time_range_sql,
                             where_str,
-                            &origin_sql[pos_end..]
+                            &rewrite_time_range_sql[pos_end..]
                         );
                     }
                     None => {
-                        origin_sql = origin_sql
+                        rewrite_time_range_sql = rewrite_time_range_sql
                             .replace(" FROM tbl", &format!(" FROM tbl WHERE {time_range_sql}"));
                     }
                 };
             }
+        }
+
+        if meta.subquery.is_some() {
+            meta.subquery = Some(rewrite_time_range_sql);
+        } else {
+            origin_sql = rewrite_time_range_sql;
         }
 
         // Hack offset limit and sort by for sql
@@ -340,7 +393,7 @@ impl Sql {
             meta.limit = if req_query.size >= 0 {
                 req_query.size as i64
             } else {
-                cfg.limit.query_default_limit
+                cfg.limit.query_default_limit * std::cmp::max(1, meta.group_by.len() as i64)
             };
             origin_sql = if meta.order_by.is_empty()
                 && (!sql_mode.eq(&SqlMode::Full)
@@ -350,7 +403,8 @@ impl Sql {
                             .split(" from ")
                             .next()
                             .unwrap_or_default()
-                            .contains('(')))
+                            .contains('('))
+                        && !origin_sql.to_lowercase().contains("distinct"))
             {
                 let sort_by = if req_query.sort_by.is_empty() {
                     meta.order_by = vec![(cfg.common.column_timestamp.to_string(), true)];
@@ -590,7 +644,11 @@ impl Sql {
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
-                log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
+                log::error!(
+                    "sql_meta: parse sql error: {}, sql: {}",
+                    sql_meta.err().unwrap(),
+                    sql
+                );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
             let sql_meta = sql_meta.unwrap();
@@ -623,7 +681,6 @@ impl Sql {
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());
-
         match &sql_meta {
             Ok(sql_meta) => {
                 let mut used_fns = vec![];
@@ -648,7 +705,7 @@ impl Sql {
                 }
             }
             Err(e) => {
-                log::error!("parse sql error: {}, sql: {}", e, origin_sql);
+                log::error!("final sql: parse sql error: {}, sql: {}", e, origin_sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
             }
         }
@@ -793,7 +850,7 @@ pub(crate) fn generate_quick_mode_fields(
     fields
 }
 
-fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
@@ -965,6 +1022,56 @@ fn split_sql_token(text: &str) -> Vec<String> {
         }
     }
     tokens
+}
+
+/// need check some things:
+///  1. no where or 1 equality where clause and term is partition key
+///  2. no aggregation
+///  3. no group by
+async fn is_fast_mode(
+    meta: &MetaSql,
+    origin_sql: &str,
+    org_id: &str,
+    stream_type: &StreamType,
+    stream_name: &str,
+) -> bool {
+    let cfg = get_config();
+    if meta.group_by.is_empty()
+        && (meta.order_by.is_empty() || meta.order_by[0].0 == cfg.common.column_timestamp)
+        && !meta.fields.iter().any(|f| f.contains('('))
+        && !meta.field_alias.iter().any(|f| f.0.contains('('))
+        && !origin_sql.to_lowercase().contains("distinct")
+    {
+        match &meta.selection {
+            None => true,
+            Some(selection) => match selection {
+                Expr::BinaryOp { left, op, right: _ } => match (left.as_ref(), op) {
+                    (
+                        Expr::Identifier(Ident {
+                            value,
+                            quote_style: _,
+                        }),
+                        BinaryOperator::Eq,
+                    ) => {
+                        let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                            org_id,
+                            stream_type,
+                            stream_name,
+                        )
+                        .await;
+                        partition_det.partition_keys.iter().any(|stream_partition| {
+                            stream_partition.types == StreamPartitionType::Value
+                                && stream_partition.field == *value
+                        })
+                    }
+                    _ => false,
+                },
+                _ => false,
+            },
+        }
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
