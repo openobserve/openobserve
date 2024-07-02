@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::stream::{StreamSettings, StreamType},
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
+    SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
@@ -128,20 +129,27 @@ pub async fn check_for_schema(
         }
     }
 
-    // Auto enable User-defined schema if fields count exceeds configured env
-    // QUESTION(taiming): is user-defined schema allowed for other [StreamType] besides logs?
-    // QUESTION(taiming): should we consider env [ZO_ALLOW_USER_DEFINED_SCHEMAS]?
+    // Automatically enable User-defined schema when
+    // 1. allow_user_defined_schemas is enabled
+    // 2. log ingestion
+    // 3. inferred schema fields count exceeds max_fields_activate_udschema
+    // 4. user defined schema is not already enabled
     if cfg.common.allow_user_defined_schemas
+        && stream_type == StreamType::Logs
+        && (cfg.limit.max_fields_activate_udschema > 0
+            && inferred_schema.fields().len() > cfg.limit.max_fields_activate_udschema)
         && (stream_setting.as_ref().map_or(true, |setting| {
             setting
                 .defined_schema_fields
                 .as_ref()
                 .map_or(true, |ud_fields| ud_fields.is_empty())
         }))
-        && (cfg.limit.max_fields_activate_udschema > 0
-            && inferred_schema.fields().len() > cfg.limit.max_fields_activate_udschema)
     {
-        // QUESTION(taiming): does it matter what fields are included in UDSchema?
+        let inferred_fields_set = inferred_schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_owned())
+            .collect::<HashSet<_>>();
         let mut ud_fields = inferred_schema
             .fields()
             .iter()
@@ -153,6 +161,12 @@ pub async fn check_for_schema(
         }
         if !ud_fields.contains(&cfg.common.column_all) {
             ud_fields.insert(cfg.common.column_all.to_owned());
+        }
+        // add fts fields
+        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+            if inferred_fields_set.contains(field) && !ud_fields.contains(field) {
+                ud_fields.insert(field.to_owned());
+            }
         }
         let mut stream_setting = match stream_setting {
             Some(setting) => setting,
