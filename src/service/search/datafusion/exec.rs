@@ -1318,26 +1318,28 @@ pub async fn register_table(
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {
-        // TODO: do this in generate schema
-        let new_schema = Schema::new(
-            schema
+        let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
+        if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+            let new_fields = schema
                 .fields()
                 .iter()
-                .filter(|x| x.name() != &cfg.common.column_timestamp)
-                .cloned()
-                .collect::<Vec<_>>(),
-        );
-        let timestamp_schema = Schema::new(vec![Field::new(
-            cfg.common.column_timestamp.clone(),
-            DataType::Int64,
-            false,
-        )]);
-        let schema = Arc::new(
-            Schema::try_merge(vec![new_schema, timestamp_schema]).map_err(|e| {
-                datafusion::error::DataFusionError::Execution(format!("merge schema error: {e}",))
-            })?,
-        );
-        config = config.with_schema(schema);
+                .map(|x| {
+                    if x.name() == &cfg.common.column_timestamp {
+                        Arc::new(Field::new(
+                            cfg.common.column_timestamp.clone(),
+                            DataType::Int64,
+                            false,
+                        ))
+                    } else {
+                        x.clone()
+                    }
+                })
+                .collect::<Vec<_>>();
+            let new_schema = Arc::new(Schema::new(new_fields));
+            config = config.with_schema(new_schema);
+        } else {
+            config = config.with_schema(schema);
+        }
     }
     let mut table = NewListingTable::try_new(config)?;
     if session.storage_type != StorageType::Tmpfs {

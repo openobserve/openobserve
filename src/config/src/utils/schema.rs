@@ -23,7 +23,7 @@ use arrow_json::reader;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use serde_json::{Map, Value};
 
-use crate::{meta::stream::StreamType, FxIndexMap};
+use crate::{get_config, meta::stream::StreamType, FxIndexMap};
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,
@@ -218,6 +218,21 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
             })
             .collect::<Vec<_>>()
     };
+    let cfg = get_config();
+    fields = fields
+        .iter()
+        .map(|x| {
+            if x.name() == &cfg.common.column_timestamp {
+                Arc::new(Field::new(
+                    cfg.common.column_timestamp.clone(),
+                    DataType::Int64,
+                    false,
+                ))
+            } else {
+                x.clone()
+            }
+        })
+        .collect::<Vec<_>>();
     fields.sort_by(|a, b| a.name().cmp(b.name()));
     Schema::new(fields)
 }
