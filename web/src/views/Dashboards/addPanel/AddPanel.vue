@@ -418,8 +418,6 @@ export default defineComponent({
       // console.time("savePanelData");
       const dashboardId = route.query.dashboard + "";
       await savePanelChangesToDashboard(dashboardId);
-      console.log("savePanelData", dashboardId);
-      
       // console.timeEnd("savePanelData");
     });
 
