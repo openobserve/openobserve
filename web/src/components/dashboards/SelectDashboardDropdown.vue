@@ -71,7 +71,7 @@ import { defineComponent, onActivated, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
-import { getAllDashboardsByFolderId } from "@/utils/commons";
+import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 
 export default defineComponent({
@@ -95,12 +95,15 @@ export default defineComponent({
     const selectedDashboard: any = ref(null);
     const { t } = useI18n();
 
-    const updateDashboardList = async (newDashboard: any) => {
+    const updateDashboardList = async (dashboardId: any, folderId: any) => {
       showAddDashboardDialog.value = false;
       await getDashboardList();
+
+      const dashboardData = await getDashboard(store, dashboardId, folderId);
+
       selectedDashboard.value = {
-        label: newDashboard.name,
-        value: newDashboard.value,
+        label: dashboardData?.title,
+        value: dashboardData?.dashboardId,
       };
     };
 
