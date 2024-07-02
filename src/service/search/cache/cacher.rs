@@ -203,10 +203,10 @@ pub async fn get_cached_results(
                         let mut to_retain = Vec::new();
 
                         let first_ts =
-                            get_ts_value(result_ts_column, &cached_response.hits.first().unwrap());
+                            get_ts_value(result_ts_column, cached_response.hits.first().unwrap());
 
                         let last_ts =
-                            get_ts_value(result_ts_column, &cached_response.hits.last().unwrap());
+                            get_ts_value(result_ts_column, cached_response.hits.last().unwrap());
 
                         let discard_ts = if discard_interval > 0 {
                             if first_ts < last_ts {
