@@ -205,6 +205,9 @@ async fn main() -> Result<(), anyhow::Error> {
         init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     }
 
+    // init meter provider
+    let meter_provider = job::metrics::init_meter_provider().await?;
+
     // let node online
     let _ = cluster::set_online(false).await;
 
@@ -234,6 +237,9 @@ async fn main() -> Result<(), anyhow::Error> {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
+
+    // shutdown meter provider
+    let _ = meter_provider.shutdown();
 
     // flush useage report
     usage::flush().await;

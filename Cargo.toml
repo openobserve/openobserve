@@ -99,7 +99,7 @@ memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry = "0.22"
-opentelemetry_sdk = { version = "0.22", features = ["rt-tokio", "trace"] }
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio", "trace", "metrics"] }
 opentelemetry-otlp = { version = "0.15", features = [
   "http-proto",
   "serialize",
