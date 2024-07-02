@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="tab.folderId"
               content-class="tab_content full-width"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
+              @mouseenter="hoverFolder(tab.folderId)"
             >
               <div class="full-width row justify-between no-wrap">
                 <span
@@ -98,23 +99,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="tab.name"
                   >{{ tab.name }}</span
                 >
-                <div>
-                  <q-icon
-                    v-if="index"
-                    :name="outlinedEdit"
+                <div
+                  v-if="hoveredFolder === tab.folderId"
+                  class="hover-actions"
+                >
+                  <q-btn-dropdown
+                    dropdown-icon="more_vert"
+                    dense
+                    flat
+                    no-caps
                     class="q-ml-sm"
-                    @click.stop="editFolder(tab.folderId)"
+                    @click.stop="toggleActions"
                     style="cursor: pointer; justify-self: end"
-                    data-test="dashboard-edit-folder-icon"
+                    data-test="dashboard-more-icon"
                   />
-                  <q-icon
-                    v-if="index"
-                    :name="outlinedDelete"
-                    class="q-ml-sm"
-                    @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                    style="cursor: pointer; justify-self: end"
-                    data-test="dashboard-delete-folder-icon"
-                  />
+                  <q-menu v-model="showActions" class="action-icons">
+                    <q-list dense>
+                      <q-item
+                        clickable
+                        v-close-popup="true"
+                        @click.stop="editFolder(tab.folderId)"
+                        data-test="dashboard-edit-folder-icon"
+                        ><q-item-section>
+                          <q-item-label class="q-pa-sm"
+                            >Edit Folder</q-item-label
+                          >
+                        </q-item-section></q-item
+                      >
+                      <q-item
+                        clickable
+                        v-close-popup="true"
+                        @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                        data-test="dashboard-delete-folder-icon"
+                        ><q-item-section>
+                          <q-item-label class="q-pa-sm"
+                            >Delete Folder</q-item-label
+                          >
+                        </q-item-section></q-item
+                      >
+                    </q-list>
+                  </q-menu>
                 </div>
               </div>
             </q-tab>
@@ -481,6 +505,16 @@ export default defineComponent({
       },
       { deep: true }
     );
+    const hoveredFolder = ref(null);
+    const showActions = ref(false);
+
+    const hoverFolder = (folderId) => {
+      hoveredFolder.value = folderId;
+    };
+
+    const toggleActions = () => {
+      showActions.value = !showActions.value;
+    };
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -747,6 +781,10 @@ export default defineComponent({
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
       handleDashboardMoved,
+      hoverFolder,
+      hoveredFolder,
+      toggleActions,
+      showActions,
     };
   },
   methods: {
@@ -774,6 +812,17 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.hover-actions {
+  display: flex;
+  align-items: center;
+}
+
+.action-icons {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
