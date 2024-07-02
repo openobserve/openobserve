@@ -303,6 +303,14 @@ pub async fn search_multi(
                     max_ts: Some(req.query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    trace_id: Some(res.trace_id.clone()),
+                    took_wait_in_queue: if res.took_detail.is_some() {
+                        let resp_took = res.took_detail.as_ref().unwrap();
+                        // Consider only the cluster wait queue duration
+                        Some(resp_took.cluster_wait_queue)
+                    } else {
+                        None
+                    },
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
@@ -859,6 +867,7 @@ pub async fn around_multi(
         multi_resp.total += total_hits;
         multi_resp.scan_size += total_scan_size;
         multi_resp.took += resp_forward.took + resp_backward.took;
+        let cached_ratio_avg = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
@@ -892,6 +901,19 @@ pub async fn around_multi(
             user_email: Some(user_id.to_string()),
             min_ts: Some(around_start_time),
             max_ts: Some(around_end_time),
+            cached_ratio: Some(cached_ratio_avg),
+            trace_id: Some(trace_id.clone()),
+            took_wait_in_queue: match (
+                resp_forward.took_detail.as_ref(),
+                resp_backward.took_detail.as_ref(),
+            ) {
+                (Some(forward_took), Some(backward_took)) => {
+                    Some(forward_took.cluster_wait_queue + backward_took.cluster_wait_queue)
+                }
+                (Some(forward_took), None) => Some(forward_took.cluster_wait_queue),
+                (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
+                _ => None,
+            },
             ..Default::default()
         };
         let num_fn = query_fn.is_some() as u16;
