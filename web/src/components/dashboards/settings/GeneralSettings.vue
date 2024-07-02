@@ -95,6 +95,7 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import { useLoading } from "@/composables/useLoading";
 import { useQuasar } from "quasar";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -108,6 +109,8 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const route = useRoute();
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
 
     const addDashboardForm: Ref<any> = ref(null);
     const closeBtn: Ref<any> = ref(null);
@@ -192,18 +195,11 @@ export default defineComponent({
           route?.query?.folder ?? "default"
         );
 
-        $q.notify({
-          type: "positive",
-          message: "Dashboard updated successfully.",
-        });
+        showPositiveNotification("Dashboard updated successfully.");
 
         emit("save");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Dashboard updation failed",
-          timeout: 2000,
-        });
+        showErrorNotification(error?.message ?? "Dashboard updation failed");
       }
     });
 
@@ -214,12 +210,11 @@ export default defineComponent({
         }
 
         saveDashboardApi.execute().catch((err: any) => {
-          $q.notify({
-            type: "negative",
-            message: JSON.stringify(
+          showErrorNotification(
+            JSON.stringify(
               err.response.data["error"] || "Dashboard creation failed."
-            ),
-          });
+            )
+          );
         });
       });
     };
