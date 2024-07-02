@@ -77,6 +77,9 @@ export default defineComponent({
   props: {
     activeFolderId: {
       required: false,
+      validator: (value) => {
+        return typeof value === "string" || value === null;
+      },
     },
   },
   setup(props, { emit }) {

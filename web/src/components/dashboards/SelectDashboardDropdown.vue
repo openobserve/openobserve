@@ -78,6 +78,9 @@ export default defineComponent({
   props: {
     folderId: {
       required: true,
+      validator: (value) => {
+        return typeof value === "string" || value === null;
+      },
     },
   },
   setup(props, { emit }) {
