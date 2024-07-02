@@ -53,12 +53,15 @@ pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
-pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
+pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
+
+pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 
@@ -498,8 +501,6 @@ pub struct Common {
     pub data_dir: String,
     #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/openobserve/wal/
     pub data_wal_dir: String,
-    #[env_config(name = "ZO_DATA_IDX_DIR", default = "")] // ./data/openobserve/idx/
-    pub data_idx_dir: String,
     #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
     pub data_stream_dir: String,
     #[env_config(name = "ZO_DATA_DB_DIR", default = "")] // ./data/openobserve/db/
@@ -649,7 +650,7 @@ pub struct Common {
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
         name = "ZO_ENABLE_INVERTED_INDEX",
-        default = false,
+        default = true,
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
@@ -720,8 +721,6 @@ pub struct Limit {
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
-    #[env_config(name = "ZO_PARQUET_MAX_ROW_GROUP_SIZE", default = 0)] // row count
-    pub parquet_max_row_group_size: usize,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
@@ -1344,12 +1343,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_wal_dir.ends_with('/') {
         cfg.common.data_wal_dir = format!("{}/", cfg.common.data_wal_dir);
-    }
-    if cfg.common.data_idx_dir.is_empty() {
-        cfg.common.data_idx_dir = format!("{}idx/", cfg.common.data_dir);
-    }
-    if !cfg.common.data_idx_dir.ends_with('/') {
-        cfg.common.data_idx_dir = format!("{}/", cfg.common.data_idx_dir);
     }
     if cfg.common.data_stream_dir.is_empty() {
         cfg.common.data_stream_dir = format!("{}stream/", cfg.common.data_dir);

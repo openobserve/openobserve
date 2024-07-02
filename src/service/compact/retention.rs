@@ -333,6 +333,7 @@ async fn delete_from_file_list(
             key: file_name,
             meta: FileMeta::default(),
             deleted: true,
+            segment_ids: None,
         });
     }
 

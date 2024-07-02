@@ -62,6 +62,7 @@ async-trait.workspace = true
 async-recursion.workspace = true
 awc = "3.4"
 base64.workspace = true
+bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
 chrono.workspace = true
@@ -206,6 +207,7 @@ async-recursion = "1.0"
 async-walkdir = "1.0.0"
 aws-config = "0.56.1"
 base64 = "0.21"
+bitvec = "1.0"
 bytes = "1.4"
 byteorder = "1.4.3"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
@@ -215,8 +217,8 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "39"
-datafusion-expr = "39"
+datafusion = { version = "39", git = "https://github.com/apache/datafusion", rev = "e40c8a8915d5017951207864886892b3327b47b5" }
+datafusion-expr = { version = "39", git = "https://github.com/apache/datafusion", rev = "e40c8a8915d5017951207864886892b3327b47b5" }
 arrow = { version = "52.0.0", features = ["ipc_compression", "prettyprint"] }
 arrow-json = "52.0.0"
 arrow-schema = { version = "52.0.0", features = ["serde"] }

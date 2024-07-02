@@ -24,7 +24,6 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
-    common::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
@@ -39,7 +38,10 @@ use crate::{
     common::meta::stream::StreamParams,
     service::{
         db, file_list,
-        search::{datafusion::exec::register_table, match_source},
+        search::{
+            datafusion::{exec::register_table, file_type::FileType},
+            match_source,
+        },
     },
 };
 

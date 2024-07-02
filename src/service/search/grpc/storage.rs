@@ -23,7 +23,7 @@ use config::{
     },
     utils::schema_ext::SchemaExt,
 };
-use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
+use datafusion::arrow::record_batch::RecordBatch;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -37,7 +37,7 @@ use tracing::{info_span, Instrument};
 use crate::service::{
     db, file_list,
     search::{
-        datafusion::exec,
+        datafusion::{exec, file_type::FileType},
         grpc::{generate_search_schema, generate_select_start_search_schema},
         sql::Sql,
         RE_SELECT_WILDCARD,

@@ -39,15 +39,10 @@ pub fn new_parquet_writer<'a>(
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
-    let row_group_size = if cfg.limit.parquet_max_row_group_size > 0 {
-        cfg.limit.parquet_max_row_group_size
-    } else {
-        PARQUET_MAX_ROW_GROUP_SIZE
-    };
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
-        .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
+        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(Compression::ZSTD(Default::default()))
         .set_column_dictionary_enabled(
             cfg.common.column_timestamp.as_str().into(),
@@ -75,7 +70,7 @@ pub fn new_parquet_writer<'a>(
     // Bloom filter stored by row_group, set NDV to reduce the memory usage.
     // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
-    let mut bf_ndv = min(metadata.records as u64, row_group_size as u64);
+    let mut bf_ndv = min(metadata.records as u64, PARQUET_MAX_ROW_GROUP_SIZE as u64);
     if bf_ndv > 1000 {
         bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
     }

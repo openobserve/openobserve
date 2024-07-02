@@ -205,9 +205,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
             log::error!("Failed to create wal dir: {}", e);
         }
-        if let Err(e) = std::fs::create_dir_all(&cfg.common.data_idx_dir) {
-            log::error!("Failed to create wal dir: {}", e);
-        }
     }
 
     tokio::task::spawn(async move { files::run().await });

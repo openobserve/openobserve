@@ -146,6 +146,7 @@ pub async fn generate_by_stream(
             key: file,
             meta,
             deleted: false,
+            segment_ids: None,
         };
         // add into queue
         PROCESSING_FILES.write().insert(file.key.clone());
