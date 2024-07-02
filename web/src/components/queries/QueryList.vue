@@ -132,12 +132,12 @@ export default defineComponent({
       };
       const originalSize =
         query?.original_size !== undefined
-          ? getUnitValue(query?.original_size, "bytes", "", 2)
+          ? getUnitValue(query?.original_size, "megabytes", "", 2)
           : { value: "", unit: "" };
 
       const compressedSize =
         query?.compressed_size !== undefined
-          ? getUnitValue(query?.compressed_size, "bytes", "", 2)
+          ? getUnitValue(query?.compressed_size, "megabytes", "", 2)
           : { value: "", unit: "" };
       const rows: any[] = [
         ["Trace ID", query?.trace_id],
