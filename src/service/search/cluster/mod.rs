@@ -231,7 +231,7 @@ pub async fn search(
                         Some((term, file_name, count, segment_ids, timestamp))
                     }
                 })
-                .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
+                .sorted_by(|a, b| Ord::cmp(&b.4, &a.4)); // Descending order of timestamp
             let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
