@@ -697,9 +697,9 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
@@ -707,7 +707,7 @@ export default defineComponent({
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();
-    const $q = useQuasar();
+    const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
       source: true,
       target: true,
@@ -817,11 +817,7 @@ export default defineComponent({
 
               const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-              $q.notify({
-                type: "negative",
-                message: errorMessage,
-                timeout: 5000,
-              });
+              showErrorNotification(errorMessage);
               cleanupDraggingFields();
               return;
             }

@@ -16,7 +16,7 @@
 import { reactive, computed } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import useNotifications from "./useNotifications";
 
 const colors = [
   "#5960b2",
@@ -144,8 +144,7 @@ let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
 
 const useDashboardPanelData = () => {
   const store = useStore();
-  const $q = useQuasar();
-
+  const { showErrorNotification } = useNotifications();
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
     dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
@@ -960,11 +959,8 @@ const useDashboardPanelData = () => {
         errorDetailValue.length > 300
           ? errorDetailValue.slice(0, 300) + " ..."
           : errorDetailValue;
-      $q.notify({
-        type: "negative",
-        message: trimmedErrorMessage,
-        timeout: 5000,
-      });
+
+      showErrorNotification(trimmedErrorMessage);
     }
   };
 
@@ -1011,11 +1007,8 @@ const useDashboardPanelData = () => {
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
-        $q.notify({
-          type: "negative",
-          message: trimmedErrorMessage,
-          timeout: 5000,
-        });
+
+        showErrorNotification(trimmedErrorMessage);
       });
   };
 

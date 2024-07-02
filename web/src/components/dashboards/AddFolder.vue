@@ -101,8 +101,8 @@ import { createFolder, updateFolder } from "@/utils/commons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
+import useNotifications from "@/composables/useNotifications";
 
 const defaultValue = () => {
   return {
@@ -142,7 +142,8 @@ export default defineComponent({
     );
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const $q = useQuasar();
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
 
     const onSubmit = useLoading(async () => {
       await addFolderForm.value.validate().then(async (valid: any) => {
@@ -158,22 +159,14 @@ export default defineComponent({
               folderData.value.folderId,
               folderData.value
             );
-            $q.notify({
-              type: "positive",
-              message: "Folder updated successfully",
-              timeout: 2000,
-            });
+            showPositiveNotification("Folder updated successfully");
             emit("update:modelValue", folderData.value);
           }
           //else new folder
           else {
             const newFolder: any = await createFolder(store, folderData.value);
             emit("update:modelValue", newFolder);
-            $q.notify({
-              type: "positive",
-              message: `Folder added successfully`,
-              timeout: 2000,
-            });
+            showPositiveNotification("Folder added successfully");
           }
           folderData.value = {
             folderId: "",
@@ -182,15 +175,12 @@ export default defineComponent({
           };
           await addFolderForm.value.resetValidation();
         } catch (err: any) {
-          $q.notify({
-            type: "negative",
-            message:
-              err?.message ??
+          showErrorNotification(
+            err?.message ??
               (props.editMode
                 ? "Folder updation failed"
-                : "Folder creation failed"),
-            timeout: 2000,
-          });
+                : "Folder creation failed")
+          );
         }
       });
     });

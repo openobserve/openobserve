@@ -180,11 +180,11 @@ import { useI18n } from "vue-i18n";
 import { getAllDashboards, getFoldersList } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import dashboardService from "../../services/dashboards";
 import axios from "axios";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "Import Dashboard",
@@ -194,8 +194,8 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const $q = useQuasar();
-
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     const selectedFolderAtJson = ref({
       label:
         store.state.organizationData.folders.find(
@@ -295,10 +295,7 @@ export default defineComponent({
     // import multiple files
     const importFiles = async () => {
       if (!jsonFiles.value || !jsonFiles.value.length) {
-        $q.notify({
-          type: "negative",
-          message: "No JSON file(s) selected for import",
-        });
+        showErrorNotification("No JSON file(s) selected for import");
         isLoading.value = false;
         return;
       }
@@ -343,19 +340,17 @@ export default defineComponent({
         }
 
         if (allFulfilledValues) {
-          $q.notify({
-            type: "positive",
-            message: `${allFulfilledValues} Dashboard(s) Imported Successfully`,
-          });
+          showPositiveNotification(
+            `${allFulfilledValues} Dashboard(s) Imported`
+          );
         }
 
         if (results.length - allFulfilledValues) {
-          $q.notify({
-            type: "negative",
-            message: `${
+          showErrorNotification(
+            `${
               results.length - allFulfilledValues
-            } Dashboard(s) Failed to Import`,
-          });
+            } Dashboard(s) Failed to Import`
+          );
         }
 
         isLoading.value = false;
@@ -398,10 +393,7 @@ export default defineComponent({
         const urlData = url.value.trim() ? url.value.trim() : "";
 
         if (!urlData) {
-          $q.notify({
-            type: "negative",
-            message: `Please Enter a URL for import`,
-          });
+          showErrorNotification("Please Enter a URL for import");
           return;
         }
 
@@ -417,16 +409,11 @@ export default defineComponent({
         ).then((res) => {
           resetAndRefresh(ImportType.URL, selectedFolderAtUrl.value);
           filesImportResults.value = [];
-          $q.notify({
-            type: "positive",
-            message: `Dashboard Imported Successfully`,
-          });
+
+          showPositiveNotification(`Dashboard Imported Successfully`);
         });
       } catch (error) {
-        $q.notify({
-          type: "negative",
-          message: "Please Enter a URL for import",
-        });
+        showErrorNotification("Please Enter a URL for import");
       } finally {
         isLoading.value = false;
       }
@@ -451,16 +438,11 @@ export default defineComponent({
             selectedFolderAtJsonObj.value
           );
           filesImportResults.value = [];
-          $q.notify({
-            type: "positive",
-            message: `Dashboard Imported Successfully`,
-          });
+
+          showPositiveNotification(`Dashboard Imported Successfully`);
         });
       } catch (error) {
-        $q.notify({
-          type: "negative",
-          message: "Please Enter a JSON object for import",
-        });
+        showErrorNotification("Please Enter a JSON object for import");
       } finally {
         isLoading.value = false;
       }

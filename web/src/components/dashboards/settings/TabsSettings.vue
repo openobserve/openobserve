@@ -157,7 +157,6 @@ import { VueDraggableNext } from "vue-draggable-next";
 import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { deleteTab, editTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
@@ -166,6 +165,7 @@ import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import { updateDashboard } from "../../../utils/commons";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -178,7 +178,6 @@ export default defineComponent({
   emits: ["refresh"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const route = useRoute();
 
     const showAddTabDialog = ref(false);
@@ -199,7 +198,8 @@ export default defineComponent({
         route.query.folder ?? "default"
       );
     };
-
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     onMounted(async () => {
       await getDashboardData();
     });
@@ -227,17 +227,9 @@ export default defineComponent({
         // emit refresh to rerender
         emit("refresh");
 
-        $q.notify({
-          type: "positive",
-          message: "Dashboard updated successfully.",
-          timeout: 2000,
-        });
+        showPositiveNotification("Dashboard updated successfully.");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Tab reorder failed",
-        });
-
+        showErrorNotification(error?.message ?? "Tab reorder failed");
         // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
@@ -269,21 +261,13 @@ export default defineComponent({
           emit("refresh");
           await getDashboardData();
 
-          $q.notify({
-            type: "positive",
-            message: "Tab updated successfully",
-            timeout: 2000,
-          });
-
+          showPositiveNotification("Tab updated successfully");
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
         }
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Tab updation failed",
-        });
+        showErrorNotification(error?.message ?? "Tab updation failed");
 
         // emit refresh to rerender
         emit("refresh");
@@ -326,17 +310,10 @@ export default defineComponent({
 
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
-        $q.notify({
-          type: "positive",
-          message: "Tab deleted successfully",
-          timeout: 2000,
-        });
+
+        showPositiveNotification("Tab deleted successfully");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Tab deletion failed",
-          timeout: 2000,
-        });
+        showErrorNotification(error?.message ?? "Tab deletion failed");
       }
     };
 
