@@ -938,7 +938,7 @@ async fn prepare_index_record_batches(
     // process full text search fields
     for column in schema.fields().iter() {
         let column_name = column.name();
-        if index_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
+        if !full_text_search_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
             continue;
         }
 
@@ -1003,7 +1003,7 @@ async fn prepare_index_record_batches(
             let segment_ids = ids
                 .iter()
                 .map(|i| i / INDEX_SEGMENT_LENGTH)
-                .collect::<Vec<_>>();
+                .collect::<HashSet<_>>();
             let segment_num = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
             let mut bv = BitVec::with_capacity(segment_num);
             for i in 0..segment_num {
@@ -1031,7 +1031,7 @@ async fn prepare_index_record_batches(
     // process index fields
     for column in schema.fields().iter() {
         let column_name = column.name();
-        if full_text_search_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
+        if !index_fields.contains(column_name) || column.data_type() != &DataType::Utf8 {
             continue;
         }
 
@@ -1091,7 +1091,7 @@ async fn prepare_index_record_batches(
             let segment_ids = ids
                 .iter()
                 .map(|i| i / INDEX_SEGMENT_LENGTH)
-                .collect::<Vec<_>>();
+                .collect::<HashSet<_>>(); 
             let segment_num = (num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
             let mut bv = BitVec::with_capacity(segment_num);
             for i in 0..segment_num {
