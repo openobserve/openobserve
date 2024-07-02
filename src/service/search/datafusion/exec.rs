@@ -1058,7 +1058,7 @@ pub async fn merge_parquet_files(
     let query_sql = if stream_type == StreamType::Index {
         // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} ASC",
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     } else if cfg.limit.distinct_values_hourly
@@ -1066,12 +1066,12 @@ pub async fn merge_parquet_files(
         && stream_name == "distinct_values"
     {
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} ASC",
+            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
             cfg.common.column_timestamp, cfg.common.column_timestamp, cfg.common.column_timestamp
         )
     } else {
         format!(
-            "SELECT * FROM tbl ORDER BY {} ASC",
+            "SELECT * FROM tbl ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     };
@@ -1283,7 +1283,7 @@ pub async fn register_table(
             expr: Box::new(Expr::Column(Column::new_unqualified(
                 cfg.common.column_timestamp.clone(),
             ))),
-            asc: true,
+            asc: false,
             nulls_first: false,
         },
     )]]);
