@@ -578,6 +578,7 @@
     "addFieldMessage": "Please add a field from the list",
     "currentFolderLabel": "Current Folder",
     "selectFolderLabel": "Select Folder",
+    "selectDashboardLabel": "Select Dashboard",
     "selectTabLabel": "Select Tab",
     "layerType": "Layer Type",
     "newDashboard": "Create new dashboard",

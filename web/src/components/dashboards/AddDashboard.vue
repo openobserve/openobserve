@@ -78,7 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <span>&nbsp;</span>
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolder = $event" />
+        <select-folder-dropdown
+          :active-folder-id="selectedFolder.value"
+          @folder-selected="selectedFolder = $event"
+        />
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
