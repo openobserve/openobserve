@@ -182,6 +182,13 @@ pub async fn search(
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
                     trace_id: Some(trace_id),
+                    took_wait_in_queue: if res.took_detail.is_some() {
+                        let resp_took = res.took_detail.as_ref().unwrap();
+                        // Consider only the cluster wait queue duration
+                        Some(resp_took.cluster_wait_queue)
+                    } else {
+                        None
+                    },
                     ..Default::default()
                 };
                 report_request_usage_stats(
