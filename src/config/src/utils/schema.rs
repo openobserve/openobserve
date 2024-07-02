@@ -220,7 +220,7 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
     };
     let cfg = get_config();
     fields = fields
-        .iter()
+        .into_iter()
         .map(|x| {
             if x.name() == &cfg.common.column_timestamp {
                 Arc::new(Field::new(
@@ -229,7 +229,7 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
                     false,
                 ))
             } else {
-                x.clone()
+                x
             }
         })
         .collect::<Vec<_>>();

@@ -1319,7 +1319,7 @@ pub async fn register_table(
         config = config.infer_schema(&ctx.state()).await?;
     } else {
         let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
-        if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+        let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
             let new_fields = schema
                 .fields()
                 .iter()
@@ -1335,11 +1335,11 @@ pub async fn register_table(
                     }
                 })
                 .collect::<Vec<_>>();
-            let new_schema = Arc::new(Schema::new(new_fields));
-            config = config.with_schema(new_schema);
+            Arc::new(Schema::new(new_fields))
         } else {
-            config = config.with_schema(schema);
-        }
+            schema
+        };
+        config = config.with_schema(schema);
     }
     let mut table = NewListingTable::try_new(config)?;
     if session.storage_type != StorageType::Tmpfs {
