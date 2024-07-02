@@ -1512,6 +1512,8 @@ fn merge_response(
         return;
     }
 
+    let mut files_cache_ratio = 0;
+    let mut result_cache_ratio = 0;
     let cache_ts = if cache_response.hits.is_empty() {
         get_ts_value(
             ts_column,
@@ -1525,7 +1527,9 @@ fn merge_response(
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
-        cache_response.cached_ratio += res.cached_ratio;
+        files_cache_ratio += res.cached_ratio;
+
+        result_cache_ratio += res.total;
 
         if res.hits.is_empty() {
             continue;
@@ -1542,7 +1546,10 @@ fn merge_response(
                 .collect();
         }
     }
-    cache_response.cached_ratio /= search_response.len() + 1;
+    cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    cache_response.result_cache_ratio = (cache_response.total as f64 * 100_f64
+        / (result_cache_ratio + cache_response.total) as f64)
+        as usize;
 }
 
 async fn write_results(
