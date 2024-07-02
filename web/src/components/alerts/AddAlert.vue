@@ -281,6 +281,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
+            <div class="col-12 flex justify-start items-center q-mt-xs">
+              <div
+                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
+                data-test="add-alert-delay-title"
+                style="width: 190px"
+              >
+                {{ t("alerts.tolerance") + " *" }}
+                <q-icon
+                  :name="outlinedInfo"
+                  size="17px"
+                  class="q-ml-xs cursor-pointer"
+                  :class="
+                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  "
+                >
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                  >
+                    <span style="font-size: 14px">
+                      If the alert is dealyed by a few minutes, how many minutes
+                      should it wait before skipping the alert.
+                      <br />
+                      e.g. if the alert is supposed to trigger at 4:00 PM and
+                      it doesn't due to system congestion, then how many minutes
+                      should the system keep it queued before skipping the alert.
+                      </span
+                    >
+                  </q-tooltip>
+                </q-icon>
+              </div>
+              <div style="min-height: 58px">
+                <div class="col-8 row justify-left align-center q-gutter-sm">
+                  <div
+                    class="flex items-center"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05)"
+                  >
+                    <div
+                      data-test="add-alert-delay-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="formData.trigger_condition.tolerance"
+                        type="number"
+                        dense
+                        filled
+                        min="0"
+                        style="background: none"
+                      />
+                    </div>
+                    <div
+                      data-test="add-alert-delay-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        background: #f2f2f2;
+                        height: 40px;
+                      "
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'bg-grey-10'
+                          : 'bg-grey-2'
+                      "
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  data-test="add-alert-delay-error"
+                  v-if="formData.trigger_condition.tolerance < 0"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+            </div>
+
             <div class="o2-input flex justify-start items-center">
               <div
                 data-test="add-alert-destination-title"
@@ -482,6 +564,7 @@ const defaultValue: any = () => {
       frequency: 1,
       threshold: 3,
       silence: 10,
+      tolerance: 0,
     },
     destinations: [],
     context_attributes: {},
@@ -944,6 +1027,9 @@ export default defineComponent({
 
       payload.trigger_condition.silence = parseInt(
         formData.value.trigger_condition.silence
+      );
+      payload.trigger_condition.tolerance = parseInt(
+        formData.value.trigger_condition.tolerance
       );
 
       payload.description = formData.value.description.trim();

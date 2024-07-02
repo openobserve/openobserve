@@ -95,6 +95,8 @@ pub struct TriggerCondition {
     pub frequency_type: AlertFrequencyType,
     #[serde(default)]
     pub silence: i64, // silence for 10 minutes after fire an alert
+    #[serde(default)]
+    pub tolerance: i64, // deviation in execution time - 1 minute
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]

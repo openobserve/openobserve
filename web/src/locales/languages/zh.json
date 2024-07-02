@@ -627,6 +627,7 @@
     "threshold": "阈值",
     "interval": "频率",
     "silenceNotification": "通知后静默",
+    "tolerance": "容差",
     "destination": "通知地址",
     "additionalVariables": "附加变量",
     "description": "描述",
