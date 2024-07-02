@@ -165,39 +165,48 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     // send notification
     if let Some(data) = ret {
-        match alert.send_notification(&data).await {
-            Ok(_) => {
-                db::scheduler::update_trigger(new_trigger).await?;
-            }
-            Err(e) => {
-                log::error!(
-                    "Error sending alert notification: org: {}, module_key: {}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
-                );
-                if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
-                    // It has been tried the maximum time, just update the
-                    // next_run_at to the next expected trigger time
-                    log::debug!(
-                        "This alert trigger: {}/{} has reached maximum retries",
+        if trigger.next_run_at < Utc::now().timestamp_micros() {
+            log::debug!(
+                "Alert trigger: {}/{} has missed the schedule, update next_run_at",
+                &new_trigger.org,
+                &new_trigger.module_key
+            );
+            db::scheduler::update_trigger(new_trigger).await?;
+        } else {
+            match alert.send_notification(&data).await {
+                Ok(_) => {
+                    db::scheduler::update_trigger(new_trigger).await?;
+                }
+                Err(e) => {
+                    log::error!(
+                        "Error sending alert notification: org: {}, module_key: {}",
                         &new_trigger.org,
                         &new_trigger.module_key
                     );
-                    db::scheduler::update_trigger(new_trigger).await?;
-                } else {
-                    // Otherwise update its status only
-                    db::scheduler::update_status(
-                        &new_trigger.org,
-                        new_trigger.module,
-                        &new_trigger.module_key,
-                        db::scheduler::TriggerStatus::Waiting,
-                        trigger.retries + 1,
-                    )
-                    .await?;
+                    if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+                        // It has been tried the maximum time, just update the
+                        // next_run_at to the next expected trigger time
+                        log::debug!(
+                            "This alert trigger: {}/{} has reached maximum retries",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                        db::scheduler::update_trigger(new_trigger).await?;
+                    } else {
+                        // Otherwise update its status only
+                        db::scheduler::update_status(
+                            &new_trigger.org,
+                            new_trigger.module,
+                            &new_trigger.module_key,
+                            db::scheduler::TriggerStatus::Waiting,
+                            trigger.retries + 1,
+                        )
+                        .await?;
+                    }
+                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    trigger_data_stream.error =
+                        Some(format!("error sending notification for alert: {e}"));
                 }
-                trigger_data_stream.status = TriggerDataStatus::Failed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
             }
         }
     } else {
