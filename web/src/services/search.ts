@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { generateTraceContext } from "@/utils/zincutils";
 import http from "./http";
 
 const search = {
@@ -21,25 +22,33 @@ const search = {
       org_identifier,
       query,
       page_type = "logs",
+      traceparent,
     }: {
       org_identifier: string;
       query: any;
       page_type: string;
+      traceparent?: string;
     },
     search_type: string = "UI"
   ) => {
+    if (!traceparent) traceparent = generateTraceContext()?.traceparent;
+
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}`;
       if (query.hasOwnProperty("aggs")) {
-        return http().post(url, { ...query.query, aggs: query.aggs });
+        return http({ headers: { traceparent } }).post(url, {
+          ...query.query,
+          aggs: query.aggs,
+        });
       } else {
-        return http().post(url, query.query);
+        return http({ headers: { traceparent } }).post(url, query.query);
       }
     }
-    return http().post(url, query);
+    return http({ headers: { traceparent } }).post(url, query);
   },
+
   search_around: ({
     org_identifier,
     index,
@@ -51,6 +60,7 @@ const search = {
     regions,
     clusters,
     is_multistream,
+    traceparent,
   }: {
     org_identifier: string;
     index: string;
@@ -62,6 +72,7 @@ const search = {
     regions: string;
     clusters: string;
     is_multistream: boolean;
+    traceparent: string;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -81,7 +92,7 @@ const search = {
     if (clusters.trim() != "") {
       url = url + `&clusters=${clusters}`;
     }
-    return http().get(url);
+    return http({ headers: { traceparent } }).get(url);
   },
   metrics_query_range: ({
     org_identifier,
@@ -152,17 +163,23 @@ const search = {
     org_identifier,
     query,
     page_type = "logs",
+    traceparent,
   }: {
     org_identifier: string;
     query: any;
     page_type: string;
+    traceparent: string;
   }) => {
     // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+
     let url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
     if (typeof query.sql != "string") {
       url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}`;
     }
-    return http().post(url, query);
+
+    return http({
+      headers: { traceparent },
+    }).post(url, query);
   },
   get_running_queries: (org_identifier: string) => {
     const url = `/api/${org_identifier}/query_manager/status`;
