@@ -318,7 +318,7 @@ export default defineComponent({
         });
         router.push({
           name: "viewDashboard",
-          query: { dashboard: dashboardId, folder: folderId },
+          query: { dashboard: dashboardId, folder: folderId, tab: tabId },
         });
       } catch (err: any) {
         console.log(err);
