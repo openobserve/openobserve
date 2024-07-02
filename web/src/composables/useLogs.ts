@@ -2011,7 +2011,8 @@ const useLogs = () => {
           if (
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].length > searchObj.data.queryResults.subpage
+            ].length > searchObj.data.queryResults.subpage &&
+            searchObj.data.queryResults.hits.length < (searchObj.meta.resultGrid.rowsPerPage * searchObj.data.stream.selectedStream.length)
           ) {
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
