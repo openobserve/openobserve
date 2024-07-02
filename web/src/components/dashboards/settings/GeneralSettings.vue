@@ -93,7 +93,6 @@ import { getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useLoading } from "@/composables/useLoading";
-import { useQuasar } from "quasar";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
 
@@ -107,7 +106,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const route = useRoute();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();

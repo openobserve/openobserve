@@ -1158,9 +1158,9 @@ import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -1178,7 +1178,8 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
-    const $q = useQuasar();
+    const {  showErrorNotification } =
+      useNotifications();
     const expansionItems = reactive({
       x: true,
       y: true,
@@ -1342,11 +1343,8 @@ export default defineComponent({
               const errorMessage = `Field '${
                 (dragName || customDragName).name
               }' already exists in '${targetAxis}' axis.`;
-              $q.notify({
-                type: "negative",
-                message: errorMessage,
-                timeout: 5000,
-              });
+
+              showErrorNotification(errorMessage);
               cleanupDraggingFields();
               return;
             }
@@ -1384,11 +1382,7 @@ export default defineComponent({
 
                 const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
 
-                $q.notify({
-                  type: "negative",
-                  message: errorMessage,
-                  timeout: 5000,
-                });
+                showErrorNotification(errorMessage);
                 cleanupDraggingFields();
                 return;
               }

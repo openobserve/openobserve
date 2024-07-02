@@ -337,6 +337,7 @@ import {
   outlinedEdit,
 } from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import useNotifications from "@/composables/useNotifications";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -377,7 +378,8 @@ export default defineComponent({
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
-
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -539,15 +541,9 @@ export default defineComponent({
 
         await getDashboards();
 
-        $q.notify({
-          type: "positive",
-          message: `Dashboard Duplicated Successfully`,
-        });
+        showPositiveNotification("Dashboard Duplicated Successfully.");
       } catch (err) {
-        $q.notify({
-          type: "negative",
-          message: err?.message ?? "Dashboard duplication failed",
-        });
+        showErrorNotification(err?.message ?? "Dashboard duplication failed");
       }
 
       dismiss();
@@ -614,17 +610,9 @@ export default defineComponent({
             selectedDelete.value.id,
             activeFolderId.value ?? "default"
           );
-          $q.notify({
-            type: "positive",
-            message: "Dashboard deleted successfully.",
-            timeout: 5000,
-          });
+          showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
-          $q.notify({
-            type: "negative",
-            message: err?.message ?? "Dashboard deletion failed",
-            timeout: 2000,
-          });
+          showErrorNotification(err?.message ?? "Dashboard deletion failed");
         }
       }
     };
@@ -670,20 +658,13 @@ export default defineComponent({
           if (activeFolderId.value === selectedFolderDelete.value)
             activeFolderId.value = "default";
 
-          $q.notify({
-            type: "positive",
-            message: `Folder deleted successfully`,
-            timeout: 2000,
-          });
+          showPositiveNotification("Folder deleted successfully.");
         } catch (err) {
-          $q.notify({
-            type: "negative",
-            message:
-              err?.response?.data?.message ||
+          showErrorNotification(
+            err?.response?.data?.message ||
               err?.message ||
-              "Folder deletion failed",
-            timeout: 2000,
-          });
+              "Folder deletion failed"
+          );
         } finally {
           confirmDeleteFolderDialog.value = false;
         }

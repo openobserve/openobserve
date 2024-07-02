@@ -100,7 +100,7 @@ import { getImageURL } from "../../utils/zincutils";
 import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
-import { useQuasar } from "quasar";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
@@ -127,7 +127,8 @@ export default defineComponent({
       value: props.activeFolderId,
     });
     const { t } = useI18n();
-    const $q = useQuasar();
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
 
     const onSubmit = useLoading(async () => {
       await moveFolderForm.value.validate().then(async (valid: any) => {
@@ -142,20 +143,13 @@ export default defineComponent({
             props.activeFolderId,
             selectedFolder.value.value
           );
-          $q.notify({
-            type: "positive",
-            message: "Dashboard Moved successfully",
-            timeout: 2000,
-          });
+
+          showPositiveNotification("Dashboard Moved successfully");
 
           emit("updated");
           moveFolderForm.value.resetValidation();
         } catch (err: any) {
-          $q.notify({
-            type: "negative",
-            message: err?.message ?? "Dashboard move failed.",
-            timeout: 2000,
-          });
+          showErrorNotification(err?.message ?? "Dashboard move failed.");
         }
       });
     });

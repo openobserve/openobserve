@@ -142,6 +142,7 @@ import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useQuasar, type QTableProps } from "quasar";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -155,7 +156,6 @@ export default defineComponent({
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const $q = useQuasar();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
     const disableColor: any = ref("");
@@ -166,7 +166,9 @@ export default defineComponent({
     const dashboardVariableData = reactive({
       data: [],
     });
-
+    const $q = useQuasar();
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
 
@@ -288,17 +290,10 @@ export default defineComponent({
           await getDashboardData();
           emit("save");
         }
-        $q.notify({
-          type: "positive",
-          message: "Variable deleted successfully",
-          timeout: 2000,
-        });
+
+        showPositiveNotification("Variable deleted successfully");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Variable deletion failed",
-          timeout: 2000,
-        });
+        showErrorNotification(error?.message ?? "Variable deletion failed");
       }
     };
     const handleSaveVariable = async () => {

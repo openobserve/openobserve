@@ -134,7 +134,6 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
@@ -147,6 +146,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
+import useNotifications from "@/composables/useNotifications";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -197,7 +197,6 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const $q = useQuasar();
     const gridLayoutRef = ref(null);
     const variablesValueSelectorRef = ref(null);
 
@@ -215,7 +214,8 @@ export default defineComponent({
           )?.panels ?? []
         : [];
     });
-
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     const refreshDashboard = () => {
       emit("refresh");
     };
@@ -346,17 +346,9 @@ export default defineComponent({
           route.query.folder ?? "default"
         );
 
-        $q.notify({
-          type: "positive",
-          message: "Dashboard updated successfully",
-          timeout: 5000,
-        });
+        showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Dashboard update failed",
-          timeout: 2000,
-        });
+        showErrorNotification(error?.message ?? "Dashboard update failed");
 
         // refresh dashboard
         refreshDashboard();
