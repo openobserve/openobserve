@@ -228,6 +228,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
+import useNotifications from "@/composables/useNotifications";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -248,12 +249,12 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const $q = useQuasar();
     const quasar = useQuasar();
     const currentDashboardData = reactive({
       data: {},
     });
-
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     let moment: any = () => {};
 
     const importMoment = async () => {
@@ -606,17 +607,10 @@ export default defineComponent({
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId
         );
         await loadDashboard();
-        $q.notify({
-          type: "positive",
-          message: "Panel deleted successfully",
-          timeout: 2000,
-        });
+
+        showPositiveNotification("Panel deleted successfully");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Panel deletion failed",
-          timeout: 2000,
-        });
+        showErrorNotification(error?.message ?? "Panel deletion failed");
       }
     };
 
@@ -632,17 +626,10 @@ export default defineComponent({
           newTabId
         );
         await loadDashboard();
-        $q.notify({
-          type: "positive",
-          message: "Panel moved successfully!",
-          timeout: 2000,
-        });
+
+        showPositiveNotification("Panel moved successfully!");
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error?.message ?? "Panel move failed",
-          timeout: 2000,
-        });
+        showErrorNotification(error?.message ?? "Panel move failed");
       }
     };
 
@@ -662,18 +649,10 @@ export default defineComponent({
 
       copyToClipboard(urlObj?.href)
         .then(() => {
-          $q.notify({
-            type: "positive",
-            message: "Link copied successfully",
-            timeout: 5000,
-          });
+          showPositiveNotification("Link copied successfully");
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Error while copying link",
-            timeout: 5000,
-          });
+          showErrorNotification("Error while copying link");
         });
     };
 
@@ -691,7 +670,7 @@ export default defineComponent({
           .catch(() => {
             isFullscreen.value = false;
           });
-      } else {        
+      } else {
         quasar.fullscreen
           .exit()
           .then(() => {
