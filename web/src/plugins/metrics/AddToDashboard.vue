@@ -133,18 +133,10 @@ export default defineComponent({
 
     const updateActiveFolderId = (selectedFolder: any) => {
       activeFolderId.value = selectedFolder.value;
-      // also, set selecteddashboard to null. because list will be updated
-      selectedDashboard.value = null;
-
-      // also, set activeTabId to null. because list will be updated
-      activeTabId.value = null;
     };
 
     const updateSelectedDashboard = (newSelectedDashboard: any) => {
       selectedDashboard.value = newSelectedDashboard?.value ?? null;
-
-      // also, set activeTabId to null. because list will be updated
-      activeTabId.value = null;
     };
 
     const updateActiveTabId = (selectedTab: any) => {

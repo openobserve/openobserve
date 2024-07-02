@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AddDashboard
       :active-folder-id="(folderId as any)"
       @updated="updateDashboardList"
+      :show-folder-selection="false"
     />
   </q-dialog>
 </template>
@@ -91,7 +92,7 @@ export default defineComponent({
     const showAddDashboardDialog: any = ref(false);
     const dashboardList: any = ref([]);
 
-    //dropdown selected folder index
+    //dropdown selected dashboard
     const selectedDashboard: any = ref(null);
     const { t } = useI18n();
 

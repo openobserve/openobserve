@@ -150,7 +150,7 @@ export default defineComponent({
     });
 
     watch(
-      () => [props.folderId, props.dashboardId],
+      () => [props?.dashboardId],
       () => {
         getTabList();
       }

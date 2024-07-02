@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     />
   </div>
-  <!-- add/edit folder -->
+  <!-- add folder -->
   <q-dialog
     v-model="showAddFolderDialog"
     position="right"
@@ -87,18 +87,26 @@ export default defineComponent({
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
 
-    const activeFolderData = store.state.organizationData.folders.find(
-      (item: any) =>
-        item.folderId === props.activeFolderId ??
-        route.query.folder ??
-        "default"
-    );
+    const getInitialFolderValue = () => {
+      // priority: activeFolderId > query.folder > default
+      // use activeFolderId if available
+      // else use router query if available
+      // else use default
+      const activeFolderData = store.state.organizationData.folders.find(
+        (item: any) =>
+          item.folderId === props.activeFolderId ??
+          route.query.folder ??
+          "default"
+      );
+
+      return {
+        label: activeFolderData?.name ?? "default",
+        value: activeFolderData?.folderId ?? "default",
+      };
+    };
 
     //dropdown selected folder index
-    const selectedFolder = ref({
-      label: activeFolderData?.name ?? "default",
-      value: activeFolderData?.folderId ?? "default",
-    });
+    const selectedFolder = ref(getInitialFolderValue());
     const { t } = useI18n();
 
     const updateFolderList = async (newFolder: any) => {
@@ -110,33 +118,15 @@ export default defineComponent({
     };
 
     onActivated(() => {
-      const activeFolderData = store.state.organizationData.folders.find(
-        (item: any) =>
-          item.folderId === props.activeFolderId ??
-          route.query.folder ??
-          "default"
-      );
-
-      selectedFolder.value = {
-        label: activeFolderData?.name ?? "default",
-        value: activeFolderData?.folderId ?? "default",
-      };
+      // refresh selected folder
+      selectedFolder.value = getInitialFolderValue();
     });
 
     watch(
       () => store.state.organizationData.folders,
       () => {
-        const activeFolderData = store.state.organizationData.folders.find(
-          (item: any) =>
-            item.folderId === props.activeFolderId ??
-            route.query.folder ??
-            "default"
-        );
-
-        selectedFolder.value = {
-          label: activeFolderData?.name ?? "default",
-          value: activeFolderData?.folderId ?? "default",
-        };
+        // refresh selected folder, on folders list change
+        selectedFolder.value = getInitialFolderValue();
       }
     );
 
