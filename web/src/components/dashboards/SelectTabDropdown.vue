@@ -30,6 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-mb-xs showLabelOnTop"
       style="width: 88%"
     >
+      <template #no-option>
+        <q-item>
+          <q-item-section> {{ t("search.noResult") }}</q-item-section>
+        </q-item>
+      </template>
     </q-select>
 
     <q-btn
@@ -49,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- add/edit tab -->
   <q-dialog
     v-model="showAddTabDialog"
-    position="righ95t"
+    position="right"
     full-height
     maximized
     data-test="dashboard-tab-add-dialog"
@@ -69,7 +74,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
-import { values } from "lodash-es";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 
@@ -79,7 +83,6 @@ export default defineComponent({
   emits: ["tab-selected", "tab-list-updated"],
   props: {
     folderId: {
-      type: String,
       required: true,
     },
     dashboardId: {
@@ -106,7 +109,10 @@ export default defineComponent({
     };
 
     const getTabList = async () => {
-      if (!props.dashboardId || !props.folderId) return;
+      if (!props.dashboardId || !props.folderId) {
+        selectedTab.value = null;
+        return;
+      }
 
       const dashboardData = await getDashboard(
         store,
@@ -119,8 +125,8 @@ export default defineComponent({
         value: tab.tabId,
       }));
 
-      22; // select first tab
-      if (tabList.value.length > 0) {
+      // select first tab
+      if (tabList?.value?.length > 0) {
         selectedTab.value = {
           label: tabList?.value[0]?.label,
           value: tabList?.value[0]?.value,
@@ -148,7 +154,7 @@ export default defineComponent({
     watch(
       () => selectedTab.value,
       () => {
-        emit("tab-selected", selectedTab.value);
+        emit("tab-selected", selectedTab?.value);
       }
     );
 

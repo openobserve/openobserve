@@ -30,6 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-mb-xs showLabelOnTop"
       style="width: 88%"
     >
+      <template #no-option>
+        <q-item>
+          <q-item-section> {{ t("search.noResult") }}</q-item-section>
+        </q-item>
+      </template>
     </q-select>
 
     <q-btn
@@ -69,17 +74,27 @@ export default defineComponent({
   name: "SelectedFolderDropdown",
   components: { AddFolder },
   emits: ["folder-selected"],
+  props: {
+    activeFolderId: {
+      required: false,
+    },
+  },
   setup(props, { emit }) {
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
+
+    const activeFolderData = store.state.organizationData.folders.find(
+      (item: any) =>
+        item.folderId === props.activeFolderId ??
+        route.query.folder ??
+        "default"
+    );
+
     //dropdown selected folder index
     const selectedFolder = ref({
-      label:
-        store.state.organizationData.folders.find(
-          (item: any) => item.folderId === route.query.folder ?? "default"
-        )?.name ?? "default",
-      value: route.query.folder ?? "default",
+      label: activeFolderData?.name ?? "default",
+      value: activeFolderData?.folderId ?? "default",
     });
     const { t } = useI18n();
 
@@ -92,24 +107,32 @@ export default defineComponent({
     };
 
     onActivated(() => {
+      const activeFolderData = store.state.organizationData.folders.find(
+        (item: any) =>
+          item.folderId === props.activeFolderId ??
+          route.query.folder ??
+          "default"
+      );
+
       selectedFolder.value = {
-        label:
-          store.state.organizationData.folders.find(
-            (item: any) => item.folderId === route.query.folder ?? "default"
-          )?.name ?? "default",
-        value: route.query.folder ?? "default",
+        label: activeFolderData?.name ?? "default",
+        value: activeFolderData?.folderId ?? "default",
       };
     });
 
     watch(
       () => store.state.organizationData.folders,
       () => {
+        const activeFolderData = store.state.organizationData.folders.find(
+          (item: any) =>
+            item.folderId === props.activeFolderId ??
+            route.query.folder ??
+            "default"
+        );
+
         selectedFolder.value = {
-          label:
-            store.state.organizationData.folders.find(
-              (item: any) => item.folderId === route.query.folder ?? "default"
-            )?.name ?? "default",
-          value: route.query.folder ?? "default",
+          label: activeFolderData?.name ?? "default",
+          value: activeFolderData?.folderId ?? "default",
         };
       }
     );

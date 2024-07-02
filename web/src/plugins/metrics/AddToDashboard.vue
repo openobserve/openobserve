@@ -21,66 +21,16 @@
       </q-card-section>
       <q-separator />
       <q-card-section>
-        <q-toggle
-          v-model="shouldCreateNewDashboard"
-          :label="t('dashboard.newDashboard')"
-          outlined
-          dense
-          data-test="new-dashboard-toggle"
-        ></q-toggle>
-      </q-card-section>
-      <q-card-section>
         <q-form ref="addToDashboardForm" @submit="onSubmit.execute">
-          <template v-if="shouldCreateNewDashboard">
-            <!-- select folder or create new folder and select -->
-            <select-folder-dropdown @folder-selected="updateActiveFolderId" />
-            <q-input
-              v-model.trim="newDashboardForm.name"
-              :label="t('dashboard.dashboardName') + '*'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md q-pl-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[(val) => !!val.trim() || 'Dashboard name required']"
-              :lazy-rules="true"
-              data-test="metrics-new-dashboard-name"
-            ></q-input>
-            <span>&nbsp;</span>
-            <q-input
-              v-model.trim="newDashboardForm.description"
-              :label="t('dashboard.dashboardDesc')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md q-pl-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              data-test="metrics-new-dashboard-description"
-            ></q-input>
-            <q-input
-              v-model.trim="panelTitle"
-              :label="t('dashboard.panelTitle') + '*'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md q-pl-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[(val) => !!val.trim() || 'Panel title required']"
-              :lazy-rules="true"
-              data-test="metrics-new-dashboard-panel-title"
-            />
-            <span>&nbsp;</span>
-          </template>
-          <template v-else>
-            <!-- select folder or create new folder and select -->
-            <select-folder-dropdown @folder-selected="updateActiveFolderId" />
-            <q-select
+          <!-- select folder or create new folder and select -->
+          <select-folder-dropdown @folder-selected="updateActiveFolderId" />
+
+          <!-- select folder or create new folder and select -->
+          <select-dashboard-dropdown
+            :folder-id="activeFolderId"
+            @dashboard-selected="updateSelectedDashboard"
+          />
+          <!-- <q-select
               data-test="metrics-add-panel-to-dashboard"
               v-model="selectedDashboard"
               :label="t('dashboard.selectDashboard')"
@@ -106,33 +56,28 @@
                   <q-item-section> {{ t("search.noResult") }}</q-item-section>
                 </q-item>
               </template>
-            </q-select>
-            <!-- select tab or create new tab and select -->
-            <select-tab-dropdown
-              v-if="
-                !shouldCreateNewDashboard && selectedDashboard && activeFolderId
-              "
-              @tab-selected="updateActiveTabId"
-              :folder-id="activeFolderId"
-              :dashboard-id="selectedDashboard?.id"
-              @tab-list-updated="onTabListUpdate"
-            />
-            <q-input
-              v-model.trim="panelTitle"
-              :label="t('dashboard.panelTitle') + '*'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md q-pl-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[(val) => !!val.trim() || 'Panel Title required']"
-              :lazy-rules="true"
-              data-test="metrics-new-dashboard-panel-title"
-            />
-            <span>&nbsp;</span>
-          </template>
+            </q-select> -->
+          <!-- select tab or create new tab and select -->
+          <select-tab-dropdown
+            :folder-id="activeFolderId"
+            :dashboard-id="selectedDashboard"
+            @tab-selected="updateActiveTabId"
+          />
+          <q-input
+            v-model.trim="panelTitle"
+            :label="t('dashboard.panelTitle') + '*'"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md q-pl-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[(val) => !!val.trim() || 'Panel Title required']"
+            :lazy-rules="true"
+            data-test="metrics-new-dashboard-panel-title"
+          />
+          <span>&nbsp;</span>
           <div class="q-mt-lg text-center">
             <q-btn
               v-close-popup="true"
@@ -162,20 +107,18 @@
 
 <script lang="ts">
 import { defineComponent, onBeforeMount, ref, toRaw, type Ref } from "vue";
-import dashboardService from "@/services/dashboards";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import {
-  getAllDashboards,
   getAllDashboardsByFolderId,
   getFoldersList,
   getPanelId,
 } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
+import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
@@ -184,6 +127,7 @@ export default defineComponent({
   name: "AddToDashboard",
   components: {
     SelectFolderDropdown,
+    SelectDashboardDropdown,
     SelectTabDropdown,
   },
   props: {
@@ -197,29 +141,15 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const q = useQuasar();
-    const dashboardList: Ref<any[]> = ref([]);
     const filteredDashboards: Ref<any[]> = ref([]);
     const selectedDashboard: any = ref(null);
-    const shouldCreateNewDashboard = ref(false);
-    const newDashboardForm = ref({
-      name: "",
-      description: "",
-    });
+
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
     const { t } = useI18n();
     const panelTitle = ref("");
 
     onBeforeMount(async () => {
-      // if (!store.state.organizationData.allDashboardList[route.query.folder ?? "default"] ||
-      //     store.state.organizationData.allDashboardList[route.query.folder ?? "default"].length == 0) {
-      // getAllDashboards(store, route.query.folder).then(() => {
-      //       updateDashboardOptions();
-      //   });
-      // } else {
-      //   updateDashboardOptions();
-      // }
-
       // get folders list
       await getFoldersList(store);
       // updateDashboardOptions();
@@ -232,55 +162,17 @@ export default defineComponent({
 
       // also, set activeTabId to null. because list will be updated
       activeTabId.value = null;
-
-      // only update if old dashboard is used
-      !shouldCreateNewDashboard.value && updateDashboardOptions();
     };
 
-    const updateSelectedDashboard = () => {
+    const updateSelectedDashboard = (newSelectedDashboard: any) => {
+      selectedDashboard.value = newSelectedDashboard?.value ?? null;
+
       // also, set activeTabId to null. because list will be updated
       activeTabId.value = null;
     };
 
     const updateActiveTabId = (selectedTab: any) => {
-      activeTabId.value = selectedTab.value;
-    };
-
-    const onTabListUpdate = () => {
-      // also, set activeTabId to null. because list will be updated
-      activeTabId.value = null;
-    };
-
-    const updateDashboardOptions = async () => {
-      // get all dashboard list folderId
-      await getAllDashboardsByFolderId(store, activeFolderId.value);
-      dashboardList.value = [];
-      filteredDashboards.value = [];
-      store.state.organizationData.allDashboardList[
-        activeFolderId.value
-      ].forEach((dashboard: any) => {
-        dashboardList.value.push({
-          id: dashboard.dashboardId,
-          label: dashboard.title,
-          value: dashboard.title,
-        });
-      });
-      filteredDashboards.value = [...dashboardList.value];
-
-      // select first dashboard
-      if (dashboardList.value.length > 0) {
-        selectedDashboard.value = dashboardList.value[0];
-      }
-    };
-
-    const filterDashboards = (val: string, update: any) => {
-      update(() => {
-        filteredDashboards.value = dashboardList.value;
-        const needle = val.toLowerCase();
-        filteredDashboards.value = filteredDashboards.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
-        );
-      });
+      activeTabId.value = selectedTab?.value ?? null;
     };
 
     const addPanelToDashboard = async (
@@ -290,8 +182,6 @@ export default defineComponent({
       panelTitle: string
     ) => {
       let dismiss = function () {};
-
-      console.log("addPanelToDashboard", dashboardId, folderId, tabId);
 
       try {
         dismiss = q.notify({
@@ -336,105 +226,36 @@ export default defineComponent({
     };
 
     const onSubmit = useLoading(async () => {
-      let dismiss = function () {};
-      if (shouldCreateNewDashboard.value) {
-        dismiss = q.notify({
-          message: "Creating a new dashboard",
-          type: "ongoing",
+      // if selected dashoboard is null
+      if (selectedDashboard.value == null) {
+        q.notify({
+          message: "Please select a dashboard",
+          type: "negative",
           position: "bottom",
+          timeout: 2000,
         });
-        const baseObj = {
-          title: newDashboardForm.value.name,
-          // NOTE: the dashboard ID is generated at the server side,
-          // in "Create a dashboard" request handler. The server
-          // doesn't care what value we put here as long as it's
-          // a string.
-          dashboardId: "",
-          description: newDashboardForm.value.description,
-          role: "",
-          owner: store.state.userInfo.name,
-          created: new Date().toISOString(),
-          tabs: [
-            {
-              panels: [],
-              name: "Default",
-              tabId: "default",
-            },
-          ],
-          version: 3,
-        };
-
-        // create dashboard
-        dashboardService
-          .create(
-            store.state.selectedOrganization.identifier,
-            baseObj,
-            activeFolderId.value
-          )
-          .then((newDashboard) => {
-            // migrate the schema
-            const data = convertDashboardSchemaVersion(
-              newDashboard.data["v" + newDashboard.data.version]
-            );
-            // get all dashboards of active folder
-            getAllDashboards(store, activeFolderId.value).then(async () => {
-              await addPanelToDashboard(
-                data.dashboardId,
-                activeFolderId.value,
-                activeTabId.value,
-                newDashboardForm.value.name
-              );
-            });
-          })
-          .catch((err) => {
-            console.log(err);
-
-            q.notify({
-              message: "Error while adding panel",
-              type: "negative",
-              position: "bottom",
-              timeout: 2000,
-            });
-          })
-          .finally(() => {
-            dismiss();
-          });
+      } else if (activeTabId.value == null) {
+        q.notify({
+          message: "Please select a tab",
+          type: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
       } else {
-        // if selected dashoboard is null
-        if (selectedDashboard.value == null) {
-          q.notify({
-            message: "Please select a dashboard",
-            type: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-        } else if (activeTabId.value == null) {
-          q.notify({
-            message: "Please select a tab",
-            type: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-        } else {
-          await addPanelToDashboard(
-            selectedDashboard.value?.id,
-            activeFolderId.value,
-            activeTabId.value,
-            panelTitle.value
-          );
-        }
+        await addPanelToDashboard(
+          selectedDashboard.value,
+          activeFolderId.value,
+          activeTabId.value,
+          panelTitle.value
+        );
       }
     });
 
     return {
       t,
       getImageURL,
-      dashboardList,
       selectedDashboard,
-      filterDashboards,
       filteredDashboards,
-      shouldCreateNewDashboard,
-      newDashboardForm,
       onSubmit,
       store,
       SelectFolderDropdown,
@@ -443,7 +264,6 @@ export default defineComponent({
       updateActiveTabId,
       activeFolderId,
       updateSelectedDashboard,
-      onTabListUpdate,
     };
   },
 });
