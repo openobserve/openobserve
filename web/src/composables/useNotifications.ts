@@ -12,6 +12,25 @@ const useNotifications = () => {
         {
           icon: "close",
           color: "white",
+          round: true,
+          handler: () => {
+            /* ... */
+          },
+        },
+      ],
+    });
+  };
+
+  const showPositiveNotification = (message: string) => {
+    return quasar.notify({
+      type: "positive",
+      message: message,
+      timeout: 5000,
+      actions: [
+        {
+          icon: "close",
+          color: "white",
+          round: true,
           handler: () => {
             /* ... */
           },
@@ -22,6 +41,7 @@ const useNotifications = () => {
 
   return {
     showErrorNotification,
+    showPositiveNotification,
   };
 };
 
