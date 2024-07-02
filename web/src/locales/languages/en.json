@@ -762,6 +762,7 @@
     "threshold": "Threshold",
     "interval": "Frequency",
     "silenceNotification": "Silence notification for",
+    "tolerance": "Tolerance",
     "destination": "Destination",
     "additionalVariables": "Additional Variables",
     "description": "Description",
