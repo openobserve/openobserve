@@ -407,7 +407,7 @@ pub async fn _search_partition_multi(
     let cfg = get_config();
     let (trace_id, http_span) = get_or_create_trace_id_and_span(
         in_req.headers(),
-        format!("/api/{org_id}/_search_partition"),
+        format!("/api/{org_id}/_search_partition_multi"),
     );
 
     let org_id = org_id.into_inner();
