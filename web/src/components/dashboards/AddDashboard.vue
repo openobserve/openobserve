@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>&nbsp;</span>
         <!-- select folder or create new folder and select -->
         <select-folder-dropdown
+          v-if="showFolderSelection"
           :active-folder-id="selectedFolder.value"
           @folder-selected="selectedFolder = $event"
         />
@@ -142,6 +143,10 @@ export default defineComponent({
         return typeof value === "string" || value === null;
       },
       default: "default",
+    },
+    showFolderSelection: {
+      type: Boolean,
+      default: true,
     },
   },
   emits: ["updated"],
