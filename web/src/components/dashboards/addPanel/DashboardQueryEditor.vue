@@ -613,7 +613,7 @@ export default defineComponent({
         ].fields.z.length == 0 &&
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown.length == 0
+        ].fields.breakdown?.length == 0
       ) {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -631,9 +631,15 @@ export default defineComponent({
         ...dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y,
-        ...dashboardPanelData.data.queries[
+        ...(dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown,
+        ].fields?.breakdown
+          ? [
+              ...dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.breakdown,
+            ]
+          : []),
         ...(dashboardPanelData.data?.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields?.z
@@ -757,8 +763,8 @@ export default defineComponent({
 
       const bAxisAlias = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown.map((it: any) => it?.alias);
-      
+      ].fields?.breakdown?.map((it: any) => it?.alias);
+
       if (dashboardPanelData.data.type == "heatmap") {
         query +=
           xAxisAlias.length && yAxisAlias.length
@@ -767,7 +773,7 @@ export default defineComponent({
               ", " +
               yAxisAlias.join(", ")
             : "";
-      } else if (bAxisAlias.length) {
+      } else if (bAxisAlias?.length) {
         query +=
           xAxisAlias.length && bAxisAlias.length
             ? " GROUP BY " +

@@ -266,7 +266,7 @@ const useDashboardPanelData = () => {
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.breakdown.length >= 1
+          ].fields.breakdown?.length >= 1
         );
     }
   });
