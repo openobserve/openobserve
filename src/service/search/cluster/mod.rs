@@ -127,15 +127,20 @@ pub async fn search(
         let terms = meta
             .fts_terms
             .iter()
-            .flat_map(|t| split_token(t, &cfg.common.inverted_index_split_chars))
+            .map(|t| {
+                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+                tokens
+                    .into_iter()
+                    .max_by_key(|key| key.len())
+                    .unwrap_or_default()
+            })
             .collect::<HashSet<String>>();
 
-        let terms = [terms
+        let search_condition = terms
             .iter()
-            .max_by_key(|key| key.len())
-            .unwrap_or(&String::new())
-            .to_string()];
-        let search_condition = format!("term LIKE '%{}%'", terms[0]);
+            .map(|v| format!("term LIKE '%{v}%'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
 
         let query = format!(
             "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",

@@ -26,9 +26,7 @@ use infra::cache::{
 
 use crate::{
     common::meta::search::{CachedQueryResponse, QueryDelta},
-    service::search::sql::{
-        generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM, TS_WITH_ALIAS,
-    },
+    service::search::sql::{generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -59,7 +57,7 @@ pub async fn check_cache(
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
-    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp);
+    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
     if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
         return CachedQueryResponse::default();
     }
@@ -168,6 +166,7 @@ pub async fn get_cached_results(
     is_aggregate: bool,
     file_path: &str,
     result_ts_column: &str,
+    trace_id: &str,
 ) -> Option<CachedQueryResponse> {
     let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
@@ -249,7 +248,12 @@ pub async fn get_cached_results(
                             cached_response.hits = to_retain;
                         };
 
-                        log::info!("Get results from disk success for query key: {}", query_key);
+                        log::info!(
+                            "[trace_id {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
+                            query_key,
+                            matching_cache_meta.start_time,
+                            matching_cache_meta.end_time
+                        );
                         Some(CachedQueryResponse {
                             cached_response,
                             deltas,
@@ -262,7 +266,10 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!("Get results from disk failed : {:?}", e);
+                        log::error!(
+                            "[trace_id {trace_id}] Get results from disk failed : {:?}",
+                            e
+                        );
                         None
                     }
                 }
@@ -360,17 +367,19 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<String> {
+fn get_ts_col(
+    parsed_sql: &config::meta::sql::Sql,
+    ts_col: &str,
+    is_aggregate: bool,
+) -> Option<String> {
     for (original, alias) in &parsed_sql.field_alias {
-        if TS_WITH_ALIAS.is_match(original) && alias == ts_col {
-            return Some(ts_col.to_string());
-        }
         if original.contains("histogram") {
             return Some(alias.clone());
         }
     }
-    if parsed_sql.fields.contains(&ts_col.to_owned())
-        || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col))
+    if !is_aggregate
+        && (parsed_sql.fields.contains(&ts_col.to_owned())
+            || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
     {
         return Some(ts_col.to_string());
     }
