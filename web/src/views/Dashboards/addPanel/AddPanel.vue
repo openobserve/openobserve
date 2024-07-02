@@ -859,11 +859,11 @@ export default defineComponent({
 
             if (
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length > 2 ||
+                .fields.x.length > 1 ||
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
                 .fields.x.length == 0
             ) {
-              errors.push(`Add one or two fields for the X-Axis`);
+              errors.push(`Add one fields for the X-Axis`);
             }
 
             break;
@@ -919,10 +919,12 @@ export default defineComponent({
             }
             if (
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length != 2
+                .fields.x.length != 1 ||
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.breakdown.length != 1
             ) {
               errors.push(
-                `Add exactly two fields on the X-Axis for stacked and h-stacked charts`
+                `Add exactly one fields on the X-Axis and breakdown for stacked, area-stacked and h-stacked charts`
               );
             }
 
