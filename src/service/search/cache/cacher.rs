@@ -230,7 +230,6 @@ pub async fn get_cached_results(
                                         && (hit_ts <= end_time && hit_ts >= start_time)
                                         && hit_ts < discard_ts
                                     {
-                                        println!("hit {:}", hit);
                                         to_retain.push(hit.clone());
                                     }
                                 }
@@ -239,7 +238,6 @@ pub async fn get_cached_results(
                             cached_response.total = cached_response.hits.len();
                             if discard_interval < 0 {
                                 matching_cache_meta.end_time = discard_ts;
-                                println!("discard_ts {:}", discard_ts);
                             };
                         };
 
