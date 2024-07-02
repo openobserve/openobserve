@@ -238,7 +238,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       full-height
       maximized
     >
-      <add-to-dashboard @save="addPanelToDashboard" />
+      <add-to-dashboard
+        @save="addPanelToDashboard"
+        :dashboardPanelData="dashboardPanelData"
+      />
     </q-dialog>
   </q-page>
 </template>
@@ -277,6 +280,8 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { provide } from "vue";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -325,8 +330,8 @@ export default defineComponent({
     const searchBarRef = ref(null);
     let parser: any;
     const metricsQueryEditorRef = ref(null);
-    const { dashboardPanelData, resetDashboardPanelData } =
-      useMetricsExplorer();
+    provide("dashboardPanelDataPageKey", "metrics");
+    const { dashboardPanelData } = useDashboardPanelData("metrics");
     const {
       autoCompleteData,
       autoCompletePromqlKeywords,
@@ -716,41 +721,8 @@ export default defineComponent({
       showAddToDashboardDialog.value = true;
     };
 
-    const addPanelToDashboard = (dashboardId, folderId, panelTitle) => {
-      dismiss = $q.notify({
-        message: "Please wait while we add the panel to the dashboard",
-        type: "ongoing",
-        position: "bottom",
-      });
-      dashboardPanelData.data.id = getPanelId();
-      // panel name will come from add to dashboard component
-      dashboardPanelData.data.title = panelTitle;
-      // to create panel dashboard id, paneldata and folderId is required
-      addPanel(store, dashboardId, dashboardPanelData.data, folderId, "default")
-        .then(() => {
-          showAddToDashboardDialog.value = false;
-          $q.notify({
-            message: "Panel added to dashboard",
-            type: "positive",
-            position: "bottom",
-            timeout: 3000,
-          });
-          router.push({
-            name: "viewDashboard",
-            query: { dashboard: dashboardId, folder: folderId },
-          });
-        })
-        .catch((err) => {
-          $q.notify({
-            message: "Error while adding panel",
-            type: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-        })
-        .finally(() => {
-          dismiss();
-        });
+    const addPanelToDashboard = () => {
+      showAddToDashboardDialog.value = false;
     };
 
     const onMetricChange = async (metric) => {

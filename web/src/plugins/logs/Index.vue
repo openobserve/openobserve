@@ -34,13 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
             @handleQuickModeChange="handleQuickModeChange"
+            @handleRunQueryFn="handleRunQueryFn"
           />
         </template>
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden"
+            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
+            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -56,7 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
-                      searchObj.data.stream.selectedStream.join(',') || 'default'
+                      searchObj.data.stream.selectedStream.join(',') ||
+                      'default'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -95,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning"
-size="10rem" /><br />
+                    <q-icon name="warning" color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -211,6 +213,13 @@ size="10rem" /><br />
               </template>
             </q-splitter>
           </div>
+          <div else :style="`height: calc(100vh - ${splitterModel}vh - 40px);`">
+            <VisualizeLogsQuery
+              :visualizeChartData="visualizeChartData"
+              :errorData="visualizeErrorData"
+              @update:stream-list="streamListUpdated"
+            ></VisualizeLogsQuery>
+          </div>
         </template>
       </q-splitter>
     </div>
@@ -228,6 +237,7 @@ import {
   onBeforeMount,
   watch,
   defineAsyncComponent,
+  provide,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -240,6 +250,12 @@ import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { reactive } from "vue";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
+import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -254,6 +270,7 @@ export default defineComponent({
       () => import("@/plugins/logs/SearchResult.vue")
     ),
     SanitizedHtmlRenderer,
+    VisualizeLogsQuery,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
@@ -391,6 +408,27 @@ export default defineComponent({
     const searchBarRef = ref(null);
     let parser: any;
     const expandedLogs = ref({});
+    const splitterModel = ref(10);
+
+    // flag to know if it is the first time visualize
+    let firstTimeVisualizeFlag = false;
+
+    watch(
+      () => splitterModel.value,
+      (val) => {
+        console.log("splitterModel", val);
+
+        window.dispatchEvent(new Event("resize"));
+      }
+    );
+
+    provide("dashboardPanelDataPageKey", "logs");
+    const visualizeChartData = ref({});
+    const { dashboardPanelData, validatePanel, generateLabelFromName } =
+      useDashboardPanelData("logs");
+    const visualizeErrorData: any = reactive({
+      errors: [],
+    });
 
     // function restoreUrlQueryParams() {
     //   const queryParams = router.currentRoute.value.query;
@@ -770,6 +808,257 @@ export default defineComponent({
       }
     };
 
+    //validate the data
+    const isValid = (onlyChart = false) => {
+      const errors = visualizeErrorData.errors;
+      errors.splice(0);
+      const dashboardData = dashboardPanelData;
+
+      // check if name of panel is there
+      if (!onlyChart) {
+        if (
+          dashboardData.data.title == null ||
+          dashboardData.data.title.trim() == ""
+        ) {
+          errors.push("Name of Panel is required");
+        }
+      }
+
+      validatePanel(dashboardData, errors);
+
+      if (errors.length) {
+        $q.notify({
+          type: "negative",
+          message: "There are some errors, please fix them and try again",
+          timeout: 5000,
+        });
+      }
+
+      if (errors.length) {
+        return false;
+      } else {
+        return true;
+      }
+    };
+
+    function buildSqlQuery(tableName, fields, whereClause) {
+      let query = "SELECT ";
+
+      // If the fields array is empty, use *, otherwise join the fields with commas
+      if (fields.length === 0) {
+        query += "*";
+      } else {
+        query += fields.join(", ");
+      }
+
+      // Add the table name
+      query += ` FROM "${tableName}"`;
+
+      // If the whereClause is not empty, add it
+      if (whereClause.trim() !== "") {
+        query += " WHERE " + whereClause;
+      }
+
+      // Return the constructed query
+      return query;
+    }
+
+    const setFieldsAndConditions = async () => {
+      // set fields and conditions for first time only
+      if (dashboardPanelData.data.queries[0].query) {
+        return;
+      }
+
+      let logsQuery = searchObj.data.query ?? "";
+
+      // if sql mode is off, then need to make query
+      if (searchObj.meta.sqlMode == false) {
+        logsQuery = buildSqlQuery(
+          searchObj.data.stream.selectedStream[0],
+          searchObj.meta.quickMode
+            ? searchObj.data.stream.interestingFieldList
+            : [],
+          logsQuery
+        );
+      }
+
+      const { fields, conditions, streamName } = await getFieldsFromQuery(
+        logsQuery ?? "",
+        store.state.zoConfig.timestamp_column ?? "_timestamp"
+      );
+
+      // set stream type and stream name
+      if (streamName && streamName != "undefined") {
+        // set firstTimeVisualizeFlag as true
+        firstTimeVisualizeFlag = true;
+
+        dashboardPanelData.data.queries[0].fields.stream_type =
+          searchObj.data.stream.streamType ?? "logs";
+        dashboardPanelData.data.queries[0].fields.stream = streamName;
+      }
+
+      // set fields
+      fields.forEach((field) => {
+        field.alias = field.alias ?? field.column;
+        field.label = generateLabelFromName(field.column);
+
+        // if fields doesnt have aggregation functions, then add it in the x axis fields
+        if (
+          field.aggregationFunction == "" ||
+          field.aggregationFunction == "histogram"
+        ) {
+          dashboardPanelData.data.queries[0].fields.x.push(field);
+        } else {
+          dashboardPanelData.data.queries[0].fields.y.push(field);
+        }
+      });
+
+      // set conditions
+      conditions.forEach((condition) => {
+        condition.operator = condition.operator.toLowerCase();
+
+        switch (condition.operator) {
+          case "in": {
+            condition.type = "list";
+            condition.values = condition.value;
+            condition.operator = "IN";
+            condition.operator = null;
+            condition.value = null;
+            break;
+          }
+          case "not in": {
+            // currently not supported
+            break;
+          }
+          case "is null": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Is Null";
+            condition.value = null;
+
+            break;
+          }
+          case "is not null": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Is Not Null";
+            condition.value = null;
+            break;
+          }
+          case "like": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Contains";
+            // remove % from the start and end
+            condition.value = condition?.value?.replace(/^%|%$/g, "");
+            break;
+          }
+          case "not like": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "Not Contains";
+            // remove % from the start and end
+            condition.value = condition?.value?.replace(/^%|%$/g, "");
+            break;
+          }
+          case "<>":
+          case "!=": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.operator = "<>";
+            condition.value = `'${condition.value}'`;
+            break;
+          }
+          case "=":
+          case "<":
+          case ">":
+          case "<=":
+          case ">=": {
+            condition.type = "condition";
+            condition.values = [];
+            condition.value = `'${condition.value}'`;
+            break;
+          }
+          default:
+            break;
+        }
+
+        dashboardPanelData.data.queries[0].fields.filter.push(condition);
+      });
+    };
+
+    // watch for changes in the visualize toggle
+    // if it is in visualize mode, then set the query and stream name in the dashboard panel
+    watch(
+      () => [
+        searchObj.meta.logsVisualizeToggle,
+        // searchObj.data.query,
+        // searchObj.data.stream.selectedStream.value,
+        // searchObj.data.stream.streamType,
+      ],
+      async () => {
+        if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          // enable sql mode
+          // searchObj.meta.sqlMode = true;
+          // dashboardPanelData.data.queries[0].customQuery = true;
+          // searchObj.data.query = await addHistogramToQuery(searchObj.data.query);
+          // dashboardPanelData.data.queries[0].fields.stream_type =
+          //   searchObj.data.stream.streamType ?? "logs";
+          // dashboardPanelData.data.queries[0].fields.stream =
+          //   searchObj.data.stream.selectedStream.value ?? "default";
+          // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+
+          await setFieldsAndConditions();
+        }
+      }
+    );
+
+    const handleRunQueryFn = () => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        // dashboardPanelData.data.queries[0].customQuery = true;
+        // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+        // dashboardPanelData.data.queries[0].fields.stream =
+        //   searchObj.data.stream.selectedStream.value ?? "default"
+
+        const dateTime =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(dateTime.startTime),
+          end_time: new Date(dateTime.endTime),
+        };
+
+        if (!isValid(true)) {
+          return;
+        }
+
+        visualizeChartData.value = JSON.parse(
+          JSON.stringify(dashboardPanelData.data)
+        );
+      }
+    };
+
+    const handleChartApiError = (errorMessage: any) => {
+      const errorList = visualizeErrorData.errors;
+      errorList.splice(0);
+      errorList.push(errorMessage);
+    };
+
+    const streamListUpdated = () => {
+      if (
+        searchObj.meta.logsVisualizeToggle == "visualize" &&
+        firstTimeVisualizeFlag
+      ) {
+        firstTimeVisualizeFlag = false;
+        // run query
+        handleRunQueryFn();
+      }
+    };
+
     return {
       t,
       store,
@@ -777,7 +1066,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
-      splitterModel: ref(10),
+      splitterModel,
       // loadPageData,
       getQueryData,
       searchResultRef,
@@ -802,6 +1091,11 @@ export default defineComponent({
       getHistogramQueryData,
       setInterestingFieldInSQLQuery,
       handleQuickModeChange,
+      handleRunQueryFn,
+      visualizeChartData,
+      handleChartApiError,
+      visualizeErrorData,
+      streamListUpdated,
     };
   },
   computed: {
@@ -1009,11 +1303,12 @@ $navbarHeight: 64px;
     width: 100%;
   }
 
-  .q-field__control-container {
+  .logsPageMainSection > .q-field__control-container {
     padding-top: 0px !important;
   }
 
   .logs-horizontal-splitter {
+    border: 1px solid var(--q-color-grey-3);
     .q-splitter__panel {
       z-index: auto !important;
     }

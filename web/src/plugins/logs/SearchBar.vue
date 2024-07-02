@@ -18,6 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div class="row">
       <div class="float-right col q-mb-xs">
+        <q-btn-toggle
+          class="q-ml-xs no-outline q-pa-none no-border"
+          v-model="searchObj.meta.logsVisualizeToggle"
+          style="margin-left: 5px; border-radius: 4px"
+          no-caps
+          padding="5px"
+          size="sm"
+          toggle-color="primary"
+          :options="[
+            { label: 'Search', value: 'logs' },
+            { label: 'Visualize', value: 'visualize' },
+          ]"
+        />
         <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
@@ -447,7 +460,7 @@ clickable v-close-popup>
               flat
               :title="t('search.runQuery')"
               class="q-pa-none search-button"
-              @click="handleRunQuery"
+              @click="handleRunQueryFn"
               :disable="
                 searchObj.loading == true || searchObj.loadingHistogram == true
               "
@@ -476,7 +489,7 @@ clickable v-close-popup>
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
-              @run-query="handleRunQuery"
+              @run-query="handleRunQueryFn"
               :class="
                 searchObj.data.editorValue == '' &&
                 searchObj.meta.queryEditorPlaceholderFlag
@@ -887,6 +900,7 @@ export default defineComponent({
     "onChangeInterval",
     "onChangeTimezone",
     "handleQuickModeChange",
+    "handleRunQueryFn",
   ],
   methods: {
     searchData() {
@@ -2229,7 +2243,7 @@ export default defineComponent({
       searchObj.data.editorValue = "";
       queryEditorRef.value.setValue(searchObj.data.query);
       if (store.state.zoConfig.query_on_stream_selection == false) {
-        handleRunQuery();
+        handleRunQueryFn();
       }
     };
 
@@ -2328,6 +2342,14 @@ export default defineComponent({
       return filtered;
     };
 
+    const regionFilterMethod = (node, filter) => {
+      const filt = filter.toLowerCase();
+      return node.label && node.label.toLowerCase().indexOf(filt) > -1;
+    };
+    const resetRegionFilter = () => {
+      regionFilter.value = "";
+    };
+
     const handleRegionsSelection = (item, isSelected) => {
       if (isSelected) {
         const index = searchObj.meta.regions.indexOf(item);
@@ -2343,13 +2365,12 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
-    const regionFilterMethod = (node, filter) => {
-      const filt = filter.toLowerCase();
-      return node.label && node.label.toLowerCase().indexOf(filt) > -1;
-    };
-
-    const resetRegionFilter = () => {
-      regionFilter.value = "";
+    const handleRunQueryFn = () => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        emit("handleRunQueryFn");
+      } else {
+        handleRunQuery();
+      }
     };
 
     return {
@@ -2380,6 +2401,7 @@ export default defineComponent({
       filterFn,
       refreshData,
       handleRunQuery,
+      handleRunQueryFn,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       onRefreshIntervalUpdate,
@@ -2577,45 +2599,45 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-#logsQueryEditor,
-#fnEditor {
-  height: 100% !important;
-}
-#fnEditor {
-  width: 100%;
-  border-radius: 5px;
-  border: 0px solid #dbdbdb;
-  overflow: hidden;
-}
-
-.q-field--standard .q-field__control:before,
-.q-field--standard .q-field__control:focus:before,
-.q-field--standard .q-field__control:hover:before {
-  border: 0px !important;
-  border-color: none;
-  transition: none;
-}
-
-.logs-search-bar-component > .row:nth-child(2) {
-  height: 100%; /* or any other height you want to set */
-}
-
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
-
 .logs-search-bar-component {
   padding-bottom: 1px;
   height: 100%;
   overflow: visible;
+
+  #logsQueryEditor,
+  #fnEditor {
+    height: 100% !important;
+  }
+  #fnEditor {
+    width: 100%;
+    border-radius: 5px;
+    border: 0px solid #dbdbdb;
+    overflow: hidden;
+  }
+
+  .q-field--standard .q-field__control:before,
+  .q-field--standard .q-field__control:focus:before,
+  .q-field--standard .q-field__control:hover:before {
+    border: 0px !important;
+    border-color: none;
+    transition: none;
+  }
+
+  .row:nth-child(2) {
+    height: 100%; /* or any other height you want to set */
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
 
   .function-dropdown {
     width: 205px;
@@ -2766,115 +2788,112 @@ export default defineComponent({
   .download-logs-btn {
     height: 30px;
   }
-}
 
-.query-editor-container {
-  height: calc(100% - 30px) !important;
-}
-
-.logs-auto-refresh-interval {
-  .q-btn {
-    min-height: 30px;
-    max-height: 30px;
-    padding: 0 4px;
-  }
-}
-
-.saved-views-dropdown {
-  border-radius: 4px;
-  button {
-    padding: 4px 5px;
-  }
-}
-
-.savedview-dropdown {
-  width: 215px;
-  display: inline-block;
-  border: 1px solid #dbdbdb;
-
-  .q-field__input {
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 12px;
-  }
-  .q-field__native,
-  .q-field__control {
-    min-height: 29px !important;
-    height: 29px;
-    padding: 0px 0px 0px 4px;
+  .query-editor-container {
+    height: calc(100% - 30px) !important;
   }
 
-  .q-field__marginal {
-    height: 30px;
-  }
-}
-
-.saved-view-item {
-  padding: 4px 5px !important;
-}
-
-.body--dark {
-  .btn-function {
-    filter: brightness(100);
-  }
-}
-
-.q-pagination__middle > .q-btn {
-  min-width: 30px !important;
-  max-width: 30px !important;
-}
-</style>
-<style lang="scss">
-.saved-view-table {
-  td {
-    padding: 0;
-    height: 25px !important;
-    min-height: 25px !important;
-  }
-
-  .q-table__control {
-    margin: 0px !important;
-    width: 100% !important;
-    text-align: right;
-  }
-
-  .q-table__bottom {
-    padding: 0px !important;
-    min-height: 35px;
-
-    .q-table__control {
-      padding: 0px 10px !important;
+  .logs-auto-refresh-interval {
+    .q-btn {
+      min-height: 30px;
+      max-height: 30px;
+      padding: 0 4px;
     }
   }
 
-  .q-table__top {
-    padding: 0px !important;
-    margin: 0px !important;
-    left: 0px;
-    width: 100%;
-
-    .q-table__separator {
-      display: none;
-    }
-
-    .q-table__control {
-      padding: 0px !important;
+  .saved-views-dropdown {
+    border-radius: 4px;
+    button {
+      padding: 4px 5px;
     }
   }
 
-  .q-field--filled .q-field__control {
-    padding: 0px 5px !important;
+  .savedview-dropdown {
+    width: 215px;
+    display: inline-block;
+    border: 1px solid #dbdbdb;
+
+    .q-field__input {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .q-field__native,
+    .q-field__control {
+      min-height: 29px !important;
+      height: 29px;
+      padding: 0px 0px 0px 4px;
+    }
+
+    .q-field__marginal {
+      height: 30px;
+    }
   }
 
   .saved-view-item {
-    padding: 4px 5px 4px 10px !important;
+    padding: 4px 5px !important;
   }
 
-  .q-item__section--main ~ .q-item__section--side {
-    padding-left: 5px !important;
+  .body--dark {
+    .btn-function {
+      filter: brightness(100);
+    }
   }
-}
-.logs-search-bar-component {
+
+  .q-pagination__middle > .q-btn {
+    min-width: 30px !important;
+    max-width: 30px !important;
+  }
+
+  .saved-view-table {
+    td {
+      padding: 0;
+      height: 25px !important;
+      min-height: 25px !important;
+    }
+
+    .q-table__control {
+      margin: 0px !important;
+      width: 100% !important;
+      text-align: right;
+    }
+
+    .q-table__bottom {
+      padding: 0px !important;
+      min-height: 35px;
+
+      .q-table__control {
+        padding: 0px 10px !important;
+      }
+    }
+
+    .q-table__top {
+      padding: 0px !important;
+      margin: 0px !important;
+      left: 0px;
+      width: 100%;
+
+      .q-table__separator {
+        display: none;
+      }
+
+      .q-table__control {
+        padding: 0px !important;
+      }
+    }
+
+    .q-field--filled .q-field__control {
+      padding: 0px 5px !important;
+    }
+
+    .saved-view-item {
+      padding: 4px 5px 4px 10px !important;
+    }
+
+    .q-item__section--main ~ .q-item__section--side {
+      padding-left: 5px !important;
+    }
+  }
   .q-item {
     padding: 0px !important;
   }
@@ -2882,43 +2901,43 @@ export default defineComponent({
   .q-focus-helper:hover {
     background: transparent !important;
   }
-}
 
-.favorite-label {
-  line-height: 24px !important;
-  font-weight: bold !important;
-}
-
-.region-dropdown-btn {
-  text-transform: capitalize;
-  font-weight: 600;
-  font-size: 12px;
-  padding-left: 8px;
-  height: 30px;
-  padding-top: 3px;
-
-  .q-btn-dropdown__arrow {
-    margin-left: 0px !important;
-  }
-}
-
-.download-logs-btn {
-  .q-btn-dropdown__arrow {
-    margin-left: 0px !important;
-  }
-}
-
-.region-dropdown-list {
-  min-width: 150px;
-
-  .q-item__section {
-    display: inline-block;
+  .favorite-label {
+    line-height: 24px !important;
+    font-weight: bold !important;
   }
 
-  .q-item__label {
-    margin-left: 20px;
+  .region-dropdown-btn {
     text-transform: capitalize;
-    margin-top: 2px;
+    font-weight: 600;
+    font-size: 12px;
+    padding-left: 8px;
+    height: 30px;
+    padding-top: 3px;
+
+    .q-btn-dropdown__arrow {
+      margin-left: 0px !important;
+    }
+  }
+
+  .download-logs-btn {
+    .q-btn-dropdown__arrow {
+      margin-left: 0px !important;
+    }
+  }
+
+  .region-dropdown-list {
+    min-width: 150px;
+
+    .q-item__section {
+      display: inline-block;
+    }
+
+    .q-item__label {
+      margin-left: 20px;
+      text-transform: capitalize;
+      margin-top: 2px;
+    }
   }
 }
 </style>

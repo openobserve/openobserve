@@ -291,7 +291,7 @@
 </template>
 
 <script lang="ts">
-import { reactive, ref, toRef } from "vue";
+import { inject, reactive, ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -327,14 +327,22 @@ export default defineComponent({
     },
     variablesData: {
       type: Object,
-      default: false,
+      default: () => {
+        return {};
+      },
     },
   },
   emits: ["close"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const { dashboardPanelData } = useDashboardPanelData();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
 
     const getDefaultDrilldownData = () => ({
       name: "",
@@ -356,10 +364,10 @@ export default defineComponent({
       },
     });
     const drilldownData = ref(
-      props.isEditMode
+      props?.isEditMode
         ? JSON.parse(
             JSON.stringify(
-              dashboardPanelData.data.config.drilldown[props.drilldownDataIndex]
+              dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex]
             )
           )
         : getDefaultDrilldownData()
@@ -538,8 +546,8 @@ export default defineComponent({
     const saveDrilldown = () => {
       // if editmode then made changes
       // else add new drilldown
-      if (props.isEditMode) {
-        dashboardPanelData.data.config.drilldown[props.drilldownDataIndex] =
+      if (props?.isEditMode) {
+        dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
           drilldownData.value;
       } else {
         dashboardPanelData.data.config.drilldown.push(drilldownData.value);
@@ -560,12 +568,13 @@ export default defineComponent({
     //want label for dropdown in input and value for its input value
     const selectedValue = computed(() => {
       let selectedValues: any = [];
-      const variableListName = props.variablesData.values
-        .filter((variable: any) => variable.type !== "dynamic_filters")
-        .map((variable: any) => ({
-          label: variable.name,
-          value: "${" + variable.name + "}",
-        }));
+      const variableListName =
+        props?.variablesData?.values
+          ?.filter((variable: any) => variable.type !== "dynamic_filters")
+          ?.map((variable: any) => ({
+            label: variable.name,
+            value: "${" + variable.name + "}",
+          })) ?? [];
 
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [

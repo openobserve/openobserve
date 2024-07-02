@@ -71,6 +71,7 @@ import {
   onActivated,
   onMounted,
   nextTick,
+  inject,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -87,11 +88,16 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
     const {
       dashboardPanelData,
       removeXYFilters,
       updateXYFieldsForCustomQueryMode,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
 
     // this is the value of the current button
