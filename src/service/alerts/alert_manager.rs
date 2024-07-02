@@ -163,9 +163,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         error: None,
     };
 
+    let tolerance = Utc::now().timestamp_micros() + Duration::try_minutes(alert.trigger_condition.tolerance)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+
     // send notification
     if let Some(data) = ret {
-        if trigger.next_run_at < Utc::now().timestamp_micros() {
+        if trigger.next_run_at < tolerance {
             log::debug!(
                 "Alert trigger: {}/{} has missed the schedule, update next_run_at",
                 &new_trigger.org,
