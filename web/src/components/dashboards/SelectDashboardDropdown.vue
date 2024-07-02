@@ -59,7 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     data-test="dashboard-dashboard-add-dialog"
   >
-    <AddDashboard :active-folder-id="folderId" @updated="updateDashboardList" />
+    <AddDashboard
+      :active-folder-id="(folderId as any)"
+      @updated="updateDashboardList"
+    />
   </q-dialog>
 </template>
 
@@ -78,7 +81,7 @@ export default defineComponent({
   props: {
     folderId: {
       required: true,
-      validator: (value) => {
+      validator: (value: any) => {
         return typeof value === "string" || value === null;
       },
     },

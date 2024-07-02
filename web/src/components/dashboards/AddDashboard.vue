@@ -115,7 +115,7 @@ import { defineComponent, ref } from "vue";
 import dashboardService from "../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { isProxy, toRaw } from "vue";
+import { toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
@@ -138,7 +138,7 @@ export default defineComponent({
   name: "ComponentAddDashboard",
   props: {
     activeFolderId: {
-      validator: (value) => {
+      validator: (value: any) => {
         return typeof value === "string" || value === null;
       },
       default: "default",
