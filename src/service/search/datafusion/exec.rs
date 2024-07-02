@@ -34,10 +34,10 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{FileType, GetExt},
+    common::{Column, FileType, GetExt},
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
-        listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+        listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
         MemTable,
     },
@@ -60,7 +60,9 @@ use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
-use super::{storage::file_list, transform_udf::get_all_transform};
+use super::{
+    storage::file_list, table_provider::NewListingTable, udf::transform_udf::get_all_transform,
+};
 use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{datafusion::rewrite, sql::Sql, RE_SELECT_WILDCARD},
@@ -101,7 +103,7 @@ pub async fn sql(
     let cfg = get_config();
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
-    // let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
+    // let select_wildcard = RE_SELECT_WILDCARD.is_match(origin_sql.as_str());
     // let without_optimizer = select_wildcard
     //     && cfg.limit.query_optimization_num_fields > 0
     //     && schema.fields().len() > cfg.limit.query_optimization_num_fields;
@@ -226,10 +228,16 @@ async fn exec_query(
     files: &[FileKey],
     file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
+    let origin_sql = if sql.meta.subquery.is_some() {
+        let subquery = sql.meta.subquery.as_ref().unwrap().to_string();
+        subquery.replace(&sql.stream_name, "tbl").clone()
+    } else {
+        sql.origin_sql.clone()
+    };
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
     let cfg = get_config();
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(origin_sql.as_str());
     let without_optimizer = select_wildcard
         && cfg.limit.query_optimization_num_fields > 0
         && schema.fields().len() > cfg.limit.query_optimization_num_fields;
@@ -247,23 +255,22 @@ async fn exec_query(
     let mut field_fns = vec![];
     let mut sql_parts = vec![];
     for fn_name in crate::common::utils::functions::get_all_transform_keys(&sql.org_id).await {
-        if sql.origin_sql.contains(&format!("{}(", fn_name)) {
+        if origin_sql.contains(&format!("{}(", fn_name)) {
             field_fns.push(fn_name.clone());
         }
     }
 
     if !fast_mode && (!field_fns.is_empty() || sql.query_fn.is_some()) {
-        if let Some(caps) = RE_WHERE.captures(&sql.origin_sql) {
+        if let Some(caps) = RE_WHERE.captures(&origin_sql) {
             sql_parts.insert(
                 0,
-                sql.origin_sql
+                origin_sql
                     .strip_suffix(caps.get(0).unwrap().as_str())
                     .unwrap(),
             );
             sql_parts.insert(1, caps.get(1).unwrap().as_str());
         };
     }
-
     // query
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
@@ -282,7 +289,7 @@ async fn exec_query(
             None => sql_parts[0].to_owned(),
         }
     } else {
-        sql.origin_sql.clone()
+        origin_sql.clone()
     };
 
     let mut query = query;
@@ -308,7 +315,7 @@ async fn exec_query(
             log::error!(
                 "[trace_id {trace_id}] query sql execute failed, session: {:?}, sql: {}, err: {:?}",
                 session,
-                sql.origin_sql,
+                origin_sql,
                 e
             );
             return Err(e);
@@ -421,7 +428,7 @@ async fn exec_query(
     let mut where_query = if !sql_parts.is_empty() {
         format!("select * from tbl where {}", &sql_parts[1])
     } else {
-        sql.origin_sql.clone()
+        origin_sql.clone()
     };
     for alias in &sql.meta.field_alias {
         replace_in_query(&alias.1, &mut where_query, true);
@@ -434,7 +441,7 @@ async fn exec_query(
             log::error!(
                 "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
                 session,
-                sql.origin_sql,
+                origin_sql,
                 e
             );
             return Err(e);
@@ -514,6 +521,7 @@ fn replace_in_query(replace_pat: &str, where_query: &mut String, is_alias: bool)
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn merge(
     org_id: &str,
     offset: i64,
@@ -522,6 +530,7 @@ pub async fn merge(
     batches: &[RecordBatch],
     select_fields: &[Arc<Field>],
     is_final_phase: bool, // use to indicate if this is the final phase of merge
+    is_subquery: bool,    // use to indicate if a subquery in from clause
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
         return Ok(vec![]);
@@ -557,7 +566,7 @@ pub async fn merge(
         && schema.fields().len() > cfg.limit.query_optimization_num_fields;
 
     // rewrite sql
-    let mut query_sql = match merge_rewrite_sql(sql, schema, is_final_phase) {
+    let mut query_sql = match merge_rewrite_sql(sql, schema, is_final_phase, is_subquery) {
         Ok(sql) => {
             if is_final_phase
                 && offset > 0
@@ -587,7 +596,7 @@ pub async fn merge(
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(cfg.limit.cpu_num);
+        .with_target_partitions(ctx.state().config().target_partitions());
     let list_url = format!("tmpfs:///{}/", work_dir.name());
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
@@ -608,7 +617,7 @@ pub async fn merge(
         }
     };
 
-    let table = ListingTable::try_new(config)?;
+    let table = NewListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
     // register UDF
@@ -678,7 +687,17 @@ fn merge_write_recordbatch(batches: &[RecordBatch], work_dir: &Directory) -> Res
     Ok(Arc::new(schema))
 }
 
-fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Result<String> {
+fn merge_rewrite_sql(
+    sql: &str,
+    schema: Arc<Schema>,
+    is_final_phase: bool,
+    is_subquery: bool,
+) -> Result<String> {
+    if is_subquery && !is_final_phase {
+        let sql = rewrite::add_group_by_order_by_field_to_select(sql)?;
+        return Ok(sql.to_string());
+    }
+
     // special case for count distinct
     if RE_COUNT_DISTINCT.is_match(sql) {
         let sql = rewrite::rewrite_count_distinct_merge_sql(sql)?;
@@ -792,6 +811,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
     // handle select *
     let mut fields = new_fields;
     if fields.len() == 1 && sel_fields_has_star {
+        sql = rewrite::remove_where_clause(&sql)?;
         return Ok(sql);
     }
     if sel_fields_has_star {
@@ -936,13 +956,13 @@ pub async fn convert_parquet_file(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(ctx.state().config().target_partitions())
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(ctx.state().config().target_partitions())
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
@@ -964,7 +984,7 @@ pub async fn convert_parquet_file(
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
 
-    let table = ListingTable::try_new(config)?;
+    let table = NewListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
     // get all sorted data
@@ -1033,22 +1053,12 @@ pub async fn merge_parquet_files(
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(cfg.limit.cpu_num);
-    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema.clone());
-    let table = Arc::new(ListingTable::try_new(config)?);
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
         // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} ASC",
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     } else if cfg.limit.distinct_values_hourly
@@ -1056,19 +1066,31 @@ pub async fn merge_parquet_files(
         && stream_name == "distinct_values"
     {
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} ASC",
+            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
             cfg.common.column_timestamp, cfg.common.column_timestamp, cfg.common.column_timestamp
         )
     } else {
         format!(
-            "SELECT * FROM tbl ORDER BY {} ASC",
+            "SELECT * FROM tbl ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     };
 
+    // create datafusion context
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+
+    // Configure listing options
+    let file_format = ParquetFormat::default();
+    let listing_options = ListingOptions::new(Arc::new(file_format))
+        .with_file_extension(FileType::PARQUET.get_ext())
+        .with_target_partitions(ctx.state().config().target_partitions());
+    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
+    let config = ListingTableConfig::new(prefix)
+        .with_listing_options(listing_options)
+        .with_schema(schema.clone());
+    let table = Arc::new(NewListingTable::try_new(config)?);
     ctx.register_table("tbl", table.clone())?;
 
     let df = ctx.sql(&query_sql).await?;
@@ -1097,6 +1119,7 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         "datafusion.execution.listing_table_ignore_subdirectory",
         false,
     );
+    config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
@@ -1189,23 +1212,23 @@ pub async fn prepare_datafusion_context(
 }
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
-    ctx.register_udf(super::match_udf::MATCH_UDF.clone());
-    ctx.register_udf(super::match_udf::MATCH_IGNORE_CASE_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEX_MATCH_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
-    ctx.register_udf(super::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
-    ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
-    ctx.register_udf(super::date_format_udf::DATE_FORMAT_UDF.clone());
-    ctx.register_udf(super::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
-    ctx.register_udf(super::arrzip_udf::ARR_ZIP_UDF.clone());
-    ctx.register_udf(super::arrindex_udf::ARR_INDEX_UDF.clone());
-    ctx.register_udf(super::arr_descending_udf::ARR_DESCENDING_UDF.clone());
-    ctx.register_udf(super::arrjoin_udf::ARR_JOIN_UDF.clone());
-    ctx.register_udf(super::arrcount_udf::ARR_COUNT_UDF.clone());
-    ctx.register_udf(super::arrsort_udf::ARR_SORT_UDF.clone());
-    ctx.register_udf(super::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
-    ctx.register_udf(super::spath_udf::SPATH_UDF.clone());
-    ctx.register_udf(super::to_arr_string_udf::TO_ARR_STRING.clone());
+    ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
+    ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
+    ctx.register_udf(super::udf::time_range_udf::TIME_RANGE_UDF.clone());
+    ctx.register_udf(super::udf::date_format_udf::DATE_FORMAT_UDF.clone());
+    ctx.register_udf(super::udf::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
+    ctx.register_udf(super::udf::arrzip_udf::ARR_ZIP_UDF.clone());
+    ctx.register_udf(super::udf::arrindex_udf::ARR_INDEX_UDF.clone());
+    ctx.register_udf(super::udf::arr_descending_udf::ARR_DESCENDING_UDF.clone());
+    ctx.register_udf(super::udf::arrjoin_udf::ARR_JOIN_UDF.clone());
+    ctx.register_udf(super::udf::arrcount_udf::ARR_COUNT_UDF.clone());
+    ctx.register_udf(super::udf::arrsort_udf::ARR_SORT_UDF.clone());
+    ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
+    ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
+    ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
 
     {
         let udf_list = get_all_transform(_org_id).await;
@@ -1232,17 +1255,19 @@ pub async fn register_table(
 
     let cfg = get_config();
     // Configure listing options
-    let listing_options = match file_type {
+    let mut listing_options = match file_type {
         FileType::PARQUET => {
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
+                .with_target_partitions(ctx.state().config().target_partitions())
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
+                .with_target_partitions(ctx.state().config().target_partitions())
                 .with_collect_stat(true)
         }
         _ => {
@@ -1251,6 +1276,17 @@ pub async fn register_table(
             )));
         }
     };
+
+    // specify sort columns for parquet file
+    listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
+        datafusion::logical_expr::SortExpr {
+            expr: Box::new(Expr::Column(Column::new_unqualified(
+                cfg.common.column_timestamp.clone(),
+            ))),
+            asc: false,
+            nulls_first: false,
+        },
+    )]]);
 
     let schema_key = schema.hash_key();
     let prefix = if session.storage_type == StorageType::Memory {
@@ -1282,9 +1318,30 @@ pub async fn register_table(
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {
+        let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
+        let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+            let new_fields = schema
+                .fields()
+                .iter()
+                .map(|x| {
+                    if x.name() == &cfg.common.column_timestamp {
+                        Arc::new(Field::new(
+                            cfg.common.column_timestamp.clone(),
+                            DataType::Int64,
+                            false,
+                        ))
+                    } else {
+                        x.clone()
+                    }
+                })
+                .collect::<Vec<_>>();
+            Arc::new(Schema::new(new_fields))
+        } else {
+            schema
+        };
         config = config.with_schema(schema);
     }
-    let mut table = ListingTable::try_new(config)?;
+    let mut table = NewListingTable::try_new(config)?;
     if session.storage_type != StorageType::Tmpfs {
         table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
     }
@@ -1458,6 +1515,7 @@ mod tests {
             &[batch, batch2],
             &[],
             true,
+            false,
         )
         .await
         .unwrap();

@@ -336,6 +336,7 @@ async fn validate_user_from_db(
         Ok(mut user) => {
             let in_pass = get_hash(user_password, &user.salt);
             if req_time.is_none() && user.password.eq(&in_pass) {
+                log::debug!("Validating internal user");
                 if user.password_ext.is_none() {
                     let password_ext = get_hash(user_password, password_ext_salt);
                     user.password_ext = Some(password_ext);
