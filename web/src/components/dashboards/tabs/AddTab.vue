@@ -121,11 +121,16 @@ export default defineComponent({
       default: false,
     },
     dashboardId: {
-      type: String,
+      validator: (value) => {
+        return typeof value === "string" || value === null;
+      },
       required: true,
     },
     folderId: {
       required: false,
+      validator: (value) => {
+        return typeof value === "string" || value === null;
+      },
     },
   },
   emits: ["refresh"],
