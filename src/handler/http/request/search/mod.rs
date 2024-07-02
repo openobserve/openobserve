@@ -197,7 +197,7 @@ pub async fn search(
             }
         }
     }
-
+    drop(r);
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
@@ -439,6 +439,13 @@ pub async fn search(
         cached_ratio: Some(res.cached_ratio),
         search_type,
         trace_id: Some(trace_id.clone()),
+        took_wait_in_queue: if res.took_detail.is_some() {
+            let resp_took = res.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -772,6 +779,17 @@ pub async fn around(
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
         trace_id: Some(trace_id),
+        took_wait_in_queue: match (
+            resp_forward.took_detail.as_ref(),
+            resp_backward.took_detail.as_ref(),
+        ) {
+            (Some(forward_took), Some(backward_took)) => {
+                Some(forward_took.cluster_wait_queue + backward_took.cluster_wait_queue)
+            }
+            (Some(forward_took), None) => Some(forward_took.cluster_wait_queue),
+            (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
+            _ => None,
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1158,6 +1176,13 @@ async fn values_v1(
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
+        took_wait_in_queue: if resp.took_detail.is_some() {
+            let resp_took = resp.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1352,6 +1377,13 @@ async fn values_v2(
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
+        took_wait_in_queue: if resp.took_detail.is_some() {
+            let resp_took = resp.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

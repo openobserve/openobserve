@@ -102,6 +102,7 @@ pub async fn report_request_usage_stats(
             compressed_size: None,
             search_type: stats.search_type,
             trace_id: None,
+            took_wait_in_queue: stats.took_wait_in_queue,
         });
     };
 
@@ -134,6 +135,7 @@ pub async fn report_request_usage_stats(
         compressed_size: None,
         search_type: stats.search_type,
         trace_id: stats.trace_id,
+        took_wait_in_queue: stats.took_wait_in_queue,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;

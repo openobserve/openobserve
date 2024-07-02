@@ -31,6 +31,7 @@ use once_cell::sync::Lazy;
 use tokio::{
     sync::{mpsc, Mutex, OnceCell},
     task::JoinHandle,
+    time,
 };
 
 use crate::{
@@ -558,18 +559,39 @@ impl super::Db for NatsDb {
                 if cluster::is_offline() {
                     break;
                 }
-                let (bucket, new_key) = get_bucket_by_key(&self_prefix, &prefix).await?;
-                let bucket_name = bucket
-                    .status()
-                    .await
-                    .map_err(|e| {
-                        Error::Message(format!("[NATS:watch] bucket.status error: {}", e))
-                    })?
-                    .bucket;
+                let (bucket, new_key) = match get_bucket_by_key(&self_prefix, &prefix).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[NATS:watch] prefix: {}, get bucket error: {}", prefix, e);
+                        time::sleep(time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
+                let bucket_name = match bucket.status().await {
+                    Ok(v) => v.bucket,
+                    Err(e) => {
+                        log::error!(
+                            "[NATS:watch] prefix: {}, bucket.status error: {}",
+                            prefix,
+                            e
+                        );
+                        time::sleep(time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
                 let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self_prefix);
-                let mut entries = bucket.watch_all().await.map_err(|e| {
-                    Error::Message(format!("[NATS:watch] bucket.watch_all error: {}", e))
-                })?;
+                let mut entries = match bucket.watch_all().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "[NATS:watch] prefix: {}, bucket.watch_all error: {}",
+                            prefix,
+                            e
+                        );
+                        time::sleep(time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
                 loop {
                     match entries.next().await {
                         None => {
@@ -731,7 +753,7 @@ impl Locker {
                 Err(err) => {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    tokio::time::sleep(Duration::from_millis(10)).await;
+                    time::sleep(time::Duration::from_millis(10)).await;
                 }
             };
         }
