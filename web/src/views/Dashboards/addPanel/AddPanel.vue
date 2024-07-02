@@ -945,6 +945,21 @@ export default defineComponent({
             }
             break;
           }
+          case "maps": {
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.name == null
+            ) {
+              errors.push("Add one field for the name");
+            }
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.value_for_maps == null
+            ) {
+              errors.push("Add one field for the value");
+            }
+            break;
+          }
 
           case "sankey": {
             if (
