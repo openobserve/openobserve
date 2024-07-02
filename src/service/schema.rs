@@ -129,12 +129,17 @@ pub async fn check_for_schema(
     }
 
     // Auto enable User-defined schema if fields count exceeds configured env
-    if (stream_setting.as_ref().map_or(true, |setting| {
-        setting
-            .defined_schema_fields
-            .as_ref()
-            .map_or(true, |ud_fields| ud_fields.is_empty())
-    })) && inferred_schema.fields().len() > cfg.limit.max_fields_activate_udschema
+    // QUESTION(taiming): is user-defined schema allowed for other [StreamType] besides logs?
+    // QUESTION(taiming): should we consider env [ZO_ALLOW_USER_DEFINED_SCHEMAS]?
+    if cfg.common.allow_user_defined_schemas
+        && (stream_setting.as_ref().map_or(true, |setting| {
+            setting
+                .defined_schema_fields
+                .as_ref()
+                .map_or(true, |ud_fields| ud_fields.is_empty())
+        }))
+        && (cfg.limit.max_fields_activate_udschema > 0
+            && inferred_schema.fields().len() > cfg.limit.max_fields_activate_udschema)
     {
         // QUESTION(taiming): does it matter what fields are included in UDSchema?
         let mut ud_fields = inferred_schema
@@ -151,7 +156,7 @@ pub async fn check_for_schema(
         }
         let mut stream_setting = match stream_setting {
             Some(setting) => setting,
-            None => StreamSettings::from(""),
+            None => StreamSettings::default(),
         };
         stream_setting.defined_schema_fields = Some(ud_fields.into_iter().collect());
         // save the settings
