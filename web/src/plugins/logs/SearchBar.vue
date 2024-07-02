@@ -2189,6 +2189,7 @@ export default defineComponent({
 
     const shareLink = () => {
       const queryObj = generateURLQuery(true);
+      console.log(queryObj);
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
