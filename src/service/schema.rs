@@ -68,7 +68,6 @@ pub async fn check_for_schema(
     let schema = stream_schema_map.get(stream_name).unwrap();
     if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
         return Ok(SchemaEvolution {
-            schema_compatible: true,
             is_schema_changed: false,
             types_delta: None,
         });
@@ -81,7 +80,6 @@ pub async fn check_for_schema(
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
         return Ok(SchemaEvolution {
-            schema_compatible: true,
             is_schema_changed: false,
             types_delta: None,
         });
@@ -111,7 +109,6 @@ pub async fn check_for_schema(
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
             return Ok(SchemaEvolution {
-                schema_compatible: true,
                 is_schema_changed: false,
                 types_delta: Some(field_datatype_delta),
             });
@@ -140,7 +137,6 @@ pub async fn check_for_schema(
     )
     .await?
     .unwrap_or(SchemaEvolution {
-        schema_compatible: true,
         is_schema_changed: false,
         types_delta: None,
     });
@@ -296,7 +292,6 @@ async fn handle_diff_schema(
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Ok(Some(SchemaEvolution {
-        schema_compatible: true,
         is_schema_changed: true,
         types_delta: Some(field_datatype_delta),
     }))
@@ -449,7 +444,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(result.schema_compatible);
+        assert!(!result.is_schema_changed);
     }
 
     #[tokio::test]

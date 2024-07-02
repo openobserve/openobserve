@@ -413,6 +413,8 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow!("not an ingester"));
     }
+
+    // check if the org is blocked
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
@@ -425,6 +427,9 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
     };
+
+    // check memtable
+    ingester::check_memtable_size()?;
 
     Ok(())
 }

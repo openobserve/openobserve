@@ -47,6 +47,7 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
                 &c.stream_name,
                 IngestionRequest::JSON(&Bytes::from(content)),
                 "root",
+                None,
             )
             .await
             {
