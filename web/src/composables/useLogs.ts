@@ -54,6 +54,7 @@ import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
+import { fr } from "date-fns/locale";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -2010,7 +2011,8 @@ const useLogs = () => {
           if (
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].length > searchObj.data.queryResults.subpage
+            ].length > searchObj.data.queryResults.subpage &&
+            searchObj.data.queryResults.hits.length < (searchObj.meta.resultGrid.rowsPerPage * searchObj.data.stream.selectedStream.length)
           ) {
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
@@ -3233,11 +3235,6 @@ const useLogs = () => {
       searchObj.shouldIgnoreWatcher = false;
       return;
     }
-    if (queryParams.period && (!queryParams.from || !queryParams.to)) {
-      const periodDateTime: any = extractTimestamps(queryParams.period);
-      queryParams.from = periodDateTime.from;
-      queryParams.to = periodDateTime.to;
-    }
 
     const date = {
       startTime: queryParams.from,
@@ -3245,9 +3242,18 @@ const useLogs = () => {
       relativeTimePeriod: queryParams.period || null,
       type: queryParams.period ? "relative" : "absolute",
     };
+
+    if (date.type === "relative") {
+      queryParams.period = date.relativeTimePeriod;
+    } else {
+      queryParams.from = date.startTime;
+      queryParams.to = date.endTime;
+    }
+
     if (date) {
       searchObj.data.datetime = date;
     }
+
     if (queryParams.query) {
       searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
       searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
@@ -3295,12 +3301,11 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
+
+    // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
         ...queryParams,
-        from: date.startTime,
-        to: date.endTime,
-        period: date.relativeTimePeriod,
         sql_mode: searchObj.meta.sqlMode,
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
