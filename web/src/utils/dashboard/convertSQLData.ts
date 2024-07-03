@@ -592,7 +592,7 @@ export const convertSQLData = async (
         ((panelSchema.type == "line" ||
           panelSchema.type == "area" ||
           panelSchema.type == "scatter") &&
-          panelSchema.queries[0].fields.breakdown.length)
+          panelSchema.queries[0].fields.breakdown?.length)
       ) {
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
