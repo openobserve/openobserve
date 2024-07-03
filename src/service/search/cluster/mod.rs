@@ -904,7 +904,7 @@ async fn get_file_list_by_inverted_index(
         fts_condition
     } else {
         format!(
-            "field='{}' AND ({})",
+            "(field='{}' AND ({}))",
             INDEX_FIELD_NAME_FOR_ALL, fts_condition
         )
     };
