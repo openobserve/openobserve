@@ -167,7 +167,9 @@ export default defineComponent({
             // emit refresh to rerender
             emit("refresh", updatedTab);
 
-            showPositiveNotification("Tab updated successfully");
+            showPositiveNotification("Tab updated successfully", {
+              timeout: 2000,
+            });
           }
           //else new tab
           else {
@@ -181,7 +183,9 @@ export default defineComponent({
             // emit refresh to rerender
             emit("refresh", newTab);
 
-            showPositiveNotification("Tab added successfully");
+            showPositiveNotification("Tab added successfully", {
+              timeout: 2000,
+            });
           }
           tabData.value = {
             name: "",
@@ -191,7 +195,10 @@ export default defineComponent({
         } catch (err: any) {
           showErrorNotification(
             err?.message ??
-              (props.editMode ? "Failed to update tab" : "Failed to add tab")
+              (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+              {
+                timeout: 2000,
+              }
           );
         } finally {
         }

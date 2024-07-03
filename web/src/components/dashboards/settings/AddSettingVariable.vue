@@ -616,7 +616,9 @@ export default defineComponent({
               data.currentFieldsList = [];
             }
           } catch (error: any) {
-            showErrorNotification(error ?? "Failed to get stream fields");
+            showErrorNotification(error ?? "Failed to get stream fields", {
+              timeout: 2000,
+            });
           }
         }
       }
@@ -651,7 +653,9 @@ export default defineComponent({
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable update failed");
+          showErrorNotification(error.message ?? "Variable update failed", {
+            timeout: 2000,
+          });
         }
       } else {
         try {
@@ -663,7 +667,9 @@ export default defineComponent({
           );
           emit("save");
         } catch (error: any) {
-          showErrorNotification(error.message ?? "Variable creation failed");
+          showErrorNotification(error.message ?? "Variable creation failed", {
+            timeout: 2000,
+          });
         }
       }
     };
@@ -808,7 +814,9 @@ export default defineComponent({
           data.currentFieldsList = [];
         }
       } catch (error: any) {
-        showErrorNotification(error ?? "Failed to get stream fields");
+        showErrorNotification(error ?? "Failed to get stream fields", {
+          timeout: 2000,
+        });
       }
     };
 

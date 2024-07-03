@@ -197,7 +197,9 @@ export default defineComponent({
 
         emit("save");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard updation failed");
+        showErrorNotification(error?.message ?? "Dashboard updation failed", {
+          timeout: 2000,
+        });
       }
     });
 

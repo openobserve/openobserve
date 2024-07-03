@@ -144,12 +144,16 @@ export default defineComponent({
             selectedFolder.value.value
           );
 
-          showPositiveNotification("Dashboard Moved successfully");
+          showPositiveNotification("Dashboard Moved successfully", {
+            timeout: 2000,
+          });
 
           emit("updated");
           moveFolderForm.value.resetValidation();
         } catch (err: any) {
-          showErrorNotification(err?.message ?? "Dashboard move failed.");
+          showErrorNotification(err?.message ?? "Dashboard move failed.", {
+            timeout: 2000,
+          });
         }
       });
     });

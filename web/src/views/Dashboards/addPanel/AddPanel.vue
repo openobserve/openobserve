@@ -1232,7 +1232,10 @@ export default defineComponent({
           error?.message ??
             (editMode.value
               ? "Error while updating panel"
-              : "Error while creating panel")
+              : "Error while creating panel"),
+          {
+            timeout: 2000,
+          }
         );
       }
     };

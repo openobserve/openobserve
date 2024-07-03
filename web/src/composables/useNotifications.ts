@@ -3,7 +3,7 @@ import { useQuasar } from "quasar";
 const useNotifications = () => {
   const quasar = useQuasar();
 
-  const showErrorNotification = (message: string) => {
+  const showErrorNotification = (message: string, options?: any) => {
     return quasar.notify({
       type: "negative",
       message: message,
@@ -18,10 +18,11 @@ const useNotifications = () => {
           },
         },
       ],
+      ...(options || {}),
     });
   };
 
-  const showPositiveNotification = (message: string) => {
+  const showPositiveNotification = (message: string, options?: any) => {
     return quasar.notify({
       type: "positive",
       message: message,
@@ -36,6 +37,7 @@ const useNotifications = () => {
           },
         },
       ],
+      ...(options || {}),
     });
   };
 

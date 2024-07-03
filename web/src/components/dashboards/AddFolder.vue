@@ -159,14 +159,18 @@ export default defineComponent({
               folderData.value.folderId,
               folderData.value
             );
-            showPositiveNotification("Folder updated successfully");
+            showPositiveNotification("Folder updated successfully", {
+              timeout: 2000,
+            });
             emit("update:modelValue", folderData.value);
           }
           //else new folder
           else {
             const newFolder: any = await createFolder(store, folderData.value);
             emit("update:modelValue", newFolder);
-            showPositiveNotification("Folder added successfully");
+            showPositiveNotification("Folder added successfully", {
+              timeout: 2000,
+            });
           }
           folderData.value = {
             folderId: "",
@@ -179,7 +183,8 @@ export default defineComponent({
             err?.message ??
               (props.editMode
                 ? "Folder updation failed"
-                : "Folder creation failed")
+                : "Folder creation failed"),
+            { timeout: 2000 }
           );
         }
       });

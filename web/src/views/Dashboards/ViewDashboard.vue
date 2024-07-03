@@ -608,9 +608,13 @@ export default defineComponent({
         );
         await loadDashboard();
 
-        showPositiveNotification("Panel deleted successfully");
+        showPositiveNotification("Panel deleted successfully", {
+          timeout: 2000,
+        });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Panel deletion failed");
+        showErrorNotification(error?.message ?? "Panel deletion failed", {
+          timeout: 2000,
+        });
       }
     };
 
@@ -627,9 +631,13 @@ export default defineComponent({
         );
         await loadDashboard();
 
-        showPositiveNotification("Panel moved successfully!");
+        showPositiveNotification("Panel moved successfully!", {
+          timeout: 2000,
+        });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Panel move failed");
+        showErrorNotification(error?.message ?? "Panel move failed", {
+          timeout: 2000,
+        });
       }
     };
 

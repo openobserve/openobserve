@@ -348,7 +348,9 @@ export default defineComponent({
 
         showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Dashboard update failed");
+        showErrorNotification(error?.message ?? "Dashboard update failed", {
+          timeout: 2000,
+        });
 
         // refresh dashboard
         refreshDashboard();

@@ -291,9 +291,13 @@ export default defineComponent({
           emit("save");
         }
 
-        showPositiveNotification("Variable deleted successfully");
+        showPositiveNotification("Variable deleted successfully", {
+          timeout: 2000,
+        });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Variable deletion failed");
+        showErrorNotification(error?.message ?? "Variable deletion failed", {
+          timeout: 2000,
+        });
       }
     };
     const handleSaveVariable = async () => {

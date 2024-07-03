@@ -612,7 +612,9 @@ export default defineComponent({
           );
           showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
-          showErrorNotification(err?.message ?? "Dashboard deletion failed");
+          showErrorNotification(err?.message ?? "Dashboard deletion failed", {
+            timeout: 2000,
+          });
         }
       }
     };
@@ -658,12 +660,17 @@ export default defineComponent({
           if (activeFolderId.value === selectedFolderDelete.value)
             activeFolderId.value = "default";
 
-          showPositiveNotification("Folder deleted successfully.");
+          showPositiveNotification("Folder deleted successfully.", {
+            timeout: 2000,
+          });
         } catch (err) {
           showErrorNotification(
             err?.response?.data?.message ||
               err?.message ||
-              "Folder deletion failed"
+              "Folder deletion failed",
+            {
+              timeout: 2000,
+            }
           );
         } finally {
           confirmDeleteFolderDialog.value = false;

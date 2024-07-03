@@ -102,7 +102,9 @@ export default defineComponent({
       );
 
       if (status === true) {
-        showErrorNotification("Table downloaded as a CSV file");
+        showErrorNotification("Table downloaded as a CSV file", {
+          timeout: 2000,
+        });
       } else {
         showErrorNotification("Browser denied file download...");
       }

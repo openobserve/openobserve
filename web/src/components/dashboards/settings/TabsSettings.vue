@@ -227,7 +227,9 @@ export default defineComponent({
         // emit refresh to rerender
         emit("refresh");
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification("Dashboard updated successfully.", {
+          timeout: 2000,
+        });
       } catch (error: any) {
         showErrorNotification(error?.message ?? "Tab reorder failed");
         // emit refresh to rerender
@@ -261,7 +263,9 @@ export default defineComponent({
           emit("refresh");
           await getDashboardData();
 
-          showPositiveNotification("Tab updated successfully");
+          showPositiveNotification("Tab updated successfully", {
+            timeout: 2000,
+          });
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
@@ -311,9 +315,13 @@ export default defineComponent({
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
 
-        showPositiveNotification("Tab deleted successfully");
+        showPositiveNotification("Tab deleted successfully", {
+          timeout: 2000,
+        });
       } catch (error: any) {
-        showErrorNotification(error?.message ?? "Tab deletion failed");
+        showErrorNotification(error?.message ?? "Tab deletion failed", {
+          timeout: 2000,
+        });
       }
     };
 
