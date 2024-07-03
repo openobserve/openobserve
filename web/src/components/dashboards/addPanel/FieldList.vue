@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn-toggle
               no-caps
               v-model="dashboardPanelData.meta.stream.useUserDefinedSchemas"
-              data-test="logs-page-field-list-user-defined-schema-toggle"
+              data-test="dashboard-page-field-list-user-defined-schema-toggle"
               class="schema-field-toggle q-mr-xs"
               toggle-color="primary"
               bordered
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="person"></q-icon>
                 <q-icon name="schema"></q-icon>
                 <q-tooltip
-                  data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
+                  data-test="dashboard-page-fields-list-user-defined-fields-warning-tooltip"
                   anchor="center right"
                   self="center left"
                   max-width="300px"
@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:all_fields_slot>
                 <q-icon name="schema"></q-icon>
                 <q-tooltip
-                  data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                  data-test="dashboard-page-fields-list-all-fields-warning-tooltip"
                   anchor="center right"
                   self="center left"
                   max-width="300px"
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
             <q-tooltip
-              data-test="logs-page-fields-list-pagination-tooltip"
+              data-test="dashboard-page-fields-list-pagination-tooltip"
               anchor="center right"
               self="center left"
               max-width="300px"
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ dashboardPanelData.meta.stream.selectedStreamFields.length }}
             </q-tooltip>
             <q-btn
-              data-test="logs-page-fields-list-pagination-firstpage-button"
+              data-test="dashboard-page-fields-list-pagination-firstpage-button"
               v-if="scope.pagesNumber > 2"
               icon="skip_previous"
               color="grey-8"
@@ -535,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <q-btn
-              data-test="logs-page-fields-list-pagination-previouspage-button"
+              data-test="dashboard-page-fields-list-pagination-previouspage-button"
               icon="fast_rewind"
               color="grey-8"
               round
@@ -547,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               round
-              data-test="logs-page-fields-list-pagination-messsage-button"
+              data-test="dashboard-page-fields-list-pagination-messsage-button"
               dense
               flat
               class="text text-caption text-regular"
@@ -555,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
 
             <q-btn
-              data-test="logs-page-fields-list-pagination-nextpage-button"
+              data-test="dashboard-page-fields-list-pagination-nextpage-button"
               icon="fast_forward"
               color="grey-8"
               round
@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <q-btn
-              data-test="logs-page-fields-list-pagination-lastpage-button"
+              data-test="dashboard-page-fields-list-pagination-lastpage-button"
               v-if="scope.pagesNumber > 2"
               icon="skip_next"
               color="grey-8"
