@@ -2008,6 +2008,8 @@ const useLogs = () => {
 
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
+          console.log(JSON.stringify(searchObj.data.queryResults.partitionDetail))
+          console.log(searchObj.data.queryResults.hits.length.toString())
           if (
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
