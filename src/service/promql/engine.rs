@@ -1024,18 +1024,19 @@ async fn selector_load_data_from_datafusion(
             MatchOp::NotEqual => {
                 df_group = df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
             }
-            MatchOp::Re(_re) => {
+            MatchOp::Re(regex) => {
                 let regexp_match_udf =
-                    crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
+                    crate::service::search::datafusion::udf::regexp_udf::REGEX_MATCH_UDF.clone();
                 df_group = df_group.filter(
-                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
                 )?
             }
-            MatchOp::NotRe(_re) => {
+            MatchOp::NotRe(regex) => {
                 let regexp_not_match_udf =
-                    crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
+                    crate::service::search::datafusion::udf::regexp_udf::REGEX_NOT_MATCH_UDF
+                        .clone();
                 df_group = df_group.filter(
-                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
                 )?
             }
         }

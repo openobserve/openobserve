@@ -182,6 +182,7 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_detail: Option<ResponseTook>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub columns: Vec<String>,
     #[schema(value_type = Vec<Object>)]
@@ -205,6 +206,7 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
+    #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub function_error: String,
     #[serde(default)]
@@ -216,6 +218,8 @@ pub struct Response {
     pub new_start_time: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_end_time: Option<i64>,
+    #[serde(default)]
+    pub result_cache_ratio: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -224,6 +228,7 @@ pub struct ResponseTook {
     pub wait_queue: usize,
     pub cluster_total: usize,
     pub cluster_wait_queue: usize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<ResponseNodeTook>,
 }
@@ -257,6 +262,7 @@ impl Response {
             histogram_interval: None,
             new_start_time: None,
             new_end_time: None,
+            result_cache_ratio: 0,
         }
     }
 

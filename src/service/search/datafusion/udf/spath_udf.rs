@@ -28,8 +28,6 @@ use datafusion::{
 use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
-use crate::service::search::datafusion::stringify_json_value;
-
 /// The name of the arrjoin UDF given to DataFusion.
 pub const SPATH_UDF_NAME: &str = "spath";
 
@@ -88,7 +86,7 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
                         }
                     }
                     if found {
-                        let field = stringify_json_value(&field);
+                        let field = super::stringify_json_value(&field);
                         Some(field)
                     } else {
                         None

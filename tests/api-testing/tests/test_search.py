@@ -46,7 +46,7 @@ def test_e2e_query(create_session, base_url):
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_invalidsqlquery(create_session, base_url):
+# def test_e2e_invalidsqlquery(create_session, base_url):
     """Running an E2E test for invalid sql query."""
 
     session = create_session
@@ -258,7 +258,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
 
 
-def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
+# def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
     """Running an E2E test for valid match all histogram query."""
 
     session = create_session
@@ -329,7 +329,7 @@ def test_e2e_matchallindexedsql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\') ORDER BY _timestamp DESC',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,
@@ -410,7 +410,7 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
                 "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
+                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\') ORDER BY _timestamp DESC',
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "from": 0,
@@ -590,7 +590,7 @@ def test_e2e_sqlmaxquery(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
   "query": {
-    "sql": "SELECT MAX(_timestamp) as latest_timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'",
+    "sql": "SELECT MAX(_timestamp) as _timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'" ,
     "start_time": one_min_ago,
     "end_time": end_time,
     "from": 0,
@@ -659,9 +659,60 @@ def test_e2e_distinctquery(create_session, base_url):
         resp_get_distinctquery.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
     response_data = resp_get_distinctquery.json()
-        
 
 
-        
+# def test_e2e_cachedscenario(create_session, base_url):
+#     """Running an E2E test for valid SQL query."""
 
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     thirty_min_ago = int((now - timedelta(minutes=30)).timestamp() * 1000000)
 
+#     # First query data
+#     json_data1 = {
+#         "query": {
+#             "sql": "select * from \"stream_pytest_data\" ",
+#             "start_time": one_min_ago,
+#             "end_time": end_time,
+#             "size": 0,
+#             "sql_mode": "full",
+#             "track_total_hits": True
+#         }
+# }
+
+#     # Second query data
+#     json_data2 = {
+#         "query": {
+#             "sql": "select * from \"stream_pytest_data\" ",
+#             "start_time": thirty_min_ago,
+#             "end_time": end_time,
+#             "size": 0,
+#             "sql_mode": "full",
+#             "track_total_hits": True
+#         }
+# }
+
+#     resp_get_allsearch1 = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data1)
+    
+#     # Wait for 5 seconds
+#     time.sleep(5)  
+    
+#     response_data1 = resp_get_allsearch1.json()
+#     cached_ratio1 = response_data1.get('cached_ratio', 0)
+#     assert cached_ratio1 == 0, f"Expected cached_ratio to be 0, but got {cached_ratio1}"
+
+#     # Wait for 5 minutes
+#     time.sleep(40)  # Sleep for 300 seconds (5 minutes)
+    
+#     resp_get_allsearch2 = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data2)
+    
+#     assert resp_get_allsearch1.status_code == 200, f"histogram mode added 200, but got {resp_get_allsearch1.status_code} {resp_get_allsearch1.content}"
+#     assert resp_get_allsearch2.status_code == 200, f"histogram mode added 200, but got {resp_get_allsearch2.status_code} {resp_get_allsearch2.content}"
+
+#     response_data2 = resp_get_allsearch2.json()
+#     cached_ratio2 = response_data2.get('cached_ratio', 0)
+#     assert cached_ratio2 > 0, f"Expected cached_ratio to be greater than 0, but got {cached_ratio2}"

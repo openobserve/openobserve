@@ -18,7 +18,7 @@ import { useI18n } from "vue-i18n";
 import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, remove } from "lodash-es";
 
 import {
   useLocalLogFilterField,
@@ -33,6 +33,8 @@ import {
   useLocalSavedView,
   convertToCamelCase,
   getFunctionErrorMessage,
+  getUUID,
+  generateTraceContext,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -196,6 +198,7 @@ const defaultObject = {
     savedViews: <any>[],
     customDownloadQueryObj: <any>{},
     functionError: "",
+    searchRequestTraceIds: <string[]>[],
   },
 };
 
@@ -486,7 +489,7 @@ const useLogs = () => {
       } else {
         query["period"] = date.relativeTimePeriod;
       }
-    } else if(date.type == "absolute") {
+    } else if (date.type == "absolute") {
       query["from"] = date.startTime;
       query["to"] = date.endTime;
     }
@@ -1096,13 +1099,19 @@ const useLogs = () => {
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
         } else {
+          const { traceparent, traceId } = generateTraceContext();
+
+          addTraceId(traceId);
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdetifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
+              traceparent,
             })
             .then(async (res) => {
+              removeTraceId(traceId);
               searchObj.data.queryResults.partitionDetail = {
                 partitions: [],
                 partitionTotal: [],
@@ -1743,12 +1752,17 @@ const useLogs = () => {
       queryReq.query["sql_mode"] = "full";
 
       queryReq.query.track_total_hits = true;
+
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       searchService
         .search(
           {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
+            traceparent,
           },
           "UI"
         )
@@ -1756,6 +1770,7 @@ const useLogs = () => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
+          removeTraceId(traceId);
           searchObj.data.queryResults.scan_size = res.data.scan_size;
           searchObj.data.queryResults.took += res.data.took;
           for (const [
@@ -1811,6 +1826,20 @@ const useLogs = () => {
     });
   };
 
+  const processPostPaginationData = () => {
+    updateFieldValues();
+
+    //extract fields from query response
+    extractFields();
+
+    //update grid columns
+    updateGridColumns();
+
+    filterHitsColumns();
+
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+  };
+
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false
@@ -1849,27 +1878,47 @@ const useLogs = () => {
         // }
       }
 
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       searchService
         .search(
           {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
+            traceparent,
           },
           "UI"
         )
         .then(async (res) => {
-          if(res.data.hasOwnProperty("function_error") && res.data.function_error != "" && res.data.hasOwnProperty("new_start_time") && res.data.hasOwnProperty("new_end_time")) {
-            res.data.function_error = getFunctionErrorMessage(res.data.function_error, res.data.new_start_time, res.data.new_end_time, store.state.timezone);
+          removeTraceId(traceId);
+          if (
+            res.data.hasOwnProperty("function_error") &&
+            res.data.function_error != "" &&
+            res.data.hasOwnProperty("new_start_time") &&
+            res.data.hasOwnProperty("new_end_time")
+          ) {
+            res.data.function_error = getFunctionErrorMessage(
+              res.data.function_error,
+              res.data.new_start_time,
+              res.data.new_end_time,
+              store.state.timezone
+            );
             searchObj.data.datetime.startTime = res.data.new_start_time;
             searchObj.data.datetime.endTime = res.data.new_end_time;
             searchObj.data.datetime.type = "absolute";
             queryReq.query.start_time = res.data.new_start_time;
             queryReq.query.end_time = res.data.new_end_time;
-            searchObj.data.histogramQuery.query.start_time = res.data.new_start_time;
-            searchObj.data.histogramQuery.query.end_time = res.data.new_end_time;
-            if(searchObj.data.queryResults.partitionDetail.partitions.length == 1) {
-              searchObj.data.queryResults.partitionDetail.partitions[0].start_time = res.data.new_start_time;
+            searchObj.data.histogramQuery.query.start_time =
+              res.data.new_start_time;
+            searchObj.data.histogramQuery.query.end_time =
+              res.data.new_end_time;
+            if (
+              searchObj.data.queryResults.partitionDetail.partitions.length == 1
+            ) {
+              searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
+                res.data.new_start_time;
             }
             updateUrlQueryParams();
           }
@@ -1982,34 +2031,21 @@ const useLogs = () => {
 
             searchObj.data.queryResults.subpage++;
 
+            setTimeout(async () => {
+              processPostPaginationData();
+
+              searchObj.data.functionError = "";
+              if (
+                res.data.hasOwnProperty("function_error") &&
+                res.data.function_error
+              ) {
+                searchObj.data.functionError = res.data.function_error;
+              }
+            }, 0);
             await getPaginatedData(queryReq, true);
           }
 
-          updateFieldValues();
-
-          //extract fields from query response
-          extractFields();
-
-          //update grid columns
-          updateGridColumns();
-
-          filterHitsColumns();
-
-          // disabled histogram case, generate histogram histogram title
-          // also calculate the total based on the partitions total
-          // if (
-          //   searchObj.meta.showHistogram == false ||
-          //   searchObj.meta.sqlMode == true
-          // ) {
-          //   searchObj.data.queryResults.total = 0;
-          //   for (const totalNumber of searchObj.data.queryResults
-          //     .partitionDetail.partitionTotal) {
-          //     if (totalNumber > 0) {
-          //       searchObj.data.queryResults.total += totalNumber;
-          //     }
-          //   }
-          // }
-          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          await processPostPaginationData();
 
           searchObj.data.functionError = "";
           if (
@@ -2027,6 +2063,7 @@ const useLogs = () => {
               searchObjDebug["paginatedDataReceivedStartTime"]
             } milliseconds to complete`
           );
+
           resolve(true);
         })
         .catch((err) => {
@@ -2109,16 +2146,21 @@ const useLogs = () => {
           //   }
           // }
 
+          const { traceparent, traceId } = generateTraceContext();
+          addTraceId(traceId);
+
           searchService
             .search(
               {
                 org_identifier: searchObj.organizationIdetifier,
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
+                traceparent,
               },
               "UI"
             )
             .then(async (res) => {
+              removeTraceId(traceId);
               searchObjDebug["histogramProcessingStartTime"] =
                 performance.now();
               searchObj.loading = false;
@@ -2320,9 +2362,27 @@ const useLogs = () => {
               stream.schema = streamSchema;
             }
 
-            if(stream.settings.max_query_range > 0 && (searchObj.data.datetime.queryRangeRestrictionInHour > stream.settings.max_query_range || stream.settings.max_query_range == 0 || searchObj.data.datetime.queryRangeRestrictionInHour == -1) && searchObj.data.datetime.queryRangeRestrictionInHour != 0) {
-              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range;
-              searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {range: searchObj.data.datetime.queryRangeRestrictionInHour > 1 ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours" : searchObj.data.datetime.queryRangeRestrictionInHour + " hour"});
+            if (
+              stream.settings.max_query_range > 0 &&
+              (searchObj.data.datetime.queryRangeRestrictionInHour >
+                stream.settings.max_query_range ||
+                stream.settings.max_query_range == 0 ||
+                searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
+              searchObj.data.datetime.queryRangeRestrictionInHour != 0
+            ) {
+              searchObj.data.datetime.queryRangeRestrictionInHour =
+                stream.settings.max_query_range;
+              searchObj.data.datetime.queryRangeRestrictionMsg = t(
+                "search.queryRangeRestrictionMsg",
+                {
+                  range:
+                    searchObj.data.datetime.queryRangeRestrictionInHour > 1
+                      ? searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hours"
+                      : searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hour",
+                }
+              );
             }
 
             let environmentInterestingFields = [];
@@ -2374,7 +2434,9 @@ const useLogs = () => {
               ...streamInterestingFieldsLocal
             );
 
-            let intField = new Set(searchObj.data.stream.interestingFieldList);
+            const intField = new Set(
+              searchObj.data.stream.interestingFieldList
+            );
             searchObj.data.stream.interestingFieldList = [...intField];
 
             // create a schema field mapping based on field name to avoid iteration over object.
@@ -2540,6 +2602,7 @@ const useLogs = () => {
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&
               searchObj.data.queryResults?.hits.length > 0 &&
+              searchObj.data.stream.selectedStream.length == 1 &&
               (!store.state.zoConfig.user_defined_schemas_enabled ||
                 !searchObj.meta.hasUserDefinedSchemas)
             ) {
@@ -2972,6 +3035,10 @@ const useLogs = () => {
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
       }
+
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
@@ -2989,8 +3056,11 @@ const useLogs = () => {
             : "",
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
+          traceparent,
         })
         .then((res) => {
+          removeTraceId(traceId);
+
           searchObj.loading = false;
           searchObj.data.histogram.chartParams.title = "";
           if (res.data.from > 0) {
@@ -3522,6 +3592,50 @@ const useLogs = () => {
     });
   };
 
+  const addTraceId = (traceId: string) => {
+    if (searchObj.data.searchRequestTraceIds.includes(traceId)) {
+      return;
+    }
+
+    searchObj.data.searchRequestTraceIds.push(traceId);
+  };
+
+  const removeTraceId = (traceId: string) => {
+    searchObj.data.searchRequestTraceIds =
+      searchObj.data.searchRequestTraceIds.filter(
+        (id: string) => id !== traceId
+      );
+  };
+
+  const cancelQuery = () => {
+    searchService
+      .delete_running_queries(
+        store.state.selectedOrganization.identifier,
+        searchObj.data.searchRequestTraceIds
+      )
+      .then(() => {
+        $q.notify({
+          message: "Running query deleted successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 1500,
+        });
+      })
+      .catch((error: any) => {
+        $q.notify({
+          message:
+            error.response?.data?.message || "Failed to delete running query",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+      })
+      .finally(() => {
+        if (searchObj.loading) searchObj.loading = false;
+        if (searchObj.loadingHistogram) searchObj.loadingHistogram = false;
+      });
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -3558,6 +3672,7 @@ const useLogs = () => {
     addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
+    cancelQuery,
   };
 };
 

@@ -48,6 +48,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
+pub mod cacher;
 pub mod grpc;
 pub mod http;
 #[cfg(feature = "enterprise")]
@@ -126,15 +127,20 @@ pub async fn search(
         let terms = meta
             .fts_terms
             .iter()
-            .flat_map(|t| split_token(t, &cfg.common.inverted_index_split_chars))
+            .map(|t| {
+                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+                tokens
+                    .into_iter()
+                    .max_by_key(|key| key.len())
+                    .unwrap_or_default()
+            })
             .collect::<HashSet<String>>();
 
-        let terms = [terms
+        let search_condition = terms
             .iter()
-            .max_by_key(|key| key.len())
-            .unwrap_or(&String::new())
-            .to_string()];
-        let search_condition = format!("term LIKE '%{}%'", terms[0]);
+            .map(|v| format!("term LIKE '%{v}%'"))
+            .collect::<Vec<_>>()
+            .join(" OR ");
 
         let query = format!(
             "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
@@ -284,12 +290,12 @@ pub async fn search(
 
     // check global concurrency
     #[cfg(feature = "enterprise")]
-    work_group_need_wait(trace_id, start, &req, &work_group, &locker, None).await?;
+    work_group_checking(trace_id, start, &req, &work_group, &locker, None).await?;
 
     // check user concurrency
     #[cfg(feature = "enterprise")]
     if user_id.is_some() {
-        work_group_need_wait(trace_id, start, &req, &work_group, &locker, user_id).await?;
+        work_group_checking(trace_id, start, &req, &work_group, &locker, user_id).await?;
     }
 
     // 3. process the search in the work group
@@ -308,7 +314,7 @@ pub async fn search(
         work_group
             .as_ref()
             .unwrap()
-            .done(&trace_id, user_id)
+            .done(trace_id, user_id)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         return Err(e);
@@ -645,6 +651,47 @@ pub async fn search(
 }
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "work_group:checking", skip_all, fields(user_id = user_id))]
+async fn work_group_checking(
+    trace_id: &str,
+    start: std::time::Instant,
+    req: &cluster_rpc::SearchRequest,
+    work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
+    locker: &Option<dist_lock::Locker>,
+    user_id: Option<&str>,
+) -> Result<()> {
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    if super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
+        ))));
+    }
+    tokio::select! {
+        res = work_group_need_wait(trace_id, start, req, work_group, locker, user_id) => {
+            match res {
+                Ok(_) => {
+                    return Ok(());
+                },
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+        _ = async {
+            let _ = abort_receiver.await;
+        } => {
+            log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
 #[tracing::instrument(name = "work_group:need_wait", skip_all, fields(user_id = user_id))]
 async fn work_group_need_wait(
     trace_id: &str,
@@ -658,7 +705,7 @@ async fn work_group_need_wait(
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
             dist_lock::unlock(locker).await?;
             return Err(Error::Message(format!(
-                "[trace_id {trace_id}] search: timeout in queue"
+                "[trace_id {trace_id}] search: request timeout in queue"
             )));
         }
         match work_group.as_ref().unwrap().need_wait(user_id).await {
@@ -766,6 +813,7 @@ async fn merge_grpc_result(
                 &batch,
                 &select_fields,
                 is_final_phase,
+                sql.meta.subquery.is_some()
             ) => {
                 match res {
                     Ok(res) => merge_batch = res,

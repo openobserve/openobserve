@@ -51,6 +51,7 @@ use crate::{
     service::format_partition_key,
 };
 
+pub mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -166,7 +167,7 @@ pub async fn search(
                 let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
                     Ok(v) => v.source.to_string(),
                     Err(e) => {
-                        log::error!("parse sql error: {:?}", e);
+                        log::error!("report_usage: parse sql error: {:?}", e);
                         "".to_string()
                     }
                 };
@@ -181,6 +182,13 @@ pub async fn search(
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
                     trace_id: Some(trace_id),
+                    took_wait_in_queue: if res.took_detail.is_some() {
+                        let resp_took = res.took_detail.as_ref().unwrap();
+                        // Consider only the cluster wait queue duration
+                        Some(resp_took.cluster_wait_queue)
+                    } else {
+                        None
+                    },
                     ..Default::default()
                 };
                 report_request_usage_stats(
