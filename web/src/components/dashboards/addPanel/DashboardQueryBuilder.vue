@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
-          <div class="layout-name" style="min-width: 0 !important">
+          <div class="layout-name">
             {{
               dashboardPanelData.data.type == "table"
                 ? t("panel.firstColumn")
@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ xAxisHint }}
               </q-tooltip>
             </q-icon>
-            <span class="layout-separator">:</span>
           </div>
+          <span class="layout-separator">:</span>
           <div
             class="axis-container droppable scroll row"
             :class="{
