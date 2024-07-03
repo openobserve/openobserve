@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="display: flex; flex-direction: row; width: 100%"
       class="q-pl-md"
     >
-      <div style="flex: 1; width: 50%">
+      <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
           <div class="layout-name" style="min-width: 0 !important">
             {{
@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     color="primary"
                     dense
+                    :no-wrap="true"
                     size="sm"
                     :label="xLabel[index]"
                     class="q-pl-sm"
@@ -242,21 +243,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- b axis container -->
-      <div style="flex: 1 1; width: 50%">
-        <div
-          style="display: flex; flex-direction: row"
-          class="q-pl-md"
-          v-if="
-            dashboardPanelData.data.type == 'area' ||
-            dashboardPanelData.data.type == 'bar' ||
-            dashboardPanelData.data.type == 'line' ||
-            dashboardPanelData.data.type == 'h-bar' ||
-            dashboardPanelData.data.type == 'h-stacked' ||
-            dashboardPanelData.data.type == 'scatter' ||
-            dashboardPanelData.data.type == 'area-stacked' ||
-            dashboardPanelData.data.type == 'stacked'
-          "
-        >
+      <div
+        style="flex: 1"
+        v-if="
+          dashboardPanelData.data.type == 'area' ||
+          dashboardPanelData.data.type == 'bar' ||
+          dashboardPanelData.data.type == 'line' ||
+          dashboardPanelData.data.type == 'h-bar' ||
+          dashboardPanelData.data.type == 'h-stacked' ||
+          dashboardPanelData.data.type == 'scatter' ||
+          dashboardPanelData.data.type == 'area-stacked' ||
+          dashboardPanelData.data.type == 'stacked'
+        "
+      >
+        <div style="display: flex; flex-direction: row" class="q-pl-md">
           <!-- Separator between X and Breakdown -->
           <q-separator vertical class="q-mr-md" />
           <div class="layout-name" style="min-width: 0 !important">
@@ -342,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     color="primary"
                     dense
+                    :no-wrap="true"
                     size="sm"
                     :label="bLabel[index]"
                     class="q-pl-sm"
@@ -559,6 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 color="primary"
                 square
+                :no-wrap="true"
                 size="sm"
                 :label="yLabel[index]"
                 :data-test="`dashboard-y-item-${itemY?.column}`"
@@ -794,6 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-right="arrow_drop_down"
                   no-caps
                   dense
+                  :no-wrap="true"
                   color="primary"
                   size="sm"
                   :label="zLabel[index]"
@@ -941,6 +944,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-right="arrow_drop_down"
             no-caps
             dense
+            :no-wrap="true"
             color="primary"
             size="sm"
             :label="filteredItem.column"
@@ -1518,6 +1522,11 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+          return t("dashboard.oneLabelFieldMessage");
+        case "metric":
+          return t("dashboard.xaxisFieldNAMessage");
+        case "table":
+          return t("dashboard.oneOrMoreFieldsMessage");
         case "stacked":
         case "area-stacked":
         case "h-stacked":
@@ -1526,14 +1535,6 @@ export default defineComponent({
         case "h-bar":
         case "line":
         case "scatter":
-          return t("dashboard.oneLabelFieldMessage");
-        case "metric":
-          return t("dashboard.xaxisFieldNAMessage");
-        case "table":
-          return t("dashboard.oneOrMoreFieldsMessage");
-        case "area-stacked":
-        case "stacked":
-        case "h-stacked":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
           return t("dashboard.oneFieldMessage");
@@ -1549,7 +1550,7 @@ export default defineComponent({
         case "stacked":
         case "area-stacked":
         case "h-stacked":
-          return t("dashboard.oneLabelFieldMessage");
+          return t("dashboard.twoFieldsMessage");
         default:
           return t("dashboard.zeroOrOneFieldMessage");
       }
@@ -1727,6 +1728,11 @@ export default defineComponent({
 .axis-field {
   overflow: hidden;
 }
+
+:deep(.axis-field div) {
+  display: flex;
+}
+
 :deep(.axis-field .q-btn--rectangle) {
   border-radius: 0%;
 }
