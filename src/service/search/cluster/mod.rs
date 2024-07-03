@@ -124,7 +124,7 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request
     let file_list = if is_inverted_index && req.aggs.is_empty() {
-        get_file_list_by_inverted_index(trace_id, meta.clone(), req.clone()).await?
+        get_file_list_by_inverted_index(meta.clone(), req.clone()).await?
     } else {
         get_file_list(
             trace_id,
@@ -876,7 +876,6 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 }
 
 async fn get_file_list_by_inverted_index(
-    trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
 ) -> Result<Vec<FileKey>> {
@@ -951,7 +950,6 @@ async fn get_file_list_by_inverted_index(
     idx_req.query.as_mut().unwrap().track_total_hits = false;
     idx_req.query.as_mut().unwrap().query_context = "".to_string();
     idx_req.query.as_mut().unwrap().query_fn = "".to_string();
-    idx_req.job.as_mut().unwrap().trace_id = format!("{}-index", trace_id);
     idx_req.aggs.clear();
 
     let idx_resp: search::Response = http::search(idx_req).await?;
