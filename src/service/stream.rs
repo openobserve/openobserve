@@ -198,6 +198,17 @@ pub async fn save_stream_settings(
         );
     }
 
+    // only allow setting user defined schema for logs stream
+    if stream_type != StreamType::Logs
+        && settings.defined_schema_fields.is_some()
+        && !settings.defined_schema_fields.as_ref().unwrap().is_empty()
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "only logs stream can have user defined schema".to_string(),
+        )));
+    }
+
     for key in settings.partition_keys.iter() {
         if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
