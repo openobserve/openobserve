@@ -2012,7 +2012,9 @@ const useLogs = () => {
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
             ].length > searchObj.data.queryResults.subpage &&
-            searchObj.data.queryResults.hits.length < (searchObj.meta.resultGrid.rowsPerPage * searchObj.data.stream.selectedStream.length)
+            searchObj.data.queryResults.hits.length <
+              searchObj.meta.resultGrid.rowsPerPage *
+                searchObj.data.stream.selectedStream.length
           ) {
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
@@ -3618,9 +3620,12 @@ const useLogs = () => {
         store.state.selectedOrganization.identifier,
         searchObj.data.searchRequestTraceIds
       )
-      .then(() => {
+      .then((res) => {
+        const isCancelled = res.data.some((item: any) => item.is_success);
         $q.notify({
-          message: "Running query deleted successfully",
+          message: isCancelled
+            ? "Running query cancelled successfully"
+            : "Query execution was completed before cancellation.",
           color: "positive",
           position: "bottom",
           timeout: 1500,
@@ -3629,7 +3634,7 @@ const useLogs = () => {
       .catch((error: any) => {
         $q.notify({
           message:
-            error.response?.data?.message || "Failed to delete running query",
+            error.response?.data?.message || "Failed to cancel running query",
           color: "negative",
           position: "bottom",
           timeout: 1500,
