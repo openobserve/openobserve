@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h5 {
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 2rem;
+    letter-spacing: normal;
+    margin: revert;
+  }
+
+  h6 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 2rem;
+    letter-spacing: 0.0125em;
+    margin: revert;
+  }
+  /* ... */
+}

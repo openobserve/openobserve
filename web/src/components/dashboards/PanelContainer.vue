@@ -235,6 +235,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
+import useNotifications from "@/composables/useNotifications";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -277,6 +278,8 @@ export default defineComponent({
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -287,9 +290,9 @@ export default defineComponent({
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {
         if (
-          query.function_error &&
-          query.new_start_time &&
-          query.new_end_time
+          query?.function_error &&
+          query?.new_start_time &&
+          query?.new_end_time
         ) {
           const combinedMessage = getFunctionErrorMessage(
             query.function_error,
@@ -370,10 +373,7 @@ export default defineComponent({
         );
 
         // Show a success notification.
-        $q.notify({
-          type: "positive",
-          message: `Panel Duplicated Successfully`,
-        });
+        showPositiveNotification("Panel Duplicated Successfully");
 
         // Navigate to the new panel.
         router.push({
@@ -388,10 +388,7 @@ export default defineComponent({
         return;
       } catch (err: any) {
         // Show an error notification.
-        $q.notify({
-          type: "negative",
-          message: err?.message ?? "Panel duplication failed",
-        });
+        showErrorNotification(err?.message ?? "Panel duplication failed");
       }
       // Hide the loading spinner notification.
       dismiss();

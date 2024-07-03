@@ -1,3 +1,18 @@
+// Copyright 2024 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use config::cluster::{is_querier, LOCAL_NODE_UUID};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
@@ -6,6 +21,7 @@ use tracing::{info_span, Instrument};
 
 use crate::{common::meta::search::CachedQueryResponse, service::search::infra_cluster};
 
+#[allow(clippy::too_many_arguments)]
 pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
@@ -14,6 +30,7 @@ pub async fn get_cached_results(
     file_path: String,
     trace_id: String,
     result_ts_column: String,
+    discard_interval: i64,
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
@@ -57,6 +74,8 @@ pub async fn get_cached_results(
                     query_key,
                     file_path,
                     timestamp_col: result_ts_column,
+                    trace_id:trace_id.clone(),
+                    discard_interval,
                 };
 
                 let request = tonic::Request::new(req);
@@ -199,6 +218,8 @@ pub async fn get_cached_results(
         is_aggregate,
         &file_path,
         result_ts_column.as_str(),
+        &trace_id,
+        discard_interval,
     )
     .await
     {

@@ -18,14 +18,14 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         search::SearchEventType,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json, time::parse_str_to_timestamp_micros_as_option},
+    utils::{base64, hash::Sum64, json},
     DISTINCT_FIELDS,
 };
 use infra::{
@@ -33,9 +33,7 @@ use infra::{
     errors,
     schema::STREAM_SCHEMAS_LATEST,
 };
-use opentelemetry::{global, trace::TraceContextExt};
 use tracing::{Instrument, Span};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
@@ -47,13 +45,17 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, RequestHeaderExtractor,
+                get_or_create_trace_id_and_span, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
             },
         },
     },
     service::{
-        search::{self as SearchService, cache::cacher::check_cache, sql::RE_ONLY_SELECT},
+        search::{
+            self as SearchService,
+            cache::{cacher::check_cache, result_utils::get_ts_value},
+            sql::RE_ONLY_SELECT,
+        },
         usage::report_request_usage_stats,
     },
 };
@@ -140,20 +142,8 @@ pub async fn search(
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
     let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone());
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) =
+        get_or_create_trace_id_and_span(in_req.headers(), format!("api/{org_id}/_search"));
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -211,7 +201,7 @@ pub async fn search(
             }
         }
     }
-
+    drop(r);
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
@@ -283,6 +273,11 @@ pub async fn search(
             delta_end_time: req.query.end_time,
             delta_removed_hits: false,
         })
+    } else {
+        log::info!(
+            "[trace_id {trace_id}]  query deltas are: {:?}",
+            c_resp.deltas
+        );
     }
     // Result caching check ends
     let mut results = Vec::new();
@@ -321,6 +316,14 @@ pub async fn search(
         let search_tracing = !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled;
         let mut tasks = Vec::new();
 
+        if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
+            log::info!(
+                "[trace_id {trace_id}]  Query original start time: {}, end time : {}",
+                req.query.start_time,
+                req.query.end_time
+            );
+        }
+
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let http_span_local = http_span.clone();
             let mut req = req.clone();
@@ -332,6 +335,15 @@ pub async fn search(
                 let trace_id = trace_id.clone();
                 req.query.start_time = delta.delta_start_time;
                 req.query.end_time = delta.delta_end_time;
+                let cfg = get_config();
+
+                if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
+                    log::info!(
+                        "[trace_id {trace_id}]  Query new start time: {}, end time : {}",
+                        req.query.start_time,
+                        req.query.end_time
+                    );
+                }
 
                 let search_fut = SearchService::search(
                     &trace_id,
@@ -385,7 +397,6 @@ pub async fn search(
                 Err(err) => {
                     report_metrics(start, &org_id, stream_type, "", "500", "_search");
                     log::error!("search error: {:?}", err);
-                    log::error!("search error: {:?}", err);
                     return Ok(HttpResponse::InternalServerError().json(
                         meta::http::HttpResponse::error(
                             StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -432,6 +443,13 @@ pub async fn search(
         cached_ratio: Some(res.cached_ratio),
         search_type,
         trace_id: Some(trace_id.clone()),
+        took_wait_in_queue: if res.took_detail.is_some() {
+            let resp_took = res.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -521,24 +539,10 @@ pub async fn around(
     let started_at = Utc::now().timestamp_micros();
     let (org_id, stream_name) = path.into_inner();
     let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!(
-            "/api/{org_id}/{stream_name}/_around",
-            org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        );
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/{stream_name}/_around"),
+    );
 
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -779,6 +783,17 @@ pub async fn around(
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
         trace_id: Some(trace_id),
+        took_wait_in_queue: match (
+            resp_forward.took_detail.as_ref(),
+            resp_backward.took_detail.as_ref(),
+        ) {
+            (Some(forward_took), Some(backward_took)) => {
+                Some(forward_took.cluster_wait_queue + backward_took.cluster_wait_queue)
+            }
+            (Some(forward_took), None) => Some(forward_took.cluster_wait_queue),
+            (None, Some(backward_took)) => Some(backward_took.cluster_wait_queue),
+            _ => None,
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -855,26 +870,11 @@ pub async fn values(
         Some(v) => v.to_str().unwrap(),
         None => "",
     };
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/{stream_name}/_values"),
+    );
 
-    let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!(
-            "/api/{org_id}/{stream_name}/_values",
-            org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        );
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
     if fields.len() == 1
         && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
@@ -1180,6 +1180,13 @@ async fn values_v1(
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
+        took_wait_in_queue: if resp.took_detail.is_some() {
+            let resp_took = resp.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1374,6 +1381,13 @@ async fn values_v2(
         cached_ratio: Some(resp.cached_ratio),
         search_type: Some(SearchEventType::Values),
         trace_id: Some(trace_id),
+        took_wait_in_queue: if resp.took_detail.is_some() {
+            let resp_took = resp.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1430,20 +1444,10 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone());
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/_search_partition"),
+    );
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -1508,6 +1512,8 @@ fn merge_response(
         return;
     }
 
+    let mut files_cache_ratio = 0;
+    let mut result_cache_ratio = 0;
     let cache_ts = if cache_response.hits.is_empty() {
         get_ts_value(
             ts_column,
@@ -1521,7 +1527,9 @@ fn merge_response(
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
-        cache_response.cached_ratio += res.cached_ratio;
+        files_cache_ratio += res.cached_ratio;
+
+        result_cache_ratio += res.total;
 
         if res.hits.is_empty() {
             continue;
@@ -1538,17 +1546,10 @@ fn merge_response(
                 .collect();
         }
     }
-    cache_response.cached_ratio /= search_response.len() + 1;
-}
-
-fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
-    match record.get(ts_column).unwrap() {
-        serde_json::Value::String(ts) => {
-            parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
-        }
-        serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-        _ => 0_i64,
-    }
+    cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    cache_response.result_cache_ratio = (cache_response.total as f64 * 100_f64
+        / (result_cache_ratio + cache_response.total) as f64)
+        as usize;
 }
 
 async fn write_results(

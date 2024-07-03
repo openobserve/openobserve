@@ -267,6 +267,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.type == 'area' ||
+                      dashboardPanelData.data.type == 'bar' ||
+                      dashboardPanelData.data.type == 'line' ||
+                      dashboardPanelData.data.type == 'h-bar' ||
+                      dashboardPanelData.data.type == 'h-stacked' ||
+                      dashboardPanelData.data.type == 'scatter' ||
+                      dashboardPanelData.data.type == 'area-stacked' ||
+                      dashboardPanelData.data.type == 'stacked'
+                    "
+                    padding="sm"
+                    :disabled="isAddBreakdownNotAllowed"
+                    @click="addBreakDownAxisItem(props.row)"
+                    data-test="dashboard-add-b-data"
+                  >
+                    <div>
+                      {{
+                        dashboardPanelData.data.type != "h-bar" ? "+B" : "+B"
+                      }}
+                    </div>
+                  </q-btn>
+                  <q-btn
                     v-if="dashboardPanelData.data.type == 'heatmap'"
                     padding="sm"
                     :disabled="isAddZAxisNotAllowed"
@@ -441,11 +463,11 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "FieldList",
@@ -462,14 +484,15 @@ export default defineComponent({
       currentFieldsList: [],
     });
     const filteredStreams = ref([]);
-    const $q = useQuasar();
     const {
       dashboardPanelData,
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addBreakDownAxisItem,
       addFilteredItem,
       isAddXAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
@@ -482,7 +505,7 @@ export default defineComponent({
       cleanupDraggingFields,
     } = useDashboardPanelData();
     const { getStreams, getStream } = useStreams();
-
+    const { showErrorNotification } = useNotifications();
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
@@ -584,10 +607,9 @@ export default defineComponent({
             dashboardPanelData.meta.stream.selectedStreamFields =
               fieldWithSchema?.schema ?? [];
           } catch (error: any) {
-            $q.notify({
-              type: "negative",
-              message: error ?? "Failed to get stream fields",
-            });
+            showErrorNotification(
+              error?.message ?? "Failed to get stream fields"
+            );
           }
         }
       }
@@ -749,6 +771,7 @@ export default defineComponent({
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
+      addBreakDownAxisItem,
       addLatitude,
       addLongitude,
       addWeight,
@@ -763,6 +786,7 @@ export default defineComponent({
       filterStreamFn,
       filteredStreams,
       isAddXAxisNotAllowed,
+      isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
       isAddZAxisNotAllowed,
       promqlMode,
@@ -776,7 +800,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .metric-explore-metric-icon {
   min-width: 28px !important;
   padding-right: 8px !important;

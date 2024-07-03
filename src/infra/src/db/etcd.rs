@@ -447,7 +447,7 @@ impl super::Db for Etcd {
                     match client.watch(key.clone(), Some(opt.clone())).await {
                         Ok((watcher, stream)) => (watcher, stream),
                         Err(e) => {
-                            log::error!("watching prefix: {}, error: {}", key, e);
+                            log::error!("[ETCD:watch] prefix: {}, error: {}", key, e);
                             time::sleep(time::Duration::from_secs(1)).await;
                             continue;
                         }
@@ -456,7 +456,7 @@ impl super::Db for Etcd {
                     let resp = match stream.message().await {
                         Ok(resp) => resp,
                         Err(e) => {
-                            log::error!("watching prefix: {}, get message error: {}", key, e);
+                            log::error!("[ETCD:watch] prefix: {}, get message error: {}", key, e);
                             break;
                         }
                     };

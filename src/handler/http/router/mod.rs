@@ -16,6 +16,7 @@
 use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
+use actix_http::header::HeaderName;
 use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
@@ -47,7 +48,6 @@ use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyUR
 pub mod openapi;
 pub mod ui;
 
-#[cfg(feature = "enterprise")]
 fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -55,22 +55,7 @@ fn get_cors() -> Rc<Cors> {
             header::AUTHORIZATION,
             header::ACCEPT,
             header::CONTENT_TYPE,
-        ])
-        .allow_any_origin()
-        .supports_credentials()
-        .max_age(3600);
-    Rc::new(cors)
-}
-
-/// #[cfg(not(feature = "enterprise"))]
-#[cfg(not(feature = "enterprise"))]
-fn get_cors() -> Rc<Cors> {
-    let cors = Cors::default()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
-        .allowed_headers(vec![
-            header::AUTHORIZATION,
-            header::ACCEPT,
-            header::CONTENT_TYPE,
+            HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
         .allow_any_origin()
         .supports_credentials()

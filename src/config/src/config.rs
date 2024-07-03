@@ -701,6 +701,12 @@ pub struct Common {
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_RESULT_CACHE_DISCARD_DURATION",
+        default = "60",
+        help = "Discard data of last n seconds from cached results"
+    )]
+    pub result_cache_discard_duration: i64,
 }
 
 #[derive(EnvConfig)]
@@ -754,11 +760,11 @@ pub struct Limit {
     pub query_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
-    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 10)] // seconds
+    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MIN_SECS", default = 600)] // seconds
     pub query_partition_min_secs: i64,
-    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 1024)] // MB/s/core
+    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
@@ -870,12 +876,6 @@ pub struct Compact {
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
     pub data_retention_history: bool,
-    #[env_config(
-        name = "ZO_COMPACT_FAST_MODE",
-        default = true,
-        help = "Enable fast mode compact, will use more memory but faster"
-    )]
-    pub fast_mode: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 100,

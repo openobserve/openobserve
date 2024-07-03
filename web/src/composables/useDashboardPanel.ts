@@ -16,7 +16,7 @@
 import { reactive, computed } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import useNotifications from "./useNotifications";
 
 const colors = [
   "#5960b2",
@@ -35,7 +35,7 @@ const colors = [
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
-    version: 3,
+    version: 4,
     id: "",
     type: "bar",
     title: "",
@@ -86,6 +86,7 @@ const getDefaultDashboardPanelData: any = () => ({
           x: [],
           y: [],
           z: [],
+          breakdown: [],
           filter: [],
           latitude: null,
           longitude: null,
@@ -143,8 +144,7 @@ let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
 
 const useDashboardPanelData = () => {
   const store = useStore();
-  const $q = useQuasar();
-
+  const { showErrorNotification } = useNotifications();
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
     dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
@@ -177,6 +177,7 @@ const useDashboardPanelData = () => {
         x: [],
         y: [],
         z: [],
+        breakdown: [],
         filter: [],
         latitude: null,
         longitude: null,
@@ -221,6 +222,14 @@ const useDashboardPanelData = () => {
       case "donut":
       case "heatmap":
       case "gauge":
+      case "area":
+      case "bar":
+      case "h-bar":
+      case "line":
+      case "scatter":
+      case "area-stacked":
+      case "stacked":
+      case "h-stacked":
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -239,6 +248,24 @@ const useDashboardPanelData = () => {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.x.length >= 2
+        );
+    }
+  });
+
+  const isAddBreakdownNotAllowed = computed((e: any) => {
+    switch (dashboardPanelData.data.type) {
+      case "area":
+      case "bar":
+      case "h-bar":
+      case "line":
+      case "scatter":
+      case "area-stacked":
+      case "stacked":
+      case "h-stacked":
+        return (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.breakdown?.length >= 1
         );
     }
   });
@@ -322,6 +349,62 @@ const useDashboardPanelData = () => {
             (dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.x.length +
+              1)
+          : row.name,
+        column: row.name,
+        color: null,
+        aggregationFunction:
+          row.name == store.state.zoConfig.timestamp_column
+            ? "histogram"
+            : null,
+        sortBy:
+          row.name == store.state.zoConfig.timestamp_column
+            ? dashboardPanelData.data.type == "table"
+              ? "DESC"
+              : "ASC"
+            : null,
+      });
+    }
+
+    updateArrayAlias();
+  };
+
+  const addBreakDownAxisItem = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown = [];
+    }
+
+    if (isAddBreakdownNotAllowed.value) {
+      return;
+    }
+
+    // check for existing field
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.find((it: any) => it.column == row.name)
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.push({
+        label: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? generateLabelFromName(row.name)
+          : row.name,
+        alias: !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "breakdown_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown.length +
               1)
           : row.name,
         column: row.name,
@@ -589,7 +672,6 @@ const useDashboardPanelData = () => {
       case "stacked":
       case "h-stacked":
       case "metric":
-      case "table":
       case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -619,6 +701,38 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         break;
+      case "table":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        break;
       case "geomap":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -629,6 +743,9 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -660,6 +777,9 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter = [];
@@ -712,6 +832,16 @@ const useDashboardPanelData = () => {
           ? "z_axis_" + (index + 1)
           : it?.column)
     );
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields?.breakdown?.forEach(
+      (it: any, index: any) =>
+        (it.alias = !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+          ? "breakdown_" + (index + 1)
+          : it?.column)
+    );
   };
 
   const removeXAxisItem = (name: string) => {
@@ -722,6 +852,17 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(index, 1);
+    }
+  };
+
+  const removeBreakdownItem = (name: string) => {
+    const index = dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.breakdown.findIndex((it: any) => it.column == name);
+    if (index >= 0) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.splice(index, 1);
     }
   };
 
@@ -849,11 +990,8 @@ const useDashboardPanelData = () => {
         errorDetailValue.length > 300
           ? errorDetailValue.slice(0, 300) + " ..."
           : errorDetailValue;
-      $q.notify({
-        type: "negative",
-        message: trimmedErrorMessage,
-        timeout: 5000,
-      });
+
+      showErrorNotification(trimmedErrorMessage);
     }
   };
 
@@ -900,11 +1038,8 @@ const useDashboardPanelData = () => {
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
-        $q.notify({
-          type: "negative",
-          message: trimmedErrorMessage,
-          timeout: 5000,
-        });
+
+        showErrorNotification(trimmedErrorMessage);
       });
   };
 
@@ -938,6 +1073,14 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z.length
+      );
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.splice(
+        0,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown.length
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1036,6 +1179,19 @@ const useDashboardPanelData = () => {
                 ].fields.y.length
             ) {
               currentFieldType = "y";
+            } else if (
+              index <
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.x.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.y.length +
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.breakdown.length
+            ) {
+              currentFieldType = "breakdown";
             } else {
               currentFieldType = "z";
             }
@@ -1055,6 +1211,19 @@ const useDashboardPanelData = () => {
                       dashboardPanelData.layout.currentQueryIndex
                     ].fields.x.length
                 ];
+            } else if (currentFieldType === "breakdown") {
+              field =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.breakdown[
+                  index -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.x.length -
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.y.length
+                ];
             } else {
               field =
                 dashboardPanelData.data.queries[
@@ -1069,7 +1238,6 @@ const useDashboardPanelData = () => {
                     ].fields.y.length
                 ];
             }
-
             // If the current field is a y or z field, set the aggregation function to "count"
             if (currentFieldType === "y" || currentFieldType === "z") {
               field.aggregationFunction = "count";
@@ -1120,6 +1288,21 @@ const useDashboardPanelData = () => {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.x[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+        // Check if the field is in the breakdown fields array
+        fieldIndex = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown?.findIndex((it: any) => it?.alias == oldName);
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown[fieldIndex];
 
           // Update the field alias and column to the new name
           field.alias = newName;
@@ -1250,6 +1433,7 @@ const useDashboardPanelData = () => {
     addXAxisItem,
     addYAxisItem,
     addZAxisItem,
+    addBreakDownAxisItem,
     addLatitude,
     addLongitude,
     addWeight,
@@ -1259,6 +1443,7 @@ const useDashboardPanelData = () => {
     removeXAxisItem,
     removeYAxisItem,
     removeZAxisItem,
+    removeBreakdownItem,
     removeFilterItem,
     removeLatitude,
     removeLongitude,
@@ -1272,6 +1457,7 @@ const useDashboardPanelData = () => {
     updateXYFieldsForCustomQueryMode,
     updateXYFieldsOnCustomQueryChange,
     isAddXAxisNotAllowed,
+    isAddBreakdownNotAllowed,
     isAddYAxisNotAllowed,
     isAddZAxisNotAllowed,
     promqlMode,
