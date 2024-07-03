@@ -72,6 +72,7 @@ pub async fn get_cached_results(
                     query_key,
                     file_path,
                     timestamp_col: result_ts_column,
+                    trace_id:trace_id.clone(),
                 };
 
                 let request = tonic::Request::new(req);
@@ -214,6 +215,7 @@ pub async fn get_cached_results(
         is_aggregate,
         &file_path,
         result_ts_column.as_str(),
+        &trace_id,
     )
     .await
     {
