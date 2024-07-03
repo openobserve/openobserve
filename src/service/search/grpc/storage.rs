@@ -303,7 +303,7 @@ pub async fn search(
                     },
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[trace_id {}] search->storage: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
+                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
                             "[trace_id {}] search->storage: task timeout", session.id
                         )))
                     },
@@ -344,9 +344,12 @@ pub async fn search(
                     }
                 }
             }
-            Err(err) => {
-                return Err(err.into());
-            }
+            Err(err) => match err {
+                datafusion::error::DataFusionError::ResourcesExhausted(e) => {
+                    return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
+                }
+                _ => return Err(err.into()),
+            },
         };
     }
 

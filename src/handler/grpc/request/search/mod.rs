@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::metrics;
-use infra::errors;
+use infra::errors::{Error::ErrorCode, ErrorCodes};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
     common::infra::config::O2_CONFIG,
@@ -166,12 +166,16 @@ impl Search for Searcher {
                 metrics::GRPC_INCOMING_REQUESTS
                     .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
                     .inc();
-                let message = if let errors::Error::ErrorCode(code) = err {
+                let message = if let ErrorCode(ref code) = err {
                     code.to_json()
                 } else {
                     err.to_string()
                 };
-                Err(Status::internal(message))
+                if let ErrorCode(ErrorCodes::SearchTimeout(_)) = err {
+                    Err(Status::deadline_exceeded(message))
+                } else {
+                    Err(Status::internal(message))
+                }
             }
         }
     }
@@ -231,7 +235,7 @@ impl Search for Searcher {
                 metrics::GRPC_INCOMING_REQUESTS
                     .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
                     .inc();
-                let message = if let errors::Error::ErrorCode(code) = err {
+                let message = if let ErrorCode(code) = err {
                     code.to_json()
                 } else {
                     err.to_string()

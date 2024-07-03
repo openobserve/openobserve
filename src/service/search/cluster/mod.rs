@@ -482,6 +482,7 @@ pub async fn search(
                     .org_id
                     .parse()
                     .map_err(|_| Error::Message("invalid org_id".to_string()))?;
+                let org_id_string = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
                 // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
@@ -532,11 +533,15 @@ pub async fn search(
                             Ok(res) => response = res.into_inner(),
                             Err(err) => {
                                 log::error!("[trace_id {trace_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
+                                if err.code() == tonic::Code::DeadlineExceeded {
+                                    metrics::QUERY_CANCELED_NUMS
+                                        .with_label_values(&[&org_id_string])
+                                        .inc();
+                                }
                                 if err.code() == tonic::Code::Internal {
                                     let err = ErrorCodes::from_json(err.message())?;
                                     return Err(Error::ErrorCode(err));
                                 }
-                                // work group and grpc and datafusion
                                 return Err(super::server_internal_error("search node error"));
                             }
                         }

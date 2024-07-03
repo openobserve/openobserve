@@ -318,7 +318,7 @@ pub async fn search_parquet(
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[trace_id {}] wal->parquet->search: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
+                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
                             "[trace_id {}] wal->parquet->search: task timeout", session.id
                         )))
                     },
@@ -373,7 +373,12 @@ pub async fn search_parquet(
                     "[trace_id {trace_id}] wal->parquet->search: datafusion execute error: {}",
                     err
                 );
-                return Err(err.into());
+                match err {
+                    datafusion::error::DataFusionError::ResourcesExhausted(e) => {
+                        return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
+                    }
+                    _ => return Err(err.into()),
+                }
             }
         };
     }
@@ -535,7 +540,7 @@ pub async fn search_memtable(
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[trace_id {}] wal->mem->search: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
+                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
                             "[trace_id {}] wal->mem->search: task timeout", session.id
                         )))
                     },
@@ -581,7 +586,12 @@ pub async fn search_memtable(
                     "[trace_id {trace_id}] wal->mem->search: datafusion execute error: {}",
                     err
                 );
-                return Err(err.into());
+                match err {
+                    datafusion::error::DataFusionError::ResourcesExhausted(e) => {
+                        return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
+                    }
+                    _ => return Err(err.into()),
+                }
             }
         };
     }
