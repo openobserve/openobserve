@@ -108,6 +108,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >Add To Dashboard</q-btn
                         >
                       </div>
+                      <div
+                        v-if="isOutDated"
+                        :style="{
+                          borderColor: '#c3920d',
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          backgroundColor:
+                            store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
+                          padding: '1%',
+                          margin: '0% 1%',
+                          borderRadius: '5px',
+                        }"
+                      >
+                        <div style="font-weight: 700">
+                          Your chart is not up to date
+                        </div>
+                        <div>
+                          Chart configuration has been updated, but the chart
+                          was not updated automatically. Click on the "Run
+                          Query" button to run the query again
+                        </div>
+                      </div>
                       <div style="flex: 1">
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
@@ -207,9 +229,10 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import { provide } from "vue";
 import { toRefs } from "vue";
 import { inject } from "vue";
-import { addPanel, getPanelId } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
+import { computed } from "vue";
+import { isEqual } from "lodash-es";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -280,6 +303,15 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
       }
     );
+
+    const isOutDated = computed(() => {
+      //compare chartdata and dashboardpaneldata
+      return !isEqual(chartData.value, dashboardPanelData.data);
+    });
+
+    watch(isOutDated, () => {
+      window.dispatchEvent(new Event("resize"));
+    });
 
     // resize the chart when config panel is opened and closed
     watch(
@@ -379,6 +411,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      isOutDated,
     };
   },
 });
