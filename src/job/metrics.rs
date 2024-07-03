@@ -57,6 +57,7 @@ pub struct TraceMetricsItem {
     pub span_status: String,
     pub span_kind: String,
     pub duration: f64,
+    pub span_id: String,
 }
 
 pub type TraceMetricsChan = (
@@ -324,6 +325,7 @@ async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
 
     while let Some(item) = receiver.recv().await {
         // Record measurements using the histogram instrument.
+        log::info!("receive span metrics: {}", item.span_id);
         TRACE_METRICS_SPAN_HISTOGRAM.record(
             item.duration,
             &[

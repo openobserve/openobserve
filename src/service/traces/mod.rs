@@ -261,6 +261,7 @@ pub async fn handle_trace_request(
                             span_status: span_status_for_spanmetric,
                             span_kind: span.kind.to_string(),
                             duration: ((end_time - start_time) / 1_000_000) as f64, // milliseconds
+                            span_id: v["span_id"].to_string(),
                         };
                         span_metrics.push(sm);
                         v
