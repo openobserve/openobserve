@@ -217,6 +217,22 @@ impl From<&String> for QueryPartitionStrategy {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum MergeStrategy {
+    FileSize,
+    FileTime,
+}
+
+impl From<&String> for MergeStrategy {
+    fn from(s: &String) -> Self {
+        match s.to_lowercase().as_str() {
+            "file_size" => MergeStrategy::FileSize,
+            "file_time" => MergeStrategy::FileTime,
+            _ => MergeStrategy::FileSize,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamStats {
     pub created_at: i64,
