@@ -413,14 +413,14 @@ export default defineComponent({
     // flag to know if it is the first time visualize
     let firstTimeVisualizeFlag = false;
 
-    watch(
-      () => splitterModel.value,
-      (val) => {
-        console.log("splitterModel", val);
+    // watch(
+    //   () => splitterModel.value,
+    //   (val) => {
+    //     console.log("splitterModel", val);
 
-        window.dispatchEvent(new Event("resize"));
-      }
-    );
+    //     window.dispatchEvent(new Event("resize"));
+    //   }
+    // );
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -912,6 +912,19 @@ export default defineComponent({
           dashboardPanelData.data.queries[0].fields.y.push(field);
         }
       });
+
+      // if x axis fields length is 2, then add 2nd x axis field to breakdown fields
+      if (dashboardPanelData.data.queries[0].fields.x.length == 2) {
+        dashboardPanelData.data.queries[0].fields.breakdown.push(
+          dashboardPanelData.data.queries[0].fields.x[1]
+        );
+        // remove 2nd x axis field from x axis fields
+        dashboardPanelData.data.queries[0].fields.x.splice(1, 1);
+      }
+      // if x axis fields length is greater than 2, then select chart type as table
+      else if (dashboardPanelData.data.queries[0].fields.x.length > 2) {
+        dashboardPanelData.data.type = "table";
+      }
 
       // set conditions
       conditions.forEach((condition) => {
