@@ -892,9 +892,12 @@ async fn prepare_index_record_batches(
         batches.remove(0)
     } else {
         let schema = batches.first().unwrap().schema();
-        concat_batches(schema, batches, true)
+        let batches = batches.iter().collect::<Vec<_>>();
+        concat_batches(schema, &batches)
             .map_err(|e| anyhow::anyhow!("concat_batches error: {}", e))?
     };
+    drop(batches);
+
     let mut null_columns = 0;
     for i in 0..new_batch.num_columns() {
         let ni = i - null_columns;
