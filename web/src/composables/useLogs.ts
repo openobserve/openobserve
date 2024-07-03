@@ -1447,12 +1447,11 @@ const useLogs = () => {
         isNaN(searchObj.data.datetime.endTime) ||
         isNaN(searchObj.data.datetime.startTime)
       ) {
-        $q.notify({
-          message: `Invalid date. Please select a valid date.`,
-          color: "negative",
-          timeout: 2000,
-        });
-        return;
+        const queryParams: any = router.currentRoute.value.query;
+        let currentPeriod: string = queryParams?.period || "15m";
+        const extractedDate: any = extractTimestamps(currentPeriod);
+        searchObj.data.datetime.startTime = extractedDate.from;
+        searchObj.data.datetime.endTime = extractedDate.to;
       }
 
       searchObjDebug["buildSearchStartTime"] = performance.now();
