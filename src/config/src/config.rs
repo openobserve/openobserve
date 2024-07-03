@@ -865,7 +865,7 @@ pub struct Compact {
     pub lookback_hours: i64,
     #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
     pub step_secs: i64,
-    #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
+    #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: usize,
