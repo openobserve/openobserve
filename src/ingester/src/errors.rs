@@ -97,6 +97,9 @@ pub enum Error {
     WriteParquetRecordBatchError {
         source: parquet::errors::ParquetError,
     },
+    MergeRecordBatchError {
+        source: datafusion::error::DataFusionError,
+    },
     TokioJoinError {
         source: tokio::task::JoinError,
     },
