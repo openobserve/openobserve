@@ -879,12 +879,6 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
     pub data_retention_history: bool,
     #[env_config(
-        name = "ZO_COMPACT_FAST_MODE",
-        default = true,
-        help = "Enable fast mode compact, will use more memory but faster"
-    )]
-    pub fast_mode: bool,
-    #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 100,
         help = "Batch size for compact get pending jobs"
