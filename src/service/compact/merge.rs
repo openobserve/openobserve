@@ -1111,13 +1111,15 @@ pub async fn merge_parquet_files(
         .collect::<Vec<_>>();
 
     // merge record batches, the record batch have same schema
-    let (schema, record_batches) =
-        merge_record_batches("MERGE", thread_id, schema, record_batches)?;
+    let record_batches = record_batches.iter().collect::<Vec<_>>();
+    let (schema, new_record_batches) =
+        merge_record_batches("MERGE", thread_id, schema, &record_batches)?;
+    drop(record_batches);
 
     log::info!(
         "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, record_batches))
+    Ok((schema, new_record_batches))
 }

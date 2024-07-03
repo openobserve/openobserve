@@ -119,9 +119,9 @@ impl Partition {
                     (vec![], vec![])
                 };
 
-            let batches = data.data.iter().map(|r| r.data.clone()).collect();
+            let batches = data.data.iter().map(|r| &r.data).collect::<Vec<_>>();
             let (schema, batches) =
-                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
+                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), &batches)
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();

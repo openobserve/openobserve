@@ -484,12 +484,11 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
 /// Returns an error if the types of underlying arrays are different.
 pub fn concat_batches(
     schema: Arc<Schema>,
-    mut batches: Vec<RecordBatch>,
-    fast_mode: bool,
+    batches: &[&RecordBatch],
 ) -> Result<RecordBatch, ArrowError> {
     // When schema is empty, sum the number of the rows of all batches
     if schema.fields().is_empty() {
-        let num_rows: usize = batches.into_iter().map(|b| b.num_rows()).sum();
+        let num_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         let mut options = RecordBatchOptions::default();
         options.row_count = Some(num_rows);
         return RecordBatch::try_new_with_options(schema.clone(), vec![], &options);
@@ -501,25 +500,14 @@ pub fn concat_batches(
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
-        let array = if fast_mode {
-            arrow::compute::concat(
-                &batches
-                    .iter()
-                    .map(|batch| batch.column(i).as_ref())
-                    .collect::<Vec<_>>(),
-            )?
-        } else {
-            let mut new_batches = Vec::with_capacity(batches.len());
-            for batch in &mut batches {
-                let i = i - arrays.len();
-                let column = batch.remove_column(i);
-                new_batches.push(column);
-            }
-            arrow::compute::concat(&new_batches.iter().map(|c| c.as_ref()).collect::<Vec<_>>())?
-        };
+        let array = arrow::compute::concat(
+            &batches
+                .iter()
+                .map(|batch| batch.column(i).as_ref())
+                .collect::<Vec<_>>(),
+        )?;
         arrays.push(array);
     }
-    drop(batches);
     RecordBatch::try_new(schema.clone(), arrays)
 }
 
@@ -528,14 +516,10 @@ pub fn merge_record_batches(
     job_name: &str,
     thread_id: usize,
     mut schema: Arc<Schema>,
-    record_batches: Vec<RecordBatch>,
+    record_batches: &[&RecordBatch],
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), DataFusionError> {
     // 1. concatenate all record batches into one single RecordBatch
-    let mut concated_record_batch = concat_batches(
-        schema.clone(),
-        record_batches,
-        get_config().compact.fast_mode,
-    )?;
+    let mut concated_record_batch = concat_batches(schema.clone(), record_batches)?;
 
     // 2. delete all the null columns
     let num_rows = concated_record_batch.num_rows();
