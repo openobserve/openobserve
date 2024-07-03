@@ -24,10 +24,11 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::{ArrowError, DataType, Schema};
+use datafusion::error::DataFusionError;
 use hashbrown::{HashMap, HashSet};
 
 use super::{json::get_string_value, schema_ext::SchemaExt};
-use crate::FxIndexMap;
+use crate::{get_config, FxIndexMap};
 
 const USIZE_SIZE: usize = std::mem::size_of::<usize>();
 
@@ -483,12 +484,11 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
 /// Returns an error if the types of underlying arrays are different.
 pub fn concat_batches(
     schema: Arc<Schema>,
-    mut batches: Vec<RecordBatch>,
-    fast_mode: bool,
+    batches: &[&RecordBatch],
 ) -> Result<RecordBatch, ArrowError> {
     // When schema is empty, sum the number of the rows of all batches
     if schema.fields().is_empty() {
-        let num_rows: usize = batches.into_iter().map(|b| b.num_rows()).sum();
+        let num_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         let mut options = RecordBatchOptions::default();
         options.row_count = Some(num_rows);
         return RecordBatch::try_new_with_options(schema.clone(), vec![], &options);
@@ -500,26 +500,75 @@ pub fn concat_batches(
     let field_num = schema.fields().len();
     let mut arrays = Vec::with_capacity(field_num);
     for i in 0..field_num {
-        let array = if fast_mode {
-            arrow::compute::concat(
-                &batches
-                    .iter()
-                    .map(|batch| batch.column(i).as_ref())
-                    .collect::<Vec<_>>(),
-            )?
-        } else {
-            let mut new_batches = Vec::with_capacity(batches.len());
-            for batch in &mut batches {
-                let i = i - arrays.len();
-                let column = batch.remove_column(i);
-                new_batches.push(column);
-            }
-            arrow::compute::concat(&new_batches.iter().map(|c| c.as_ref()).collect::<Vec<_>>())?
-        };
+        let array = arrow::compute::concat(
+            &batches
+                .iter()
+                .map(|batch| batch.column(i).as_ref())
+                .collect::<Vec<_>>(),
+        )?;
         arrays.push(array);
     }
-    drop(batches);
     RecordBatch::try_new(schema.clone(), arrays)
+}
+
+// merge record batches, the record batch have same schema
+pub fn merge_record_batches(
+    job_name: &str,
+    thread_id: usize,
+    mut schema: Arc<Schema>,
+    record_batches: &[&RecordBatch],
+) -> Result<(Arc<Schema>, Vec<RecordBatch>), DataFusionError> {
+    // 1. concatenate all record batches into one single RecordBatch
+    let mut concated_record_batch = concat_batches(schema.clone(), record_batches)?;
+
+    // 2. delete all the null columns
+    let num_rows = concated_record_batch.num_rows();
+    let mut null_columns = Vec::new();
+    for idx in 0..schema.fields().len() {
+        if concated_record_batch.column(idx).null_count() == num_rows {
+            null_columns.push(idx);
+        }
+    }
+    if !null_columns.is_empty() {
+        for (deleted_num, idx) in null_columns.into_iter().enumerate() {
+            concated_record_batch.remove_column(idx - deleted_num);
+        }
+        schema = concated_record_batch.schema().clone();
+    }
+
+    // 3. sort concatenated record batch by timestamp col in desc order
+    let sort_indices = arrow::compute::sort_to_indices(
+        concated_record_batch
+            .column_by_name(&get_config().common.column_timestamp)
+            .ok_or_else(|| {
+                log::error!(
+                    "[{job_name}:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",
+                );
+                DataFusionError::Execution(
+                    "No _timestamp column found in merged record batch".to_string(),
+                )
+            })?,
+        Some(arrow_schema::SortOptions {
+            descending: true,
+            nulls_first: false,
+        }),
+        None,
+    )?;
+
+    let batch_columns_len = concated_record_batch.columns().len();
+    let mut sorted_columns = Vec::with_capacity(batch_columns_len);
+    for i in 0..batch_columns_len {
+        let i = i - sorted_columns.len();
+        let sorted_column =
+            arrow::compute::take(&concated_record_batch.remove_column(i), &sort_indices, None)?;
+        sorted_columns.push(sorted_column);
+    }
+    drop(concated_record_batch);
+
+    let final_record_batch = RecordBatch::try_new(schema.clone(), sorted_columns)?;
+    let schema = final_record_batch.schema();
+
+    Ok((schema, vec![final_record_batch]))
 }
 
 #[cfg(test)]

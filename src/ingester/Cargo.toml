@@ -19,6 +19,7 @@ hashbrown.workspace = true
 indexmap.workspace = true
 itertools.workspace = true
 log.workspace = true
+datafusion.workspace = true
 once_cell.workspace = true
 parquet.workspace = true
 serde.workspace = true
