@@ -123,8 +123,19 @@ pub async fn check_cache(
     .await
     {
         Some(mut cached_resp) => {
-            let search_delta: Vec<QueryDelta> = cached_resp
-                .deltas
+            let mut deltas = vec![];
+            calculate_deltas_v1(
+                &ResultCacheMeta {
+                    start_time: cached_resp.response_start_time,
+                    end_time: cached_resp.response_end_time,
+                    is_aggregate,
+                },
+                req.query.start_time,
+                req.query.end_time,
+                &mut deltas,
+            );
+
+            let search_delta: Vec<QueryDelta> = deltas
                 .iter()
                 .filter(|d| !d.delta_removed_hits)
                 .cloned()
@@ -133,6 +144,7 @@ pub async fn check_cache(
                 log::debug!("cached response found");
                 *should_exec_query = false;
             };
+
             if cached_resp.cached_response.total == (meta.meta.limit as usize) {
                 *should_exec_query = false;
                 cached_resp.deltas = vec![];
@@ -196,13 +208,6 @@ pub async fn get_cached_results(
                     return None;
                 }
 
-                let mut deltas = vec![];
-
-                calculate_deltas_v1(&matching_cache_meta, start_time, end_time, &mut deltas);
-
-                let remove_hits: Vec<&QueryDelta> =
-                    deltas.iter().filter(|d| d.delta_removed_hits).collect();
-
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
@@ -235,40 +240,22 @@ pub async fn get_cached_results(
                             if Utc::now().timestamp_micros() - discard_duration < m_first_ts {
                                 m_first_ts - discard_duration
                             } else {
-                                matching_cache_meta.start_time
+                                matching_cache_meta.end_time
                             }
                         };
 
-                        if !remove_hits.is_empty() {
-                            for delta in remove_hits {
-                                for hit in &cached_response.hits {
-                                    let hit_ts = get_ts_value(result_ts_column, hit);
+                        for hit in &cached_response.hits {
+                            let hit_ts = get_ts_value(result_ts_column, hit);
 
-                                    if !(hit_ts >= delta.delta_start_time
-                                        && hit_ts < delta.delta_end_time)
-                                        && (hit_ts <= end_time && hit_ts >= start_time)
-                                        && hit_ts < discard_ts
-                                    {
-                                        to_retain.push(hit.clone());
-                                    }
-                                }
+                            if (hit_ts <= end_time && hit_ts >= start_time) && hit_ts < discard_ts {
+                                to_retain.push(hit.clone());
                             }
-                            cached_response.hits = to_retain;
-                            cached_response.total = cached_response.hits.len();
-                            if discard_interval < 0 {
-                                matching_cache_meta.end_time = discard_ts;
-                            };
+                        }
+                        cached_response.hits = to_retain;
+                        cached_response.total = cached_response.hits.len();
+                        if discard_interval < 0 {
+                            matching_cache_meta.end_time = discard_ts;
                         };
-
-                        // recalculate deltas
-                        let mut deltas = vec![];
-
-                        let has_pre_cache_delta = calculate_deltas_v1(
-                            &matching_cache_meta,
-                            start_time,
-                            end_time,
-                            &mut deltas,
-                        );
 
                         log::info!(
                             "[trace_id {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
@@ -278,8 +265,7 @@ pub async fn get_cached_results(
                         );
                         Some(CachedQueryResponse {
                             cached_response,
-                            deltas,
-                            has_pre_cache_delta,
+                            deltas: vec![],
                             has_cached_data: true,
                             cache_query_response: true,
                             response_start_time: matching_cache_meta.start_time,

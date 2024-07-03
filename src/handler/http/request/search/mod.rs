@@ -332,14 +332,6 @@ pub async fn search(
         let search_tracing = !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled;
         let mut tasks = Vec::new();
 
-        if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
-            log::info!(
-                "[trace_id {trace_id}]  Query original start time: {}, end time : {}",
-                req.query.start_time,
-                req.query.end_time
-            );
-        }
-
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let http_span_local = http_span.clone();
             let mut req = req.clone();
@@ -353,7 +345,16 @@ pub async fn search(
                 req.query.end_time = delta.delta_end_time;
                 let cfg = get_config();
 
-                if cfg.common.result_cache_enabled && cfg.common.print_key_sql {
+                if cfg.common.result_cache_enabled
+                    && cfg.common.print_key_sql
+                    && c_resp.has_cached_data
+                {
+                    log::info!(
+                        "[trace_id {trace_id}]  Query original start time: {}, end time : {}",
+                        req.query.start_time,
+                        req.query.end_time
+                    );
+
                     log::info!(
                         "[trace_id {trace_id}]  Query new start time: {}, end time : {}",
                         req.query.start_time,
@@ -1551,7 +1552,12 @@ fn merge_response(
     search_response: &Vec<config::meta::search::Response>,
     ts_column: &str,
 ) {
+    if cache_response.hits.is_empty() && search_response.is_empty() {
+        return;
+    }
+
     if cache_response.hits.is_empty()
+        && search_response.is_empty()
         && search_response.first().unwrap().hits.is_empty()
         && search_response.last().unwrap().hits.is_empty()
     {

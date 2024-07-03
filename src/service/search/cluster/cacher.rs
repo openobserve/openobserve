@@ -145,15 +145,6 @@ pub async fn get_cached_results(
             Ok(res) => match res {
                 Ok((node, node_res)) => match node_res.response {
                     Some(res) => {
-                        let deltas = res
-                            .deltas
-                            .iter()
-                            .map(|d| crate::common::meta::search::QueryDelta {
-                                delta_start_time: d.delta_start_time,
-                                delta_end_time: d.delta_end_time,
-                                delta_removed_hits: d.delta_removed_hits,
-                            })
-                            .collect();
                         let cached_res: config::meta::search::Response = match res.cached_response {
                             Some(cached_response) => {
                                 match serde_json::from_slice(&cached_response.data) {
@@ -181,8 +172,7 @@ pub async fn get_cached_results(
                             node,
                             CachedQueryResponse {
                                 cached_response: cached_res,
-                                deltas,
-                                has_pre_cache_delta: res.has_pre_cache_delta,
+                                deltas: vec![],
                                 has_cached_data: res.has_cached_data,
                                 cache_query_response: res.cache_query_response,
                                 response_start_time: res.cache_start_time,

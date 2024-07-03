@@ -31,12 +31,10 @@ message QueryCacheRequest {
 
 message QueryCacheRes {
     QueryResponse cached_response = 1;
-    repeated   QueryDelta deltas  = 2;
-    bool      has_pre_cache_delta = 3;
-    bool          has_cached_data = 4;
-    bool     cache_query_response = 5;
-    int64        cache_start_time = 6;
-    int64          cache_end_time = 7;
+    bool          has_cached_data = 2;
+    bool     cache_query_response = 3;
+    int64        cache_start_time = 4;
+    int64          cache_end_time = 5;
 }
 
 message QueryCacheResponse {
