@@ -269,6 +269,9 @@ impl Search for Searcher {
                 for sender in senders.abort_senders.into_iter().rev() {
                     let _ = sender.send(());
                 }
+                metrics::CANCEL_QUERY_NUMS
+                    .with_label_values(&[&senders.org_id])
+                    .inc();
                 Ok(Response::new(CancelQueryResponse { is_success: true }))
             }
             None => Ok(Response::new(CancelQueryResponse { is_success: false })),

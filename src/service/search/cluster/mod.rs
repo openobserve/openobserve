@@ -27,6 +27,7 @@ use config::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
+    metrics,
     utils::{inverted_index::split_token, json},
 };
 use hashbrown::{HashMap, HashSet};
@@ -384,6 +385,13 @@ pub async fn search(
             )
             .await;
     }
+
+    metrics::PENDING_QUERY_NUMS
+        .with_label_values(&[&req.org_id])
+        .dec();
+    metrics::RUNNING_QUERY_NUMS
+        .with_label_values(&[&req.org_id])
+        .inc();
 
     // make cluster request
     let mut tasks = Vec::new();
