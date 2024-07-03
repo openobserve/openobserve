@@ -286,15 +286,15 @@ async fn handle_diff_schema(
     // 1. allow_user_defined_schemas is enabled
     // 2. log ingestion
     // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds max_fields_activate_udschema
+    // 4. final schema fields count exceeds udschema_max_fields
     // user-defined schema does not include _timestamp or _all columns
     if cfg.common.allow_user_defined_schemas
-        && cfg.limit.max_fields_activate_udschema > 0
+        && cfg.limit.udschema_max_fields > 0
         && stream_type == StreamType::Logs
         && defined_schema_fields.is_empty()
-        && final_schema.fields().len() > cfg.limit.max_fields_activate_udschema
+        && final_schema.fields().len() > cfg.limit.udschema_max_fields
     {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.max_fields_activate_udschema);
+        let mut uds_fields = HashSet::with_capacity(cfg.limit.udschema_max_fields);
         // add fts fields
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
             if final_schema.field_with_name(field).is_ok() {
@@ -308,7 +308,7 @@ async fn handle_diff_schema(
                 continue;
             }
             uds_fields.insert(field_name.to_string());
-            if uds_fields.len() == cfg.limit.max_fields_activate_udschema {
+            if uds_fields.len() == cfg.limit.udschema_max_fields {
                 break;
             }
         }
