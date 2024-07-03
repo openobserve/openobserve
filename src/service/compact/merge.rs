@@ -1028,7 +1028,10 @@ pub fn generate_inverted_idx_recordbatch(
     index_fields: &[String],
 ) -> Vec<RecordBatch> {
     let cfg = get_config();
-    if !cfg.common.inverted_index_enabled || batches.is_empty() || stream_type != StreamType::Logs {
+    if !cfg.common.inverted_index_enabled
+        || batches.is_empty()
+        || !stream_type.create_inverted_index()
+    {
         return Vec::new();
     }
 
