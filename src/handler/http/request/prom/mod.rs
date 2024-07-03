@@ -300,19 +300,8 @@ async fn query_range(
             utils::auth::{is_root_user, AuthExtractor},
         };
 
-        let ast = match parser::parse(&req.query.clone()) {
-            Ok(v) => match v {
-                Some(v) => v,
-                None => {
-                    log::error!("parse promql error: query is empty");
-                    return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                        status: promql::Status::Error,
-                        data: None,
-                        error_type: Some("bad_data".to_string()),
-                        error: Some("query is empty".to_string()),
-                    }));
-                }
-            },
+        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
+            Ok(v) => v,
             Err(e) => {
                 log::error!("parse promql error: {}", e);
                 return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
