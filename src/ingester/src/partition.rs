@@ -21,7 +21,7 @@ use config::{
     metrics,
     utils::{
         parquet::{generate_filename_with_time_range, new_parquet_writer},
-        record_batch_ext::merge_record_batchs,
+        record_batch_ext::merge_record_batches,
         schema_ext::SchemaExt,
     },
 };
@@ -121,7 +121,7 @@ impl Partition {
 
             let batches = data.data.iter().map(|r| r.data.clone()).collect();
             let (schema, batches) =
-                merge_record_batchs("INGESTER:PERSIST", 0, self.schema.clone(), batches)
+                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();

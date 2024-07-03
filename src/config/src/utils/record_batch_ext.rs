@@ -524,7 +524,7 @@ pub fn concat_batches(
 }
 
 // merge record batches, the record batch have same schema
-pub fn merge_record_batchs(
+pub fn merge_record_batches(
     job_name: &str,
     thread_id: usize,
     mut schema: Arc<Schema>,

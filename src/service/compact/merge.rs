@@ -29,7 +29,7 @@ use config::{
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::{format_recordbatch_by_schema, merge_record_batchs},
+        record_batch_ext::{format_recordbatch_by_schema, merge_record_batches},
     },
     FILE_EXT_PARQUET,
 };
@@ -1111,7 +1111,8 @@ pub async fn merge_parquet_files(
         .collect::<Vec<_>>();
 
     // merge record batches, the record batch have same schema
-    let (schema, record_batches) = merge_record_batchs("MERGE", thread_id, schema, record_batches)?;
+    let (schema, record_batches) =
+        merge_record_batches("MERGE", thread_id, schema, record_batches)?;
 
     log::info!(
         "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
