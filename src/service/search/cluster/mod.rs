@@ -534,7 +534,7 @@ pub async fn search(
                             Err(err) => {
                                 log::error!("[trace_id {trace_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
                                 if err.code() == tonic::Code::DeadlineExceeded {
-                                    metrics::QUERY_CANCELED_NUMS
+                                    metrics::QUERY_TIMEOUT_NUMS
                                         .with_label_values(&[&org_id_string])
                                         .inc();
                                 }
@@ -722,6 +722,9 @@ async fn work_group_need_wait(
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
             dist_lock::unlock(locker).await?;
+            metrics::QUERY_TIMEOUT_NUMS
+                .with_label_values(&[&req.org_id])
+                .inc();
             return Err(Error::Message(format!(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));
