@@ -1030,21 +1030,20 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
-        // console.time("watch:dashboardPanelData.data.type");
-        await nextTick();
+        // await nextTick();
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data)
         );
       }
     );
 
-    const handleRunQueryFn = () => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        // dashboardPanelData.data.queries[0].customQuery = true;
-        // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
-        // dashboardPanelData.data.queries[0].fields.stream =
-        //   searchObj.data.stream.selectedStream.value ?? "default"
-
+    watch(
+      () => [
+        searchObj.data.datetime.type,
+        searchObj.data.datetime,
+        searchObj.data.datetime.relativeTimePeriod,
+      ],
+      async () => {
         const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
@@ -1056,6 +1055,16 @@ export default defineComponent({
           start_time: new Date(dateTime.startTime),
           end_time: new Date(dateTime.endTime),
         };
+      },
+      { deep: true }
+    );
+
+    const handleRunQueryFn = () => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        // dashboardPanelData.data.queries[0].customQuery = true;
+        // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
+        // dashboardPanelData.data.queries[0].fields.stream =
+        //   searchObj.data.stream.selectedStream.value ?? "default"
 
         if (!isValid(true)) {
           return;
