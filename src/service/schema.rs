@@ -202,6 +202,7 @@ async fn handle_diff_schema(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Result<Option<SchemaEvolution>> {
+    let cfg = get_config();
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
@@ -216,7 +217,7 @@ async fn handle_diff_schema(
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
     // retry x times for update schema
-    while retries < get_config().limit.meta_transaction_retries {
+    while retries < cfg.limit.meta_transaction_retries {
         match db::schema::merge(
             org_id,
             stream_name,
@@ -287,52 +288,53 @@ async fn handle_diff_schema(
     // 3. user defined schema is not already enabled
     // 4. final schema fields count exceeds max_fields_activate_udschema
     // user-defined schema does not include _timestamp or _all columns
-    let cfg = get_config();
-    let final_schema_field_count = final_schema
-        .fields()
-        .iter()
-        .filter(|field| {
-            *field.name() != cfg.common.column_timestamp && *field.name() != cfg.common.column_all
-        })
-        .count();
     if cfg.common.allow_user_defined_schemas
+        && cfg.limit.max_fields_activate_udschema > 0
         && stream_type == StreamType::Logs
         && defined_schema_fields.is_empty()
-        && (cfg.limit.max_fields_activate_udschema > 0
-            && final_schema_field_count > cfg.limit.max_fields_activate_udschema)
+        && final_schema.fields().len() > cfg.limit.max_fields_activate_udschema
     {
-        let mut ud_fields = HashSet::with_capacity(cfg.limit.max_fields_activate_udschema);
+        let mut uds_fields = HashSet::with_capacity(cfg.limit.max_fields_activate_udschema);
         // add fts fields
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-            if final_schema.field_with_name(field).is_ok() && !ud_fields.contains(field) {
-                ud_fields.insert(field.to_owned());
+            if final_schema.field_with_name(field).is_ok() {
+                uds_fields.insert(field.to_string());
             }
         }
         for field in final_schema.fields() {
             let field_name = field.name();
             // skip _timestamp and _all columns
-            if *field_name == cfg.common.column_timestamp || *field_name == cfg.common.column_all {
+            if field_name == &cfg.common.column_timestamp || field_name == &cfg.common.column_all {
                 continue;
             }
-            ud_fields.insert(field_name.to_owned());
-            if ud_fields.len() == cfg.limit.max_fields_activate_udschema {
+            uds_fields.insert(field_name.to_string());
+            if uds_fields.len() == cfg.limit.max_fields_activate_udschema {
                 break;
             }
         }
-        defined_schema_fields = ud_fields.iter().cloned().collect();
+        defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
         stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
         );
         // save the new settings
-        super::stream::save_stream_settings(
+        if let Err(e) = super::stream::save_stream_settings(
             org_id,
             stream_name,
             stream_type,
             stream_setting.clone(),
         )
-        .await?;
+        .await
+        {
+            log::error!(
+                "save_stream_settings [{}/{}/{}] error: {}",
+                org_id,
+                stream_type,
+                stream_name,
+                e
+            );
+        }
     }
 
     // update node cache
