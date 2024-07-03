@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       class="q-mb-xs showLabelOnTop"
       style="width: 88%"
+      :loading="getTabList.isLoading.value"
     >
       <template #no-option>
         <q-item>
@@ -76,6 +77,7 @@ import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectTabDropdown",
@@ -107,14 +109,14 @@ export default defineComponent({
 
     const updateTabList = async (newTab: any) => {
       showAddTabDialog.value = false;
-      await getTabList();
+      await getTabList.execute();
       selectedTab.value = {
         label: newTab.name,
         value: newTab.tabId,
       };
     };
 
-    const getTabList = async () => {
+    const getTabList = useLoading(async () => {
       if (!props.dashboardId || !props.folderId) return;
 
       const dashboardData = await getDashboard(
@@ -139,20 +141,20 @@ export default defineComponent({
       }
 
       emit("tab-list-updated");
-    };
+    });
 
     onMounted(() => {
-      getTabList();
+      getTabList.execute();
     });
 
     onActivated(() => {
-      getTabList();
+      getTabList.execute();
     });
 
     watch(
       () => [props?.dashboardId],
       () => {
-        getTabList();
+        getTabList.execute();
       }
     );
 
@@ -170,6 +172,7 @@ export default defineComponent({
       updateTabList,
       showAddTabDialog,
       tabList,
+      getTabList,
     };
   },
 });

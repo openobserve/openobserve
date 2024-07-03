@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       class="q-mb-xs showLabelOnTop"
       style="width: 88%"
+      :loading="getDashboardList.isLoading.value"
     >
       <template #no-option>
         <q-item>
@@ -74,6 +75,7 @@ import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
@@ -98,7 +100,7 @@ export default defineComponent({
 
     const updateDashboardList = async (dashboardId: any, folderId: any) => {
       showAddDashboardDialog.value = false;
-      await getDashboardList();
+      await getDashboardList.execute();
 
       const dashboardData = await getDashboard(store, dashboardId, folderId);
 
@@ -108,7 +110,7 @@ export default defineComponent({
       };
     };
 
-    const getDashboardList = async () => {
+    const getDashboardList = useLoading(async () => {
       if (!props.folderId) return;
 
       const allDashboardDataByFolderId = await getAllDashboardsByFolderId(
@@ -134,20 +136,20 @@ export default defineComponent({
       }
 
       emit("dashboard-list-updated");
-    };
+    });
 
     onMounted(() => {
-      getDashboardList();
+      getDashboardList.execute();
     });
 
     onActivated(() => {
-      getDashboardList();
+      getDashboardList.execute();
     });
 
     watch(
       () => [props.folderId],
       () => {
-        getDashboardList();
+        getDashboardList.execute();
       }
     );
 
@@ -165,6 +167,7 @@ export default defineComponent({
       updateDashboardList,
       showAddDashboardDialog,
       dashboardList,
+      getDashboardList,
     };
   },
 });
