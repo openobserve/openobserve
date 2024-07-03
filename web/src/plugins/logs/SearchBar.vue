@@ -439,22 +439,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn-group>
 
             <q-btn
-              v-if="
-                config.isEnterprise == 'true' &&
-                (searchObj.loading == true ||
-                  searchObj.loadingHistogram == true)
-              "
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              :title="t('search.cancel')"
-              class="q-pa-none search-button cancel-search-button"
-              @click="cancelQuery"
-              >{{ t("search.cancel") }}</q-btn
-            >
-            <q-btn
-              v-else
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               dense
