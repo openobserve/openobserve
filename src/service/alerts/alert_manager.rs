@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use chrono::{Duration, FixedOffset, Utc};
+use chrono::{Duration, FixedOffset, Timelike, Utc};
 use config::{
     get_config,
     meta::{
@@ -137,11 +137,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
         // tz_offset is in minutes
         let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
-        new_trigger.next_run_at = schedule
-            .upcoming(tz_offset)
-            .next()
-            .unwrap()
+        let next_run_date_time = schedule.upcoming(tz_offset).next().unwrap();
+        new_trigger.next_run_at = next_run_date_time
             .timestamp_micros();
+
+        //TODO: make this condition more inclusive e.g. `next_run_date_time.minute() % 10 == 0` -- open for discussion
+        if next_run_date_time.minute() == 0 {
+            new_trigger.next_run_at += Duration::try_minutes(2).unwrap().num_microseconds().unwrap();
+        }
     } else {
         new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
             .unwrap()
