@@ -565,36 +565,36 @@ pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // metrics for query manager
-pub static RUNNING_QUERY_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static QUERY_RUNNING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
-        Opts::new("running_query", "Running query numbers")
+        Opts::new("query_running_nums", "Running query numbers")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
     )
     .expect("Metric created")
 });
-pub static PENDING_QUERY_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static QUERY_PENDING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
-        Opts::new("pending_query", "Pending query numbers")
+        Opts::new("query_pending_nums", "Pending query numbers")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
     )
     .expect("Metric created")
 });
-pub static TIMEOUT_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static QUERY_TIMEOUT_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
-        Opts::new("timeout_query", "Timeout query numbers")
+        Opts::new("query_timeout_nums", "Timeout query numbers")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
     )
     .expect("Metric created")
 });
-pub static CANCEL_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
-        Opts::new("cancel_query", "Cancel query numbers")
+        Opts::new("query_canceled_nums", "Cancel query numbers")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
@@ -673,16 +673,16 @@ fn register_metrics(registry: &Registry) {
 
     // query manager
     registry
-        .register(Box::new(RUNNING_QUERY_NUMS.clone()))
+        .register(Box::new(QUERY_RUNNING_NUMS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(PENDING_QUERY_NUMS.clone()))
+        .register(Box::new(QUERY_PENDING_NUMS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(TIMEOUT_QUERY_NUMS.clone()))
+        .register(Box::new(QUERY_TIMEOUT_NUMS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(CANCEL_QUERY_NUMS.clone()))
+        .register(Box::new(QUERY_CANCELED_NUMS.clone()))
         .expect("Metric registered");
 
     // compactor stats

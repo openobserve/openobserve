@@ -28,6 +28,7 @@ use config::{
     FxIndexMap,
 };
 use datafusion::arrow::datatypes::Schema;
+use hashbrown::HashSet;
 use infra::{
     cache::stats,
     errors::{Error, Result},
@@ -331,7 +332,24 @@ pub async fn remote_write(
             let value_str = config::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
-            if !schema_evolved.contains_key(&metric_name)
+            let schema_fields = match metric_schema_map.get(&metric_name) {
+                Some(schema) => schema
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name())
+                    .collect::<HashSet<_>>(),
+                None => HashSet::default(),
+            };
+            let mut need_schema_check = !schema_evolved.contains_key(&metric_name);
+            for key in val_map.keys() {
+                if !schema_fields.contains(&key) {
+                    need_schema_check = true;
+                    break;
+                }
+            }
+            drop(schema_fields);
+            if need_schema_check
                 && check_for_schema(
                     org_id,
                     &metric_name,
@@ -343,7 +361,7 @@ pub async fn remote_write(
                 .await
                 .is_ok()
             {
-                schema_evolved.insert(metric_name.to_owned(), true);
+                schema_evolved.insert(metric_name.clone(), true);
             }
 
             let schema = metric_schema_map

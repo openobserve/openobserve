@@ -48,7 +48,7 @@ use {std::sync::Arc, tokio::sync::Mutex};
 use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
-    handler::grpc::request::search::intra_cluster::Searcher,
+    handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
 
@@ -112,10 +112,6 @@ pub async fn search(
             .await;
     }
 
-    metrics::PENDING_QUERY_NUMS
-        .with_label_values(&[org_id])
-        .inc();
-
     #[cfg(feature = "enterprise")]
     let req_regions = in_req.regions.clone();
     #[cfg(feature = "enterprise")]
@@ -137,12 +133,6 @@ pub async fn search(
     let res = {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            metrics::PENDING_QUERY_NUMS
-                .with_label_values(&[&req.org_id])
-                .dec();
-            metrics::RUNNING_QUERY_NUMS
-                .with_label_values(&[&req.org_id])
-                .inc();
             cluster::super_cluster::search(req, req_regions, req_clusters).await
         } else {
             cluster::http::search(req).await
@@ -157,7 +147,7 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     SEARCH_SERVER.remove(&trace_id).await;
 
-    metrics::RUNNING_QUERY_NUMS
+    metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[org_id])
         .dec();
 

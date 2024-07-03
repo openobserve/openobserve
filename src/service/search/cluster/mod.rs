@@ -267,6 +267,10 @@ pub async fn search(
         file_list_took,
     );
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&req.org_id])
+        .inc();
+
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
     // 1. get work group
@@ -386,10 +390,10 @@ pub async fn search(
             .await;
     }
 
-    metrics::PENDING_QUERY_NUMS
+    metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
         .dec();
-    metrics::RUNNING_QUERY_NUMS
+    metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[&req.org_id])
         .inc();
 
@@ -532,6 +536,7 @@ pub async fn search(
                                     let err = ErrorCodes::from_json(err.message())?;
                                     return Err(Error::ErrorCode(err));
                                 }
+                                // work group and grpc and datafusion
                                 return Err(super::server_internal_error("search node error"));
                             }
                         }
