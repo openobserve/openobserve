@@ -673,7 +673,6 @@ const useDashboardPanelData = () => {
       case "stacked":
       case "h-stacked":
       case "metric":
-      case "table":
       case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -685,6 +684,38 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        break;
+      case "table":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
