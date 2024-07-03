@@ -276,16 +276,8 @@ export default defineComponent({
     watch(
       () => visualizeChartData.value,
       async () => {
-        await nextTick();
+        // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      }
-    );
-
-    watch(
-      () => dashboardPanelData.data.type,
-      async () => {
-        await nextTick();
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       }
     );
 

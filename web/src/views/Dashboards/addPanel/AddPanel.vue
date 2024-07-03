@@ -685,7 +685,8 @@ export default defineComponent({
         }
       }
 
-      validatePanel(dashboardData.data, errors);
+      // will push errors in errors array
+      validatePanel(errors);
 
       // show all the errors
       // for (let index = 0; index < errors.length; index++) {

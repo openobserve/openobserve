@@ -824,7 +824,8 @@ export default defineComponent({
         }
       }
 
-      validatePanel(dashboardData, errors);
+      // will push errors in errors array
+      validatePanel(errors);
 
       if (errors.length) {
         $q.notify({
@@ -1023,6 +1024,17 @@ export default defineComponent({
 
           await setFieldsAndConditions();
         }
+      }
+    );
+
+    watch(
+      () => dashboardPanelData.data.type,
+      async () => {
+        // console.time("watch:dashboardPanelData.data.type");
+        await nextTick();
+        visualizeChartData.value = JSON.parse(
+          JSON.stringify(dashboardPanelData.data)
+        );
       }
     );
 
