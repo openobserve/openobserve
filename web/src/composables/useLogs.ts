@@ -1815,6 +1815,7 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
+          searchObj.data.errorMsg = "Error while processing search total count request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
           } else {
@@ -2084,6 +2085,7 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
+          searchObj.data.errorMsg = "Error while processing search request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
           } else {
@@ -2223,6 +2225,7 @@ const useLogs = () => {
             })
             .catch((err) => {
               searchObj.loadingHistogram = false;
+              searchObj.data.errorMsg = "Error while processing histogram request.";
               if (err.response != undefined) {
                 searchObj.data.histogram.errorMsg = err.response.data.error;
               } else {
