@@ -318,11 +318,17 @@ pub async fn search(
         .process(trace_id, user_id)
         .await
     {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(e.to_string()));
     }
     #[cfg(feature = "enterprise")]
     if let Err(e) = dist_lock::unlock(&locker).await {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
         work_group
             .as_ref()
             .unwrap()
