@@ -178,7 +178,9 @@ pub async fn add_user_to_org(
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    // let role = role.into_inner().role;
+    #[cfg(feature = "enterprise")]
+    let role = _role.into_inner().role;
+    #[cfg(not(feature = "enterprise"))]
     let role = meta::user::UserRole::Admin;
     let initiator_id = user_email.user_id;
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
