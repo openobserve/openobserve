@@ -100,6 +100,7 @@ pub async fn multi(
             &stream_name,
             IngestionRequest::Multi(&body),
             user_email,
+            None,
         )
         .await
         {
@@ -150,6 +151,7 @@ pub async fn json(
             &stream_name,
             IngestionRequest::JSON(&body),
             user_email,
+            None,
         )
         .await
         {
@@ -204,6 +206,7 @@ pub async fn handle_kinesis_request(
             &stream_name,
             IngestionRequest::KinesisFH(&post_data.into_inner()),
             user_email,
+            None,
         )
         .await
         {
@@ -238,6 +241,7 @@ pub async fn handle_gcp_request(
             &stream_name,
             IngestionRequest::GCP(&post_data.into_inner()),
             user_email,
+            None,
         )
         .await
         {
@@ -279,10 +283,36 @@ pub async fn otlp_logs_write(
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");
-        logs_proto_handler(&org_id, body, in_stream_name, user_email).await
+        match logs_proto_handler(&org_id, body, in_stream_name, user_email).await {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                log::error!(
+                    "Error processing otlp pb logs write request {org_id}/{:?}: {:?}",
+                    in_stream_name,
+                    e
+                );
+                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )))
+            }
+        }
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         // log::info!("otlp::logs_json_handler");
-        logs_json_handler(&org_id, body, in_stream_name, user_email).await
+        match logs_json_handler(&org_id, body, in_stream_name, user_email).await {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                log::error!(
+                    "Error processing otlp json logs write request {org_id}/{:?}: {:?}",
+                    in_stream_name,
+                    e
+                );
+                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )))
+            }
+        }
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),

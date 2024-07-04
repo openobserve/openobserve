@@ -94,11 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import { addTab } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
+import useNotifications from "@/composables/useNotifications";
 
 const defaultValue = () => {
   return {
@@ -129,6 +129,8 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store: any = useStore();
     const addTabForm: any = ref(null);
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     const tabData: any = ref(
       props.editMode
         ? JSON.parse(
@@ -142,7 +144,6 @@ export default defineComponent({
     );
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const $q = useQuasar();
     const route = useRoute();
 
     const onSubmit = useLoading(async () => {
@@ -166,9 +167,7 @@ export default defineComponent({
             // emit refresh to rerender
             emit("refresh", updatedTab);
 
-            $q.notify({
-              type: "positive",
-              message: "Tab updated successfully",
+            showPositiveNotification("Tab updated successfully", {
               timeout: 2000,
             });
           }
@@ -184,9 +183,7 @@ export default defineComponent({
             // emit refresh to rerender
             emit("refresh", newTab);
 
-            $q.notify({
-              type: "positive",
-              message: `Tab added successfully.`,
+            showPositiveNotification("Tab added successfully", {
               timeout: 2000,
             });
           }
@@ -196,13 +193,13 @@ export default defineComponent({
           };
           await addTabForm.value.resetValidation();
         } catch (err: any) {
-          $q.notify({
-            type: "negative",
-            message:
-              err?.message ??
+          showErrorNotification(
+            err?.message ??
               (props.editMode ? "Failed to update tab" : "Failed to add tab"),
-            timeout: 2000,
-          });
+              {
+                timeout: 2000,
+              }
+          );
         } finally {
         }
       });
