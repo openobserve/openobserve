@@ -87,58 +87,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="tab.folderId"
               content-class="tab_content full-width"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
-              @mouseenter="hoverFolder(tab.folderId)"
             >
-              <div class="full-width row justify-between no-wrap">
-                <span
-                  style="
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                  "
-                  :title="tab.name"
-                  >{{ tab.name }}</span
-                >
-                <div
-                  v-if="hoveredFolder === tab.folderId"
-                  class="hover-actions"
-                >
-                  <q-btn-dropdown
-                    dropdown-icon="more_vert"
+              <div class="folder-item full-width row justify-between no-wrap">
+                <span class="folder-name" :title="tab.name">{{
+                  tab.name
+                }}</span>
+                <div class="hover-actions">
+                  <q-btn
                     dense
                     flat
                     no-caps
-                    class="q-ml-sm"
-                    @click.stop="toggleActions"
+                    icon="more_vert"
                     style="cursor: pointer; justify-self: end"
+                    size="sm"
                     data-test="dashboard-more-icon"
-                  />
-                  <q-menu v-model="showActions" class="action-icons">
-                    <q-list dense>
-                      <q-item
-                        clickable
-                        v-close-popup="true"
-                        @click.stop="editFolder(tab.folderId)"
-                        data-test="dashboard-edit-folder-icon"
-                        ><q-item-section>
-                          <q-item-label class="q-pa-sm"
-                            >Edit Folder</q-item-label
-                          >
-                        </q-item-section></q-item
-                      >
-                      <q-item
-                        clickable
-                        v-close-popup="true"
-                        @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                        data-test="dashboard-delete-folder-icon"
-                        ><q-item-section>
-                          <q-item-label class="q-pa-sm"
-                            >Delete Folder</q-item-label
-                          >
-                        </q-item-section></q-item
-                      >
-                    </q-list>
-                  </q-menu>
+                  >
+                    <q-menu>
+                      <q-list dense>
+                        <q-item
+                          v-close-popup
+                          clickable
+                          @click.stop="editFolder(tab.folderId)"
+                          data-test="dashboard-edit-folder-icon"
+                        >
+                          <q-item-section avatar>
+                            <q-icon name="edit" size="xs" />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label>Edit</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                        <q-item
+                          v-close-popup
+                          clickable
+                          @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                          data-test="dashboard-delete-folder-icon"
+                        >
+                          <q-item-section avatar>
+                            <q-icon name="delete" size="xs" />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label>Delete</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-menu>
+                  </q-btn>
                 </div>
               </div>
             </q-tab>
@@ -507,16 +501,6 @@ export default defineComponent({
       },
       { deep: true }
     );
-    const hoveredFolder = ref(null);
-    const showActions = ref(false);
-
-    const hoverFolder = (folderId) => {
-      hoveredFolder.value = folderId;
-    };
-
-    const toggleActions = () => {
-      showActions.value = !showActions.value;
-    };
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -769,10 +753,6 @@ export default defineComponent({
       selectedDashboardIdToMove,
       showMoveDashboardDialog,
       handleDashboardMoved,
-      hoverFolder,
-      hoveredFolder,
-      toggleActions,
-      showActions,
     };
   },
   methods: {
@@ -800,33 +780,47 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.hover-actions {
-  display: flex;
-  align-items: center;
-}
-
-.action-icons {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-}
-
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
 .dashboards-tabs {
+  .folder-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    border-radius: 0.25rem;
+    transition: background-color 0.3s;
+
+    &:hover {
+      .hover-actions {
+        display: flex;
+      }
+    }
+
+    .folder-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hover-actions {
+      display: none;
+      align-items: center;
+
+      .q-btn {
+        margin-left: 0.5rem;
+      }
+    }
+  }
+
   .q-tabs {
     &--vertical {
       margin: 5px;
+
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         text-transform: capitalize;
+
         &__content.tab_content {
           .q-tab {
             &__icon + &__label {
@@ -835,6 +829,7 @@ export default defineComponent({
             }
           }
         }
+
         &--active {
           background-color: $accent;
           color: black;
