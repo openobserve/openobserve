@@ -13,39 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+};
 
 use actix_web::{http, HttpResponse};
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    get_config,
     meta::stream::StreamType,
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    DISTINCT_FIELDS,
+    utils::{flatten, json},
 };
-use infra::schema::SchemaCache;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use super::StreamMeta;
+use super::ingest::handle_timestamp;
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
         meta::{
-            alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::{SchemaRecords, StreamParams},
+            ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
+            stream::StreamParams,
             syslog::SyslogRoute,
         },
     },
-    service::{
-        db, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::get_upto_discard_error,
-    },
+    service::{format_stream_name, ingestion::check_ingestion_allowed},
 };
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
@@ -68,78 +63,57 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
-    let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    // check stream
+    let stream_name = format_stream_name(in_stream_name);
+    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
+                e.to_string(),
             )),
         );
-    }
+    };
 
-    // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, stream_name, None) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{stream_name}] is being deleted"),
-            )),
-        );
-    }
-
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut distinct_values = Vec::with_capacity(16);
-
-    let mut trigger: Option<TriggerAlertData> = None;
-
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-
-    // Start get stream alerts
-    crate::service::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
-    // End get stream alert
+    let cfg = get_config();
+    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     // Start Register Transforms for stream
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
-        stream_name,
+        &stream_name,
     );
     // End Register Transforms for stream
 
-    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
+    crate::service::ingestion::get_user_defined_schema(
+        &[stream_params],
+        &mut user_defined_schema_map,
+    )
+    .await;
+    // End get user defined schema
 
-    let cfg = config::get_config();
+    let mut stream_status = StreamStatus::new(&stream_name);
+
+    // parse msg to json::Value
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
+
+    // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
+    // Start row based transform
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
             &local_trans,
             value,
             &stream_vrl_map,
             org_id,
-            stream_name,
+            &stream_name,
             &mut runtime,
         )?;
     }
@@ -159,89 +133,42 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         _ => unreachable!(),
     };
 
+    if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+        local_val = crate::service::logs::refactor_map(local_val, fields);
+    }
+
     // handle timestamp
-    let timestamp = match local_val.get(&cfg.common.column_timestamp) {
-        Some(v) => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => Utc::now().timestamp_micros(),
-        },
-        None => Utc::now().timestamp_micros(),
-    };
-    // check ingestion time
-    let earlest_time = Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap();
-    if timestamp < earlest_time.timestamp_micros() {
-        stream_status.status.failed += 1; // to old data, just discard
-        stream_status.status.error = get_upto_discard_error().to_string();
-    }
-
-    local_val.insert(
-        cfg.common.column_timestamp.clone(),
-        json::Value::Number(timestamp.into()),
-    );
-
-    let mut to_add_distinct_values = vec![];
-    // get distinct_value item
-    for field in DISTINCT_FIELDS.iter() {
-        if let Some(val) = local_val.get(field) {
-            if !val.is_null() {
-                to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    field_name: field.to_string(),
-                    field_value: val.as_str().unwrap().to_string(),
-                    filter_name: "".to_string(),
-                    filter_value: "".to_string(),
-                }));
-            }
-        }
-    }
-
-    let local_trigger = match super::add_valid_record(
-        &StreamMeta {
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            partition_keys: &partition_keys,
-            partition_time_level: &partition_time_level,
-            stream_alerts_map: &stream_alerts_map,
-        },
-        &mut stream_schema_map,
-        &mut stream_status.status,
-        &mut buf,
-        local_val,
-        trigger.is_none(),
-    )
-    .await
-    {
-        Ok(v) => v,
+    let timestamp = match handle_timestamp(&mut local_val, min_ts) {
+        Ok(ts) => ts,
         Err(e) => {
             stream_status.status.failed += 1;
             stream_status.status.error = e.to_string();
-            None
+            return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+                http::StatusCode::OK.into(),
+                vec![stream_status],
+            ))); // just return
         }
     };
-    if local_trigger.is_some() {
-        trigger = local_trigger;
-    }
 
-    // get distinct_value item
-    distinct_values.extend(to_add_distinct_values);
-
-    // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
-    write_file(&writer, stream_name, buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
-
-    // only one trigger per request, as it updates etcd
-    evaluate_trigger(trigger).await;
-
-    // send distinct_values
-    if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
-    }
+    let mut status = IngestionStatus::Record(stream_status.status);
+    if let Err(e) = super::write_logs(
+        org_id,
+        &stream_name,
+        &mut status,
+        vec![(timestamp, local_val)],
+    )
+    .await
+    {
+        log::error!("Error while writing logs: {}", e);
+        stream_status.status = match status {
+            IngestionStatus::Record(status) => status,
+            IngestionStatus::Bulk(_) => unreachable!(),
+        };
+        return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ))); // just return
+    };
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -249,7 +176,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
@@ -258,11 +185,20 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
 
+    // drop variables
+    drop(runtime);
+    drop(stream_vrl_map);
+    drop(user_defined_schema_map);
+
+    stream_status.status = match status {
+        IngestionStatus::Record(status) => status,
+        IngestionStatus::Bulk(_) => unreachable!(),
+    };
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],

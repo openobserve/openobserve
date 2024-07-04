@@ -594,7 +594,11 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     if s == field {
         return true;
     }
-    if field == "*" && s != "_all" && s != get_config().common.column_timestamp.clone() {
+    let cfg = get_config();
+    if field == "*"
+        && s != cfg.common.column_all.as_str()
+        && s != cfg.common.column_timestamp.as_str()
+    {
         return true;
     }
 

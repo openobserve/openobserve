@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="display: flex; flex-direction: row; width: 100%"
       class="q-pl-md"
     >
-      <div style="flex: 1; width: 50%">
+      <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
-          <div class="layout-name" style="min-width: 0 !important">
+          <div class="layout-name">
             {{
               dashboardPanelData.data.type == "table"
                 ? t("panel.firstColumn")
@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ xAxisHint }}
               </q-tooltip>
             </q-icon>
-            <span class="layout-separator">:</span>
           </div>
+          <span class="layout-separator">:</span>
           <div
             class="axis-container droppable scroll row"
             :class="{
@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     color="primary"
                     dense
+                    :no-wrap="true"
                     size="sm"
                     :label="xLabel[index]"
                     class="q-pl-sm"
@@ -242,21 +243,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- b axis container -->
-      <div style="flex: 1 1; width: 50%">
-        <div
-          style="display: flex; flex-direction: row"
-          class="q-pl-md"
-          v-if="
-            dashboardPanelData.data.type == 'area' ||
-            dashboardPanelData.data.type == 'bar' ||
-            dashboardPanelData.data.type == 'line' ||
-            dashboardPanelData.data.type == 'h-bar' ||
-            dashboardPanelData.data.type == 'h-stacked' ||
-            dashboardPanelData.data.type == 'scatter' ||
-            dashboardPanelData.data.type == 'area-stacked' ||
-            dashboardPanelData.data.type == 'stacked'
-          "
-        >
+      <div
+        style="flex: 1"
+        v-if="
+          dashboardPanelData.data.type == 'area' ||
+          dashboardPanelData.data.type == 'bar' ||
+          dashboardPanelData.data.type == 'line' ||
+          dashboardPanelData.data.type == 'h-bar' ||
+          dashboardPanelData.data.type == 'h-stacked' ||
+          dashboardPanelData.data.type == 'scatter' ||
+          dashboardPanelData.data.type == 'area-stacked' ||
+          dashboardPanelData.data.type == 'stacked'
+        "
+      >
+        <div style="display: flex; flex-direction: row" class="q-pl-md">
           <!-- Separator between X and Breakdown -->
           <q-separator vertical class="q-mr-md" />
           <div class="layout-name" style="min-width: 0 !important">
@@ -342,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     color="primary"
                     dense
+                    :no-wrap="true"
                     size="sm"
                     :label="bLabel[index]"
                     class="q-pl-sm"
@@ -559,6 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 color="primary"
                 square
+                :no-wrap="true"
                 size="sm"
                 :label="yLabel[index]"
                 :data-test="`dashboard-y-item-${itemY?.column}`"
@@ -794,6 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-right="arrow_drop_down"
                   no-caps
                   dense
+                  :no-wrap="true"
                   color="primary"
                   size="sm"
                   :label="zLabel[index]"
@@ -941,6 +944,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-right="arrow_drop_down"
             no-caps
             dense
+            :no-wrap="true"
             color="primary"
             size="sm"
             :label="filteredItem.column"
@@ -1154,9 +1158,9 @@ import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -1174,7 +1178,8 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
-    const $q = useQuasar();
+    const {  showErrorNotification } =
+      useNotifications();
     const expansionItems = reactive({
       x: true,
       y: true,
@@ -1338,11 +1343,8 @@ export default defineComponent({
               const errorMessage = `Field '${
                 (dragName || customDragName).name
               }' already exists in '${targetAxis}' axis.`;
-              $q.notify({
-                type: "negative",
-                message: errorMessage,
-                timeout: 5000,
-              });
+
+              showErrorNotification(errorMessage);
               cleanupDraggingFields();
               return;
             }
@@ -1380,11 +1382,7 @@ export default defineComponent({
 
                 const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
 
-                $q.notify({
-                  type: "negative",
-                  message: errorMessage,
-                  timeout: 5000,
-                });
+                showErrorNotification(errorMessage);
                 cleanupDraggingFields();
                 return;
               }
@@ -1518,6 +1516,11 @@ export default defineComponent({
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
+          return t("dashboard.oneLabelFieldMessage");
+        case "metric":
+          return t("dashboard.xaxisFieldNAMessage");
+        case "table":
+          return t("dashboard.oneOrMoreFieldsMessage");
         case "stacked":
         case "area-stacked":
         case "h-stacked":
@@ -1526,14 +1529,6 @@ export default defineComponent({
         case "h-bar":
         case "line":
         case "scatter":
-          return t("dashboard.oneLabelFieldMessage");
-        case "metric":
-          return t("dashboard.xaxisFieldNAMessage");
-        case "table":
-          return t("dashboard.oneOrMoreFieldsMessage");
-        case "area-stacked":
-        case "stacked":
-        case "h-stacked":
           return t("dashboard.twoFieldsMessage");
         case "heatmap":
           return t("dashboard.oneFieldMessage");
@@ -1549,7 +1544,7 @@ export default defineComponent({
         case "stacked":
         case "area-stacked":
         case "h-stacked":
-          return t("dashboard.oneLabelFieldMessage");
+          return t("dashboard.twoFieldsMessage");
         default:
           return t("dashboard.zeroOrOneFieldMessage");
       }
@@ -1727,6 +1722,11 @@ export default defineComponent({
 .axis-field {
   overflow: hidden;
 }
+
+:deep(.axis-field div) {
+  display: flex;
+}
+
 :deep(.axis-field .q-btn--rectangle) {
   border-radius: 0%;
 }

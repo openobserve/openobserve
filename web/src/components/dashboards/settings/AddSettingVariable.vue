@@ -425,13 +425,13 @@ import {
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -439,7 +439,6 @@ export default defineComponent({
   components: { DashboardHeader, CommonAutoComplete },
   emits: ["close", "save"],
   setup(props, { emit }) {
-    const $q = useQuasar();
     const { t } = useI18n();
     const store = useStore();
     const addVariableForm: Ref<any> = ref(null);
@@ -455,7 +454,7 @@ export default defineComponent({
     const route = useRoute();
     const title = ref("Add Variable");
     const { getStreams, getStream } = useStreams();
-
+    const { showErrorNotification } = useNotifications();
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -617,9 +616,7 @@ export default defineComponent({
               data.currentFieldsList = [];
             }
           } catch (error: any) {
-            $q.notify({
-              type: "negative",
-              message: error ?? "Failed to get stream fields",
+            showErrorNotification(error ?? "Failed to get stream fields", {
               timeout: 2000,
             });
           }
@@ -656,9 +653,7 @@ export default defineComponent({
           );
           emit("save");
         } catch (error: any) {
-          $q.notify({
-            type: "negative",
-            message: error.message ?? "Variable update failed",
+          showErrorNotification(error.message ?? "Variable update failed", {
             timeout: 2000,
           });
         }
@@ -672,9 +667,7 @@ export default defineComponent({
           );
           emit("save");
         } catch (error: any) {
-          $q.notify({
-            type: "negative",
-            message: error.message ?? "Variable creation failed",
+          showErrorNotification(error.message ?? "Variable creation failed", {
             timeout: 2000,
           });
         }
@@ -730,14 +723,12 @@ export default defineComponent({
         filterCycleError.value = "";
         return false;
       } catch (err: any) {
-        $q.notify({
-          type: "negative",
-          message:
-            err?.message ??
+        showErrorNotification(
+          err?.message ??
             (editMode.value
               ? "Variable update failed"
-              : "Variable creation failed"),
-        });
+              : "Variable creation failed")
+        );
         return true;
       }
     };
@@ -760,14 +751,12 @@ export default defineComponent({
 
         // save the variable
         saveVariableApiCall.execute().catch((err: any) => {
-          $q.notify({
-            type: "negative",
-            message:
-              err?.message ??
+          showErrorNotification(
+            err?.message ??
               (editMode.value
                 ? "Variable update failed"
-                : "Variable creation failed"),
-          });
+                : "Variable creation failed")
+          );
         });
       });
     };
@@ -825,9 +814,7 @@ export default defineComponent({
           data.currentFieldsList = [];
         }
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message: error ?? "Failed to get stream fields",
+        showErrorNotification(error ?? "Failed to get stream fields", {
           timeout: 2000,
         });
       }

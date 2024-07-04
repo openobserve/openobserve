@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { exportFile, useQuasar } from "quasar";
+import useNotifications from "@/composables/useNotifications";
+import { exportFile } from "quasar";
 import { defineComponent, ref, onMounted, watch } from "vue";
 
 export default defineComponent({
@@ -53,9 +54,8 @@ export default defineComponent({
   },
   emits: ["row-click"],
   setup(props: any) {
-    const $q = useQuasar();
     const tableRef: any = ref(null);
-
+    const { showErrorNotification } = useNotifications();
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 
@@ -102,17 +102,11 @@ export default defineComponent({
       );
 
       if (status === true) {
-        $q.notify({
-          message: "Table downloaded as a CSV file",
-          color: "positive",
+        showErrorNotification("Table downloaded as a CSV file", {
           timeout: 2000,
         });
       } else {
-        $q.notify({
-          message: "Browser denied file download...",
-          color: "negative",
-          icon: "warning",
-        });
+        showErrorNotification("Browser denied file download...");
       }
     };
     return {

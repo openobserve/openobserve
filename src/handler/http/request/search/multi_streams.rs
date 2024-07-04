@@ -224,6 +224,9 @@ pub async fn search_multi(
             }
         }
 
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -238,6 +241,9 @@ pub async fn search_multi(
         #[cfg(feature = "enterprise")]
         let took_wait = 0;
         log::info!("http search multi API wait in queue took: {}", took_wait);
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
 
         let trace_id = trace_id.clone();
         // do search
@@ -260,7 +266,7 @@ pub async fn search_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "200",
                         &org_id,
                         "",
@@ -269,7 +275,7 @@ pub async fn search_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "200",
                         &org_id,
                         "",
@@ -332,7 +338,7 @@ pub async fn search_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "500",
                         &org_id,
                         "",
@@ -341,7 +347,7 @@ pub async fn search_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "500",
                         &org_id,
                         "",
@@ -642,6 +648,9 @@ pub async fn around_multi(
         .map(|v| v.to_string());
 
     for around_sql in around_sqls.iter() {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -659,6 +668,9 @@ pub async fn around_multi(
             "http search around multi API wait in queue took: {}",
             took_wait
         );
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
 
         // search forward
         let req = config::meta::search::Request {
@@ -698,7 +710,7 @@ pub async fn around_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -707,7 +719,7 @@ pub async fn around_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -775,7 +787,7 @@ pub async fn around_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -784,7 +796,7 @@ pub async fn around_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -834,7 +846,7 @@ pub async fn around_multi(
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
             .with_label_values(&[
-                "/api/org/_around",
+                "/api/org/_around_multi",
                 "200",
                 &org_id,
                 &stream_names,
@@ -843,7 +855,7 @@ pub async fn around_multi(
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
             .with_label_values(&[
-                "/api/org/_around",
+                "/api/org/_around_multi",
                 "200",
                 &org_id,
                 &stream_names,

@@ -23,6 +23,7 @@ use config::{
         stream::{FileKey, StreamType},
         usage::{RequestStats, UsageType},
     },
+    metrics,
     utils::str::find,
 };
 use infra::{
@@ -47,7 +48,7 @@ use {std::sync::Arc, tokio::sync::Mutex};
 use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
-    handler::grpc::request::search::intra_cluster::Searcher,
+    handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
 
@@ -145,6 +146,10 @@ pub async fn search(
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
     SEARCH_SERVER.remove(&trace_id).await;
+
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[org_id])
+        .dec();
 
     // do this because of clippy warning
     match res {
@@ -457,7 +462,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse, Error> {
+pub async fn cancel_query(
+    _org_id: &str,
+    trace_id: &str,
+) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
     let mut nodes = infra_cluster::get_cached_online_query_nodes()
         .await
@@ -482,8 +490,6 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                 let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
-                // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
-
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
                         &tracing::Span::current().context(),
@@ -501,7 +507,7 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     .await
                     .map_err(|err| {
                         log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
+                            "grpc_cancel_query: node: {}, connect err: {:?}",
                             &node.grpc_addr,
                             err
                         );
@@ -519,21 +525,22 @@ pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse,
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-                let response = match client.cancel_query(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!(
-                            "search->grpc: node: {}, search err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
+                let response: cluster_rpc::CancelQueryResponse =
+                    match client.cancel_query(request).await {
+                        Ok(res) => res.into_inner(),
+                        Err(err) => {
+                            log::error!(
+                                "grpc_cancel_query: node: {}, search err: {:?}",
+                                &node.grpc_addr,
+                                err
+                            );
+                            if err.code() == tonic::Code::Internal {
+                                let err = ErrorCodes::from_json(err.message())?;
+                                return Err(Error::ErrorCode(err));
+                            }
+                            return Err(server_internal_error("search node error"));
                         }
-                        return Err(server_internal_error("search node error"));
-                    }
-                };
+                    };
                 Ok(response)
             }
             .instrument(grpc_span),

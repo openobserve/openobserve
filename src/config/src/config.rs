@@ -730,6 +730,8 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
     pub max_file_size_in_memory: usize,
+    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 0)]
+    pub udschema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
@@ -876,12 +878,6 @@ pub struct Compact {
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
     pub data_retention_history: bool,
-    #[env_config(
-        name = "ZO_COMPACT_FAST_MODE",
-        default = true,
-        help = "Enable fast mode compact, will use more memory but faster"
-    )]
-    pub fast_mode: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 100,
