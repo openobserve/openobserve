@@ -98,6 +98,7 @@ pub enum ErrorCodes {
     SearchFieldHasNoCompatibleDataType(String),
     SearchSQLExecuteError(String),
     SearchCancelQuery(String),
+    SearchTimeout(String),
 }
 
 impl std::fmt::Display for ErrorCodes {
@@ -123,7 +124,8 @@ impl ErrorCodes {
             ErrorCodes::SearchParquetFileNotFound => 20006,
             ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => 20007,
             ErrorCodes::SearchSQLExecuteError(_) => 20008,
-            ErrorCodes::SearchCancelQuery(_) => 429,
+            ErrorCodes::SearchCancelQuery(_) => 20009,
+            ErrorCodes::SearchTimeout(_) => 20010,
         }
     }
 
@@ -149,6 +151,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) => {
                 "Search query was cancelled by the administrator".to_string()
             }
+            ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
         }
     }
 
@@ -164,6 +167,7 @@ impl ErrorCodes {
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => field.to_owned(),
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
             ErrorCodes::SearchCancelQuery(msg) => msg.to_owned(),
+            ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
         }
     }
 
@@ -179,6 +183,7 @@ impl ErrorCodes {
             ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => "".to_string(),
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
             ErrorCodes::SearchCancelQuery(msg) => msg.to_string(),
+            ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
         }
     }
 
@@ -226,6 +231,8 @@ impl ErrorCodes {
             20006 => Ok(ErrorCodes::SearchParquetFileNotFound),
             20007 => Ok(ErrorCodes::SearchFieldHasNoCompatibleDataType(message)),
             20008 => Ok(ErrorCodes::SearchSQLExecuteError(message)),
+            20009 => Ok(ErrorCodes::SearchCancelQuery(message)),
+            20010 => Ok(ErrorCodes::SearchTimeout(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
