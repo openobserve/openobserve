@@ -133,15 +133,16 @@ impl From<UsageType> for UsageEvent {
             UsageType::Bulk
             | UsageType::Json
             | UsageType::Multi
-            | UsageType::Traces
-            | UsageType::RUM
-            | UsageType::Metrics
             | UsageType::KinesisFirehose
             | UsageType::GCPSubscription
-            | UsageType::EnrichmentTable
-            | UsageType::Syslog
+            | UsageType::Logs
+            | UsageType::Traces
+            | UsageType::Metrics
+            | UsageType::PrometheusRemoteWrite
             | UsageType::JsonMetrics
-            | UsageType::Logs => UsageEvent::Ingestion,
+            | UsageType::RUM
+            | UsageType::EnrichmentTable
+            | UsageType::Syslog => UsageEvent::Ingestion,
             UsageType::Search
             | UsageType::SearchAround
             | UsageType::SearchTopNValues
@@ -164,12 +165,14 @@ pub enum UsageType {
     KinesisFirehose,
     #[serde(rename = "/gcp/_sub")]
     GCPSubscription,
-    #[serde(rename = "/v1/logs")]
+    #[serde(rename = "/otlp/v1/logs")]
     Logs,
-    #[serde(rename = "/traces")]
+    #[serde(rename = "/otlp/v1/traces")]
     Traces,
-    #[serde(rename = "/prometheus/v1/write")]
+    #[serde(rename = "/otlp/v1/metrics")]
     Metrics,
+    #[serde(rename = "/prometheus/v1/write")]
+    PrometheusRemoteWrite,
     #[serde(rename = "/metrics/_json")]
     JsonMetrics,
     #[serde(rename = "/v1/rum")]
@@ -200,9 +203,10 @@ impl std::fmt::Display for UsageType {
             UsageType::Multi => write!(f, "/logs/_multi"),
             UsageType::KinesisFirehose => write!(f, "/_kinesis_firehose"),
             UsageType::GCPSubscription => write!(f, "/gcp/_sub"),
-            UsageType::Logs => write!(f, "/v1/logs"),
-            UsageType::Traces => write!(f, "/traces"),
-            UsageType::Metrics => write!(f, "/prometheus/v1/write"),
+            UsageType::Logs => write!(f, "/otlp/v1/logs"),
+            UsageType::Traces => write!(f, "/otlp/v1/traces"),
+            UsageType::Metrics => write!(f, "/otlp/v1/metrics"),
+            UsageType::PrometheusRemoteWrite => write!(f, "/prometheus/v1/write"),
             UsageType::JsonMetrics => write!(f, "/metrics/_json"),
             UsageType::RUM => write!(f, "/v1/rum"),
             UsageType::Search => write!(f, "/_search"),

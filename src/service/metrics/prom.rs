@@ -431,7 +431,7 @@ pub async fn remote_write(
             org_id,
             &stream_name,
             StreamType::Metrics,
-            UsageType::Metrics,
+            UsageType::PrometheusRemoteWrite,
             fns_length as u16,
             started_at,
         )

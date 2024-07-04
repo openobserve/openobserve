@@ -241,9 +241,9 @@ pub async fn handle_grpc_request(
     };
 
     let ep = if is_grpc {
-        "/grpc/export/logs"
+        "/grpc/otlp/logs"
     } else {
-        "/api/org/v1/logs"
+        "/api/oltp/v1/logs"
     };
 
     let time = start.elapsed().as_secs_f64();

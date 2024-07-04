@@ -260,7 +260,7 @@ pub async fn search_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "200",
                         &org_id,
                         "",
@@ -269,7 +269,7 @@ pub async fn search_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "200",
                         &org_id,
                         "",
@@ -332,7 +332,7 @@ pub async fn search_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "500",
                         &org_id,
                         "",
@@ -341,7 +341,7 @@ pub async fn search_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "500",
                         &org_id,
                         "",
@@ -698,7 +698,7 @@ pub async fn around_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -707,7 +707,7 @@ pub async fn around_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -775,7 +775,7 @@ pub async fn around_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -784,7 +784,7 @@ pub async fn around_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -834,7 +834,7 @@ pub async fn around_multi(
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
             .with_label_values(&[
-                "/api/org/_around",
+                "/api/org/_around_multi",
                 "200",
                 &org_id,
                 &stream_names,
@@ -843,7 +843,7 @@ pub async fn around_multi(
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
             .with_label_values(&[
-                "/api/org/_around",
+                "/api/org/_around_multi",
                 "200",
                 &org_id,
                 &stream_names,
