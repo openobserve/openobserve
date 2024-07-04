@@ -736,6 +736,7 @@ const useLogs = () => {
           searchObj.meta.resultGrid.chartInterval
         );
       } else {
+        notificationMsg.value = "Invalid date format";
         return false;
       }
 
@@ -760,7 +761,7 @@ const useLogs = () => {
         req.aggs.histogram = histogramQuery;
 
         if (!parsedSQL?.columns?.length) {
-          notificationMsg.value = "Invalid SQL Syntax";
+          notificationMsg.value = "No column found in selected stream.";
           return false;
         }
 
@@ -1014,7 +1015,7 @@ const useLogs = () => {
     } catch (e: any) {
       // showErrorNotification("Invalid SQL Syntax");
       console.log(e);
-      notificationMsg.value = "Invalid SQL Syntax";
+      notificationMsg.value = "An error occurred while constructing the search query.";
     }
   }
 
@@ -1262,170 +1263,177 @@ const useLogs = () => {
       }
     } catch (e: any) {
       console.log("error", e);
+      notificationMsg.value = "Error while getting search partitions.";
       searchObj.data.queryResults.error = e.message;
       throw e;
     }
   };
 
   const refreshPartitionPagination = (regenrateFlag: boolean = false) => {
-    const { rowsPerPage } = searchObj.meta.resultGrid;
-    const { currentPage } = searchObj.data.resultGrid;
-    const partitionDetail = searchObj.data.queryResults.partitionDetail;
-    let remainingRecords = rowsPerPage;
-    let lastPartitionSize = 0;
-
-    if (
-      partitionDetail.paginations.length <= currentPage + 3 ||
-      regenrateFlag
-    ) {
-      partitionDetail.paginations = [];
-
-      let pageNumber = 0;
-      let partitionFrom = 0;
-      let total = 0;
-      let totalPages = 0;
-      let recordSize = 0;
-      let from = 0;
-      let lastPage = 0;
-
-      const parsedSQL: any = fnParsedSQL();
+    try {
+      const { rowsPerPage } = searchObj.meta.resultGrid;
+      const { currentPage } = searchObj.data.resultGrid;
+      const partitionDetail = searchObj.data.queryResults.partitionDetail;
+      let remainingRecords = rowsPerPage;
+      let lastPartitionSize = 0;
 
       if (
-        (searchObj.data.queryResults.aggs !== undefined &&
-          searchObj.data.resultGrid.currentPage == 1 &&
-          searchObj.meta.showHistogram == true &&
-          searchObj.data.stream.selectedStream.length <= 1 &&
-          (!searchObj.meta.sqlMode ||
-            (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
-        (searchObj.loadingHistogram == false &&
-          searchObj.meta.showHistogram == true &&
-          searchObj.data.stream.selectedStream.length <= 1 &&
-          searchObj.meta.sqlMode == false &&
-          searchObj.data.resultGrid.currentPage == 1)
+        partitionDetail.paginations.length <= currentPage + 3 ||
+        regenrateFlag
       ) {
+        partitionDetail.paginations = [];
+
+        let pageNumber = 0;
+        let partitionFrom = 0;
+        let total = 0;
+        let totalPages = 0;
+        let recordSize = 0;
+        let from = 0;
+        let lastPage = 0;
+
+        const parsedSQL: any = fnParsedSQL();
+
         if (
-          searchObj.data.queryResults.hasOwnProperty("aggs") &&
-          searchObj.data.queryResults.aggs != null
+          (searchObj.data.queryResults.aggs !== undefined &&
+            searchObj.data.resultGrid.currentPage == 1 &&
+            searchObj.meta.showHistogram == true &&
+            searchObj.data.stream.selectedStream.length <= 1 &&
+            (!searchObj.meta.sqlMode ||
+              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+          (searchObj.loadingHistogram == false &&
+            searchObj.meta.showHistogram == true &&
+            searchObj.data.stream.selectedStream.length <= 1 &&
+            searchObj.meta.sqlMode == false &&
+            searchObj.data.resultGrid.currentPage == 1)
         ) {
+          if (
+            searchObj.data.queryResults.hasOwnProperty("aggs") &&
+            searchObj.data.queryResults.aggs != null
+          ) {
+            searchObj.data.queryResults.total =
+              searchObj.data.queryResults.aggs.reduce(
+                (accumulator: number, currentValue: any) =>
+                  accumulator +
+                  Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+                0
+              );
+            partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
+          }
+        } else {
           searchObj.data.queryResults.total =
-            searchObj.data.queryResults.aggs.reduce(
-              (accumulator: number, currentValue: any) =>
-                accumulator +
-                Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+            partitionDetail.partitionTotal.reduce(
+              (accumulator: number, currentValue: number) =>
+                accumulator + Math.max(currentValue, 0),
               0
             );
-          partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
         }
-      } else {
-        searchObj.data.queryResults.total =
-          partitionDetail.partitionTotal.reduce(
-            (accumulator: number, currentValue: number) =>
-              accumulator + Math.max(currentValue, 0),
-            0
-          );
-      }
-      // partitionDetail.partitions.forEach((item: any, index: number) => {
-      for (const [index, item] of partitionDetail.partitions.entries()) {
-        total = partitionDetail.partitionTotal[index];
-        totalPages = Math.ceil(total / rowsPerPage);
-        if (!partitionDetail.paginations[pageNumber]) {
-          partitionDetail.paginations[pageNumber] = [];
-        }
-        if (totalPages > 0) {
-          partitionFrom = 0;
-          for (let i = 0; i < totalPages; i++) {
-            remainingRecords = rowsPerPage;
-            recordSize =
-              i === totalPages - 1
-                ? total - partitionFrom || rowsPerPage
-                : rowsPerPage;
-            from = partitionFrom;
+        // partitionDetail.partitions.forEach((item: any, index: number) => {
+        for (const [index, item] of partitionDetail.partitions.entries()) {
+          total = partitionDetail.partitionTotal[index];
+          totalPages = Math.ceil(total / rowsPerPage);
+          if (!partitionDetail.paginations[pageNumber]) {
+            partitionDetail.paginations[pageNumber] = [];
+          }
+          if (totalPages > 0) {
+            partitionFrom = 0;
+            for (let i = 0; i < totalPages; i++) {
+              remainingRecords = rowsPerPage;
+              recordSize =
+                i === totalPages - 1
+                  ? total - partitionFrom || rowsPerPage
+                  : rowsPerPage;
+              from = partitionFrom;
 
-            // if (i === 0 && partitionDetail.paginations.length > 0) {
-            lastPartitionSize = 0;
-            if (pageNumber > 0) {
-              lastPage = partitionDetail.paginations.length - 1;
+              // if (i === 0 && partitionDetail.paginations.length > 0) {
+              lastPartitionSize = 0;
+              if (pageNumber > 0) {
+                lastPage = partitionDetail.paginations.length - 1;
 
-              // partitionDetail.paginations[lastPage].forEach((item: any) => {
-              for (const item of partitionDetail.paginations[lastPage]) {
-                lastPartitionSize += item.size;
+                // partitionDetail.paginations[lastPage].forEach((item: any) => {
+                for (const item of partitionDetail.paginations[lastPage]) {
+                  lastPartitionSize += item.size;
+                }
+
+                if (lastPartitionSize != rowsPerPage) {
+                  recordSize = rowsPerPage - lastPartitionSize;
+                }
+              }
+              if (!partitionDetail.paginations[pageNumber]) {
+                partitionDetail.paginations[pageNumber] = [];
               }
 
-              if (lastPartitionSize != rowsPerPage) {
-                recordSize = rowsPerPage - lastPartitionSize;
+              partitionDetail.paginations[pageNumber].push({
+                startTime: item[0],
+                endTime: item[1],
+                from,
+                size: Math.abs(Math.min(recordSize, rowsPerPage)),
+              });
+
+              partitionFrom += recordSize;
+
+              if (
+                recordSize == rowsPerPage ||
+                lastPartitionSize + recordSize == rowsPerPage
+              ) {
+                pageNumber++;
+              }
+
+              if (
+                partitionDetail.paginations.length >
+                searchObj.data.resultGrid.currentPage + 10
+              ) {
+                return true;
               }
             }
-            if (!partitionDetail.paginations[pageNumber]) {
-              partitionDetail.paginations[pageNumber] = [];
+          } else {
+            lastPartitionSize = 0;
+            recordSize = rowsPerPage;
+            lastPage = partitionDetail.paginations.length - 1;
+
+            // partitionDetail.paginations[lastPage].forEach((item: any) => {
+            for (const item of partitionDetail.paginations[lastPage]) {
+              lastPartitionSize += item.size;
+            }
+
+            if (lastPartitionSize != rowsPerPage) {
+              recordSize = rowsPerPage - lastPartitionSize;
+            }
+            from = 0;
+
+            if (total == 0) {
+              recordSize = 0;
             }
 
             partitionDetail.paginations[pageNumber].push({
               startTime: item[0],
               endTime: item[1],
               from,
-              size: Math.abs(Math.min(recordSize, rowsPerPage)),
+              size: Math.abs(recordSize),
             });
 
-            partitionFrom += recordSize;
-
-            if (
-              recordSize == rowsPerPage ||
-              lastPartitionSize + recordSize == rowsPerPage
-            ) {
+            if (partitionDetail.paginations[pageNumber].size > 0) {
               pageNumber++;
-            }
-
-            if (
-              partitionDetail.paginations.length >
-              searchObj.data.resultGrid.currentPage + 10
-            ) {
-              return true;
+              remainingRecords =
+                rowsPerPage - partitionDetail.paginations[pageNumber].size;
+            } else {
+              remainingRecords = rowsPerPage;
             }
           }
-        } else {
-          lastPartitionSize = 0;
-          recordSize = rowsPerPage;
-          lastPage = partitionDetail.paginations.length - 1;
 
-          // partitionDetail.paginations[lastPage].forEach((item: any) => {
-          for (const item of partitionDetail.paginations[lastPage]) {
-            lastPartitionSize += item.size;
-          }
-
-          if (lastPartitionSize != rowsPerPage) {
-            recordSize = rowsPerPage - lastPartitionSize;
-          }
-          from = 0;
-
-          if (total == 0) {
-            recordSize = 0;
-          }
-
-          partitionDetail.paginations[pageNumber].push({
-            startTime: item[0],
-            endTime: item[1],
-            from,
-            size: Math.abs(recordSize),
-          });
-
-          if (partitionDetail.paginations[pageNumber].size > 0) {
-            pageNumber++;
-            remainingRecords =
-              rowsPerPage - partitionDetail.paginations[pageNumber].size;
-          } else {
-            remainingRecords = rowsPerPage;
+          if (
+            partitionDetail.paginations.length >
+            searchObj.data.resultGrid.currentPage + 10
+          ) {
+            return true;
           }
         }
 
-        if (
-          partitionDetail.paginations.length >
-          searchObj.data.resultGrid.currentPage + 10
-        ) {
-          return true;
-        }
+        searchObj.data.queryResults.partitionDetail = partitionDetail;
       }
-
-      searchObj.data.queryResults.partitionDetail = partitionDetail;
+    } catch (e: any) {
+      console.log("Error while refreshing partition pagination", e);
+      notificationMsg.value = "Error while refreshing partition pagination.";
+      return false;
     }
   };
 
@@ -1665,6 +1673,9 @@ const useLogs = () => {
         }
       } else {
         searchObj.loading = false;
+        if(!notificationMsg.value) {
+          notificationMsg.value = "Search query is empty or invalid.";
+        }
       }
       searchObjDebug["queryDataEndTime"] = performance.now();
       console.log(
@@ -1676,7 +1687,7 @@ const useLogs = () => {
       console.log("=================== getQueryData Debug ===================");
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Something went wrong.");
+      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
       notificationMsg.value = "";
     }
   };
@@ -1816,6 +1827,8 @@ const useLogs = () => {
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage);
           }
+
+          notificationMsg.value = searchObj.data.errorMsg;
 
           if (err?.response?.data?.code == 429) {
             notificationMsg.value = err.response.data.message;
@@ -2084,6 +2097,8 @@ const useLogs = () => {
             searchObj.data.errorMsg = t(customMessage);
           }
 
+          notificationMsg.value = searchObj.data.errorMsg;
+
           if (err?.response?.data?.code == 429) {
             notificationMsg.value = err.response.data.message;
             searchObj.data.errorMsg = err.response.data.message;
@@ -2223,6 +2238,8 @@ const useLogs = () => {
                 searchObj.data.histogram.errorMsg = t(customMessage);
               }
 
+              notificationMsg.value = searchObj.data.histogram.errorMsg;
+
               if (err?.response?.data?.code == 429) {
                 notificationMsg.value = err.response.data.message;
                 searchObj.data.histogram.errorMsg = err.response.data.message;
@@ -2236,6 +2253,7 @@ const useLogs = () => {
         searchObj.data.histogram.errorMsg = e.message;
         searchObj.data.histogram.errorCode = e.code;
         searchObj.loadingHistogram = false;
+        notificationMsg.value = searchObj.data.histogram.errorMsg;
         showErrorNotification("Error while fetching histogram data");
         reject(false);
       }
@@ -2707,7 +2725,8 @@ const useLogs = () => {
       );
     } catch (e: any) {
       searchObj.loadingStream = false;
-      console.log("Error while extracting fields", e);
+      console.log("Error while extracting fields.", e);
+      notificationMsg.value = "Error while extracting stream fields.";
     }
   }
 
@@ -2832,56 +2851,63 @@ const useLogs = () => {
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while updating grid columns");
+      notificationMsg.value = "Error while updating table columns.";
     }
   };
 
   function getHistogramTitle() {
-    const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
-    const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
-    let endCount;
+    try {
+      const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
+      const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+      let endCount;
 
-    let totalCount = searchObj.data.queryResults.total || 0;
-    if (searchObj.meta.resultGrid.showPagination == false) {
-      endCount = searchObj.data.queryResults.hits.length;
-      totalCount = searchObj.data.queryResults.hits.length;
-    } else {
-      if (
-        currentPage >=
-        searchObj.data.queryResults.partitionDetail.paginations.length - 1
-      ) {
-        endCount = Math.min(
-          startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-          searchObj.data.queryResults.total
-        );
+      let totalCount = searchObj.data.queryResults.total || 0;
+      if (searchObj.meta.resultGrid.showPagination == false) {
+        endCount = searchObj.data.queryResults.hits.length;
+        totalCount = searchObj.data.queryResults.hits.length;
       } else {
-        endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+        if (
+          currentPage >=
+          searchObj.data.queryResults.partitionDetail.paginations.length - 1
+        ) {
+          endCount = Math.min(
+            startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+            searchObj.data.queryResults.total
+          );
+        } else {
+          endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+        }
       }
-    }
 
-    if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
-      totalCount = searchAggData.total;
-    }
+      if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
+        totalCount = searchAggData.total;
+      }
 
-    if (isNaN(totalCount)) {
-      totalCount = 0;
-    }
+      if (isNaN(totalCount)) {
+        totalCount = 0;
+      }
 
-    if (isNaN(endCount)) {
-      endCount = 0;
+      if (isNaN(endCount)) {
+        endCount = 0;
+      }
+      const title =
+        "Showing " +
+        startCount +
+        " to " +
+        endCount +
+        " out of " +
+        totalCount.toLocaleString() +
+        " events in " +
+        searchObj.data.queryResults.took +
+        " ms. (Scan Size: " +
+        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+        ")";
+      return title;
+    } catch (e: any) {
+      console.log("Error while generating histogram title", e);
+      notificationMsg.value = "Error while generating histogram title.";
+      return "";
     }
-    const title =
-      "Showing " +
-      startCount +
-      " to " +
-      endCount +
-      " out of " +
-      totalCount.toLocaleString() +
-      " events in " +
-      searchObj.data.queryResults.took +
-      " ms. (Scan Size: " +
-      formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-      ")";
-    return title;
   }
 
   function generateHistogramData() {
@@ -2933,7 +2959,8 @@ const useLogs = () => {
         errorDetail: "",
       };
     } catch (e: any) {
-      console.log("Error while generating histogram data");
+      console.log("Error while generating histogram data", e);
+      notificationMsg.value = "Error while generating histogram data.";
     }
   }
 
@@ -3128,29 +3155,33 @@ const useLogs = () => {
   };
 
   const refreshData = () => {
-    if (
-      searchObj.meta.refreshInterval > 0 &&
-      router.currentRoute.value.name == "logs"
-    ) {
-      clearInterval(store.state.refreshIntervalID);
-      const refreshIntervalID = setInterval(async () => {
-        if (searchObj.loading == false && searchObj.loadingHistogram == false) {
-          searchObj.loading = true;
-          await getQueryData(false);
-          generateHistogramData();
-          updateGridColumns();
-          searchObj.meta.histogramDirtyFlag = true;
-        }
-      }, searchObj.meta.refreshInterval * 1000);
-      store.dispatch("setRefreshIntervalID", refreshIntervalID);
-      $q.notify({
-        message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-        color: "positive",
-        position: "top",
-        timeout: 1000,
-      });
-    } else {
-      clearInterval(store.state.refreshIntervalID);
+    try{
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs"
+      ) {
+        clearInterval(store.state.refreshIntervalID);
+        const refreshIntervalID = setInterval(async () => {
+          if (searchObj.loading == false && searchObj.loadingHistogram == false) {
+            searchObj.loading = true;
+            await getQueryData(false);
+            generateHistogramData();
+            updateGridColumns();
+            searchObj.meta.histogramDirtyFlag = true;
+          }
+        }, searchObj.meta.refreshInterval * 1000);
+        store.dispatch("setRefreshIntervalID", refreshIntervalID);
+        $q.notify({
+          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+          color: "positive",
+          position: "top",
+          timeout: 1000,
+        });
+      } else {
+        clearInterval(store.state.refreshIntervalID);
+      }
+    } catch (e: any) {
+      console.log("Error while refreshing data", e);
     }
   };
 
