@@ -211,8 +211,6 @@ pub async fn get_cached_results(
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
-                        // remove hits if time range is lesser than cached time range
-                        let mut to_retain = Vec::new();
 
                         let first_ts =
                             get_ts_value(result_ts_column, cached_response.hits.first().unwrap());
@@ -244,14 +242,11 @@ pub async fn get_cached_results(
                             }
                         };
 
-                        for hit in &cached_response.hits {
+                        cached_response.hits.retain(|hit| {
                             let hit_ts = get_ts_value(result_ts_column, hit);
+                            (hit_ts <= end_time && hit_ts >= start_time) && hit_ts < discard_ts
+                        });
 
-                            if (hit_ts <= end_time && hit_ts >= start_time) && hit_ts < discard_ts {
-                                to_retain.push(hit.clone());
-                            }
-                        }
-                        cached_response.hits = to_retain;
                         cached_response.total = cached_response.hits.len();
                         if discard_interval < 0 {
                             matching_cache_meta.end_time = discard_ts;
