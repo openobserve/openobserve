@@ -27,6 +27,7 @@ use config::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
+    metrics,
     utils::{inverted_index::split_token, json},
     INDEX_FIELD_NAME_FOR_ALL,
 };
@@ -145,6 +146,10 @@ pub async fn search(
         file_list_took,
     );
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&req.org_id])
+        .inc();
+
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
     // 1. get work group
@@ -164,7 +169,14 @@ pub async fn search(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, req.timeout as u64).await?
+        dist_lock::lock(&locker_key, req.timeout as u64)
+            .await
+            .map_err(|e| {
+                metrics::QUERY_PENDING_NUMS
+                    .with_label_values(&[&req.org_id])
+                    .dec();
+                Error::Message(e.to_string())
+            })?
     };
 
     // check global concurrency
@@ -185,11 +197,17 @@ pub async fn search(
         .process(trace_id, user_id)
         .await
     {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(e.to_string()));
     }
     #[cfg(feature = "enterprise")]
     if let Err(e) = dist_lock::unlock(&locker).await {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
         work_group
             .as_ref()
             .unwrap()
@@ -263,6 +281,13 @@ pub async fn search(
             )
             .await;
     }
+
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&req.org_id])
+        .dec();
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[&req.org_id])
+        .inc();
 
     // make cluster request
     let mut tasks = Vec::new();
@@ -349,6 +374,7 @@ pub async fn search(
                     .org_id
                     .parse()
                     .map_err(|_| Error::Message("invalid org_id".to_string()))?;
+                let org_id_string = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
                 // request.set_timeout(Duration::from_secs(cfg.grpc.timeout));
 
@@ -399,6 +425,11 @@ pub async fn search(
                             Ok(res) => response = res.into_inner(),
                             Err(err) => {
                                 log::error!("[trace_id {trace_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
+                                if err.code() == tonic::Code::DeadlineExceeded {
+                                    metrics::QUERY_TIMEOUT_NUMS
+                                        .with_label_values(&[&org_id_string])
+                                        .inc();
+                                }
                                 if err.code() == tonic::Code::Internal {
                                     let err = ErrorCodes::from_json(err.message())?;
                                     return Err(Error::ErrorCode(err));
@@ -584,6 +615,12 @@ async fn work_group_need_wait(
 ) -> Result<()> {
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
+            metrics::QUERY_TIMEOUT_NUMS
+                .with_label_values(&[&req.org_id])
+                .inc();
             return Err(Error::Message(format!(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));

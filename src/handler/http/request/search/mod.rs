@@ -297,6 +297,10 @@ pub async fn search(
             }
         }
 
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
+
         let cfg = get_config();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
@@ -313,6 +317,11 @@ pub async fn search(
         let took_wait = 0;
         ext_took_wait = took_wait;
         log::info!("http search API wait in queue took: {} ms", took_wait);
+
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
+
         let search_tracing = !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled;
         let mut tasks = Vec::new();
 
@@ -598,6 +607,9 @@ pub async fn around(
             .collect::<Vec<_>>()
     });
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -615,6 +627,9 @@ pub async fn around(
         "http search around API wait in queue took: {} ms",
         took_wait
     );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
 
     let query_context: Option<String> = None;
 
@@ -1049,6 +1064,9 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[org_id])
+        .inc();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -1066,6 +1084,9 @@ async fn values_v1(
         "http search value_v1 API wait in queue took: {} ms",
         took_wait
     );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[org_id])
+        .dec();
 
     // search
     let mut req = config::meta::search::Request {
@@ -1273,6 +1294,9 @@ async fn values_v2(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[org_id])
+        .inc();
     let cfg = get_config();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
@@ -1291,6 +1315,9 @@ async fn values_v2(
         "http search value_v2 API wait in queue took: {} ms",
         took_wait
     );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[org_id])
+        .dec();
 
     // search
     let req = config::meta::search::Request {
