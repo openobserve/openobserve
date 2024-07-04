@@ -290,7 +290,14 @@ pub async fn search(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, req.timeout as u64).await?
+        dist_lock::lock(&locker_key, req.timeout as u64)
+            .await
+            .map_err(|e| {
+                metrics::QUERY_PENDING_NUMS
+                    .with_label_values(&[&req.org_id])
+                    .dec();
+                Error::Message(e.to_string())
+            })?
     };
 
     // check global concurrency
@@ -721,13 +728,13 @@ async fn work_group_need_wait(
 ) -> Result<()> {
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
-            dist_lock::unlock(locker).await?;
             metrics::QUERY_PENDING_NUMS
                 .with_label_values(&[&req.org_id])
                 .dec();
             metrics::QUERY_TIMEOUT_NUMS
                 .with_label_values(&[&req.org_id])
                 .inc();
+            dist_lock::unlock(locker).await?;
             return Err(Error::Message(format!(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));
