@@ -898,14 +898,8 @@ fn merge_rewrite_sql(
             fn_name = "sum".to_string();
         }
         if fn_name == "approx_percentile_cont" {
-            let percentile = cap
-                .get(2)
-                .unwrap()
-                .as_str()
-                .splitn(2, ',')
-                .last()
-                .unwrap()
-                .trim();
+            let re = Regex::new(r"(?i)approx_percentile_cont\(.*?,\s*(\d+(?:\.\d+)?)\)").unwrap();
+            let percentile = re.captures(field).unwrap().get(1).unwrap().as_str();
             fields[i] = format!(
                 "{fn_name}(\"{}\", {}) {}",
                 schema_field, percentile, over_as
