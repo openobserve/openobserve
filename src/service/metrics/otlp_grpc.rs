@@ -426,9 +426,9 @@ pub async fn handle_grpc_request(
         .await;
 
         let ep = if is_grpc {
-            "/grpc/export/metrics"
+            "/grpc/otlp/metrics"
         } else {
-            "/api/org/v1/metrics"
+            "/api/otlp/v1/metrics"
         };
 
         let time = start.elapsed().as_secs_f64();
