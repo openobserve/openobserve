@@ -26,10 +26,22 @@ pub struct CachedQueryResponse {
     pub response_start_time: i64,
     pub response_end_time: i64,
     pub ts_column: String,
+    pub is_descending: bool,
+    pub limit: i64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
     pub delta_removed_hits: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct CacheQueryRequest {
+    pub q_start_time: i64,
+    pub q_end_time: i64,
+    pub is_aggregate: bool,
+    pub ts_column: String,
+    pub discard_interval: i64,
+    pub is_descending: bool,
 }

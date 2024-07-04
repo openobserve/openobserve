@@ -20,4 +20,5 @@ pub struct ResultCacheMeta {
     pub start_time: i64,
     pub end_time: i64,
     pub is_aggregate: bool,
+    pub is_descending: bool,
 }

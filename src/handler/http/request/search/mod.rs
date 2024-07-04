@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::{cmp, collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Utc};
@@ -423,7 +423,12 @@ pub async fn search(
             }
         }
         if c_resp.has_cached_data {
-            merge_response(&mut c_resp.cached_response, &results, &c_resp.ts_column);
+            merge_response(
+                &mut c_resp.cached_response,
+                &results,
+                &c_resp.ts_column,
+                c_resp.limit,
+            );
             c_resp.cached_response
         } else {
             results[0].clone()
@@ -494,6 +499,7 @@ pub async fn search(
             file_path,
             is_aggregate,
             trace_id,
+            c_resp.is_descending,
         )
         .await;
     }
@@ -1550,6 +1556,7 @@ fn merge_response(
     cache_response: &mut config::meta::search::Response,
     search_response: &Vec<config::meta::search::Response>,
     ts_column: &str,
+    limit: i64,
 ) {
     if cache_response.hits.is_empty() && search_response.is_empty() {
         return;
@@ -1567,6 +1574,7 @@ fn merge_response(
         }
         return;
     }
+    let cache_hits_len = cache_response.hits.len();
 
     let mut files_cache_ratio = 0;
     let mut result_cache_ratio = 0;
@@ -1602,10 +1610,12 @@ fn merge_response(
                 .collect();
         }
     }
+    if cache_response.hits.len() > limit as usize {
+        cache_response.hits.truncate(limit as usize);
+    }
     cache_response.cached_ratio = files_cache_ratio / search_response.len();
-    cache_response.result_cache_ratio = (cache_response.total as f64 * 100_f64
-        / (result_cache_ratio + cache_response.total) as f64)
-        as usize;
+    cache_response.result_cache_ratio =
+        (cache_hits_len as f64 * 100_f64 / (result_cache_ratio + cache_hits_len) as f64) as usize;
 }
 
 async fn write_results(
@@ -1616,18 +1626,23 @@ async fn write_results(
     file_path: String,
     is_aggregate: bool,
     trace_id: String,
+    is_descending: bool,
 ) {
     let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
-    let cache_end_time = if last_rec_ts > 0 && last_rec_ts < req_query_end_time {
+    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+    let largest_ts = cmp::max(first_rec_ts, last_rec_ts);
+
+    let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
         last_rec_ts
     } else {
         req_query_end_time
     };
     let file_name = format!(
-        "{}_{}_{}.json",
+        "{}_{}_{}_{}.json",
         req_query_start_time,
         cache_end_time,
-        if is_aggregate { 1 } else { 0 }
+        if is_aggregate { 1 } else { 0 },
+        if is_descending { 1 } else { 0 }
     );
 
     let res_cache = json::to_string(&res).unwrap();
@@ -1651,6 +1666,7 @@ async fn write_results(
                         start_time: req_query_start_time,
                         end_time: cache_end_time,
                         is_aggregate,
+                        is_descending,
                     });
                 drop(w);
             }
