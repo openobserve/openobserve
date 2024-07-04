@@ -174,13 +174,12 @@ pub async fn update(
 #[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
-    _role: web::Json<UserOrgRole>,
+    role: web::Json<UserOrgRole>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    // let role = role.into_inner().role;
-    let role = meta::user::UserRole::Admin;
     let initiator_id = user_email.user_id;
+    let role = role.into_inner().role;
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
 
