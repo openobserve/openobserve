@@ -107,6 +107,7 @@ export default defineComponent({
     const selectedTab: any = ref(null);
     const { t } = useI18n();
 
+    // on add tab, select added tab
     const updateTabList = async (newTab: any) => {
       showAddTabDialog.value = false;
       await getTabList.execute();
@@ -116,6 +117,7 @@ export default defineComponent({
       };
     };
 
+    // get all tabs based on selected dashboardId
     const getTabList = useLoading(async () => {
       if (!props.dashboardId || !props.folderId) return;
 
@@ -151,6 +153,7 @@ export default defineComponent({
       getTabList.execute();
     });
 
+    // get all tabs based on selected dashboardId
     watch(
       () => [props?.dashboardId],
       () => {

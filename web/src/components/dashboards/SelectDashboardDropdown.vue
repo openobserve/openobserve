@@ -98,6 +98,7 @@ export default defineComponent({
     const selectedDashboard: any = ref(null);
     const { t } = useI18n();
 
+    // on add dashboard, select added dashboard
     const updateDashboardList = async (dashboardId: any, folderId: any) => {
       showAddDashboardDialog.value = false;
       await getDashboardList.execute();
@@ -110,6 +111,7 @@ export default defineComponent({
       };
     };
 
+    // get all dashboards based on selected folderId
     const getDashboardList = useLoading(async () => {
       if (!props.folderId) return;
 
@@ -146,6 +148,7 @@ export default defineComponent({
       getDashboardList.execute();
     });
 
+    // get all dashboards based on selected folderId
     watch(
       () => [props.folderId],
       () => {
