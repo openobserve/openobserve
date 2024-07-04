@@ -176,9 +176,10 @@ pub async fn check_cache(
         None => {
             // since there is no cache & will be cached in the end we should return the response
             log::debug!("cached response not found");
-            let mut c_resp = CachedQueryResponse::default();
-            c_resp.is_descending = is_descending;
-            c_resp
+            CachedQueryResponse {
+                is_descending,
+                ..Default::default()
+            }
         }
     };
     c_resp.cache_query_response = true;
