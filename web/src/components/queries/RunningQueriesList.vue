@@ -513,7 +513,7 @@ export default defineComponent({
           getRunningQueries();
 
           q.notify({
-            message: "Running query deleted successfully",
+            message: "Query cancelled",
             color: "positive",
             position: "bottom",
             timeout: 1500,
@@ -522,7 +522,7 @@ export default defineComponent({
         .catch((error: any) => {
           q.notify({
             message:
-              error.response?.data?.message || "Failed to delete running query",
+              error.response?.data?.message || "Failed to cancel query",
             color: "negative",
             position: "bottom",
             timeout: 1500,

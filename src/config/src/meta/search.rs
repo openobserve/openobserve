@@ -510,7 +510,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
     }
 }
 
-#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum SearchEventType {
     UI,
     Dashboards,
