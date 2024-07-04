@@ -179,8 +179,6 @@ export default defineComponent({
           query: { dashboard: dashboardId, folder: folderId, tab: tabId },
         });
       } catch (err: any) {
-        console.log(err);
-
         q.notify({
           message: "Error while adding panel",
           type: "negative",

@@ -327,9 +327,7 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
-        // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
-        // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
       }
     );
 
@@ -337,7 +335,6 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.layout.showQueryBar,
       (newValue) => {
-        // console.time("watch:dashboardPanelData.layout.showQueryBar");
         if (!newValue) {
           dashboardPanelData.layout.querySplitter = 41;
         } else {
@@ -346,7 +343,6 @@ export default defineComponent({
               expandedSplitterHeight.value;
           }
         }
-        // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
       }
     );
 

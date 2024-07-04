@@ -750,22 +750,6 @@ export default defineComponent({
         // if fields found
         if (fields) {
           try {
-            // get schema of that field using getstream
-            // const fieldWithSchema: any = await getStreamFields.execute(
-            //   fields.name,
-            //   fields.stream_type,
-            //   true
-            // );
-
-            // // below line required for pass by reference
-            // // if we don't set blank, then same object from cache is being set
-            // // and that doesn't call the watchers,
-            // // so it will not be updated when we switch to different chart types
-            // // which doesn't have field list and coming back to field list
-            // dashboardPanelData.meta.stream.selectedStreamFields = [];
-            // // assign the schema
-            // dashboardPanelData.meta.stream.selectedStreamFields =
-            //   fieldWithSchema?.schema ?? [];
             await extractFields();
           } catch (error: any) {
             showErrorNotification(

@@ -413,15 +413,6 @@ export default defineComponent({
     // flag to know if it is the first time visualize
     let firstTimeVisualizeFlag = false;
 
-    // watch(
-    //   () => splitterModel.value,
-    //   (val) => {
-    //     console.log("splitterModel", val);
-
-    //     window.dispatchEvent(new Event("resize"));
-    //   }
-    // );
-
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
     const { dashboardPanelData, validatePanel, generateLabelFromName } =
@@ -1004,24 +995,9 @@ export default defineComponent({
     // watch for changes in the visualize toggle
     // if it is in visualize mode, then set the query and stream name in the dashboard panel
     watch(
-      () => [
-        searchObj.meta.logsVisualizeToggle,
-        // searchObj.data.query,
-        // searchObj.data.stream.selectedStream.value,
-        // searchObj.data.stream.streamType,
-      ],
+      () => [searchObj.meta.logsVisualizeToggle],
       async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
-          // enable sql mode
-          // searchObj.meta.sqlMode = true;
-          // dashboardPanelData.data.queries[0].customQuery = true;
-          // searchObj.data.query = await addHistogramToQuery(searchObj.data.query);
-          // dashboardPanelData.data.queries[0].fields.stream_type =
-          //   searchObj.data.stream.streamType ?? "logs";
-          // dashboardPanelData.data.queries[0].fields.stream =
-          //   searchObj.data.stream.selectedStream.value ?? "default";
-          // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
-
           // hide VRL function editor
           searchObj.config.fnSplitterModel = 99.5;
 
@@ -1081,11 +1057,6 @@ export default defineComponent({
 
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        // dashboardPanelData.data.queries[0].customQuery = true;
-        // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
-        // dashboardPanelData.data.queries[0].fields.stream =
-        //   searchObj.data.stream.selectedStream.value ?? "default"
-
         if (!isValid(true)) {
           return;
         }
