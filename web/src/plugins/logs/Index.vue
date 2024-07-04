@@ -1022,7 +1022,19 @@ export default defineComponent({
           //   searchObj.data.stream.selectedStream.value ?? "default";
           // dashboardPanelData.data.queries[0].query = searchObj.data.query ?? "";
 
+          // hide VRL function editor
+          searchObj.config.fnSplitterModel = 99.5;
+
+          // set fields and conditions
           await setFieldsAndConditions();
+        } else {
+          // else check if VRL function toggle is true or false
+          // based on that set the splitter model
+          if (searchObj.meta.toggleFunction == false) {
+            searchObj.config.fnSplitterModel = 99.5;
+          } else {
+            searchObj.config.fnSplitterModel = 60;
+          }
         }
       }
     );
@@ -1034,6 +1046,14 @@ export default defineComponent({
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data)
         );
+      }
+    );
+
+    watch(
+      () => splitterModel.value,
+      () => {
+        // rerender chart
+        window.dispatchEvent(new Event("resize"));
       }
     );
 

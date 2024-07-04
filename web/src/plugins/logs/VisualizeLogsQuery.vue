@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="px"
                   :limits="
                     !dashboardPanelData.layout.showQueryBar
-                      ? [43, 400]
+                      ? [0, 400]
                       : [140, 400]
                   "
                   :disable="!dashboardPanelData.layout.showQueryBar"
@@ -96,18 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <DashboardQueryBuilder :dashboardData="{}" />
                       <q-separator />
 
-                      <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
-                        <q-btn
-                          size="md"
-                          class="q-px-sm no-border"
-                          no-caps
-                          dense
-                          color="primary"
-                          @click="addToDashboard"
-                          title="Add To Dashboard"
-                          >Add To Dashboard</q-btn
-                        >
-                      </div>
                       <div
                         v-if="isOutDated"
                         :style="{
@@ -117,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           backgroundColor:
                             store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
                           padding: '1%',
-                          margin: '0% 1%',
+                          margin: '1%',
                           borderRadius: '5px',
                         }"
                       >
@@ -130,17 +118,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Query" button to run the query again
                         </div>
                       </div>
-                      <div style="flex: 1">
-                        <PanelSchemaRenderer
-                          @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="{}"
-                          :width="6"
-                          @error="handleChartApiError"
-                        />
+
+                      <div
+                        style="position: relative; height: 100%; width: 100%"
+                      >
+                        <div style="flex: 1; height: 100%; width: 100%">
+                          <PanelSchemaRenderer
+                            @metadata-update="metaDataValue"
+                            :key="dashboardPanelData.data.type"
+                            :panelSchema="chartData"
+                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                            :variablesData="{}"
+                            :width="6"
+                            @error="handleChartApiError"
+                          />
+                        </div>
+                        <div
+                          class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
+                          style="position: absolute; top: 0px; right: -13px"
+                        >
+                          <q-btn
+                            size="md"
+                            class="no-border"
+                            no-caps
+                            dense
+                            style="padding: 2px 4px"
+                            color="primary"
+                            @click="addToDashboard"
+                            title="Add To Dashboard"
+                            >Add To Dashboard</q-btn
+                          >
+                        </div>
                       </div>
+
                       <DashboardErrorsComponent :errors="errorData" />
                     </div>
                   </template>

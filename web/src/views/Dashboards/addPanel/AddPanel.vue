@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           backgroundColor:
                             store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
                           padding: '1%',
-                          margin: '0% 1%',
+                          margin: '1%',
                           borderRadius: '5px',
                         }"
                       >
