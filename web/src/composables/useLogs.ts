@@ -1016,6 +1016,7 @@ const useLogs = () => {
       // showErrorNotification("Invalid SQL Syntax");
       console.log(e);
       notificationMsg.value = "An error occurred while constructing the search query.";
+      return "";
     }
   }
 
@@ -1043,8 +1044,7 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
 
       if (searchObj.meta.sqlMode && parsedSQL == undefined) {
-        searchObj.data.queryResults.error = "Invalid SQL Syntax";
-        throw new Error("Invalid SQL Syntax");
+        searchObj.data.queryResults.error = "Error while search partition. Search query is invalid.";
         return;
       }
 
