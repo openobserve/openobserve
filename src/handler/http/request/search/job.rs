@@ -84,6 +84,9 @@ async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<HttpResp
     }
     let mut res = Vec::with_capacity(trace_ids.len());
     for trace_id in trace_ids {
+        if trace_id.is_empty() {
+            continue;
+        }
         let ret = if O2_CONFIG.super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::search::cancel_query(org_id, trace_id).await
         } else {
