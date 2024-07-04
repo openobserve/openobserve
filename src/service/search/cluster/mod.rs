@@ -108,6 +108,7 @@ pub async fn search(
     };
 
     let is_inverted_index = cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
         && meta.use_inverted_index
         && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 

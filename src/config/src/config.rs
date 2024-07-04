@@ -536,6 +536,8 @@ pub struct Common {
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
+    pub feature_query_without_index: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
