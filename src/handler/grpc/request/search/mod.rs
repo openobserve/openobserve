@@ -215,6 +215,10 @@ impl Search for Searcher {
             self.remove(&trace_id).await;
         }
 
+        metrics::QUERY_RUNNING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
+
         match result {
             Ok(res) => {
                 let time = start.elapsed().as_secs_f64();
