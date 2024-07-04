@@ -576,6 +576,10 @@ async fn work_group_checking(
         .await
         .is_err()
     {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        dist_lock::unlock(locker).await?;
         log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
         dist_lock::unlock(locker).await?;
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
@@ -589,6 +593,9 @@ async fn work_group_checking(
                     return Ok(());
                 },
                 Err(e) => {
+                    metrics::QUERY_PENDING_NUMS
+                        .with_label_values(&[&req.org_id])
+                        .dec();
                     dist_lock::unlock(locker).await?;
                     return Err(e);
                 }
@@ -597,6 +604,10 @@ async fn work_group_checking(
         _ = async {
             let _ = abort_receiver.await;
         } => {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
+            dist_lock::unlock(locker).await?;
             log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
             dist_lock::unlock(locker).await?;
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
@@ -615,9 +626,6 @@ async fn work_group_need_wait(
 ) -> Result<()> {
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
-            metrics::QUERY_PENDING_NUMS
-                .with_label_values(&[&req.org_id])
-                .dec();
             metrics::QUERY_TIMEOUT_NUMS
                 .with_label_values(&[&req.org_id])
                 .inc();
