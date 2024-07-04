@@ -201,6 +201,9 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
     let cfg = get_config();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
@@ -219,6 +222,9 @@ pub async fn get_latest_traces(
         "http traces latest API wait in queue took: {} ms",
         took_wait
     );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
 
     // search
     let query_sql = format!(

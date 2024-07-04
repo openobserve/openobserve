@@ -23,6 +23,7 @@ use config::{
         stream::{FileKey, StreamType},
         usage::{RequestStats, UsageType},
     },
+    metrics,
     utils::str::find,
 };
 use infra::{
@@ -47,7 +48,7 @@ use {std::sync::Arc, tokio::sync::Mutex};
 use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
-    handler::grpc::request::search::intra_cluster::Searcher,
+    handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
 
@@ -145,6 +146,10 @@ pub async fn search(
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
     SEARCH_SERVER.remove(&trace_id).await;
+
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[org_id])
+        .dec();
 
     // do this because of clippy warning
     match res {
