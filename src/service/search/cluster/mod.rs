@@ -722,6 +722,9 @@ async fn work_group_need_wait(
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
             dist_lock::unlock(locker).await?;
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
             metrics::QUERY_TIMEOUT_NUMS
                 .with_label_values(&[&req.org_id])
                 .inc();

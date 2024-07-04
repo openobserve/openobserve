@@ -274,7 +274,7 @@ impl Search for Searcher {
                     let _ = sender.send(());
                 }
                 metrics::QUERY_CANCELED_NUMS
-                    .with_label_values(&[&senders.org_id])
+                    .with_label_values(&[&senders.org_id.unwrap()])
                     .inc();
                 Ok(Response::new(CancelQueryResponse { is_success: true }))
             }
