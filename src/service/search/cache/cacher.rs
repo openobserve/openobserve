@@ -226,7 +226,7 @@ pub async fn get_cached_results(
                                 first_ts
                             }
                         } else if first_ts < last_ts {
-                            // non-aggregate quer
+                            // non-aggregate query
                             let m_last_ts = round_down_to_nearest_minute(last_ts);
                             if Utc::now().timestamp_micros() - discard_duration < last_ts {
                                 m_last_ts - discard_duration
