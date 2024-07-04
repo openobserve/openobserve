@@ -188,7 +188,6 @@ pub async fn check_cache(
     c_resp
 }
 
-#[allow(clippy::too_many_arguments)]
 pub async fn get_cached_results(
     file_path: &str,
     trace_id: &str,

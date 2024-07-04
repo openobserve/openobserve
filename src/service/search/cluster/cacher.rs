@@ -24,7 +24,6 @@ use crate::{
     service::search::infra_cluster,
 };
 
-#[allow(clippy::too_many_arguments)]
 pub async fn get_cached_results(
     query_key: String,
     file_path: String,

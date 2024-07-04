@@ -1618,6 +1618,7 @@ fn merge_response(
         (cache_hits_len as f64 * 100_f64 / (result_cache_ratio + cache_hits_len) as f64) as usize;
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_results(
     ts_column: &str,
     req_query_start_time: i64,
