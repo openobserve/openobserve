@@ -54,6 +54,7 @@ import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
+import { fr } from "date-fns/locale";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -1446,12 +1447,11 @@ const useLogs = () => {
         isNaN(searchObj.data.datetime.endTime) ||
         isNaN(searchObj.data.datetime.startTime)
       ) {
-        $q.notify({
-          message: `Invalid date. Please select a valid date.`,
-          color: "negative",
-          timeout: 2000,
-        });
-        return;
+        const queryParams: any = router.currentRoute.value.query;
+        let currentPeriod: string = queryParams?.period || "15m";
+        const extractedDate: any = extractTimestamps(currentPeriod);
+        searchObj.data.datetime.startTime = extractedDate.from;
+        searchObj.data.datetime.endTime = extractedDate.to;
       }
 
       searchObjDebug["buildSearchStartTime"] = performance.now();
@@ -2010,7 +2010,10 @@ const useLogs = () => {
           if (
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].length > searchObj.data.queryResults.subpage
+            ].length > searchObj.data.queryResults.subpage &&
+            searchObj.data.queryResults.hits.length <
+              searchObj.meta.resultGrid.rowsPerPage *
+                searchObj.data.stream.selectedStream.length
           ) {
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
@@ -3233,11 +3236,6 @@ const useLogs = () => {
       searchObj.shouldIgnoreWatcher = false;
       return;
     }
-    if (queryParams.period && (!queryParams.from || !queryParams.to)) {
-      const periodDateTime: any = extractTimestamps(queryParams.period);
-      queryParams.from = periodDateTime.from;
-      queryParams.to = periodDateTime.to;
-    }
 
     const date = {
       startTime: queryParams.from,
@@ -3245,9 +3243,18 @@ const useLogs = () => {
       relativeTimePeriod: queryParams.period || null,
       type: queryParams.period ? "relative" : "absolute",
     };
+
+    if (date.type === "relative") {
+      queryParams.period = date.relativeTimePeriod;
+    } else {
+      queryParams.from = date.startTime;
+      queryParams.to = date.endTime;
+    }
+
     if (date) {
       searchObj.data.datetime = date;
     }
+
     if (queryParams.query) {
       searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
       searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
@@ -3295,12 +3302,11 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
+
+    // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
         ...queryParams,
-        from: date.startTime,
-        to: date.endTime,
-        period: date.relativeTimePeriod,
         sql_mode: searchObj.meta.sqlMode,
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
@@ -3613,9 +3619,12 @@ const useLogs = () => {
         store.state.selectedOrganization.identifier,
         searchObj.data.searchRequestTraceIds
       )
-      .then(() => {
+      .then((res) => {
+        const isCancelled = res.data.some((item: any) => item.is_success);
         $q.notify({
-          message: "Running query deleted successfully",
+          message: isCancelled
+            ? "Running query cancelled successfully"
+            : "Query execution was completed before cancellation.",
           color: "positive",
           position: "bottom",
           timeout: 1500,
@@ -3624,7 +3633,7 @@ const useLogs = () => {
       .catch((error: any) => {
         $q.notify({
           message:
-            error.response?.data?.message || "Failed to delete running query",
+            error.response?.data?.message || "Failed to cancel running query",
           color: "negative",
           position: "bottom",
           timeout: 1500,
