@@ -697,18 +697,26 @@ async fn work_group_checking(
         .await
         .is_err()
     {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&req.org_id])
+            .dec();
+        dist_lock::unlock(locker).await?;
         log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
             "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
         ))));
     }
     tokio::select! {
-        res = work_group_need_wait(trace_id, start, req, work_group, locker, user_id) => {
+        res = work_group_need_wait(trace_id, start, req, work_group, user_id) => {
             match res {
                 Ok(_) => {
                     return Ok(());
                 },
                 Err(e) => {
+                    metrics::QUERY_PENDING_NUMS
+                        .with_label_values(&[&req.org_id])
+                        .dec();
+                    dist_lock::unlock(locker).await?;
                     return Err(e);
                 }
             }
@@ -716,6 +724,10 @@ async fn work_group_checking(
         _ = async {
             let _ = abort_receiver.await;
         } => {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
+            dist_lock::unlock(locker).await?;
             log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
         }
@@ -729,18 +741,13 @@ async fn work_group_need_wait(
     start: std::time::Instant,
     req: &cluster_rpc::SearchRequest,
     work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
-    locker: &Option<dist_lock::Locker>,
     user_id: Option<&str>,
 ) -> Result<()> {
     loop {
         if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
-            metrics::QUERY_PENDING_NUMS
-                .with_label_values(&[&req.org_id])
-                .dec();
             metrics::QUERY_TIMEOUT_NUMS
                 .with_label_values(&[&req.org_id])
                 .inc();
-            dist_lock::unlock(locker).await?;
             return Err(Error::Message(format!(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));
@@ -753,7 +760,6 @@ async fn work_group_need_wait(
                 return Ok(());
             }
             Err(e) => {
-                dist_lock::unlock(locker).await?;
                 return Err(Error::Message(e.to_string()));
             }
         }
