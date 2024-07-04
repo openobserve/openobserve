@@ -901,7 +901,15 @@ fn merge_rewrite_sql(
             let re =
                 Regex::new(r"(?i)approx_percentile_cont\(.*?,\s*(\d+(?:\.\d+)?(?:,\s*\d+)?)\)")
                     .unwrap();
-            let percentile = re.captures(field).unwrap().get(1).unwrap().as_str();
+            let percentile = match re.captures(field) {
+                Some(caps) => caps.get(1).unwrap().as_str(),
+                None => {
+                    return Err(DataFusionError::Execution(
+                        "Failed to extract percentile value in approx_percentile_cont function"
+                            .to_string(),
+                    ));
+                }
+            };
             fields[i] = format!(
                 "{fn_name}(\"{}\", {}) {}",
                 schema_field, percentile, over_as
