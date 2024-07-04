@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="dashboard-edit-folder-icon"
                         >
                           <q-item-section avatar>
-                            <q-icon name="edit" size="xs" />
+                            <q-icon :name="outlinedEdit" size="xs" />
                           </q-item-section>
                           <q-item-section>
                             <q-item-label>Edit</q-item-label>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="dashboard-delete-folder-icon"
                         >
                           <q-item-section avatar>
-                            <q-icon name="delete" size="xs" />
+                            <q-icon :name="outlinedDelete" size="xs" />
                           </q-item-section>
                           <q-item-section>
                             <q-item-label>Delete</q-item-label>
