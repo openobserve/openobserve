@@ -581,7 +581,6 @@ async fn work_group_checking(
             .dec();
         dist_lock::unlock(locker).await?;
         log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
-        dist_lock::unlock(locker).await?;
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
             "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
         ))));
@@ -609,7 +608,6 @@ async fn work_group_checking(
                 .dec();
             dist_lock::unlock(locker).await?;
             log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
-            dist_lock::unlock(locker).await?;
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
         }
     }
