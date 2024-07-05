@@ -62,12 +62,11 @@ static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query"
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-static RE_MATCH_ALL: Lazy<Regex> =
+static RE_MATCH_ALL_RAW: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
+static RE_MATCH_ALL_RAW_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 
 pub static _TS_WITH_ALIAS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
@@ -494,13 +493,13 @@ impl Sql {
                 if !token.to_lowercase().starts_with("match_all") {
                     continue;
                 }
-                for cap in RE_MATCH_ALL.captures_iter(token) {
+                for cap in RE_MATCH_ALL_RAW.captures_iter(token) {
                     fulltext.push((cap[0].to_string(), cap[1].to_string()));
                 }
-                for cap in RE_MATCH_ALL_IGNORE_CASE.captures_iter(token) {
+                for cap in RE_MATCH_ALL_RAW_IGNORE_CASE.captures_iter(token) {
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
-                for cap in RE_MATCH_ALL_INDEXED.captures_iter(token) {
+                for cap in RE_MATCH_ALL.captures_iter(token) {
                     indexed_text.push((cap[0].to_string(), cap[1].to_lowercase())); // since `terms` are indexed in lowercase
                 }
             }

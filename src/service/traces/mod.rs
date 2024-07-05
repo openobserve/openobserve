@@ -174,13 +174,18 @@ pub async fn handle_trace_request(
                 }
                 let start_time: u64 = span.start_time_unix_nano;
                 let end_time: u64 = span.end_time_unix_nano;
+                let mut operation_name = span.name.clone();
                 let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                 for span_att in span.attributes {
                     let mut key = span_att.key;
                     if BLOCK_FIELDS.contains(&key.as_str()) {
                         key = format!("attr_{}", key);
                     }
-                    span_att_map.insert(key, get_val(&span_att.value.as_ref()));
+                    let val = get_val(&span_att.value.as_ref());
+                    if key == "ep" {
+                        operation_name = val.to_string();
+                    }
+                    span_att_map.insert(key, val);
                 }
 
                 let mut events = vec![];
@@ -207,7 +212,7 @@ pub async fn handle_trace_request(
                     span_id,
                     span_kind: span.kind.to_string(),
                     span_status: get_span_status(span.status),
-                    operation_name: span.name.clone(),
+                    operation_name,
                     start_time,
                     end_time,
                     duration: (end_time - start_time) / 1000, // microseconds
