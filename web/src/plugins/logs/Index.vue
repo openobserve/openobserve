@@ -1061,6 +1061,11 @@ export default defineComponent({
           return;
         }
 
+        // refresh the date time
+        searchBarRef.value &&
+          searchBarRef.value.dateTimeRef &&
+          searchBarRef.value.dateTimeRef.refresh();
+
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data)
         );
