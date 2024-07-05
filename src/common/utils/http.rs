@@ -98,7 +98,7 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
 #[inline(always)]
 pub(crate) fn get_or_create_trace_id_and_span(
     headers: &HeaderMap,
-    ep: String,
+    endpoint: String,
 ) -> (String, Option<tracing::Span>) {
     let cfg = config::get_config();
     if let Some(traceparent) = headers.get("traceparent") {
@@ -111,7 +111,7 @@ pub(crate) fn get_or_create_trace_id_and_span(
 
             let span = if cfg.common.tracing_search_enabled {
                 // Create the span and set parent context
-                let span = tracing::info_span!("{ep}", ep = ep);
+                let span = tracing::info_span!("", endpoint = endpoint);
                 span.set_parent(ctx);
                 Some(span)
             } else {
@@ -137,7 +137,7 @@ pub(crate) fn get_or_create_trace_id_and_span(
             (config::ider::uuid(), None)
         }
     } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("{ep}", ep = ep);
+        let span = tracing::info_span!("", endpoint = endpoint);
         let trace_id = span.context().span().span_context().trace_id().to_string();
         (trace_id, Some(span))
     } else {

@@ -204,7 +204,8 @@ pub async fn handle_trace_request(
 
                 let operation_name = span_att_map
                     .get("ep")
-                    .map(|val| val.to_string())
+                    .and_then(|val| val.as_str())
+                    .map(String::from)
                     .unwrap_or(span.name.clone());
 
                 let local_val = Span {
