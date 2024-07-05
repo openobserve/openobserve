@@ -525,7 +525,8 @@ impl Sql {
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
-                indexed_search.push(format!("\"{}\" LIKE '%{}%'", field.name(), item.1));
+                // since data in file can be in uppercase, we need to use ILIKE
+                indexed_search.push(format!("\"{}\" ILIKE '%{}%'", field.name(), item.1));
                 // add full text field to meta fields
                 meta.fields.push(field.name().to_string());
                 fts_terms.insert(item.1.clone());
