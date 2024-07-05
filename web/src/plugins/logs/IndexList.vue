@@ -95,8 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="cursor-pointer text-bold"
           >
             <q-td
-              class="field_list bg-grey-3"
+              class="field_list"
               style="line-height: 28px; padding-left: 10px"
+              :class="
+                store.state.theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'
+              "
             >
               {{ props.row.name }} ({{
                 searchObj.data.stream.expandGroupRowsFieldCount[
