@@ -196,7 +196,7 @@ function extractFields(parsedAst: any, timeField: string) {
     const field = {
       column: "",
       alias: "",
-      aggregationFunction: "",
+      aggregationFunction: null,
     };
 
     if (column.expr.type === "column_ref") {

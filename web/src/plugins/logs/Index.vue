@@ -896,7 +896,7 @@ export default defineComponent({
 
         // if fields doesnt have aggregation functions, then add it in the x axis fields
         if (
-          field.aggregationFunction == "" ||
+          field.aggregationFunction === null ||
           field.aggregationFunction == "histogram"
         ) {
           dashboardPanelData.data.queries[0].fields.x.push(field);
