@@ -39,10 +39,10 @@ pub async fn cancel_query(_params: web::Path<(String, String)>) -> Result<HttpRe
 #[cfg(feature = "enterprise")]
 #[put("/{org_id}/query_manager/cancel")]
 pub async fn cancel_multiple_query(
-    params: web::Path<(String, String)>,
+    params: web::Path<String>,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, _) = params.into_inner();
+    let org_id = params.into_inner();
     let trace_ids: Vec<String> = match config::utils::json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
