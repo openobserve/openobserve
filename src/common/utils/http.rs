@@ -127,14 +127,8 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &Option<tracing:
             log::warn!("Failed to parse valid trace_id from received [Traceparent] header");
             config::ider::uuid()
         }
-    } else if span.is_some() {
-        span.as_ref()
-            .unwrap()
-            .context()
-            .span()
-            .span_context()
-            .trace_id()
-            .to_string()
+    } else if let Some(span) = span {
+        span.context().span().span_context().trace_id().to_string()
     } else {
         config::ider::uuid()
     }
