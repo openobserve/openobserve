@@ -1991,8 +1991,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       if (
         !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].customQuery &&
-        dashboardPanelData.data.queryType === "sql"
+        ].customQuery
       ) {
         makeAutoSQLQuery();
       }
