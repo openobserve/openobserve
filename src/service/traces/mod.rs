@@ -202,18 +202,12 @@ pub async fn handle_trace_request(
                     continue;
                 }
 
-                let operation_name = span_att_map
-                    .get("endpoint")
-                    .and_then(|val| val.as_str())
-                    .map(String::from)
-                    .unwrap_or(span.name.clone());
-
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id,
                     span_kind: span.kind.to_string(),
                     span_status: get_span_status(span.status),
-                    operation_name,
+                    operation_name: span.name.clone(),
                     start_time,
                     end_time,
                     duration: (end_time - start_time) / 1000, // microseconds
