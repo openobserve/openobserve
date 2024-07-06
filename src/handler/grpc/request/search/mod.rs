@@ -131,9 +131,23 @@ impl Search for Searcher {
         let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
         #[cfg(feature = "enterprise")]
         if !self.contain_key(&trace_id).await {
+            let req_query = req.query.as_ref().unwrap();
+            let sql = Some(req_query.sql.clone());
+            let start_time = Some(req_query.start_time);
+            let end_time = Some(req_query.end_time);
+            let user_id = req.user_id.clone();
             self.insert(
                 trace_id.clone(),
-                TaskStatus::new(vec![], false, None, None, None, None, None, None),
+                TaskStatus::new(
+                    vec![],
+                    false,
+                    user_id,
+                    Some(org_id.to_string()),
+                    Some(stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                ),
             )
             .await;
         }
@@ -200,9 +214,23 @@ impl Search for Searcher {
         let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
         #[cfg(feature = "enterprise")]
         if !self.contain_key(&trace_id).await {
+            let req_query = req.query.as_ref().unwrap();
+            let sql = Some(req_query.sql.clone());
+            let start_time = Some(req_query.start_time);
+            let end_time = Some(req_query.end_time);
+            let user_id = req.user_id.clone();
             self.insert(
                 trace_id.clone(),
-                TaskStatus::new(vec![], false, None, None, None, None, None, None),
+                TaskStatus::new(
+                    vec![],
+                    false,
+                    user_id,
+                    Some(org_id.to_string()),
+                    Some(stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                ),
             )
             .await;
         }
@@ -288,6 +316,28 @@ impl Search for Searcher {
 
     #[cfg(not(feature = "enterprise"))]
     async fn cancel_query(
+        &self,
+        _req: Request<CancelQueryRequest>,
+    ) -> Result<Response<CancelQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn cluster_cancel_query(
+        &self,
+        req: Request<CancelQueryRequest>,
+    ) -> Result<Response<CancelQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        match SearchService::cancel_query("", &trace_id).await {
+            Ok(ret) => Ok(Response::new(CancelQueryResponse {
+                is_success: ret.is_success,
+            })),
+            Err(_) => Ok(Response::new(CancelQueryResponse { is_success: false })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn cluster_cancel_query(
         &self,
         _req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {

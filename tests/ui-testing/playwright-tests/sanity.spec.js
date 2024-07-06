@@ -408,11 +408,8 @@ test.describe("Sanity testcases", () => {
     await page.click('[data-test="dashboard-folder-add-save"]');
     await page.getByText(randomFolderName).click();
     await page.waitForTimeout(5000);
-    await page
-      .locator(
-        `[data-test^="dashboard-folder-tab"]:has-text("${randomFolderName}") [data-test="dashboard-delete-folder-icon"]`
-      )
-      .click({ force: true });
+    await page.locator(`[data-test^="dashboard-folder-tab"]:has-text("${randomFolderName}") [data-test="dashboard-more-icon"]`).click();
+    await page.locator('[data-test="dashboard-delete-folder-icon"]').click({ force: true });
     await page.waitForTimeout(100);
     await page.click('[data-test="confirm-button"]');
 
