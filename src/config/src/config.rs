@@ -863,7 +863,7 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
-    #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_size")] // file_size, file_time
+    #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")] // file_size, file_time
     pub strategy: String,
     #[env_config(name = "ZO_COMPACT_LOOKBACK_HOURS", default = 0)] // hours
     pub lookback_hours: i64,
