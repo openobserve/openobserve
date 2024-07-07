@@ -24,7 +24,7 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::get_or_create_trace_id_and_span,
+        utils::http::get_or_create_trace_id,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces::otlp_http},
@@ -129,12 +129,19 @@ pub async fn get_latest_traces(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let cfg = get_config();
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
-    let (trace_id, http_span) = get_or_create_trace_id_and_span(
-        in_req.headers(),
-        format!("/api/{org_id}/{stream_name}/traces/latest"),
-    );
+    let http_span = if cfg.common.tracing_search_enabled {
+        Some(tracing::info_span!(
+            "/api/{org_id}/{stream_name}/traces/latest",
+            org_id = org_id.clone(),
+            stream_name = stream_name.clone()
+        ))
+    } else {
+        None
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
@@ -204,7 +211,6 @@ pub async fn get_latest_traces(
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&org_id])
         .inc();
-    let cfg = get_config();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
