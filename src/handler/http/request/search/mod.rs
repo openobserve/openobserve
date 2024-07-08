@@ -1318,7 +1318,7 @@ async fn values_v2(
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
+    if !get_config().common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
