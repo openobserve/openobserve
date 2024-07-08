@@ -219,13 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  nextTick,
-  watch,
-  defineAsyncComponent,
-} from "vue";
+import { defineComponent, ref, watch, defineAsyncComponent } from "vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
@@ -239,8 +233,6 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import { provide } from "vue";
 import { toRefs } from "vue";
 import { inject } from "vue";
-import { useQuasar } from "quasar";
-import { useRouter } from "vue-router";
 import { computed } from "vue";
 import { isEqual } from "lodash-es";
 
@@ -286,8 +278,6 @@ export default defineComponent({
   },
   emits: ["handleChartApiError", "update:streamList"],
   setup(props, { emit }) {
-    const $q = useQuasar();
-    const router = useRouter();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "logs"
