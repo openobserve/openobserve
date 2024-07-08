@@ -151,7 +151,6 @@ pub async fn search(
         None
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
@@ -257,6 +256,7 @@ pub async fn search(
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
+    let cfg = get_config();
     let mut c_resp: CachedQueryResponse = if use_cache && cfg.common.result_cache_enabled {
         check_cache(
             &rpc_req,

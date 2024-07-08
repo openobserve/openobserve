@@ -55,6 +55,7 @@ import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import { fr } from "date-fns/locale";
+import useWebSocket from "./useWebSocket";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -243,6 +244,8 @@ const useLogs = () => {
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
+
+  const { sendMessage } = useWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -1075,6 +1078,7 @@ const useLogs = () => {
           }
         }
 
+        
         if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
@@ -1104,6 +1108,18 @@ const useLogs = () => {
           const { traceparent, traceId } = generateTraceContext();
 
           addTraceId(traceId);
+
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "partition",
+                trace_id: traceId,
+                query: partitionQueryReq,
+              },
+            })
+          );
+
 
           await searchService
             .partition({
@@ -1767,6 +1783,7 @@ const useLogs = () => {
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
 
+
       searchService
         .search(
           {
@@ -1894,6 +1911,17 @@ const useLogs = () => {
 
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
+
+      sendMessage(
+        JSON.stringify({
+          type: "search",
+          content: {
+            type: "search_logs",
+            trace_id: traceId,
+            query: queryReq.query,
+          },
+        })
+      );
 
       searchService
         .search(
@@ -2168,6 +2196,17 @@ const useLogs = () => {
 
           const { traceparent, traceId } = generateTraceContext();
           addTraceId(traceId);
+
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "search_logs_histogram",
+                trace_id: traceId,
+                query: queryReq.query,
+              },
+            })
+          );
 
           searchService
             .search(
@@ -3677,6 +3716,12 @@ const useLogs = () => {
         if (searchObj.loading) searchObj.loading = false;
         if (searchObj.loadingHistogram) searchObj.loadingHistogram = false;
       });
+  };
+
+  const getTraceParentHeader = () => {
+    return `00-${getUUID().replace(/-/g, "")}-${getUUID()
+      .replace(/-/g, "")
+      .slice(0, 16)}-01`;
   };
 
   return {
