@@ -508,7 +508,7 @@ pub fn concat_batches(
         )?;
         arrays.push(array);
     }
-    RecordBatch::try_new(schema.clone(), arrays)
+    RecordBatch::try_new(schema, arrays)
 }
 
 // merge record batches, the record batch have same schema
