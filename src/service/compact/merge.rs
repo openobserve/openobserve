@@ -30,6 +30,7 @@ use config::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
         record_batch_ext::{format_recordbatch_by_schema, merge_record_batches},
+        schema_ext::SchemaExt,
     },
     FILE_EXT_PARQUET,
 };
@@ -596,6 +597,8 @@ pub async fn merge_files(
                     }
                 }
                 deleted_files.push(file.key.clone());
+                total_records -= file.meta.records;
+                new_file_size -= file.meta.original_size;
                 continue;
             }
         };
@@ -723,7 +726,7 @@ pub async fn merge_files(
 
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.metadata().clone()).await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
     } else {
         datafusion::exec::merge_parquet_files(
             tmp_dir.name(),
@@ -1069,7 +1072,7 @@ pub fn generate_inverted_idx_recordbatch(
 pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
-    metadata: HashMap<String, String>,
+    schema: Arc<Schema>,
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
@@ -1103,13 +1106,11 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
         record_batches.extend(batches);
-        shared_fields.extend(file_schema.fields().iter().cloned());
+        shared_fields.extend(file_schema.fields().iter().map(|f| f.name().to_string()));
     }
 
-    let schema = Arc::new(Schema::new_with_metadata(
-        shared_fields.into_iter().collect::<Vec<_>>(),
-        metadata,
-    ));
+    // create new schema with the shared fields
+    let schema = Arc::new(schema.retain(shared_fields));
 
     // format recordbatch
     let record_batches = record_batches
