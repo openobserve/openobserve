@@ -188,6 +188,7 @@ pub(crate) async fn create_context(
         FileType::PARQUET,
         false,
         &[],
+        0,
     )
     .await?;
     resp.push((ctx, schema, parquet_scan_stats));

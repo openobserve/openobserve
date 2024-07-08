@@ -116,6 +116,7 @@ pub async fn sql(
             file_type.clone(),
             false,
             &sql.meta.order_by,
+            sql.meta.limit as usize,
         )
         .await?
     } else {
@@ -501,6 +502,7 @@ async fn get_fast_mode_ctx(
         file_type,
         without_optimizer,
         &sql.meta.order_by,
+        sql.meta.limit as usize,
     )
     .await?;
 
@@ -1255,6 +1257,7 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn register_table(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -1263,11 +1266,15 @@ pub async fn register_table(
     file_type: FileType,
     without_optimizer: bool,
     sort_key: &[(String, bool)],
+    limit: usize,
 ) -> Result<SessionContext> {
     let cfg = get_config();
     // only sort by timestamp desc
-    let sort_by_timestamp_desc =
-        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+    let sort_by_timestamp_desc = sort_key.len() == 1
+        && sort_key[0].0 == cfg.common.column_timestamp
+        && sort_key[0].1
+        && limit > 0
+        && limit < PARQUET_BATCH_SIZE;
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
