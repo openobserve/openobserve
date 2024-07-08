@@ -612,6 +612,18 @@ pub async fn merge_files(
     let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
     let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
 
+    let mut new_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: total_records,
+        original_size: new_file_size,
+        compressed_size: 0,
+        flattened: false,
+    };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
+
     // convert the file to the latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
@@ -709,21 +721,15 @@ pub async fn merge_files(
         }
     }
 
-    let mut new_file_meta = FileMeta {
-        min_ts,
-        max_ts,
-        records: total_records,
-        original_size: new_file_size,
-        compressed_size: 0,
-        flattened: false,
-    };
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
-    }
-
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
+        merge_parquet_files(
+            thread_id,
+            tmp_dir.name(),
+            schema_latest.metadata().clone(),
+            &defined_schema_fields,
+        )
+        .await
     } else {
         datafusion::exec::merge_parquet_files(
             tmp_dir.name(),
@@ -1069,7 +1075,8 @@ pub fn generate_inverted_idx_recordbatch(
 pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
-    schema: Arc<Schema>,
+    metadata: HashMap<String, String>,
+    defined_schema_fields: &[String],
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
@@ -1083,6 +1090,7 @@ pub async fn merge_parquet_files(
     })?;
 
     let mut record_batches = Vec::new();
+    let mut shared_fields = HashSet::new();
     for file in temp_files {
         let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
             log::error!(
@@ -1092,7 +1100,7 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
 
-        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
+        let (file_schema, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
             log::error!("[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error");
             log::error!(
                 "[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
@@ -1102,7 +1110,17 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
         record_batches.extend(batches);
+        shared_fields.extend(file_schema.fields().iter().cloned());
     }
+
+    let schema = Schema::new_with_metadata(shared_fields.into_iter().collect::<Vec<_>>(), metadata);
+    let schema = if !defined_schema_fields.is_empty() {
+        let schema = SchemaCache::new(schema);
+        let schema = generate_schema_for_defined_schema_fields(&schema, defined_schema_fields);
+        Arc::new(schema.schema().clone())
+    } else {
+        Arc::new(schema)
+    };
 
     // format recordbatch
     let record_batches = record_batches

@@ -946,13 +946,10 @@ pub async fn convert_parquet_file(
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
         cfg.common.column_timestamp
-    );
-
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
-    let without_optimizer = select_wildcard;
+    ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, true).await?;
 
     // Configure listing options
     let listing_options = match file_type {
