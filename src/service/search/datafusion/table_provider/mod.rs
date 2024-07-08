@@ -253,7 +253,7 @@ impl TableProvider for NewListingTable {
                 if groups.len() <= self.options.target_partitions {
                     let cpu_num = get_config().limit.cpu_num;
                     if cpu_num > groups.len() {
-                        let new_groups = split_groups_by_cpu_num(&groups, 12);
+                        let new_groups = split_groups_by_cpu_num(&groups, cpu_num);
                         partitioned_file_lists = new_groups;
                     } else {
                         partitioned_file_lists = groups;
