@@ -34,7 +34,6 @@ use std::{any::Any, sync::Arc};
 
 use arrow_schema::{Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
-use config::get_config;
 use datafusion::{
     common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
     datasource::{
@@ -251,10 +250,9 @@ impl TableProvider for NewListingTable {
             Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
             Some(Ok(groups)) => {
                 if groups.len() <= self.options.target_partitions {
-                    let cpu_num = get_config().limit.cpu_num;
+                    let cpu_num = config::get_config().limit.cpu_num;
                     if cpu_num > groups.len() {
-                        let new_groups = split_groups_by_cpu_num(&groups, cpu_num);
-                        partitioned_file_lists = new_groups;
+                        partitioned_file_lists = repartition_sorted_groups(groups, cpu_num);
                     } else {
                         partitioned_file_lists = groups;
                     }
@@ -342,24 +340,28 @@ impl TableProvider for NewListingTable {
 // 1. first get larger group
 // 2. split larger groups based on odd and even numbers
 // 3. loop until the group reaches the number of partitions
-fn split_groups_by_cpu_num(
-    groups: &[Vec<PartitionedFile>],
+fn repartition_sorted_groups(
+    mut groups: Vec<Vec<PartitionedFile>>,
     partition_num: usize,
 ) -> Vec<Vec<PartitionedFile>> {
-    let mut new_groups = groups.to_owned();
+    if groups.is_empty() {
+        return groups;
+    }
 
-    while new_groups.len() < partition_num {
-        let max_index = find_max_group_index(&new_groups);
-        let max_group = new_groups.remove(max_index);
+    while groups.len() < partition_num {
+        let max_index = find_max_group_index(&groups);
+        let max_group = groups.remove(max_index);
 
-        // if the max group has only one file, we don't split it further
-        if max_group.len() == 1 {
-            new_groups.push(max_group);
+        // if the max group has less than 2 files, we don't split it further
+        if max_group.len() <= 2 {
+            groups.push(max_group);
             break;
         }
 
-        let mut odd_group = Vec::new();
-        let mut even_group = Vec::new();
+        // split max_group into odd and even groups
+        let group_cap = (max_group.len() + 1) / 2;
+        let mut odd_group = Vec::with_capacity(group_cap);
+        let mut even_group = Vec::with_capacity(group_cap);
 
         for (idx, file) in max_group.into_iter().enumerate() {
             if idx % 2 == 0 {
@@ -370,27 +372,28 @@ fn split_groups_by_cpu_num(
         }
 
         if !odd_group.is_empty() {
-            new_groups.push(odd_group);
+            groups.push(odd_group);
         }
         if !even_group.is_empty() {
-            new_groups.push(even_group);
+            groups.push(even_group);
         }
     }
 
-    new_groups
+    groups
 }
 
 // find the index of the group with the most files
 fn find_max_group_index(groups: &[Vec<PartitionedFile>]) -> usize {
-    let mut max_index = 0;
-    let mut max_size = groups[0].len();
-    for (idx, group) in groups.iter().enumerate().skip(1) {
-        if group.len() > max_size {
-            max_size = group.len();
-            max_index = idx;
-        }
-    }
-    max_index
+    groups
+        .iter()
+        .enumerate()
+        .fold(0, |max_index, (idx, group)| {
+            if group.len() > groups[max_index].len() {
+                idx
+            } else {
+                max_index
+            }
+        })
 }
 
 fn create_ordering(schema: &Schema, sort_order: &[Vec<Expr>]) -> Result<Vec<LexOrdering>> {

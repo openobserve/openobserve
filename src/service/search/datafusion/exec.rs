@@ -956,8 +956,7 @@ pub async fn convert_parquet_file(
     ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx =
-        prepare_datafusion_context(None, &SearchType::Normal, true, false).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, true, false).await?;
 
     // Configure listing options
     let listing_options = match file_type {
