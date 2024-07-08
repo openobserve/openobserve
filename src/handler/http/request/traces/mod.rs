@@ -19,7 +19,7 @@ use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use config::{get_config, meta::stream::StreamType, metrics, utils::json};
 use infra::errors;
 use serde::Serialize;
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 use crate::{
     common::{
@@ -133,13 +133,13 @@ pub async fn get_latest_traces(
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
     let http_span = if cfg.common.tracing_search_enabled {
-        Some(tracing::info_span!(
+        tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/latest",
             org_id = org_id.clone(),
             stream_name = stream_name.clone()
-        ))
+        )
     } else {
-        None
+        Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
@@ -275,12 +275,9 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
 
-    let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span.clone().unwrap()).await
-    } else {
-        search_fut.await
-    };
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+        .instrument(http_span.clone())
+        .await;
 
     let resp_search = match search_res {
         Ok(res) => res,
@@ -367,13 +364,11 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_search = match search_res {
             Ok(res) => res,
             Err(err) => {

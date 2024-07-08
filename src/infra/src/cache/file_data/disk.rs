@@ -412,11 +412,13 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         );
                         let meta = columns[5].split('_').collect::<Vec<&str>>();
                         let is_aggregate = meta[2] == "1";
+                        let is_descending = meta[3] == "1";
                         result_cache.entry(query_key).or_insert_with(Vec::new).push(
                             ResultCacheMeta {
                                 start_time: meta[0].parse().unwrap(),
                                 end_time: meta[1].parse().unwrap(),
                                 is_aggregate,
+                                is_descending,
                             },
                         );
                     };

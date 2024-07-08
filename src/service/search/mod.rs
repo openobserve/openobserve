@@ -67,7 +67,6 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 static RE_SELECT_WILDCARD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
 
-#[tracing::instrument(name = "service:search:enter", skip(in_req))]
 pub async fn search(
     trace_id: &str,
     org_id: &str,

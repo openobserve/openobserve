@@ -318,6 +318,12 @@ async fn delete_stream_cache(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    if !config::get_config().common.result_cache_enabled {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Result Cache is disabled".to_string(),
+        )));
+    }
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
