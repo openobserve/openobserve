@@ -744,12 +744,10 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
     };
-    let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span).await
-    } else {
-        search_fut.await
-    };
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
+        .instrument(http_span)
+        .await;
+
     let resp_backward = match search_res {
         Ok(res) => res,
         Err(err) => {

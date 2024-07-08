@@ -275,12 +275,9 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
 
-    let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span.clone()).await
-    } else {
-        search_fut.await
-    };
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+        .instrument(http_span.clone())
+        .await;
 
     let resp_search = match search_res {
         Ok(res) => res,
@@ -367,13 +364,11 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_search = match search_res {
             Ok(res) => res,
             Err(err) => {
