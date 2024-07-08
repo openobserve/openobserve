@@ -96,7 +96,7 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
 }
 
 #[inline(always)]
-pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &Option<tracing::Span>) -> String {
+pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
     let cfg = config::get_config();
     if let Some(traceparent) = headers.get("traceparent") {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
@@ -105,7 +105,7 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &Option<tracing:
                 propagator.extract(&RequestHeaderExtractor::new(headers))
             });
             let trace_id = ctx.span().span_context().trace_id().to_string();
-            if let Some(span) = span {
+            if !span.is_none() {
                 span.set_parent(ctx);
             }
             trace_id
@@ -127,7 +127,7 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &Option<tracing:
             log::warn!("Failed to parse valid trace_id from received [Traceparent] header");
             config::ider::uuid()
         }
-    } else if let Some(span) = span {
+    } else if !span.is_none() {
         span.context().span().span_context().trace_id().to_string()
     } else {
         config::ider::uuid()
