@@ -53,7 +53,7 @@ jobs:
           python-version: "3.11.6"
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v3
+        uses: eifinger/setup-rye@v4
         with:
           enable-cache: true
           working-directory: 'tests/api-testing/'
