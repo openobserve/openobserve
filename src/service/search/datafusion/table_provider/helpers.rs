@@ -56,8 +56,8 @@ use crate::service::search::datafusion::storage;
 /// Check whether the given expression can be resolved using only the columns `col_names`.
 /// This means that if this function returns true:
 /// - the table provider can filter the table partition values with this expression
-/// - the expression can be marked as `TableProviderFilterPushDown::Exact` once this filtering
-/// was performed
+/// - the expression can be marked as `TableProviderFilterPushDown::Exact` once this filtering was
+///   performed
 pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
     let mut is_applicable = true;
     expr.apply(|expr| {

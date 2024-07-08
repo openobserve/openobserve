@@ -61,7 +61,7 @@ pub struct Etcd {
 
 impl Etcd {
     pub fn new(prefix: &str) -> Etcd {
-        let prefix = prefix.trim_end_matches(|v| v == '/');
+        let prefix = prefix.trim_end_matches('/');
         Etcd {
             prefix: prefix.to_string(),
         }

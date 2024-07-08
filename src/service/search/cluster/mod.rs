@@ -777,7 +777,7 @@ pub(crate) async fn get_file_list(
             .len()
             <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = match file_list::query(
+    let file_list = file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
@@ -787,10 +787,7 @@ pub(crate) async fn get_file_list(
         is_local,
     )
     .await
-    {
-        Ok(file_list) => file_list,
-        Err(_) => vec![],
-    };
+    .unwrap_or_default();
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {

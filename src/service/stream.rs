@@ -139,10 +139,7 @@ pub fn stream_res(
         })
         .collect::<Vec<_>>();
 
-    let mut stats = match stats {
-        Some(v) => v,
-        None => StreamStats::default(),
-    };
+    let mut stats = stats.unwrap_or_default();
     stats.created_at = stream_created(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
