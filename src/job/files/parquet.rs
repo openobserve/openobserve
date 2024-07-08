@@ -586,13 +586,7 @@ async fn merge_files(
         )
         .await
     } else if stream_type == StreamType::Logs {
-        merge_parquet_files(
-            thread_id,
-            tmp_dir.name(),
-            schema.metadata().clone(),
-            &defined_schema_fields,
-        )
-        .await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema.metadata().clone()).await
     } else {
         merge_parquet_files_by_datafusion(tmp_dir.name(), stream_type, &stream_name, schema.clone())
             .await

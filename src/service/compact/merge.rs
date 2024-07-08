@@ -723,13 +723,7 @@ pub async fn merge_files(
 
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(
-            thread_id,
-            tmp_dir.name(),
-            schema_latest.metadata().clone(),
-            &defined_schema_fields,
-        )
-        .await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.metadata().clone()).await
     } else {
         datafusion::exec::merge_parquet_files(
             tmp_dir.name(),
@@ -1076,7 +1070,6 @@ pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
     metadata: HashMap<String, String>,
-    defined_schema_fields: &[String],
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
 
@@ -1113,14 +1106,10 @@ pub async fn merge_parquet_files(
         shared_fields.extend(file_schema.fields().iter().cloned());
     }
 
-    let schema = Schema::new_with_metadata(shared_fields.into_iter().collect::<Vec<_>>(), metadata);
-    let schema = if !defined_schema_fields.is_empty() {
-        let schema = SchemaCache::new(schema);
-        let schema = generate_schema_for_defined_schema_fields(&schema, defined_schema_fields);
-        Arc::new(schema.schema().clone())
-    } else {
-        Arc::new(schema)
-    };
+    let schema = Arc::new(Schema::new_with_metadata(
+        shared_fields.into_iter().collect::<Vec<_>>(),
+        metadata,
+    ));
 
     // format recordbatch
     let record_batches = record_batches
