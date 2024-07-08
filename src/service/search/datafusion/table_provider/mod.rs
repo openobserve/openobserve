@@ -252,13 +252,18 @@ impl TableProvider for NewListingTable {
             .flatten()
         {
             Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
-            Some(Ok(new_groups)) => {
-                if new_groups.len() <= self.options.target_partitions {
-                    partitioned_file_lists = new_groups;
+            Some(Ok(groups)) => {
+                if groups.len() <= self.options.target_partitions {
+                    let cpu_num = config::get_config().limit.cpu_num;
+                    if cpu_num > groups.len() {
+                        partitioned_file_lists = repartition_sorted_groups(groups, cpu_num);
+                    } else {
+                        partitioned_file_lists = groups;
+                    }
                 } else {
                     log::info!(
                         "attempted to split file groups by statistics, but there were more file groups: {} than target_partitions: {}",
-                        new_groups.len(),
+                        groups.len(),
                         self.options.target_partitions
                     )
                 }
@@ -334,6 +339,65 @@ impl TableProvider for NewListingTable {
             .collect();
         Ok(support)
     }
+}
+
+// 1. first get larger group
+// 2. split larger groups based on odd and even numbers
+// 3. loop until the group reaches the number of partitions
+fn repartition_sorted_groups(
+    mut groups: Vec<Vec<PartitionedFile>>,
+    partition_num: usize,
+) -> Vec<Vec<PartitionedFile>> {
+    if groups.is_empty() {
+        return groups;
+    }
+
+    while groups.len() < partition_num {
+        let max_index = find_max_group_index(&groups);
+        let max_group = groups.remove(max_index);
+
+        // if the max group has less than 2 files, we don't split it further
+        if max_group.len() <= 2 {
+            groups.push(max_group);
+            break;
+        }
+
+        // split max_group into odd and even groups
+        let group_cap = (max_group.len() + 1) / 2;
+        let mut odd_group = Vec::with_capacity(group_cap);
+        let mut even_group = Vec::with_capacity(group_cap);
+
+        for (idx, file) in max_group.into_iter().enumerate() {
+            if idx % 2 == 0 {
+                even_group.push(file);
+            } else {
+                odd_group.push(file);
+            }
+        }
+
+        if !odd_group.is_empty() {
+            groups.push(odd_group);
+        }
+        if !even_group.is_empty() {
+            groups.push(even_group);
+        }
+    }
+
+    groups
+}
+
+// find the index of the group with the most files
+fn find_max_group_index(groups: &[Vec<PartitionedFile>]) -> usize {
+    groups
+        .iter()
+        .enumerate()
+        .fold(0, |max_index, (idx, group)| {
+            if group.len() > groups[max_index].len() {
+                idx
+            } else {
+                max_index
+            }
+        })
 }
 
 fn create_ordering(schema: &Schema, sort_order: &[Vec<Expr>]) -> Result<Vec<LexOrdering>> {

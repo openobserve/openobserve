@@ -30,6 +30,7 @@ use config::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
         record_batch_ext::{format_recordbatch_by_schema, merge_record_batches},
+        schema_ext::SchemaExt,
     },
     FILE_EXT_PARQUET,
 };
@@ -608,6 +609,8 @@ pub async fn merge_files(
                     }
                 }
                 deleted_files.push(file.key.clone());
+                total_records -= file.meta.records;
+                new_file_size -= file.meta.original_size;
                 continue;
             }
         };
@@ -623,6 +626,18 @@ pub async fn merge_files(
     // get time range for these files
     let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
     let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
+
+    let mut new_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: total_records,
+        original_size: new_file_size,
+        compressed_size: 0,
+        flattened: false,
+    };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
 
     // convert the file to the latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
@@ -721,18 +736,6 @@ pub async fn merge_files(
             // replace the file in tmpfs
             tmp_dir.set(&file.key, buf.into())?;
         }
-    }
-
-    let mut new_file_meta = FileMeta {
-        min_ts,
-        max_ts,
-        records: total_records,
-        original_size: new_file_size,
-        compressed_size: 0,
-        flattened: false,
-    };
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }
 
     let start = std::time::Instant::now();
@@ -1109,6 +1112,7 @@ pub async fn merge_parquet_files(
     })?;
 
     let mut record_batches = Vec::new();
+    let mut shared_fields = HashSet::new();
     for file in temp_files {
         let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
             log::error!(
@@ -1118,7 +1122,7 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
 
-        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
+        let (file_schema, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
             log::error!("[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error");
             log::error!(
                 "[MERGE:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
@@ -1128,7 +1132,11 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
         record_batches.extend(batches);
+        shared_fields.extend(file_schema.fields().iter().map(|f| f.name().to_string()));
     }
+
+    // create new schema with the shared fields
+    let schema = Arc::new(schema.retain(shared_fields));
 
     // format recordbatch
     let record_batches = record_batches

@@ -19,6 +19,7 @@ use std::{
 };
 
 use arrow_schema::{Field, Schema};
+use hashbrown::HashSet;
 
 const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
 
@@ -26,6 +27,7 @@ const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
 pub trait SchemaExt {
     fn to_cloned_fields(&self) -> Vec<Field>;
     fn cloned_from(&self, schema: &Schema) -> Schema;
+    fn retain(&self, fields: HashSet<String>) -> Schema;
     fn hash_key(&self) -> String;
     fn size(&self) -> usize;
     fn simple_fields(&self) -> Vec<(String, String)>;
@@ -50,6 +52,17 @@ impl SchemaExt for Schema {
                 Some(f) => (*f).clone(),
                 None => f.clone(),
             })
+            .collect::<Vec<_>>();
+        Schema::new(fields)
+    }
+
+    // create a new schema with only the fields in the set and keep the order
+    fn retain(&self, fields: HashSet<String>) -> Schema {
+        let fields = self
+            .fields()
+            .iter()
+            .filter(|f| fields.contains(f.name()))
+            .cloned()
             .collect::<Vec<_>>();
         Schema::new(fields)
     }
