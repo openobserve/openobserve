@@ -1138,6 +1138,7 @@ pub fn create_session_config(
     config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     if sort_by_timestamp_desc {
         config = config.with_round_robin_repartition(false);
+        config = config.with_coalesce_batches(false);
     }
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
