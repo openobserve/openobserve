@@ -1131,8 +1131,8 @@ pub fn create_session_config(
         "datafusion.execution.listing_table_ignore_subdirectory",
         false,
     );
-    config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     if sort_by_timestamp_desc {
+        config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
         config = config.with_round_robin_repartition(false);
         config = config.with_coalesce_batches(false);
     }
