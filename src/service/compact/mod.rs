@@ -283,7 +283,7 @@ pub async fn run_merge(
 
     let mut tasks = Vec::with_capacity(jobs.len());
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
-    let mut min_offset = std::i64::MAX;
+    let mut min_offset = i64::MAX;
     for job in jobs {
         if job.offsets == 0 {
             log::error!("[COMPACTOR] merge job offset error: {}", job.offsets);
