@@ -45,8 +45,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
+                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request,
             },
         },
     },
