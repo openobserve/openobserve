@@ -661,6 +661,136 @@ def test_e2e_distinctquery(create_session, base_url):
     response_data = resp_get_distinctquery.json()
 
 
+
+def test_e2e_matchalllowercase(create_session, base_url):
+    """Running an E2E test for valid SQL query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "select * from \"stream_pytest_data\" WHERE match_all('e2e_test')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False
+        }
+    }
+    
+    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_distinctquery.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+    
+    response_data = resp_get_distinctquery.json()
+    
+    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+    assert any(hit['log'] == 'e2e_test' for hit in response_data['hits']), "'e2e_test' not found in log field of hits"
+
+def test_e2e_matchalluppercase(create_session, base_url):
+    """Running an E2E test for valid SQL query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_TESTING')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False
+        }
+    }
+    
+    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_distinctquery.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+    
+    response_data = resp_get_distinctquery.json()
+    
+    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+    assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
+
+
+def test_e2e_matchallupperandlowercase(create_session, base_url):
+    """Running an E2E test for valid SQL query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_testing')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False
+        }
+    }
+    
+    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_distinctquery.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+    
+    response_data = resp_get_distinctquery.json()
+    
+    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+    assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
+
+def test_e2e_matchallupperlowercase(create_session, base_url):
+    """Running an E2E test for valid SQL query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_test')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 250,
+            "quick_mode": False
+        }
+    }
+    
+    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_distinctquery.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+    
+    response_data = resp_get_distinctquery.json()
+    
+    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+    logs = [hit['log'] for hit in response_data['hits']]
+    assert 'e2e_test' in logs, "'e2e_test' not found in log field of hits"
+    assert 'E2E_TESTING' in logs, "'E2E_TESTING' not found in log field of hits"
+
+
+
 # def test_e2e_cachedscenario(create_session, base_url):
 #     """Running an E2E test for valid SQL query."""
 
