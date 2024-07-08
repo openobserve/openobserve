@@ -254,9 +254,19 @@ impl TableProvider for NewListingTable {
             Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
             Some(Ok(groups)) => {
                 if groups.len() <= self.options.target_partitions {
-                    let cpu_num = config::get_config().limit.cpu_num;
-                    if cpu_num > groups.len() {
-                        partitioned_file_lists = repartition_sorted_groups(groups, cpu_num);
+                    let query_limit = state
+                        .config()
+                        .get_extension::<super::ExtLimit>()
+                        .map(|x| x.0)
+                        .unwrap_or(0);
+                    let partition_num =
+                        if query_limit == 0 || query_limit >= config::PARQUET_BATCH_SIZE {
+                            self.options.target_partitions
+                        } else {
+                            config::get_config().limit.cpu_num
+                        };
+                    if partition_num > groups.len() {
+                        partitioned_file_lists = repartition_sorted_groups(groups, partition_num);
                     } else {
                         partitioned_file_lists = groups;
                     }

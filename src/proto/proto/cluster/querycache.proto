@@ -27,16 +27,16 @@ message QueryCacheRequest {
     string  timestamp_col = 6; 
     string  trace_id = 7;
     int64 discard_interval = 8;
+    bool is_descending = 9; 
 }
 
 message QueryCacheRes {
     QueryResponse cached_response = 1;
-    repeated   QueryDelta deltas  = 2;
-    bool      has_pre_cache_delta = 3;
-    bool          has_cached_data = 4;
-    bool     cache_query_response = 5;
-    int64        cache_start_time = 6;
-    int64          cache_end_time = 7;
+    bool          has_cached_data = 2;
+    bool     cache_query_response = 3;
+    int64        cache_start_time = 4;
+    int64          cache_end_time = 5;
+    bool is_descending = 6;
 }
 
 message QueryCacheResponse {

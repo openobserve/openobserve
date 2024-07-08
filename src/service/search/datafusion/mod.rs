@@ -22,6 +22,9 @@ pub mod storage;
 pub mod table_provider;
 pub mod udf;
 
+/// Extension setting for query limit
+pub(crate) struct ExtLimit(usize);
+
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {
     Greedy,

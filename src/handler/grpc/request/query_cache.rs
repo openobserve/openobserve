@@ -16,11 +16,11 @@
 use async_trait::async_trait;
 use proto::cluster_rpc::{
     query_cache_server::QueryCache, DeleteResultCacheRequest, DeleteResultCacheResponse,
-    QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryDelta, QueryResponse,
+    QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
 };
 use tonic::{Request, Response, Status};
 
-use crate::service::search::cache::cacher;
+use crate::{common::meta::search::CacheQueryRequest, service::search::cache::cacher};
 
 #[derive(Debug, Default)]
 pub struct QueryCacheServerImpl;
@@ -33,37 +33,29 @@ impl QueryCache for QueryCacheServerImpl {
     ) -> Result<Response<QueryCacheResponse>, Status> {
         let req: QueryCacheRequest = request.into_inner();
         match cacher::get_cached_results(
-            req.start_time,
-            req.end_time,
-            req.is_aggregate,
             &req.file_path,
-            &req.timestamp_col,
             &req.trace_id,
-            req.discard_interval,
+            CacheQueryRequest {
+                q_start_time: req.start_time,
+                q_end_time: req.end_time,
+                is_aggregate: req.is_aggregate,
+                ts_column: req.timestamp_col,
+                discard_interval: req.discard_interval,
+                is_descending: req.is_descending,
+            },
         )
         .await
         {
             Some(res) => {
-                let deltas = res
-                    .deltas
-                    .iter()
-                    .map(|d| QueryDelta {
-                        delta_start_time: d.delta_start_time,
-                        delta_end_time: d.delta_end_time,
-                        delta_removed_hits: d.delta_removed_hits,
-                    })
-                    .collect();
-
                 let res = QueryCacheRes {
                     cached_response: Some(QueryResponse {
                         data: serde_json::to_vec(&res.cached_response).unwrap(),
                     }),
-                    deltas,
-                    has_pre_cache_delta: res.has_pre_cache_delta,
                     has_cached_data: res.has_cached_data,
                     cache_query_response: res.cache_query_response,
                     cache_start_time: res.response_start_time,
                     cache_end_time: res.response_end_time,
+                    is_descending: res.is_descending,
                 };
 
                 Ok(Response::new(QueryCacheResponse {
