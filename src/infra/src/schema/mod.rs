@@ -303,8 +303,6 @@ pub async fn merge(
 ) -> Result<Option<(Schema, Vec<Field>)>> {
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
-    #[cfg(feature = "enterprise")]
-    let key_for_update = key.clone();
     let inferred_schema = schema.clone();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let db = infra_db::get_db().await;
@@ -417,10 +415,6 @@ pub async fn update_setting(
     metadata: std::collections::HashMap<String, String>,
 ) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
-    #[cfg(feature = "enterprise")]
-    let key_for_update = key.clone();
-    #[cfg(feature = "enterprise")]
-    let metadata_for_update = metadata.clone();
     let db = infra_db::get_db().await;
     db.get_for_update(
         &key.clone(),
@@ -472,18 +466,6 @@ pub async fn update_setting(
     )
     .await?;
 
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::schema_setting(
-            &key_for_update,
-            json::to_vec(&metadata_for_update).unwrap().into(),
-            infra::db::NEED_WATCH,
-            None,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
     Ok(())
 }
 
@@ -494,10 +476,6 @@ pub async fn delete_fields(
     deleted_fields: Vec<String>,
 ) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
-    #[cfg(feature = "enterprise")]
-    let key_for_update = key.clone();
-    #[cfg(feature = "enterprise")]
-    let deleted_fields_for_update = deleted_fields.clone();
     let db = infra_db::get_db().await;
     db.get_for_update(
         &key.clone(),
@@ -565,19 +543,6 @@ pub async fn delete_fields(
         }),
     )
     .await?;
-
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::schema_delete_fields(
-            &key_for_update,
-            json::to_vec(&deleted_fields_for_update).unwrap().into(),
-            infra::db::NEED_WATCH,
-            None,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
 
     Ok(())
 }
