@@ -336,7 +336,7 @@ pub async fn search(
             let http_span_local = http_span.clone();
             let mut req = req.clone();
             let org_id = org_id.clone();
-            let trace_id = format!("{}-{:?}", trace_id.clone(), i);
+            let trace_id = trace_id.clone();
             let user_id = user_id.clone();
 
             let task = tokio::task::spawn(async move {
@@ -356,15 +356,15 @@ pub async fn search(
                     );
                 }
 
-                let search_fut = SearchService::search(
+                SearchService::search(
                     &trace_id,
                     &org_id,
                     stream_type,
                     Some(user_id.to_string()),
                     &req,
-                );
-
-                search_fut.instrument(http_span_local).await
+                )
+                .instrument(http_span_local)
+                .await
             })
             .instrument(http_span.clone());
             tasks.push(task);
