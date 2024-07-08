@@ -21,16 +21,27 @@ use utoipa::ToSchema;
 pub struct CachedQueryResponse {
     pub cached_response: Response,
     pub deltas: Vec<QueryDelta>,
-    pub has_pre_cache_delta: bool,
     pub has_cached_data: bool,
     pub cache_query_response: bool,
     pub response_start_time: i64,
     pub response_end_time: i64,
     pub ts_column: String,
+    pub is_descending: bool,
+    pub limit: i64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
     pub delta_removed_hits: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct CacheQueryRequest {
+    pub q_start_time: i64,
+    pub q_end_time: i64,
+    pub is_aggregate: bool,
+    pub ts_column: String,
+    pub discard_interval: i64,
+    pub is_descending: bool,
 }
