@@ -683,12 +683,12 @@ def test_e2e_matchalllowercase(create_session, base_url):
         }
     }
     
-    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_matchalllowercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     assert (
-        resp_get_distinctquery.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+        resp_get_matchalllowercase.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_matchalllowercase.status_code} {resp_get_matchalllowercase.content}"
     
-    response_data = resp_get_distinctquery.json()
+    response_data = resp_get_matchalllowercase.json()
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     assert any(hit['log'] == 'e2e_test' for hit in response_data['hits']), "'e2e_test' not found in log field of hits"
@@ -714,12 +714,12 @@ def test_e2e_matchalluppercase(create_session, base_url):
         }
     }
     
-    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_matchalluppercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     assert (
-        resp_get_distinctquery.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+        resp_get_matchalluppercase.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_matchalluppercase.status_code} {resp_get_matchalluppercase.content}"
     
-    response_data = resp_get_distinctquery.json()
+    response_data = resp_get_matchalluppercase.json()
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
@@ -777,12 +777,12 @@ def test_e2e_matchallupperlowercase(create_session, base_url):
         }
     }
     
-    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_matchallupperlowercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     assert (
-        resp_get_distinctquery.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+        resp_get_matchallupperlowercase.status_code == 200
+    ), f"Expected status code 200, but got {resp_get_matchallupperlowercase.status_code} {resp_get_matchallupperlowercase.content}"
     
-    response_data = resp_get_distinctquery.json()
+    response_data = resp_get_matchallupperlowercase.json()
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     logs = [hit['log'] for hit in response_data['hits']]
