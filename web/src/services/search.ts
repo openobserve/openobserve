@@ -32,7 +32,7 @@ const search = {
     search_type: string = "UI"
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean = (window as any).use_cache || true;
+    const use_cache: boolean = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (typeof query.query.sql != "string") {
