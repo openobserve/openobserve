@@ -1537,14 +1537,12 @@ const useLogs = () => {
           searchObj.data.histogramQuery.aggs.histogram;
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
-        searchObj.data.histogramQuery.query.start_time =
-          searchObj.data.datetime.startTime.toString().length > 13
-            ? searchObj.data.datetime.startTime
-            : searchObj.data.datetime.startTime * 1000;
-        searchObj.data.histogramQuery.query.end_time =
-          searchObj.data.datetime.endTime.toString().length > 13
-            ? searchObj.data.datetime.endTime
-            : searchObj.data.datetime.endTime * 1000;
+        // searchObj.data.histogramQuery.query.start_time =
+        //   queryReq.query.start_time;             
+      
+        // searchObj.data.histogramQuery.query.end_time =
+        //   queryReq.query.end_time;
+   
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
 

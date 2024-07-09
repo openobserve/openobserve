@@ -30,7 +30,7 @@ use crate::{
                 DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
             },
         },
-        utils::auth::{get_hash, is_root_user},
+        utils::auth::{get_hash, get_role, is_root_user},
     },
     service::db,
 };
@@ -374,6 +374,7 @@ pub async fn add_user_to_org(
                 .unwrap()
                 .unwrap()
         };
+        let role = get_role(role);
         if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
