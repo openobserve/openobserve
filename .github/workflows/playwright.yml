@@ -91,7 +91,7 @@ jobs:
         run: ls -R
 
       - name: Start OpenObserve
-        run: ./debug-binary/openobserve &
+        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve &
 
       - name: Wait for start
         run: sleep 10
