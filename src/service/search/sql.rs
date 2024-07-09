@@ -393,7 +393,7 @@ impl Sql {
         }
 
         // Hack offset limit and sort by for sql
-        if meta.limit == 0 {
+        if meta.limit == 0 && stream_type != StreamType::Index {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
             meta.limit = if req_query.size >= 0 {

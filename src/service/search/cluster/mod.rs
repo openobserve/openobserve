@@ -37,7 +37,6 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
-use itertools::Itertools;
 use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
@@ -973,8 +972,8 @@ async fn get_file_list_by_inverted_index(
 
     let index_stream_name = format!("{}_{}", meta.stream_name, stream_type);
     let query = format!(
-        "SELECT {}, file_name, field, term, _count, deleted, segment_ids FROM \"{}\" WHERE {}",
-        cfg.common.column_timestamp, index_stream_name, search_condition
+        "SELECT term, file_name, _count, deleted, segment_ids FROM \"{}\" WHERE {} ORDER BY {} DESC",
+        index_stream_name, search_condition, cfg.common.column_timestamp
     );
 
     // fast_mode is for 1st page optimization
@@ -986,7 +985,7 @@ async fn get_file_list_by_inverted_index(
     idx_req.query.as_mut().unwrap().sql = query;
     idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
     idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
-    idx_req.query.as_mut().unwrap().size = 99999;
+    idx_req.query.as_mut().unwrap().size = -1;
     idx_req.query.as_mut().unwrap().uses_zo_fn = false;
     idx_req.query.as_mut().unwrap().track_total_hits = false;
     idx_req.query.as_mut().unwrap().query_context = "".to_string();
@@ -1009,32 +1008,27 @@ async fn get_file_list_by_inverted_index(
     let unique_files = if fast_mode {
         let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
         let mut total_count = 0;
-        let sorted_data = idx_resp
-            .hits
-            .iter()
-            .filter_map(|hit| {
-                let term = hit.get("term").unwrap().as_str().unwrap().to_string();
-                let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-                let count = hit.get("_count").unwrap().as_u64().unwrap();
-                let segment_ids = hit
-                    .get("segment_ids")
-                    .unwrap()
-                    .as_str()
-                    .unwrap()
-                    .to_string();
-                let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
-                if deleted_files.contains(&file_name) {
-                    None
-                } else {
-                    total_count += count;
-                    Some((term, file_name, count, segment_ids, timestamp))
-                }
-            })
-            .sorted_by(|a, b| Ord::cmp(&b.4, &a.4)); // Descending order of timestamp
+        let sorted_data = idx_resp.hits.iter().filter_map(|hit| {
+            let term = hit.get("term").unwrap().as_str().unwrap().to_string();
+            let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
+            let count = hit.get("_count").unwrap().as_u64().unwrap();
+            let segment_ids = hit
+                .get("segment_ids")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string();
+            if deleted_files.contains(&file_name) {
+                None
+            } else {
+                total_count += count;
+                Some((term, file_name, count, segment_ids))
+            }
+        }); // Descending order of timestamp
         let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
         let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-        for (term, filename, count, segment_ids, _timestamp) in sorted_data {
+        for (term, filename, count, segment_ids) in sorted_data {
             let term = term.as_str();
             for search_term in terms.iter() {
                 if term.contains(search_term) {
