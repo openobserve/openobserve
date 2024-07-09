@@ -107,7 +107,9 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled && !meta.fts_terms.is_empty();
+    let is_inverted_index = cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && !meta.fts_terms.is_empty();
 
     log::info!(
         "[trace_id {trace_id}] search: is_agg_query {:?} is_inverted_index {:?}",
@@ -144,8 +146,8 @@ pub async fn search(
             .join(" OR ");
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
-            meta.stream_name, search_condition
+            "SELECT file_name, term, _count, deleted, {} FROM \"{}\" WHERE {}",
+            cfg.common.column_timestamp, meta.stream_name, search_condition
         );
 
         // fast_mode is for 1st page optimization

@@ -701,27 +701,6 @@ async fn get_file_list(
     .await
 }
 
-/// get file list from local mutable arrow idx file, each file will be searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list_arrow", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
-async fn get_file_list_arrow(
-    trace_id: &str,
-    sql: &Sql,
-    stream_type: StreamType,
-    _partition_time_level: &PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Result<Vec<FileKey>, Error> {
-    get_file_list_inner(
-        trace_id,
-        sql,
-        stream_type,
-        _partition_time_level,
-        partition_keys,
-        &get_config().common.data_idx_dir,
-        "arrow",
-    )
-    .await
-}
-
 pub fn adapt_batch(table_schema: &Schema, batch: &RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
