@@ -74,6 +74,7 @@ jobs:
 
   ui_integration_tests:
     name: playwright_ui_integration_tests
+    needs: [build_binary]
     runs-on: 
       labels: ubuntu-latest
     strategy:
