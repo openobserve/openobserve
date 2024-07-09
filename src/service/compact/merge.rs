@@ -22,7 +22,7 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
     get_config, ider,
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    meta::stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
     utils::{
         json,
@@ -361,7 +361,14 @@ pub async fn merge_by_stream(
             let cfg = get_config();
             // sort by file size
             let mut files_with_size = files_with_size.to_owned();
-            files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
+            match MergeStrategy::from(&cfg.compact.strategy) {
+                MergeStrategy::FileSize => {
+                    files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
+                }
+                MergeStrategy::FileTime => {
+                    files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+                }
+            }
             // delete duplicated files
             files_with_size.dedup_by(|a, b| a.key == b.key);
             // partition files by size

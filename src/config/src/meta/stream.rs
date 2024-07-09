@@ -22,9 +22,9 @@ use proto::cluster_rpc;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
-use super::usage::Stats;
 use crate::{
     get_config,
+    meta::usage::Stats,
     utils::{
         hash::{gxhash, Sum64},
         json::{self, Map, Value},
@@ -197,6 +197,22 @@ impl From<&String> for QueryPartitionStrategy {
             "file_size" => QueryPartitionStrategy::FileSize,
             "file_hash" => QueryPartitionStrategy::FileHash,
             _ => QueryPartitionStrategy::FileNum,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MergeStrategy {
+    FileSize,
+    FileTime,
+}
+
+impl From<&String> for MergeStrategy {
+    fn from(s: &String) -> Self {
+        match s.to_lowercase().as_str() {
+            "file_size" => MergeStrategy::FileSize,
+            "file_time" => MergeStrategy::FileTime,
+            _ => MergeStrategy::FileSize,
         }
     }
 }

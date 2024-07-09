@@ -336,7 +336,10 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty() && meta_time_range_is_empty {
+            if !time_range_sql.is_empty()
+                && meta_time_range_is_empty
+                && stream_type != StreamType::Index
+            {
                 match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
