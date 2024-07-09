@@ -77,6 +77,9 @@ jobs:
     needs: [build_binary]
     runs-on: 
       labels: ubuntu-latest
+    container: 
+      image: mcr.microsoft.com/playwright:v1.40.0-jammy
+      options: --user root
     strategy:
       matrix:
         browser: [chrome]
@@ -101,7 +104,7 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v4
-        
+
       - uses: actions/setup-node@v4
         with:
             node-version: lts/*
@@ -114,7 +117,7 @@ jobs:
           echo "INGESTION_URL"=${INGESTION_URL} >> .env
           echo "ORGNAME"=${ORGNAME} >> .env
           mv .env tests/ui-testing
-          cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+          cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
