@@ -2891,6 +2891,11 @@ const useLogs = () => {
       if (isNaN(endCount)) {
         endCount = 0;
       }
+
+      let plusSign: string = "";
+      if(searchObj.data.queryResults.partitionDetail.partitions.length > 1 && searchObj.meta.showHistogram == false) {
+        plusSign = "+";
+      }
       const title =
         "Showing " +
         startCount +
@@ -2898,10 +2903,12 @@ const useLogs = () => {
         endCount +
         " out of " +
         totalCount.toLocaleString() +
+        plusSign +
         " events in " +
         searchObj.data.queryResults.took +
         " ms. (Scan Size: " +
         formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+        plusSign +
         ")";
       return title;
     } catch (e: any) {
@@ -3166,9 +3173,6 @@ const useLogs = () => {
           if (searchObj.loading == false && searchObj.loadingHistogram == false) {
             searchObj.loading = true;
             await getQueryData(false);
-            generateHistogramData();
-            updateGridColumns();
-            searchObj.meta.histogramDirtyFlag = true;
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
