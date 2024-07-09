@@ -1043,6 +1043,8 @@ async fn prepare_index_record_batches(
             new_schema.clone(),
             vec![
                 Arc::new(field_timestamp.finish()),
+                Arc::new(field_min_ts.finish()),
+                Arc::new(field_max_ts.finish()),
                 Arc::new(field_field.finish()),
                 Arc::new(field_term.finish()),
                 Arc::new(field_file_name.finish()),
