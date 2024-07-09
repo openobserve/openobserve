@@ -89,9 +89,9 @@ jobs:
 
       - name: Display structure of downloaded files
         run: ls -R
-        
+
       - name: Start OpenObserve
-        run: target/debug/openobserve &
+        run: ./debug-binary/openobserve &
 
       - name: Wait for start
         run: sleep 10
