@@ -3171,7 +3171,11 @@ const useLogs = () => {
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
-          if (searchObj.loading == false && searchObj.loadingHistogram == false) {
+          if (
+            searchObj.loading == false &&
+            searchObj.loadingHistogram == false &&
+            searchObj.meta.logsVisualizeToggle == "logs"
+          ) {
             searchObj.loading = true;
             await getQueryData(false);
           }

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onChangeTimezone="refreshTimezone"
             @handleQuickModeChange="handleQuickModeChange"
             @handleRunQueryFn="handleRunQueryFn"
+            @on-auto-interval-trigger="onAutoIntervalTrigger"
           />
         </template>
         <template v-slot:after>
@@ -701,6 +702,13 @@ export default defineComponent({
       refreshData();
     };
 
+    const onAutoIntervalTrigger = () => {
+      // handle event for visualization page only
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        handleRunQueryFn();
+      }
+    };
+
     function removeFieldByName(data, fieldName) {
       return data.filter((item) => {
         if (item.expr) {
@@ -1114,6 +1122,7 @@ export default defineComponent({
       updateUrlQueryParams,
       refreshHistogramChart,
       onChangeInterval,
+      onAutoIntervalTrigger,
       handleRunQuery,
       refreshTimezone,
       resetSearchObj,

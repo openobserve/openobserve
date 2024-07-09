@@ -406,7 +406,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <auto-refresh-interval
               class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
+              :trigger="true"
               @update:model-value="onRefreshIntervalUpdate"
+              @trigger="$emit('onAutoIntervalTrigger')"
             />
             <q-btn-group
               class="no-outline q-pa-none no-border q-mr-xs"
@@ -902,6 +904,7 @@ export default defineComponent({
     "onChangeTimezone",
     "handleQuickModeChange",
     "handleRunQueryFn",
+    "onAutoIntervalTrigger",
   ],
   methods: {
     searchData() {
