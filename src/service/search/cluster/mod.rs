@@ -146,8 +146,8 @@ pub async fn search(
             .join(" OR ");
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
-            meta.stream_name, search_condition
+            "SELECT file_name, term, _count, deleted, {} FROM \"{}\" WHERE {}",
+            cfg.common.column_timestamp, meta.stream_name, search_condition
         );
 
         // fast_mode is for 1st page optimization
