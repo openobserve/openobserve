@@ -30,7 +30,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on: 
-      labels: ubuntu-latest
+      labels: ubicloud-standard-8
       
     steps:
       - name: Remove unused tools
@@ -63,7 +63,7 @@ jobs:
         run: cd web && npm install && npm run build
       
       - name: Build and run binary
-        run: cargo build --features mimalloc
+        run: cargo build --release --features mimalloc
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
