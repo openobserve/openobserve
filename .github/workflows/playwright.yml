@@ -86,6 +86,9 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
+
+      - name: Display structure of downloaded files
+        run: ls -R
         
       - name: Start OpenObserve
         run: target/debug/openobserve &
