@@ -27,16 +27,11 @@ env:
 
 
 jobs:
-  ui_integration_tests:
-    name: playwright_ui_integration_tests
+  build_binary:
+    name: build_binary
     runs-on: 
       labels: ubuntu-latest
-    strategy:
-      matrix:
-        browser: [chrome]
-        testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
-       
+      
     steps:
       - name: Remove unused tools
         run: |
@@ -69,6 +64,27 @@ jobs:
       
       - name: Build and run binary
         run: cargo build --features mimalloc
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-binary
+          path: target/debug/openobserve
+          retention-days: 1
+
+  ui_integration_tests:
+    name: playwright_ui_integration_tests
+    runs-on: 
+      labels: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chrome]
+        testfilename: 
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
+       
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         
       - name: Start OpenObserve
         run: target/debug/openobserve &
