@@ -99,6 +99,9 @@ jobs:
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
 
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+        
       - uses: actions/setup-node@v4
         with:
             node-version: lts/*
