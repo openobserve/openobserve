@@ -973,8 +973,8 @@ async fn get_file_list_by_inverted_index(
 
     let index_stream_name = format!("{}_{}", meta.stream_name, stream_type);
     let query = format!(
-        "SELECT file_name, field, term, _count, _timestamp, deleted, segment_ids FROM \"{index_stream_name}\" WHERE {}",
-        search_condition
+        "SELECT {}, file_name, field, term, _count, deleted, segment_ids FROM \"{}\" WHERE {}",
+        cfg.common.column_timestamp, index_stream_name, search_condition
     );
 
     // fast_mode is for 1st page optimization
