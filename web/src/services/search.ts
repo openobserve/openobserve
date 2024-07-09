@@ -32,11 +32,11 @@ const search = {
     search_type: string = "UI"
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-
+    let use_cache = window.use_cache || false;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
-    let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
+    let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (typeof query.query.sql != "string") {
-      url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}`;
+      url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,
