@@ -233,6 +233,7 @@ export default defineComponent({
     "result-metadata-update",
     "last-triggered-at-update",
     "update:initialVariableValues",
+    // "search-request-trace-ids",
     "updated:vrlFunctionFieldList",
   ],
   setup(props, { emit }) {
@@ -264,6 +265,7 @@ export default defineComponent({
       metadata,
       resultMetaData,
       lastTriggeredAt,
+      searchRequestTraceIds,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -288,7 +290,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {} },
+      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -301,7 +303,17 @@ export default defineComponent({
         };
       }
     });
+    //watch trace id and add in the searchRequestTraceIds
+    watch(searchRequestTraceIds, (updatedSearchRequestTraceIds) => {
+      console.log("updatedSearchRequestTraceIds", updatedSearchRequestTraceIds);
 
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: updatedSearchRequestTraceIds,
+        };
+      }
+    });
     // ======= [END] dashboard PrintMode =======
 
     watch(
@@ -388,6 +400,18 @@ export default defineComponent({
       emit("last-triggered-at-update", lastTriggeredAt.value);
     });
 
+    watch(lastTriggeredAt, () => {
+      emit("last-triggered-at-update", lastTriggeredAt.value);
+    });
+
+    // watch(searchRequestTraceIds, () => {
+    //   console.log(
+    //     "searchRequestTraceIds----------",
+    //     searchRequestTraceIds.value
+    //   );
+
+    //   emit("search-request-trace-ids", searchRequestTraceIds.value);
+    // });
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
         (it: any) => it.alias,
@@ -813,6 +837,7 @@ export default defineComponent({
       chartPanelRef,
       data,
       loading,
+      searchRequestTraceIds,
       errorDetail,
       panelData,
       noData,

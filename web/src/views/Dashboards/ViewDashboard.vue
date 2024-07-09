@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
               </q-btn>
               <q-btn
+                v-if="config.isEnterprise == 'true'"
                 size="sm"
                 no-caps
                 icon="cancel"
@@ -215,7 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :showTabs="true"
         :forceLoad="store.state.printMode"
         :searchType="searchType"
-        @panelsValues="getPanelsValues"
+        @panelsValues="handleEmittedData"
+        @searchRequestTraceIds="searchRequestTraceIds"
       />
 
       <q-dialog
@@ -278,7 +280,8 @@ import ScheduledDashboards from "./ScheduledDashboards.vue";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
-import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
+import config from "@/aws-exports";
+import queryService from "../../services/search";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -301,6 +304,7 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const quasar = useQuasar();
+    const $q = useQuasar();
     const currentDashboardData = reactive({
       data: {},
     });
@@ -309,13 +313,19 @@ export default defineComponent({
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
     const disableDateTimeRefresh = ref(false);
-    const getPanelsValues = computed(() => {
-      return (data) => {
-        console.log("getPanelsValues", data);
-        disableDateTimeRefresh.value = data.some((item) => item === true);
-        console.log("disableDateTimeRefresh", disableDateTimeRefresh.value);
-      };
-    });
+
+    const receivedData = ref([]);
+    const handleEmittedData = (panelsValues) => {
+      console.log("handleEmittedData called with:", panelsValues);
+      receivedData.value = panelsValues;
+      disableDateTimeRefresh.value = panelsValues.some((item) => item === true);
+    };
+
+    const traceIdRef = ref(null);
+    const searchRequestTraceIds = (data) => {
+      console.log("searchRequestTraceIds====", data);
+      traceIdRef.value = data;
+    };
 
     let moment: any = () => {};
 
@@ -522,6 +532,52 @@ export default defineComponent({
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
     };
+
+    // [START] cancel running queries
+
+    const cancelQuery = () => {
+      console.log("cancelQuery called");
+      console.log("Current state of searchRequestTraceIds:", traceIdRef.value);
+      if (traceIdRef.value.length === 0) {
+        console.error("No trace IDs to cancel");
+        return;
+      }
+      queryService
+        .delete_running_queries(
+          store.state.selectedOrganization.identifier,
+          traceIdRef.value
+        )
+        .then((res) => {
+          console.log("cancelQuery response:", res);
+          const isCancelled = res.data.some((item: any) => item.is_success);
+          console.log("isCancelled:", isCancelled);
+          
+          $q.notify({
+            message: isCancelled
+              ? "Running query cancelled successfully"
+              : "Query execution was completed before cancellation.",
+            color: "positive",
+            position: "bottom",
+            timeout: 1500,
+          });
+          console.log("isCancelled:", isCancelled);
+        })
+        .catch((error) => {
+          console.error("cancelQuery error:", error);
+          $q.notify({
+            message:
+              error.response?.data?.message || "Failed to cancel running query",
+            color: "negative",
+            position: "bottom",
+            timeout: 1500,
+          });
+        })
+        .finally(() => {
+          console.log("cancelQuery finally");
+        });
+    };
+
+    // [END] cancel running queries
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
@@ -872,10 +928,13 @@ export default defineComponent({
       folderId,
       tabId,
       outlinedDescription,
-      getPanelsValues,
+      // getPanelsValues,
+      searchRequestTraceIds,
       disableDateTimeRefresh,
       // cancelAllApiCalls,
       cancelQuery,
+      handleEmittedData,
+      config,
     };
   },
 });
