@@ -264,9 +264,16 @@ export default defineComponent({
       rowsPerPage: 20,
     });
     const changePagination = (val: { label: string; value: any }) => {
+      console.log("changePagination", val);
+
       selectedPerPage.value = val.value;
+      console.log("selectedPerPage", selectedPerPage.value);
+
       pagination.value.rowsPerPage = val.value;
+      console.log("pagination.value.rowsPerPage", pagination.value.rowsPerPage);
+
       qTable.value?.setPagination(pagination.value);
+      console.log("qTable.value?.setPagination", qTable.value?.setPagination);
     };
     const filterQuery = ref("");
 
@@ -296,10 +303,19 @@ export default defineComponent({
         formattedDuration = `${durationInSeconds}s`;
       } else if (durationInSeconds < 3600) {
         const minutes = Math.floor(durationInSeconds / 60);
-        formattedDuration = `${minutes}m`;
-      } else {
+        const seconds = durationInSeconds % 60;
+        formattedDuration = `${minutes}m ${seconds}s`;
+      } else if (durationInSeconds < 86400) {
         const hours = Math.floor(durationInSeconds / 3600);
-        formattedDuration = `${hours}h`;
+        const minutes = Math.floor((durationInSeconds % 3600) / 60);
+        const seconds = durationInSeconds % 60;
+        formattedDuration = `${hours}h ${minutes}m ${seconds}s`;
+      } else {
+        const days = Math.floor(durationInSeconds / 86400);
+        const hours = Math.floor((durationInSeconds % 86400) / 3600);
+        const minutes = Math.floor((durationInSeconds % 3600) / 60);
+        const seconds = durationInSeconds % 60;
+        formattedDuration = `${days}d ${hours}h ${minutes}m ${seconds}s`;
       }
 
       return formattedDuration;
