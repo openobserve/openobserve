@@ -59,7 +59,7 @@ pub mod super_cluster;
 #[tracing::instrument(
     name = "service:search:cluster:run",
     skip_all,
-    fields(trace_id = req.job.as_ref().unwrap().trace_id, org_id = req.org_id)
+    fields(trace_id, org_id = req.org_id)
 )]
 pub async fn search(
     trace_id: &str,
@@ -462,7 +462,10 @@ pub async fn search(
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
-            trace_id,
+            trace_id = trace_id
+                .split_once('-')
+                .map(|(trace_id, _)| trace_id)
+                .unwrap_or(&trace_id),
             org_id = req.org_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
