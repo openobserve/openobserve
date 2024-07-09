@@ -825,6 +825,18 @@ pub(crate) async fn generate_index_on_compactor(
             .map(|x| x.meta.min_ts)
             .collect::<Vec<i64>>(),
     ));
+    let min_ts: ArrayRef = Arc::new(Int64Array::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.meta.min_ts)
+            .collect::<Vec<i64>>(),
+    ));
+    let max_ts: ArrayRef = Arc::new(Int64Array::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.meta.max_ts)
+            .collect::<Vec<i64>>(),
+    ));
     let empty_fields: ArrayRef = Arc::new(new_null_array(
         &DataType::Utf8,
         len_of_columns_to_invalidate,
@@ -847,6 +859,8 @@ pub(crate) async fn generate_index_on_compactor(
     ));
     let columns = vec![
         _timestamp,
+        min_ts,
+        max_ts,
         empty_fields,
         empty_terms,
         file_names,
@@ -915,7 +929,9 @@ async fn prepare_index_record_batches(
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
-        Field::new("field", DataType::Utf8, true),
+        Field::new("min_ts", DataType::Int64, false),
+        Field::new("max_ts", DataType::Int64, false),
+        Field::new("field", DataType::Utf8, false),
         Field::new("term", DataType::Utf8, true),
         Field::new("file_name", DataType::Utf8, false),
         Field::new("_count", DataType::Int64, false),
@@ -968,15 +984,19 @@ async fn prepare_index_record_batches(
             continue;
         }
 
-        // unique terms and get the min _timestamp
+        // unique terms and get the min & max _timestamp
         let mut uniq_terms = BTreeMap::new();
         for (term, idx) in terms {
             let term_time = time_data.value(idx);
-            let (time, ids) = uniq_terms
-                .entry(term.to_string())
-                .or_insert((term_time, Vec::new()));
-            if *time > term_time {
-                *time = term_time;
+            let (min_ts, max_ts, ids) =
+                uniq_terms
+                    .entry(term.to_string())
+                    .or_insert((term_time, term_time, Vec::new()));
+            if *min_ts > term_time {
+                *min_ts = term_time;
+            }
+            if *max_ts < term_time {
+                *max_ts = term_time;
             }
             ids.push(idx);
         }
@@ -984,6 +1004,8 @@ async fn prepare_index_record_batches(
         // build record batch
         let records_len = uniq_terms.len();
         let mut field_timestamp = Int64Builder::with_capacity(records_len);
+        let mut field_min_ts = Int64Builder::with_capacity(records_len);
+        let mut field_max_ts = Int64Builder::with_capacity(records_len);
         let mut field_field =
             StringBuilder::with_capacity(records_len, INDEX_FIELD_NAME_FOR_ALL.len() * records_len);
         let mut field_term = StringBuilder::with_capacity(
@@ -995,8 +1017,10 @@ async fn prepare_index_record_batches(
         let mut field_count = Int64Builder::with_capacity(records_len);
         let mut field_deleted = BooleanBuilder::with_capacity(records_len);
         let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
-        for (term, (time, ids)) in uniq_terms {
-            field_timestamp.append_value(time);
+        for (term, (min_ts, max_ts, ids)) in uniq_terms {
+            field_timestamp.append_value(min_ts);
+            field_min_ts.append_value(min_ts);
+            field_max_ts.append_value(max_ts);
             field_field.append_value(INDEX_FIELD_NAME_FOR_ALL);
             field_term.append_value(term);
             field_file_name.append_value(file_name_without_prefix);
@@ -1056,15 +1080,19 @@ async fn prepare_index_record_batches(
             continue;
         }
 
-        // unique terms and get the min _timestamp
+        // unique terms and get the min & max _timestamp
         let mut uniq_terms = BTreeMap::new();
         for (term, idx) in terms {
             let term_time = time_data.value(idx);
-            let (time, ids) = uniq_terms
-                .entry(term.to_string())
-                .or_insert((term_time, Vec::new()));
-            if *time > term_time {
-                *time = term_time;
+            let (min_ts, max_ts, ids) =
+                uniq_terms
+                    .entry(term.to_string())
+                    .or_insert((term_time, term_time, Vec::new()));
+            if *min_ts > term_time {
+                *min_ts = term_time;
+            }
+            if *max_ts < term_time {
+                *max_ts = term_time;
             }
             ids.push(idx);
         }
@@ -1072,6 +1100,8 @@ async fn prepare_index_record_batches(
         // build record batch
         let records_len = uniq_terms.len();
         let mut field_timestamp = Int64Builder::with_capacity(records_len);
+        let mut field_min_ts = Int64Builder::with_capacity(records_len);
+        let mut field_max_ts = Int64Builder::with_capacity(records_len);
         let mut field_field =
             StringBuilder::with_capacity(records_len, column_name.len() * records_len);
         let mut field_term = StringBuilder::with_capacity(
@@ -1083,8 +1113,10 @@ async fn prepare_index_record_batches(
         let mut field_count = Int64Builder::with_capacity(records_len);
         let mut field_deleted = BooleanBuilder::with_capacity(records_len);
         let mut field_segment_ids = BinaryBuilder::with_capacity(records_len, records_len);
-        for (term, (time, ids)) in uniq_terms {
-            field_timestamp.append_value(time);
+        for (term, (min_ts, max_ts, ids)) in uniq_terms {
+            field_timestamp.append_value(min_ts);
+            field_min_ts.append_value(min_ts);
+            field_max_ts.append_value(max_ts);
             field_field.append_value(column_name);
             field_term.append_value(term);
             field_file_name.append_value(file_name_without_prefix);
@@ -1107,6 +1139,8 @@ async fn prepare_index_record_batches(
             new_schema.clone(),
             vec![
                 Arc::new(field_timestamp.finish()),
+                Arc::new(field_min_ts.finish()),
+                Arc::new(field_max_ts.finish()),
                 Arc::new(field_field.finish()),
                 Arc::new(field_term.finish()),
                 Arc::new(field_file_name.finish()),
