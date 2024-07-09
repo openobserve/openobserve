@@ -47,7 +47,7 @@ use crate::service::{
 type CachedFiles = (usize, usize);
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
@@ -252,7 +252,7 @@ pub async fn search(
             trace_id = trace_id
                 .split_once('-')
                 .map(|(trace_id, _)| trace_id)
-                .unwrap_or(&trace_id),
+                .unwrap_or(trace_id),
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
@@ -359,7 +359,7 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
     trace_id: &str,
     sql: &Sql,
@@ -408,11 +408,7 @@ async fn get_file_list(
     Ok(files)
 }
 
-#[tracing::instrument(
-    name = "service:search:grpc:storage:cache_parquet_files",
-    skip_all,
-    fields(trace_id)
-)]
+#[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
 async fn cache_parquet_files(
     trace_id: &str,
     files: &[FileKey],

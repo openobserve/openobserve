@@ -59,7 +59,7 @@ pub mod super_cluster;
 #[tracing::instrument(
     name = "service:search:cluster:run",
     skip_all,
-    fields(trace_id, org_id = req.org_id)
+    fields(org_id = req.org_id)
 )]
 pub async fn search(
     trace_id: &str,
