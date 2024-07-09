@@ -107,7 +107,9 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled && !meta.fts_terms.is_empty();
+    let is_inverted_index = cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && !meta.fts_terms.is_empty();
 
     log::info!(
         "[trace_id {trace_id}] search: is_agg_query {:?} is_inverted_index {:?}",
