@@ -1139,10 +1139,8 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema.retain(shared_fields));
 
     // merge record batches, the record batch have same schema
-    let record_batches = record_batches.iter().collect::<Vec<_>>();
     let (schema, new_record_batches) =
-        merge_record_batches("MERGE", thread_id, schema, &record_batches)?;
-    drop(record_batches);
+        merge_record_batches("MERGE", thread_id, schema, record_batches)?;
 
     log::info!(
         "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",

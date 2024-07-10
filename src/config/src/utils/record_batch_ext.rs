@@ -516,7 +516,7 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
 /// Returns an error if the types of underlying arrays are different.
 pub fn concat_batches(
     schema: Arc<Schema>,
-    batches: &[&RecordBatch],
+    batches: Vec<RecordBatch>,
 ) -> Result<RecordBatch, ArrowError> {
     // When schema is empty, sum the number of the rows of all batches
     if schema.fields().is_empty() {
@@ -548,17 +548,16 @@ pub fn merge_record_batches(
     job_name: &str,
     thread_id: usize,
     mut schema: Arc<Schema>,
-    record_batches: &[&RecordBatch],
+    record_batches: Vec<RecordBatch>,
 ) -> Result<(Arc<Schema>, RecordBatch), DataFusionError> {
     // 1. format the record batch by schema (after format all record batch have the same schema)
     let record_batches = record_batches
         .into_iter()
-        .map(|b| format_recordbatch_by_schema(schema.clone(), (*b).clone()))
+        .map(|batch| format_recordbatch_by_schema(schema.clone(), batch))
         .collect::<Vec<_>>();
 
     // 2. concatenate all record batches into one single RecordBatch
-    let record_batches = record_batches.iter().collect::<Vec<_>>();
-    let mut concated_record_batch = concat_batches(schema.clone(), &record_batches)?;
+    let mut concated_record_batch = concat_batches(schema.clone(), record_batches)?;
 
     // 3. delete all the null columns
     let num_rows = concated_record_batch.num_rows();
