@@ -101,18 +101,32 @@ fn default_scrape_interval() -> u32 {
     config::get_config().common.default_scrape_interval
 }
 
+fn default_trace_id_field_name() -> String {
+    "trace_id".to_string()
+}
+
+fn default_span_id_field_name() -> String {
+    "span_id".to_string()
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSetting {
     /// Ideally this should be the same as prometheus-scrape-interval (in
     /// seconds).
     #[serde(default = "default_scrape_interval")]
     pub scrape_interval: u32,
+    #[serde(default = "default_trace_id_field_name")]
+    pub trace_id_field_name: String,
+    #[serde(default = "default_span_id_field_name")]
+    pub span_id_field_name: String,
 }
 
 impl Default for OrganizationSetting {
     fn default() -> Self {
         Self {
             scrape_interval: default_scrape_interval(),
+            trace_id_field_name: default_trace_id_field_name(),
+            span_id_field_name: default_span_id_field_name(),
         }
     }
 }
