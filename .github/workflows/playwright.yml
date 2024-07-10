@@ -27,16 +27,11 @@ env:
 
 
 jobs:
-  ui_integration_tests:
-    name: playwright_ui_integration_tests
+  build_binary:
+    name: build_binary
     runs-on: 
-      labels: ubuntu-latest
-    strategy:
-      matrix:
-        browser: [chrome]
-        testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
-       
+      labels: ubicloud-standard-8
+      
     steps:
       - name: Remove unused tools
         run: |
@@ -68,16 +63,47 @@ jobs:
         run: cd web && npm install && npm run build
       
       - name: Build and run binary
-        run: cargo build --features mimalloc
+        run: cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
         
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-binary
+          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          retention-days: 1
+
+  ui_integration_tests:
+    name: playwright_ui_integration_tests
+    needs: [build_binary]
+    runs-on: 
+      labels: ubuntu-latest
+    container: 
+      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+      options: --user root
+    strategy:
+      matrix:
+        browser: [chrome]
+        testfilename: 
+         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
+       
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Display structure of downloaded files
+        run: ls -R
+
       - name: Start OpenObserve
-        run: target/debug/openobserve &
+        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve &
 
       - name: Wait for start
         run: sleep 10
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
+
+      - name: Clone the current repo
+        uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -91,7 +117,7 @@ jobs:
           echo "INGESTION_URL"=${INGESTION_URL} >> .env
           echo "ORGNAME"=${ORGNAME} >> .env
           mv .env tests/ui-testing
-          cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+          cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

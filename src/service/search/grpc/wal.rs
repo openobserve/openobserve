@@ -52,7 +52,7 @@ use crate::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
     trace_id: &str,
     sql: Arc<Sql>,
@@ -277,7 +277,6 @@ pub async fn search_parquet(
 
         let datafusion_span = info_span!(
             "service:search:grpc:wal:parquet:datafusion",
-            trace_id,
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),

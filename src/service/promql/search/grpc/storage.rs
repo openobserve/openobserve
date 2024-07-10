@@ -169,7 +169,7 @@ pub(crate) async fn create_context(
 #[tracing::instrument(
     name = "promql:search:grpc:storage:get_file_list",
     skip_all,
-    fields(trace_id, org_id, stream_name)
+    fields(org_id, stream_name)
 )]
 async fn get_file_list(
     trace_id: &str,
