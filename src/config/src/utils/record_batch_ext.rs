@@ -27,7 +27,10 @@ use arrow_schema::{ArrowError, DataType, Schema};
 use datafusion::error::DataFusionError;
 use hashbrown::{HashMap, HashSet};
 
-use super::{json::get_string_value, schema_ext::SchemaExt};
+use super::{
+    json::{get_bool_value, get_float_value, get_int_value, get_string_value, get_uint_value},
+    schema_ext::SchemaExt,
+};
 use crate::{get_config, FxIndexMap};
 
 const USIZE_SIZE: usize = std::mem::size_of::<usize>();
@@ -110,7 +113,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_i64().unwrap());
+                        b.append_value(get_int_value(v));
                     }
                 }
                 DataType::UInt64 => {
@@ -121,7 +124,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_u64().unwrap());
+                        b.append_value(get_uint_value(v));
                     }
                 }
                 DataType::Float64 => {
@@ -132,7 +135,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_f64().unwrap());
+                        b.append_value(get_float_value(v));
                     }
                 }
                 DataType::Boolean => {
@@ -143,7 +146,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_bool().unwrap());
+                        b.append_value(get_bool_value(v));
                     }
                 }
                 DataType::Binary => {
