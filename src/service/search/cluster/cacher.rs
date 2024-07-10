@@ -235,8 +235,10 @@ pub async fn get_cached_results(
                 && cache_meta.response_end_time >= cache_req.q_start_time
         })
         .max_by_key(|(_, result)| {
-            result.response_end_time.min(cache_req.q_end_time)
-                - result.response_start_time.max(cache_req.q_start_time)
+              let overlap = result.response_end_time.min(cache_req.q_end_time)
+            - result.response_start_time.max(cache_req.q_start_time);
+        let total_duration = result.response_end_time - result.response_start_time;
+        (overlap, total_duration)
         }) {
         Some((node, result)) => {
             log::info!(
