@@ -102,13 +102,7 @@ pub fn cast_to_type(
                         continue;
                     }
                     Value::String(v) => v.parse::<i64>().map_err(|e| e.to_string()),
-                    Value::Bool(v) => {
-                        if *v {
-                            Ok(1)
-                        } else {
-                            Ok(0)
-                        }
-                    }
+                    Value::Bool(v) => Ok(if *v { 1 } else { 0 }),
                     _ => Err("".to_string()),
                 };
                 match ret {
@@ -124,13 +118,7 @@ pub fn cast_to_type(
                         continue;
                     }
                     Value::String(v) => v.parse::<u64>().map_err(|e| e.to_string()),
-                    Value::Bool(v) => {
-                        if *v {
-                            Ok(1)
-                        } else {
-                            Ok(0)
-                        }
-                    }
+                    Value::Bool(v) => Ok(if *v { 1 } else { 0 }),
                     _ => Err("".to_string()),
                 };
                 match ret {
@@ -146,13 +134,7 @@ pub fn cast_to_type(
                         continue;
                     }
                     Value::String(v) => v.parse::<f64>().map_err(|e| e.to_string()),
-                    Value::Bool(v) => {
-                        if *v {
-                            Ok(1.0)
-                        } else {
-                            Ok(0.0)
-                        }
-                    }
+                    Value::Bool(v) => Ok(if *v { 1.0 } else { 0.0 }),
                     _ => Err("".to_string()),
                 };
                 match ret {
