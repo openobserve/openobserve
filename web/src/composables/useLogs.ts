@@ -3942,8 +3942,7 @@ const useLogs = () => {
         });
       })
       .finally(() => {
-        if (searchObj.loading) searchObj.loading = false;
-        if (searchObj.loadingHistogram) searchObj.loadingHistogram = false;
+        searchObj.data.searchRequestTraceIds = [];
       });
   };
 
