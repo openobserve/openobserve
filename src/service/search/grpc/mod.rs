@@ -72,11 +72,6 @@ pub async fn search(
         sql.meta.time_range
     );
 
-    let span_trace_id = trace_id
-        .split_once('-')
-        .map(|(trace_id, _)| trace_id)
-        .unwrap_or(&trace_id);
-
     // search in WAL parquet
     let skip_wal = req.query.as_ref().unwrap().skip_wal;
     let work_group1 = work_group.clone();
@@ -84,7 +79,6 @@ pub async fn search(
     let sql1 = sql.clone();
     let wal_parquet_span = info_span!(
         "service:search:grpc:in_wal_parquet",
-        trace_id = span_trace_id,
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -106,7 +100,6 @@ pub async fn search(
     let sql2 = sql.clone();
     let wal_mem_span = info_span!(
         "service:search:grpc:in_wal_memory",
-        trace_id = span_trace_id,
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -130,7 +123,6 @@ pub async fn search(
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     let storage_span = info_span!(
         "service:search:grpc:in_storage",
-        trace_id = span_trace_id,
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),

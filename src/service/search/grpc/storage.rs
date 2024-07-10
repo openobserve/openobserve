@@ -249,10 +249,6 @@ pub async fn search(
 
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
-            trace_id = trace_id
-                .split_once('-')
-                .map(|(trace_id, _)| trace_id)
-                .unwrap_or(trace_id),
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),

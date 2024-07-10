@@ -280,10 +280,6 @@ pub async fn search_parquet(
 
         let datafusion_span = info_span!(
             "service:search:grpc:wal:parquet:datafusion",
-            trace_id = trace_id
-                .split_once('-')
-                .map(|(trace_id, _)| trace_id)
-                .unwrap_or(trace_id),
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
@@ -505,10 +501,6 @@ pub async fn search_memtable(
 
         let datafusion_span = info_span!(
             "service:search:grpc:wal:mem:datafusion",
-            trace_id = trace_id
-                .split_once('-')
-                .map(|(trace_id, _)| trace_id)
-                .unwrap_or(trace_id),
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),

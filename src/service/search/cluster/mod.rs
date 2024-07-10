@@ -462,10 +462,6 @@ pub async fn search(
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
-            trace_id = trace_id
-                .split_once('-')
-                .map(|(trace_id, _)| trace_id)
-                .unwrap_or(&trace_id),
             org_id = req.org_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
