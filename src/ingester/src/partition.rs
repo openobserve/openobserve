@@ -25,6 +25,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use itertools::Itertools;
 use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
@@ -129,10 +130,7 @@ impl Partition {
                 .collect::<Vec<_>>();
             let schema = Arc::new(Schema::try_merge(schemas).context(MergeSchemaSnafu)?);
 
-            let batches = batches
-                .into_iter()
-                .map(|batch| batch.clone())
-                .collect::<Vec<_>>();
+            let batches = batches.into_iter().cloned().collect_vec();
             let (schema, batches) =
                 merge_record_batches("INGESTER:PERSIST", 0, schema.clone(), batches)
                     .context(MergeRecordBatchSnafu)?;
