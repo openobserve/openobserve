@@ -220,7 +220,7 @@ pub async fn get_cached_results(
                 let overlap = result.end_time.min(cache_req.q_end_time)
             - result.start_time.max(cache_req.q_start_time);
         let total_duration = result.end_time - result.start_time;
-        (overlap, total_duration)
+        (total_duration ,overlap )
             }) {
             Some(matching_meta) => {
                 let file_name = format!(
