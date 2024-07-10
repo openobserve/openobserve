@@ -187,7 +187,7 @@ const useTraces = () => {
 
     query["stream"] = searchObj.data.stream.selectedStream.value;
 
-    if (date.type == "relative" && !getShareLink) {
+    if (date.type === "relative" && !getShareLink) {
       query["period"] = date.relativeTimePeriod;
     } else {
       query["from"] = date.startTime;
