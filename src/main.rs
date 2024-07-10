@@ -640,6 +640,11 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
         .with_exporter(
             opentelemetry_otlp::new_exporter()
                 .http()
+                .with_http_client(
+                    reqwest::Client::builder()
+                        .danger_accept_invalid_certs(true)
+                        .build()?,
+                )
                 .with_endpoint(&cfg.common.otel_otlp_url)
                 .with_headers(headers),
         )

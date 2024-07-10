@@ -1,4 +1,4 @@
-// Copyright 2023 Openobserve.ai and Contributors
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
