@@ -217,10 +217,7 @@ pub async fn get_cached_results(
                     && cache_meta.end_time >= cache_req.q_start_time
             })
             .max_by_key(|result| {
-                let overlap = result.end_time.min(cache_req.q_end_time)
-            - result.start_time.max(cache_req.q_start_time);
-        let total_duration = result.end_time - result.start_time;
-        (total_duration ,overlap )
+                result.end_time -result.start_time
             }) {
             Some(matching_meta) => {
                 let file_name = format!(
