@@ -303,6 +303,7 @@ async fn query_inner(
             key: file.0,
             meta: file.1,
             deleted: false,
+            segment_ids: None,
         });
     }
     Ok(file_keys)
@@ -378,6 +379,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
         key: key.to_string(),
         meta: meta.clone(),
         deleted,
+        segment_ids: None,
     };
 
     // generate the new file list

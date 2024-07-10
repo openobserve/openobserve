@@ -98,3 +98,26 @@ impl SchemaExt for Schema {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::DataType;
+
+    use super::*;
+
+    #[test]
+    fn test_schema_hash() {
+        let schema1 = Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("address", DataType::Utf8, false),
+            Field::new("priority", DataType::UInt8, false),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("address", DataType::Utf8, false),
+            Field::new("priority", DataType::UInt8, false),
+            Field::new("flag", DataType::UInt8, false),
+        ]);
+        assert_ne!(schema1.hash_key(), schema2.hash_key());
+    }
+}

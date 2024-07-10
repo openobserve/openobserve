@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        make_builder, new_null_array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-        Float64Array, Float64Builder, Int64Array, Int64Builder, NullBuilder, RecordBatchOptions,
-        StringArray, StringBuilder, UInt64Array, UInt64Builder,
+        make_builder, new_null_array, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray,
+        BooleanBuilder, Float64Array, Float64Builder, Int64Array, Int64Builder, NullBuilder,
+        RecordBatchOptions, StringArray, StringBuilder, UInt64Array, UInt64Builder,
     },
     record_batch::RecordBatch,
 };
@@ -146,6 +146,29 @@ pub fn convert_json_to_record_batch(
                         b.append_value(v.as_bool().unwrap());
                     }
                 }
+                DataType::Binary => {
+                    let b = builder
+                        .as_any_mut()
+                        .downcast_mut::<BinaryBuilder>()
+                        .unwrap();
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        let v = v.as_str().ok_or_else(|| {
+                            ArrowError::SchemaError(
+                                "Cannot convert to [DataType::Binary] from non-string value"
+                                    .to_string(),
+                            )
+                        })?;
+                        let bin_data = hex::decode(v).map_err(|_| {
+                            ArrowError::SchemaError(
+                                "Cannot convert to [DataType::Binary] from non-hex string value"
+                                    .to_string(),
+                            )
+                        })?;
+                        b.append_value(bin_data);
+                    }
+                }
                 DataType::Null => {
                     let b = builder.as_any_mut().downcast_mut::<NullBuilder>().unwrap();
                     b.append_null();
@@ -189,6 +212,12 @@ pub fn convert_json_to_record_batch(
                     DataType::Boolean => {
                         b.as_any_mut()
                             .downcast_mut::<BooleanBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Binary => {
+                        b.as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
                             .unwrap()
                             .append_null();
                     }

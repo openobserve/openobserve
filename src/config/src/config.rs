@@ -158,7 +158,7 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
 });
 
 pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
-    let mut map = HashMap::new();
+    let mut map = HashMap::default();
     let streams: Vec<String> = get_config()
         .common
         .mem_table_individual_streams
@@ -173,8 +173,11 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
         })
         .collect();
     let num_mem_tables = get_config().limit.mem_table_bucket_num;
-    for (idx, stream) in streams.into_iter().enumerate() {
-        map.insert(stream, num_mem_tables + idx);
+    for stream in streams.into_iter() {
+        if map.contains_key(&stream) {
+            continue;
+        }
+        map.insert(stream, num_mem_tables + map.len());
     }
     map
 });
@@ -652,7 +655,7 @@ pub struct Common {
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
         name = "ZO_ENABLE_INVERTED_INDEX",
-        default = false,
+        default = true,
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
@@ -662,6 +665,12 @@ pub struct Common {
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
     )]
     pub inverted_index_split_chars: String,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
+        default = false,
+        help = "Use old format for inverted index, it will generate same stream name for index."
+    )]
+    pub inverted_index_old_format: bool,
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,

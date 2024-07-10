@@ -34,7 +34,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{Column, FileType, GetExt},
+    common::Column,
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -61,7 +61,10 @@ use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
 use super::{
-    storage::file_list, table_provider::NewListingTable, udf::transform_udf::get_all_transform,
+    file_type::{FileType, GetExt},
+    storage::file_list,
+    table_provider::NewListingTable,
+    udf::transform_udf::get_all_transform,
 };
 use crate::{
     common::meta::functions::VRLResultResolver,
@@ -332,6 +335,11 @@ async fn exec_query(
             return Err(e);
         }
     };
+
+    // Explain the sql
+    // let explain_batches = df.clone().explain(true, true)?.collect().await?;
+    // let result = arrow::util::pretty::pretty_format_batches(&explain_batches)?;
+    // log::info!("[trace_id {trace_id}] Explain: \n{result}");
 
     if !rules.is_empty() {
         let mut exprs = Vec::with_capacity(df.schema().fields().len());
