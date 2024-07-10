@@ -750,9 +750,7 @@ export const generateTraceContext = () => {
  * @param {number} durationInSeconds - The duration in seconds to be formatted.
  * @return {string} The formatted duration string.
  */
-export const queryManagementFormatDuration = (
-  durationInSeconds: number
-): string => {
+export const durationFormatter = (durationInSeconds: number): string => {
   let formattedDuration;
 
   // If duration is invalid, set formatted duration to "Invalid duration"

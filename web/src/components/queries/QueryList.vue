@@ -44,10 +44,7 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-  timestampToTimezoneDate,
-  queryManagementFormatDuration,
-} from "@/utils/zincutils";
+import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
@@ -98,14 +95,14 @@ export default defineComponent({
           (currentTime - createdAt) / 1000000
         );
 
-        return queryManagementFormatDuration(durationInSeconds);
+        return durationFormatter(durationInSeconds);
       };
 
       //different between start and end time to show in UI as queryRange
       const queryRange = (startTime: number, endTime: number) => {
         const queryDuration = Math.floor((endTime - startTime) / 1000000);
 
-        return queryManagementFormatDuration(queryDuration);
+        return durationFormatter(queryDuration);
       };
 
       const originalSize =

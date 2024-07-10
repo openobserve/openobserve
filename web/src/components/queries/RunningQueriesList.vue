@@ -194,7 +194,7 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
-import { queryManagementFormatDuration } from "@/utils/zincutils";
+import { durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -290,14 +290,14 @@ export default defineComponent({
       const currentTime = localTimeToMicroseconds();
       const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
 
-      return queryManagementFormatDuration(durationInSeconds);
+      return durationFormatter(durationInSeconds);
     };
 
     //different between start and end time to show in UI as queryRange
     const queryRange = (startTime: number, endTime: number) => {
       const queryDuration = Math.floor((endTime - startTime) / 1000000);
 
-      return queryManagementFormatDuration(queryDuration);
+      return durationFormatter(queryDuration);
     };
 
     const columns = ref<QTableProps["columns"]>([
