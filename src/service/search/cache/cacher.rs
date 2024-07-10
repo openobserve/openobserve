@@ -209,7 +209,10 @@ pub async fn get_cached_results(
             .iter()
             .filter(|cache_meta| {
                 // to make sure there is overlap between cache time range and query time range
-
+                log::info!(
+                "[trace_id {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                cache_meta.start_time ,
+                cache_meta.end_time);
                 cache_meta.start_time <= cache_req.q_end_time
                     && cache_meta.end_time >= cache_req.q_start_time
             })
