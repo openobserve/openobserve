@@ -33,6 +33,11 @@ use crate::{
     },
 };
 
+#[tracing::instrument(
+    name = "service:search:cluster:run",
+    skip_all,
+    fields(org_id = rpc_req.org_id)
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn check_cache(
     rpc_req: &proto::cluster_rpc::SearchRequest,
