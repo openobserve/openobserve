@@ -96,12 +96,17 @@ impl Entry {
         })
     }
 
-    pub fn into_batch(&self, schema: Arc<Schema>) -> Result<Option<Arc<RecordBatchEntry>>> {
+    pub fn into_batch(
+        &self,
+        stream_type: Arc<str>,
+        schema: Arc<Schema>,
+    ) -> Result<Option<Arc<RecordBatchEntry>>> {
         let batch =
             convert_json_to_record_batch(&schema, &self.data).context(ArrowJsonEncodeSnafu)?;
 
         let arrow_size = batch.size();
         Ok(Some(RecordBatchEntry::new(
+            stream_type,
             batch,
             self.data_size,
             arrow_size,
@@ -125,28 +130,16 @@ pub struct RecordBatchEntry {
 
 impl RecordBatchEntry {
     pub fn new(
+        stream_type: Arc<str>,
         data: RecordBatch,
         data_json_size: usize,
         data_arrow_size: usize,
     ) -> Arc<RecordBatchEntry> {
-        let (min_ts, max_ts) =
-            match data.column_by_name(&config::get_config().common.column_timestamp) {
-                None => (0, 0),
-                Some(v) => {
-                    let v = v.as_any().downcast_ref::<Int64Array>().unwrap();
-                    let mut min_v = v.value(0);
-                    let mut max_v = v.value(0);
-                    for v in v.values() {
-                        if &min_v > v {
-                            min_v = *v;
-                        }
-                        if &max_v < v {
-                            max_v = *v;
-                        }
-                    }
-                    (min_v, max_v)
-                }
-            };
+        let (min_ts, max_ts) = if stream_type == Arc::from("index") {
+            pop_time_range(&data, Some("min_ts"), Some("max_ts"))
+        } else {
+            pop_time_range(&data, None, None)
+        };
         Arc::new(Self {
             data,
             data_json_size,
@@ -155,6 +148,63 @@ impl RecordBatchEntry {
             max_ts,
         })
     }
+}
+
+fn pop_time_range(
+    batch: &RecordBatch,
+    min_field: Option<&str>,
+    max_field: Option<&str>,
+) -> (i64, i64) {
+    let mut min_ts = 0;
+    let mut max_ts = 0;
+    let time_field = config::get_config().common.column_timestamp.to_string();
+    let min_field = min_field.unwrap_or(time_field.as_str());
+    let max_field = max_field.unwrap_or(time_field.as_str());
+    if min_field == max_field {
+        let Some(col) = batch.column_by_name(min_field) else {
+            return (0, 0);
+        };
+        let Some(col) = col.as_any().downcast_ref::<Int64Array>() else {
+            return (0, 0);
+        };
+        for v in col.values() {
+            if min_ts == 0 || min_ts > *v {
+                min_ts = *v;
+            }
+            if max_ts < *v {
+                max_ts = *v;
+            }
+        }
+        return (min_ts, max_ts);
+    }
+
+    // min_ts
+    let Some(col) = batch.column_by_name(min_field) else {
+        return (0, 0);
+    };
+    let Some(col) = col.as_any().downcast_ref::<Int64Array>() else {
+        return (0, 0);
+    };
+    for v in col.values() {
+        if min_ts == 0 || min_ts > *v {
+            min_ts = *v;
+        }
+    }
+
+    // max_ts
+    let Some(col) = batch.column_by_name(max_field) else {
+        return (0, 0);
+    };
+    let Some(col) = col.as_any().downcast_ref::<Int64Array>() else {
+        return (0, 0);
+    };
+    for v in col.values() {
+        if max_ts < *v {
+            max_ts = *v;
+        }
+    }
+
+    (min_ts, max_ts)
 }
 
 #[derive(Default)]

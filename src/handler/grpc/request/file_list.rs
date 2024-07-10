@@ -84,6 +84,7 @@ impl Filelist for Filelister {
                 key: file,
                 meta: Some((&meta).into()),
                 deleted: false,
+                segment_ids: None,
             })
             .collect::<_>();
 

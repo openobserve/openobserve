@@ -75,17 +75,22 @@ pub async fn populate_file_meta(
     schema: Arc<Schema>,
     batch: Vec<Vec<RecordBatch>>,
     file_meta: &mut FileMeta,
+    min_field: Option<&str>,
+    max_field: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     if schema.fields().is_empty() || batch.is_empty() {
         return Ok(());
     }
+    let cfg = get_config();
+    let min_field = min_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
+    let max_field = max_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
     let ctx = SessionContext::new();
     let provider = MemTable::try_new(schema, batch)?;
     ctx.register_table("temp", Arc::new(provider))?;
 
     let sql = format!(
-        "SELECT min({0}) as min, max({0}) as max, count({0}) as num_records FROM temp;",
-        get_config().common.column_timestamp
+        "SELECT min({}) as min, max({}) as max, count(*) as num_records FROM temp;",
+        min_field, max_field
     );
     let df = ctx.sql(sql.as_str()).await?;
     let batches = df.collect().await?;
@@ -185,9 +190,51 @@ mod tests {
             compressed_size: 700,
             flattened: false,
         };
-        populate_file_meta(schema, vec![vec![batch]], &mut file_meta)
+        populate_file_meta(schema, vec![vec![batch]], &mut file_meta, None, None)
             .await
             .unwrap();
+        assert_eq!(file_meta.records, 4);
+        assert_eq!(file_meta.min_ts, val - 100);
+    }
+
+    #[tokio::test]
+    async fn test_populate_file_meta_with_custom_field() {
+        // define a schema.
+        let val: i64 = 1666093521151350;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("log", DataType::Utf8, false),
+            Field::new("pod_id", DataType::Int64, false),
+            Field::new("time", DataType::Int64, false),
+        ]));
+
+        // define data.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
+                Arc::new(Int64Array::from(vec![val - 100, val - 10, val - 90, val])),
+            ],
+        )
+        .unwrap();
+        // let file_name = path.file_name();
+        let mut file_meta = FileMeta {
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 1000,
+            compressed_size: 700,
+            flattened: false,
+        };
+        populate_file_meta(
+            schema,
+            vec![vec![batch]],
+            &mut file_meta,
+            Some("time"),
+            Some("time"),
+        )
+        .await
+        .unwrap();
         assert_eq!(file_meta.records, 4);
         assert_eq!(file_meta.min_ts, val - 100);
     }

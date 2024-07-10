@@ -27,10 +27,7 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
 };
-use datafusion::{
-    arrow::{datatypes::Schema, record_batch::RecordBatch},
-    common::FileType,
-};
+use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
 use futures::{future::try_join_all, StreamExt};
 use hashbrown::HashMap;
 use infra::{
@@ -46,7 +43,7 @@ use crate::{
     service::{
         db, file_list,
         search::{
-            datafusion::exec,
+            datafusion::{exec, file_type::FileType},
             grpc::{generate_search_schema, generate_select_start_search_schema},
             sql::Sql,
             RE_SELECT_WILDCARD,
