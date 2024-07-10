@@ -737,3 +737,38 @@ export const generateTraceContext = () => {
     spanId,
   };
 };
+
+export const queryManagementFormatDuration = (durationInSeconds: number): string => {
+  let formattedDuration;
+
+  if (durationInSeconds < 0) {
+    formattedDuration = "Invalid duration";
+  } else if (durationInSeconds < 60) {
+    formattedDuration = `${durationInSeconds}s`;
+  } else if (durationInSeconds < 3600) {
+    const minutes = Math.floor(durationInSeconds / 60);
+    const seconds = durationInSeconds % 60;
+    formattedDuration = `${minutes > 0 ? `${minutes}m ` : ""}${
+      seconds > 0 ? `${seconds}s` : ""
+    }`.trim();
+  } else if (durationInSeconds < 86400) {
+    const hours = Math.floor(durationInSeconds / 3600);
+    const minutes = Math.floor((durationInSeconds % 3600) / 60);
+    const seconds = durationInSeconds % 60;
+    formattedDuration = `${hours > 0 ? `${hours}h ` : ""}${
+      minutes > 0 ? `${minutes}m ` : ""
+    }${seconds > 0 ? `${seconds}s` : ""}`.trim();
+  } else {
+    const days = Math.floor(durationInSeconds / 86400);
+    const hours = Math.floor((durationInSeconds % 86400) / 3600);
+    const minutes = Math.floor((durationInSeconds % 3600) / 60);
+    const seconds = durationInSeconds % 60;
+    formattedDuration = `${days > 0 ? `${days}d ` : ""}${
+      hours > 0 ? `${hours}h ` : ""
+    }${minutes > 0 ? `${minutes}m ` : ""}${
+      seconds > 0 ? `${seconds}s` : ""
+    }`.trim();
+  }
+
+  return formattedDuration;
+};

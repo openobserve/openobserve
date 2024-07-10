@@ -194,6 +194,7 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
+import { queryManagementFormatDuration } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -289,74 +290,14 @@ export default defineComponent({
       const currentTime = localTimeToMicroseconds();
       const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
 
-      let formattedDuration;
-      if (durationInSeconds < 0) {
-        formattedDuration = "Invalid duration";
-      } else if (durationInSeconds < 60) {
-        formattedDuration = `${durationInSeconds}s`;
-      } else if (durationInSeconds < 3600) {
-        const minutes = Math.floor(durationInSeconds / 60);
-        const seconds = durationInSeconds % 60;
-        formattedDuration = `${minutes > 0 ? `${minutes}m ` : ""}${
-          seconds > 0 ? `${seconds}s` : ""
-        }`.trim();
-      } else if (durationInSeconds < 86400) {
-        const hours = Math.floor(durationInSeconds / 3600);
-        const minutes = Math.floor((durationInSeconds % 3600) / 60);
-        const seconds = durationInSeconds % 60;
-        formattedDuration = `${hours > 0 ? `${hours}h ` : ""}${
-          minutes > 0 ? `${minutes}m ` : ""
-        }${seconds > 0 ? `${seconds}s` : ""}`.trim();
-      } else {
-        const days = Math.floor(durationInSeconds / 86400);
-        const hours = Math.floor((durationInSeconds % 86400) / 3600);
-        const minutes = Math.floor((durationInSeconds % 3600) / 60);
-        const seconds = durationInSeconds % 60;
-        formattedDuration = `${days > 0 ? `${days}d ` : ""}${
-          hours > 0 ? `${hours}h ` : ""
-        }${minutes > 0 ? `${minutes}m ` : ""}${
-          seconds > 0 ? `${seconds}s` : ""
-        }`.trim();
-      }
-
-      return formattedDuration;
+      return queryManagementFormatDuration(durationInSeconds);
     };
 
     //different between start and end time to show in UI as queryRange
     const queryRange = (startTime: number, endTime: number) => {
       const queryDuration = Math.floor((endTime - startTime) / 1000000);
 
-      let formattedDuration;
-      if (queryDuration < 0) {
-        formattedDuration = "Invalid duration";
-      } else if (queryDuration < 60) {
-        formattedDuration = `${queryDuration}s`;
-      } else if (queryDuration < 3600) {
-        const minutes = Math.floor(queryDuration / 60);
-        const seconds = queryDuration % 60;
-        formattedDuration = `${minutes > 0 ? `${minutes}m ` : ""}${
-          seconds > 0 ? `${seconds}s` : ""
-        }`.trim();
-      } else if (queryDuration < 86400) {
-        const hours = Math.floor(queryDuration / 3600);
-        const minutes = Math.floor((queryDuration % 3600) / 60);
-        const seconds = queryDuration % 60;
-        formattedDuration = `${hours > 0 ? `${hours}h ` : ""}${
-          minutes > 0 ? `${minutes}m ` : ""
-        }${seconds > 0 ? `${seconds}s` : ""}`.trim();
-      } else {
-        const days = Math.floor(queryDuration / 86400);
-        const hours = Math.floor((queryDuration % 86400) / 3600);
-        const minutes = Math.floor((queryDuration % 3600) / 60);
-        const seconds = queryDuration % 60;
-        formattedDuration = `${days > 0 ? `${days}d ` : ""}${
-          hours > 0 ? `${hours}h ` : ""
-        }${minutes > 0 ? `${minutes}m ` : ""}${
-          seconds > 0 ? `${seconds}s` : ""
-        }`.trim();
-      }
-
-      return formattedDuration;
+      return queryManagementFormatDuration(queryDuration);
     };
 
     const columns = ref<QTableProps["columns"]>([
