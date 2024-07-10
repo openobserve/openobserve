@@ -210,7 +210,7 @@ pub async fn get_cached_results(
             .filter(|cache_meta| {
                 // to make sure there is overlap between cache time range and query time range
                 log::info!(
-                "[trace_id {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                "[CACHE CANDIDATES {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
                 cache_meta.start_time ,
                 cache_meta.end_time);
                 cache_meta.start_time <= cache_req.q_end_time
@@ -288,7 +288,7 @@ pub async fn get_cached_results(
                         };
 
                         log::info!(
-                            "[trace_id {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
+                            "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
                             query_key,
                             matching_cache_meta.start_time,
                             matching_cache_meta.end_time

@@ -226,7 +226,7 @@ pub async fn get_cached_results(
         .filter(|(_, cache_meta)| {
             // to make sure there is overlap between cache time range and query time range &
             log::info!(
-                "[trace_id {trace_id}] Got caches :get_cached_results->grpc: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                "[CACHE CANDIDATES {trace_id}] get_cached_results->grpc: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
                 cache_meta.response_start_time,
                 cache_meta.response_end_time);
                 
@@ -239,7 +239,7 @@ pub async fn get_cached_results(
         }) {
         Some((node, result)) => {
             log::info!(
-                "[trace_id {trace_id}]get_cached_results->grpc: node: {}, get cached result took {} ms selected cache cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                "[CACHE SELECTED {trace_id}] get_cached_results->cluster: node: {}, get cached result took {} ms selected cache cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
                 &node.grpc_addr,
                 start.elapsed().as_millis(),
                 result.response_start_time,
