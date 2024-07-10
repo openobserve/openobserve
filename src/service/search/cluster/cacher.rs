@@ -235,7 +235,7 @@ pub async fn get_cached_results(
                 && cache_meta.response_end_time >= cache_req.q_start_time
         })
         .max_by_key(|(_, result)| {
-            result.end_time -result.start_time
+            result.response_end_time -result.response_start_time
         }) {
         Some((node, result)) => {
             log::info!(
