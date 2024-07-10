@@ -769,15 +769,17 @@ export default defineComponent({
 
         let filter = searchObj.data.editorValue.trim();
 
-        let duration = "";
-        if (searchObj.meta.filterType === "basic" && durationFilter.max) {
-          duration += ` duration >= ${
-            durationFilter.min * 1000
-          } AND duration <= ${durationFilter.max * 1000}`;
+        if (
+          searchObj.meta.filterType === "basic" &&
+          durationFilter.max !== undefined &&
+          durationFilter.min !== undefined
+        ) {
+          const minDuration = durationFilter.min * 1000;
+          const maxDuration = durationFilter.max * 1000;
 
-          filter = filter
-            ? searchObj.data.editorValue + " AND" + duration
-            : duration;
+          const duration = `duration >= ${minDuration} AND duration <= ${maxDuration}`;
+
+          filter = filter ? `${filter} AND ${duration}` : duration;
         }
 
         searchService
