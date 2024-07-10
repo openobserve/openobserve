@@ -128,6 +128,11 @@ pub struct BulkResponseItem {
     pub original_record: Option<json::Value>,
 }
 
+pub enum IngestionStatus {
+    Record(RecordStatus),
+    Bulk(BulkResponse),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ShardResponse {
     pub total: i64,
@@ -316,8 +321,10 @@ pub struct GCPIngestionResponse {
 pub enum IngestionRequest<'a> {
     JSON(&'a web::Bytes),
     Multi(&'a web::Bytes),
-    KinesisFH(&'a KinesisFHRequest),
     GCP(&'a GCPIngestionRequest),
+    KinesisFH(&'a KinesisFHRequest),
+    RUM(&'a web::Bytes),
+    Usage(&'a web::Bytes),
 }
 
 pub enum IngestionData<'a> {

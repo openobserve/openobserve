@@ -34,7 +34,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{Column, FileType, GetExt},
+    common::Column,
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -61,11 +61,18 @@ use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
 use super::{
-    storage::file_list, table_provider::NewListingTable, udf::transform_udf::get_all_transform,
+    file_type::{FileType, GetExt},
+    storage::file_list,
+    table_provider::NewListingTable,
+    udf::transform_udf::get_all_transform,
 };
 use crate::{
     common::meta::functions::VRLResultResolver,
-    service::search::{datafusion::rewrite, sql::Sql, RE_SELECT_WILDCARD},
+    service::search::{
+        datafusion::{rewrite, ExtLimit},
+        sql::Sql,
+        RE_SELECT_WILDCARD,
+    },
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
@@ -115,12 +122,19 @@ pub async fn sql(
             files,
             file_type.clone(),
             false,
+            &sql.meta.order_by,
+            Some(sql.meta.limit as usize),
         )
         .await?
     } else {
-        let ctx =
-            prepare_datafusion_context(session.work_group.clone(), &session.search_type, false)
-                .await?;
+        let ctx = prepare_datafusion_context(
+            session.work_group.clone(),
+            &session.search_type,
+            false,
+            false,
+            None,
+        )
+        .await?;
         let record_batches = in_records_batches.unwrap();
         let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
         // Register the MemTable as a table in the DataFusion context
@@ -322,6 +336,11 @@ async fn exec_query(
         }
     };
 
+    // Explain the sql
+    // let explain_batches = df.clone().explain(true, true)?.collect().await?;
+    // let result = arrow::util::pretty::pretty_format_batches(&explain_batches)?;
+    // log::info!("[trace_id {trace_id}] Explain: \n{result}");
+
     if !rules.is_empty() {
         let mut exprs = Vec::with_capacity(df.schema().fields().len());
         for (qualifier, field) in df.schema().iter() {
@@ -495,6 +514,8 @@ async fn get_fast_mode_ctx(
         &new_files,
         file_type,
         without_optimizer,
+        &sql.meta.order_by,
+        Some(sql.meta.limit as usize),
     )
     .await?;
 
@@ -591,7 +612,9 @@ pub async fn merge(
     }
 
     // query data
-    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+    let mut ctx =
+        prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, None)
+            .await?;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -898,14 +921,18 @@ fn merge_rewrite_sql(
             fn_name = "sum".to_string();
         }
         if fn_name == "approx_percentile_cont" {
-            let percentile = cap
-                .get(2)
-                .unwrap()
-                .as_str()
-                .splitn(2, ',')
-                .last()
-                .unwrap()
-                .trim();
+            let re =
+                Regex::new(r"(?i)approx_percentile_cont\(.*?,\s*(\d+(?:\.\d+)?(?:,\s*\d+)?)\)")
+                    .unwrap();
+            let percentile = match re.captures(field) {
+                Some(caps) => caps.get(1).unwrap().as_str(),
+                None => {
+                    return Err(DataFusionError::Execution(
+                        "Failed to extract percentile value in approx_percentile_cont function"
+                            .to_string(),
+                    ));
+                }
+            };
             fields[i] = format!(
                 "{fn_name}(\"{}\", {}) {}",
                 schema_field, percentile, over_as
@@ -942,13 +969,10 @@ pub async fn convert_parquet_file(
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
         cfg.common.column_timestamp
-    );
-
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
-    let without_optimizer = select_wildcard;
+    ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, true, false, None).await?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -1079,7 +1103,8 @@ pub async fn merge_parquet_files(
     // create datafusion context
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, None)
+        .await?;
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -1109,7 +1134,11 @@ pub async fn merge_parquet_files(
     Ok((schema, batches))
 }
 
-pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
+pub fn create_session_config(
+    search_type: &SearchType,
+    sort_by_timestamp_desc: bool,
+    limit: Option<usize>,
+) -> Result<SessionConfig> {
     let cfg = get_config();
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
@@ -1119,7 +1148,6 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
         "datafusion.execution.listing_table_ignore_subdirectory",
         false,
     );
-    config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
@@ -1129,6 +1157,15 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
     }
     if cfg.common.bloom_filter_disabled_on_search {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
+    }
+    if sort_by_timestamp_desc {
+        config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
+        config = config.with_round_robin_repartition(false);
+        config = config.with_coalesce_batches(false);
+        if let Some(limit) = limit {
+            config = config.with_coalesce_batches(limit == 0 || limit >= PARQUET_BATCH_SIZE);
+            config.set_extension::<ExtLimit>(Arc::new(ExtLimit(limit)));
+        }
     }
     Ok(config)
 }
@@ -1195,8 +1232,10 @@ pub async fn prepare_datafusion_context(
     work_group: Option<String>,
     search_type: &SearchType,
     without_optimizer: bool,
+    sort_by_timestamp_desc: bool,
+    limit: Option<usize>,
 ) -> Result<SessionContext, DataFusionError> {
-    let session_config = create_session_config(search_type)?;
+    let session_config = create_session_config(search_type, sort_by_timestamp_desc, limit)?;
     let runtime_env = create_runtime_env(work_group).await?;
     if without_optimizer {
         let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
@@ -1238,6 +1277,7 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn register_table(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -1245,15 +1285,23 @@ pub async fn register_table(
     files: &[FileKey],
     file_type: FileType,
     without_optimizer: bool,
+    sort_key: &[(String, bool)],
+    limit: Option<usize>,
 ) -> Result<SessionContext> {
+    let cfg = get_config();
+    // only sort by timestamp desc
+    let sort_by_timestamp_desc =
+        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
         &session.search_type,
         without_optimizer,
+        sort_by_timestamp_desc,
+        limit,
     )
     .await?;
 
-    let cfg = get_config();
     // Configure listing options
     let mut listing_options = match file_type {
         FileType::PARQUET => {
@@ -1277,16 +1325,18 @@ pub async fn register_table(
         }
     };
 
-    // specify sort columns for parquet file
-    listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
-        datafusion::logical_expr::SortExpr {
-            expr: Box::new(Expr::Column(Column::new_unqualified(
-                cfg.common.column_timestamp.clone(),
-            ))),
-            asc: false,
-            nulls_first: false,
-        },
-    )]]);
+    if sort_by_timestamp_desc {
+        // specify sort columns for parquet file
+        listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
+            datafusion::logical_expr::SortExpr {
+                expr: Box::new(Expr::Column(Column::new_unqualified(
+                    cfg.common.column_timestamp.clone(),
+                ))),
+                asc: false,
+                nulls_first: false,
+            },
+        )]]);
+    }
 
     let schema_key = schema.hash_key();
     let prefix = if session.storage_type == StorageType::Memory {

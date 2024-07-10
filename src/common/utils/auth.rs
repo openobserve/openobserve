@@ -63,6 +63,19 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
+pub fn get_role(role: UserRole) -> UserRole {
+    use std::str::FromStr;
+
+    let role = o2_enterprise::enterprise::openfga::authorizer::roles::get_role(format!("{role}"));
+    UserRole::from_str(&role).unwrap()
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn get_role(_role: UserRole) -> UserRole {
+    UserRole::Admin
+}
+
+#[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
@@ -392,9 +405,6 @@ impl FromRequest for AuthExtractor {
                                 )
                                 .as_str(),
                             )
-                        } else if stream_type.eq(&StreamType::Index) {
-                            object_type
-                                .replace("stream:", format!("{}:", StreamType::Logs).as_str())
                         } else {
                             object_type.replace("stream:", format!("{}:", stream_type).as_str())
                         }

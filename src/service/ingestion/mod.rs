@@ -222,6 +222,7 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
         );
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
+            _timestamp: now,
             org: alert.org_id.to_string(),
             module: TriggerDataType::Alert,
             key: module_key.clone(),
@@ -413,6 +414,8 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow!("not an ingester"));
     }
+
+    // check if the org is blocked
     if !db::file_list::BLOCKED_ORGS.is_empty()
         && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
@@ -425,6 +428,9 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
     };
+
+    // check memtable
+    ingester::check_memtable_size()?;
 
     Ok(())
 }

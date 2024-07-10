@@ -275,10 +275,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     #[cfg(feature = "enterprise")]
     {
         let user_id = req.headers().get("user_id").unwrap();
-        if let Some(mut s_type) = &stream_type {
-            if s_type.eq(&StreamType::Index) {
-                s_type = StreamType::Logs;
-            };
+        if let Some(s_type) = &stream_type {
             if !s_type.eq(&StreamType::EnrichmentTables) && !s_type.eq(&StreamType::Metadata) {
                 match crate::handler::http::auth::validator::list_objects_for_user(
                     &org_id,
@@ -318,6 +315,12 @@ async fn delete_stream_cache(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    if !config::get_config().common.result_cache_enabled {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Result Cache is disabled".to_string(),
+        )));
+    }
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {

@@ -16,36 +16,32 @@
 use std::collections::{HashMap, HashSet};
 
 use actix_web::{http, web, HttpResponse};
+use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    cluster,
+    get_config,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json},
-    DISTINCT_FIELDS,
 };
-use infra::schema::SchemaCache;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use prost::Message;
 
-use super::StreamMeta;
 use crate::{
     common::meta::{
-        alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
-        ingestion::StreamStatus,
-        stream::{SchemaRecords, StreamParams},
+        ingestion::{IngestionStatus, StreamStatus},
+        stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
-        db, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
-        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
-        schema::{get_upto_discard_error, stream_schema_exists},
+        format_stream_name,
+        ingestion::{check_ingestion_allowed, get_val_for_attr},
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };
@@ -58,7 +54,7 @@ pub async fn logs_proto_handler(
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
-) -> Result<HttpResponse, std::io::Error> {
+) -> Result<HttpResponse> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
     match super::otlp_grpc::handle_grpc_request(org_id, request, false, in_stream_name, user_email)
         .await
@@ -83,105 +79,42 @@ pub async fn logs_json_handler(
     body: web::Bytes,
     in_stream_name: Option<&str>,
     user_email: &str,
-) -> Result<HttpResponse, std::io::Error> {
+) -> Result<HttpResponse> {
+    let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE.into(),
-                e.to_string(),
-            )),
-        );
-    }
-
-    let start = std::time::Instant::now();
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
+    // check stream
     let stream_name = match in_stream_name {
-        Some(name) => {
-            get_formatted_stream_name(
-                &mut StreamParams::new(org_id, name, StreamType::Logs),
-                &mut stream_schema_map,
-            )
-            .await
-        }
-        None => {
-            let _schema_exists =
-                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
-                    .await;
-            "default".to_owned()
-        }
+        Some(name) => format_stream_name(name),
+        None => "default".to_owned(),
     };
+    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    check_ingestion_allowed(org_id, Some(&stream_name))?;
 
-    let stream_name = &stream_name;
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-
-    let mut distinct_values = Vec::with_capacity(16);
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: Option<TriggerAlertData> = None;
-
-    let cfg = config::get_config();
+    let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+    // Start Register Transforms for stream
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
         org_id,
         &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-    let partition_keys = partition_det.partition_keys;
-    let partition_time_level = partition_det.partition_time_level;
-
-    let stream_param = StreamParams {
-        org_id: org_id.to_owned().into(),
-        stream_name: stream_name.to_owned().into(),
-        stream_type: StreamType::Logs,
-    };
-
-    // Start get stream alerts
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(&[stream_param.clone()], &mut stream_alerts_map)
-        .await;
-    // End get stream alert
+        &stream_name,
+    );
+    // End Register Transforms for stream
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
-        &[stream_param],
+        &[stream_params],
         &mut user_defined_schema_map,
     )
     .await;
     // End get user defined schema
 
-    // Start Register Transforms for stream
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    );
-    // End Register Transforms for stream
-
-    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let mut stream_status = StreamStatus::new(&stream_name);
+    let mut json_data = Vec::new();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -364,7 +297,7 @@ pub async fn logs_json_handler(
                         value,
                         &stream_vrl_map,
                         org_id,
-                        stream_name,
+                        &stream_name,
                         &mut runtime,
                     )
                     .unwrap();
@@ -376,111 +309,94 @@ pub async fn logs_json_handler(
                     _ => unreachable!(),
                 };
 
-                if let Some(fields) = user_defined_schema_map.get(stream_name) {
+                if let Some(fields) = user_defined_schema_map.get(&stream_name) {
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
-                let mut to_add_distinct_values = vec![];
-                // get distinct_value item
-                for field in DISTINCT_FIELDS.iter() {
-                    if let Some(val) = local_val.get(field) {
-                        if !val.is_null() {
-                            to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                                stream_type: StreamType::Logs,
-                                stream_name: stream_name.to_string(),
-                                field_name: field.to_string(),
-                                field_value: val.as_str().unwrap().to_string(),
-                                filter_name: "".to_string(),
-                                filter_value: "".to_string(),
-                            }));
-                        }
-                    }
-                }
-
-                let local_trigger = match super::add_valid_record(
-                    &StreamMeta {
-                        org_id: org_id.to_string(),
-                        stream_name: stream_name.to_string(),
-                        partition_keys: &partition_keys,
-                        partition_time_level: &partition_time_level,
-                        stream_alerts_map: &stream_alerts_map,
-                    },
-                    &mut stream_schema_map,
-                    &mut stream_status.status,
-                    &mut buf,
-                    local_val,
-                    trigger.is_none(),
-                )
-                .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        stream_status.status.failed += 1;
-                        stream_status.status.error = e.to_string();
-                        continue;
-                    }
-                };
-                if local_trigger.is_some() {
-                    trigger = local_trigger;
-                }
-
-                // add distinct values
-                distinct_values.extend(to_add_distinct_values);
+                json_data.push((timestamp, local_val));
             }
         }
     }
 
-    // write data to wal
-    let writer = ingester::get_writer(org_id, &StreamType::Logs.to_string(), stream_name).await;
-    let mut req_stats = write_file(&writer, stream_name, buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
+    let mut res = ExportLogsServiceResponse {
+        partial_success: None,
+    };
+
+    // if no data, fast return
+    if json_data.is_empty() {
+        let mut out = BytesMut::with_capacity(res.encoded_len());
+        res.encode(&mut out).expect("Out of memory");
+        return Ok(HttpResponse::Ok()
+            .status(http::StatusCode::OK)
+            .content_type(CONTENT_TYPE_JSON)
+            .body(out)); // just return
     }
 
-    // only one trigger per request, as it updates etcd
-    evaluate_trigger(trigger).await;
-
-    // send distinct_values
-    if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
+    let mut status = IngestionStatus::Record(stream_status.status);
+    let mut req_stats = match super::write_logs(org_id, &stream_name, &mut status, json_data).await
+    {
+        Ok(rs) => rs,
+        Err(e) => {
+            log::error!("Error while writing logs: {}", e);
+            stream_status.status = match status {
+                IngestionStatus::Record(status) => status,
+                IngestionStatus::Bulk(_) => unreachable!(),
+            };
+            res.partial_success = Some(ExportLogsPartialSuccess {
+                rejected_log_records: stream_status.status.failed as i64,
+                error_message: stream_status.status.error,
+            });
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            return Ok(HttpResponse::Ok()
+                .status(http::StatusCode::OK)
+                .content_type(CONTENT_TYPE_JSON)
+                .body(out));
         }
-    }
+    };
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/org/v1/logs",
+            "/api/oltp/v1/logs",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/org/v1/logs",
+            "/api/oltp/v1/logs",
             "200",
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    req_stats.user_email = Some(user_email.to_string());
+    req_stats.user_email = if user_email.is_empty() {
+        None
+    } else {
+        Some(user_email.to_string())
+    };
     // metric + data usage
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::Logs,
-        UsageType::Json,
-        0,
+        UsageType::Logs,
+        local_trans.len() as u16,
         started_at,
     )
     .await;
 
+    stream_status.status = match status {
+        IngestionStatus::Record(status) => status,
+        IngestionStatus::Bulk(_) => unreachable!(),
+    };
     let res = ExportLogsServiceResponse {
         partial_success: Some(ExportLogsPartialSuccess {
             rejected_log_records: stream_status.status.failed as i64,

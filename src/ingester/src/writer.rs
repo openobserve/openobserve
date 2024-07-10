@@ -179,7 +179,7 @@ impl Writer {
         }
         let (entry_bytes, entry_batch) = if !check_ttl {
             let bytes = entry.into_bytes()?;
-            let batch = entry.into_batch(schema.clone())?;
+            let batch = entry.into_batch(self.key.stream_type.clone(), schema.clone())?;
             (bytes, batch)
         } else {
             (Vec::new(), None)

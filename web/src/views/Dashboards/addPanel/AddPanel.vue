@@ -310,7 +310,6 @@ import {
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
-import { useQuasar } from "quasar";
 
 import { useI18n } from "vue-i18n";
 import {
@@ -330,6 +329,7 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
+import useNotifications from "@/composables/useNotifications";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -372,11 +372,11 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref({});
-    const $q = useQuasar();
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+    const { showErrorNotification } = useNotifications();
     const {
       dashboardPanelData,
       promqlMode,
@@ -1157,11 +1157,9 @@ export default defineComponent({
       // }
 
       if (errors.length) {
-        $q.notify({
-          type: "negative",
-          message: "There are some errors, please fix them and try again",
-          timeout: 5000,
-        });
+        showErrorNotification(
+          "There are some errors, please fix them and try again"
+        );
       }
 
       if (errors.length) {
@@ -1230,15 +1228,15 @@ export default defineComponent({
           },
         });
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message:
-            error?.message ??
+        showErrorNotification(
+          error?.message ??
             (editMode.value
               ? "Error while updating panel"
               : "Error while creating panel"),
-          timeout: 2000,
-        });
+          {
+            timeout: 2000,
+          }
+        );
       }
     };
 

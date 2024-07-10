@@ -119,6 +119,7 @@ import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
+import useNotifications from "@/composables/useNotifications";
 
 const defaultValue = () => {
   return {
@@ -148,6 +149,9 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const $q = useQuasar();
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
+
     const activeFolder: any = store.state.organizationData.folders.find(
       (item: any) => item.folderId === props.activeFolderId
     );
@@ -225,15 +229,10 @@ export default defineComponent({
             description: "",
           };
           await addDashboardForm.value.resetValidation();
-          $q.notify({
-            type: "positive",
-            message: `Dashboard added successfully.`,
-          });
+
+          showPositiveNotification("Dashboard added successfully.");
         } catch (err: any) {
-          $q.notify({
-            type: "negative",
-            message: err?.message ?? "Dashboard creation failed.",
-          });
+          showErrorNotification(err?.message ?? "Dashboard creation failed.");
         }
       });
     });

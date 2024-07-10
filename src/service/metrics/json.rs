@@ -335,7 +335,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             &StreamType::Metrics.to_string(),
         ])
         .inc();
-    // let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

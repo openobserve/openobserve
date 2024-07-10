@@ -5,6 +5,7 @@
       ref="qTable"
       :rows="rowsQuery"
       :columns="columns"
+      :pagination="pagination"
       row-key="trace_id"
       style="width: 100%"
       selection="multiple"
@@ -193,6 +194,7 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
+import { durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -286,42 +288,16 @@ export default defineComponent({
     };
     const getDuration = (createdAt: number) => {
       const currentTime = localTimeToMicroseconds();
-
       const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
 
-      let formattedDuration;
-      if (durationInSeconds < 0) {
-        formattedDuration = "Invalid duration";
-      } else if (durationInSeconds < 60) {
-        formattedDuration = `${durationInSeconds}s`;
-      } else if (durationInSeconds < 3600) {
-        const minutes = Math.floor(durationInSeconds / 60);
-        formattedDuration = `${minutes}m`;
-      } else {
-        const hours = Math.floor(durationInSeconds / 3600);
-        formattedDuration = `${hours}h`;
-      }
-
-      return formattedDuration;
+      return durationFormatter(durationInSeconds);
     };
 
     //different between start and end time to show in UI as queryRange
     const queryRange = (startTime: number, endTime: number) => {
       const queryDuration = Math.floor((endTime - startTime) / 1000000);
-      let formattedDuration;
-      if (queryDuration < 0) {
-        formattedDuration = "Invalid duration";
-      } else if (queryDuration < 60) {
-        formattedDuration = `${queryDuration}s`;
-      } else if (queryDuration < 3600) {
-        const minutes = Math.floor(queryDuration / 60);
-        formattedDuration = `${minutes}m`;
-      } else {
-        const hours = Math.floor(queryDuration / 3600);
-        formattedDuration = `${hours}h`;
-      }
 
-      return formattedDuration;
+      return durationFormatter(queryDuration);
     };
 
     const columns = ref<QTableProps["columns"]>([
@@ -513,7 +489,7 @@ export default defineComponent({
           getRunningQueries();
 
           q.notify({
-            message: "Running query deleted successfully",
+            message: "Query cancelled",
             color: "positive",
             position: "bottom",
             timeout: 1500,
@@ -521,8 +497,7 @@ export default defineComponent({
         })
         .catch((error: any) => {
           q.notify({
-            message:
-              error.response?.data?.message || "Failed to delete running query",
+            message: error.response?.data?.message || "Failed to cancel query",
             color: "negative",
             position: "bottom",
             timeout: 1500,
@@ -604,6 +579,7 @@ export default defineComponent({
       selectedSearchField,
       searchFieldOptions,
       otherFieldOptions,
+      pagination,
     };
   },
 });

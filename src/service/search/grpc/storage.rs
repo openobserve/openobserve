@@ -23,7 +23,7 @@ use config::{
     },
     utils::schema_ext::SchemaExt,
 };
-use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
+use datafusion::arrow::record_batch::RecordBatch;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -37,7 +37,7 @@ use tracing::{info_span, Instrument};
 use crate::service::{
     db, file_list,
     search::{
-        datafusion::exec,
+        datafusion::{exec, file_type::FileType},
         grpc::{generate_search_schema, generate_select_start_search_schema},
         sql::Sql,
         RE_SELECT_WILDCARD,
@@ -47,7 +47,7 @@ use crate::service::{
 type CachedFiles = (usize, usize);
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
@@ -249,7 +249,6 @@ pub async fn search(
 
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
-            trace_id,
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
@@ -303,7 +302,7 @@ pub async fn search(
                     },
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[trace_id {}] search->storage: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
+                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
                             "[trace_id {}] search->storage: task timeout", session.id
                         )))
                     },
@@ -344,16 +343,19 @@ pub async fn search(
                     }
                 }
             }
-            Err(err) => {
-                return Err(err.into());
-            }
+            Err(err) => match err {
+                datafusion::error::DataFusionError::ResourcesExhausted(e) => {
+                    return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
+                }
+                _ => return Err(err.into()),
+            },
         };
     }
 
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
     trace_id: &str,
     sql: &Sql,
@@ -402,11 +404,7 @@ async fn get_file_list(
     Ok(files)
 }
 
-#[tracing::instrument(
-    name = "service:search:grpc:storage:cache_parquet_files",
-    skip_all,
-    fields(trace_id)
-)]
+#[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
 async fn cache_parquet_files(
     trace_id: &str,
     files: &[FileKey],

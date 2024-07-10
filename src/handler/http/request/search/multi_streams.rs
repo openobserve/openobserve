@@ -28,7 +28,7 @@ use config::{
     utils::{base64, json},
 };
 use infra::errors;
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 use crate::{
     common::{
@@ -36,8 +36,7 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id_and_span, get_search_type_from_request,
-                get_stream_type_from_request,
+                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
             },
         },
     },
@@ -119,8 +118,12 @@ pub async fn search_multi(
     let org_id = org_id.into_inner();
     let cfg = get_config();
     let started_at = Utc::now().timestamp_micros();
-    let (trace_id, http_span) =
-        get_or_create_trace_id_and_span(in_req.headers(), format!("/api/{org_id}/_search_multi"));
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone())
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -224,6 +227,9 @@ pub async fn search_multi(
             }
         }
 
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -238,29 +244,28 @@ pub async fn search_multi(
         #[cfg(feature = "enterprise")]
         let took_wait = 0;
         log::info!("http search multi API wait in queue took: {}", took_wait);
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
 
         let trace_id = trace_id.clone();
         // do search
-        let search_fut = SearchService::search(
+        let search_res = SearchService::search(
             &trace_id,
             &org_id,
             stream_type,
             Some(user_id.to_string()),
             &req,
-        );
-
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        )
+        .instrument(http_span.clone())
+        .await;
 
         match search_res {
             Ok(mut res) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "200",
                         &org_id,
                         "",
@@ -269,7 +274,7 @@ pub async fn search_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "200",
                         &org_id,
                         "",
@@ -332,7 +337,7 @@ pub async fn search_multi(
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "500",
                         &org_id,
                         "",
@@ -341,7 +346,7 @@ pub async fn search_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_search",
+                        "/api/org/_search_multi",
                         "500",
                         &org_id,
                         "",
@@ -413,10 +418,15 @@ pub async fn _search_partition_multi(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    let (trace_id, http_span) = get_or_create_trace_id_and_span(
-        in_req.headers(),
-        format!("/api/{org_id}/_search_partition_multi"),
-    );
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/_search_partition_multi",
+            org_id = org_id.clone()
+        )
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -432,7 +442,7 @@ pub async fn _search_partition_multi(
 
     let search_fut = SearchService::search_partition_multi(&trace_id, &org_id, stream_type, &req);
     let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span.unwrap()).await
+        search_fut.instrument(http_span).await
     } else {
         search_fut.await
     };
@@ -549,10 +559,16 @@ pub async fn around_multi(
     let (org_id, stream_names) = path.into_inner();
     let cfg = get_config();
 
-    let (trace_id, http_span) = get_or_create_trace_id_and_span(
-        in_req.headers(),
-        format!("/api/{org_id}/{stream_names}/_around_multi"),
-    );
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/{stream_names}/_around_multi",
+            org_id = org_id.clone(),
+            stream_names = stream_names.clone()
+        )
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let stream_names = base64::decode_url(&stream_names)?;
     let mut uses_fn = false;
@@ -642,6 +658,9 @@ pub async fn around_multi(
         .map(|v| v.to_string());
 
     for around_sql in around_sqls.iter() {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
         // get a local search queue lock
         #[cfg(not(feature = "enterprise"))]
         let locker = SearchService::QUEUE_LOCKER.clone();
@@ -659,6 +678,9 @@ pub async fn around_multi(
             "http search around multi API wait in queue took: {}",
             took_wait
         );
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
 
         // search forward
         let req = config::meta::search::Request {
@@ -685,20 +707,18 @@ pub async fn around_multi(
             timeout,
             search_type: Some(search::SearchEventType::UI),
         };
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_forward = match search_res {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -707,7 +727,7 @@ pub async fn around_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -762,20 +782,18 @@ pub async fn around_multi(
             timeout,
             search_type: Some(search::SearchEventType::UI),
         };
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_backward = match search_res {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::HTTP_RESPONSE_TIME
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -784,7 +802,7 @@ pub async fn around_multi(
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
                     .with_label_values(&[
-                        "/api/org/_around",
+                        "/api/org/_around_multi",
                         "500",
                         &org_id,
                         &stream_names,
@@ -834,7 +852,7 @@ pub async fn around_multi(
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
             .with_label_values(&[
-                "/api/org/_around",
+                "/api/org/_around_multi",
                 "200",
                 &org_id,
                 &stream_names,
@@ -843,7 +861,7 @@ pub async fn around_multi(
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
             .with_label_values(&[
-                "/api/org/_around",
+                "/api/org/_around_multi",
                 "200",
                 &org_id,
                 &stream_names,

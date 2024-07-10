@@ -185,9 +185,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     infra_file_list::create_table_index().await?;
-    db::file_list::remote::cache_stats()
-        .await
-        .expect("Load stream stats failed");
+    tokio::task::spawn(async move { db::file_list::remote::cache_stats().await });
 
     #[cfg(feature = "enterprise")]
     db::ofga::cache().await.expect("ofga model cache failed");
@@ -203,9 +201,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         // create wal dir
         if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
-            log::error!("Failed to create wal dir: {}", e);
-        }
-        if let Err(e) = std::fs::create_dir_all(&cfg.common.data_idx_dir) {
             log::error!("Failed to create wal dir: {}", e);
         }
     }

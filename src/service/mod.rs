@@ -13,12 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use once_cell::sync::Lazy;
 use regex::Regex;
-
-use crate::common::meta::stream::StreamParams;
 
 pub mod alerts;
 pub mod compact;
@@ -62,35 +58,6 @@ pub fn format_partition_key(input: &str) -> String {
         }
     }
     output
-}
-
-// format stream name
-pub async fn get_formatted_stream_name(
-    params: &mut StreamParams,
-    schema_map: &mut HashMap<String, infra::schema::SchemaCache>,
-) -> String {
-    let mut stream_name = params.stream_name.to_string();
-
-    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type)
-        .await
-        .unwrap();
-
-    let schema = if schema.fields_map().is_empty() {
-        stream_name = RE_CORRECT_STREAM_NAME
-            .replace_all(&stream_name, "_")
-            .to_string();
-        infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type)
-            .await
-            .unwrap()
-    } else {
-        schema
-    };
-
-    schema_map.insert(stream_name.to_owned(), schema);
-
-    params.stream_name = stream_name.to_owned().into();
-
-    stream_name
 }
 
 // format stream name

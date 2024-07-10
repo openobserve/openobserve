@@ -346,7 +346,7 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
 
 async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
     if curr_usages.is_empty() {
-        log::info!(" Returning as no triggers reported ");
+        log::info!(" Returning as no triggers reported");
         return;
     }
 

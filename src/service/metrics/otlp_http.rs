@@ -512,7 +512,7 @@ pub async fn metrics_json_handler(
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
             .with_label_values(&[
-                "/api/org/v1/metrics",
+                "/api/otlp/v1/metrics",
                 "200",
                 org_id,
                 &stream_name,
@@ -521,7 +521,7 @@ pub async fn metrics_json_handler(
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
             .with_label_values(&[
-                "/api/org/v1/metrics",
+                "/api/otlp/v1/metrics",
                 "200",
                 org_id,
                 &stream_name,
@@ -836,7 +836,7 @@ fn process_hist_data_point(
             bucket_rec["le"] = (*val.to_string()).into()
         }
         if i == len - 1 {
-            bucket_rec["le"] = std::f64::INFINITY.to_string().into();
+            bucket_rec["le"] = f64::INFINITY.to_string().into();
         }
         bucket_recs.push(bucket_rec);
     }

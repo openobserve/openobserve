@@ -19,12 +19,12 @@ use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use config::{get_config, meta::stream::StreamType, metrics, utils::json};
 use infra::errors;
 use serde::Serialize;
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::get_or_create_trace_id_and_span,
+        utils::http::get_or_create_trace_id,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces::otlp_http},
@@ -129,12 +129,19 @@ pub async fn get_latest_traces(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let cfg = get_config();
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
-    let (trace_id, http_span) = get_or_create_trace_id_and_span(
-        in_req.headers(),
-        format!("/api/{org_id}/{stream_name}/traces/latest"),
-    );
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/{stream_name}/traces/latest",
+            org_id = org_id.clone(),
+            stream_name = stream_name.clone()
+        )
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
@@ -201,7 +208,9 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    let cfg = get_config();
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -219,6 +228,9 @@ pub async fn get_latest_traces(
         "http traces latest API wait in queue took: {} ms",
         took_wait
     );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
 
     // search
     let query_sql = format!(
@@ -263,12 +275,9 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
 
-    let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span.clone().unwrap()).await
-    } else {
-        search_fut.await
-    };
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+        .instrument(http_span.clone())
+        .await;
 
     let resp_search = match search_res {
         Ok(res) => res,
@@ -355,13 +364,11 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_search = match search_res {
             Ok(res) => res,
             Err(err) => {

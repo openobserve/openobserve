@@ -13,6 +13,7 @@ service Search {
     rpc ClusterSearch (SearchRequest) returns (SearchResponse) {}
     rpc QueryStatus(QueryStatusRequest) returns (QueryStatusResponse) {}
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
+    rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
 }
 
 // Search request query

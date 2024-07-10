@@ -426,9 +426,9 @@ pub async fn handle_grpc_request(
         .await;
 
         let ep = if is_grpc {
-            "/grpc/export/metrics"
+            "/grpc/otlp/metrics"
         } else {
-            "/api/org/v1/metrics"
+            "/api/otlp/v1/metrics"
         };
 
         let time = start.elapsed().as_secs_f64();
@@ -670,7 +670,7 @@ fn process_hist_data_point(
             bucket_rec["le"] = (*val.to_string()).into()
         }
         if i == len - 1 {
-            bucket_rec["le"] = std::f64::INFINITY.to_string().into();
+            bucket_rec["le"] = f64::INFINITY.to_string().into();
         }
         bucket_recs.push(bucket_rec);
     }

@@ -463,11 +463,11 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "FieldList",
@@ -484,7 +484,6 @@ export default defineComponent({
       currentFieldsList: [],
     });
     const filteredStreams = ref([]);
-    const $q = useQuasar();
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -506,7 +505,7 @@ export default defineComponent({
       cleanupDraggingFields,
     } = useDashboardPanelData();
     const { getStreams, getStream } = useStreams();
-
+    const { showErrorNotification } = useNotifications();
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
@@ -608,10 +607,9 @@ export default defineComponent({
             dashboardPanelData.meta.stream.selectedStreamFields =
               fieldWithSchema?.schema ?? [];
           } catch (error: any) {
-            $q.notify({
-              type: "negative",
-              message: error ?? "Failed to get stream fields",
-            });
+            showErrorNotification(
+              error?.message ?? "Failed to get stream fields"
+            );
           }
         }
       }
@@ -802,7 +800,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .metric-explore-metric-icon {
   min-width: 28px !important;
   padding-right: 8px !important;

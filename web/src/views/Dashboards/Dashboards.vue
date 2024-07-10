@@ -88,33 +88,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               content-class="tab_content full-width"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
             >
-              <div class="full-width row justify-between no-wrap">
-                <span
-                  style="
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                  "
-                  :title="tab.name"
-                  >{{ tab.name }}</span
-                >
-                <div>
-                  <q-icon
+              <div class="folder-item full-width row justify-between no-wrap">
+                <span class="folder-name" :title="tab.name">{{
+                  tab.name
+                }}</span>
+                <div class="hover-actions">
+                  <q-btn
                     v-if="index"
-                    :name="outlinedEdit"
-                    class="q-ml-sm"
-                    @click.stop="editFolder(tab.folderId)"
+                    dense
+                    flat
+                    no-caps
+                    icon="more_vert"
                     style="cursor: pointer; justify-self: end"
-                    data-test="dashboard-edit-folder-icon"
-                  />
-                  <q-icon
-                    v-if="index"
-                    :name="outlinedDelete"
-                    class="q-ml-sm"
-                    @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                    style="cursor: pointer; justify-self: end"
-                    data-test="dashboard-delete-folder-icon"
-                  />
+                    size="sm"
+                    data-test="dashboard-more-icon"
+                  >
+                    <q-menu>
+                      <q-list dense>
+                        <q-item
+                          v-close-popup
+                          clickable
+                          @click.stop="editFolder(tab.folderId)"
+                          data-test="dashboard-edit-folder-icon"
+                        >
+                          <q-item-section avatar>
+                            <q-icon :name="outlinedEdit" size="xs" />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label>Edit</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                        <q-item
+                          v-close-popup
+                          clickable
+                          @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                          data-test="dashboard-delete-folder-icon"
+                        >
+                          <q-item-section avatar>
+                            <q-icon :name="outlinedDelete" size="xs" />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label>Delete</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-menu>
+                  </q-btn>
                 </div>
               </div>
             </q-tab>
@@ -337,6 +356,7 @@ import {
   outlinedEdit,
 } from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import useNotifications from "@/composables/useNotifications";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -377,7 +397,8 @@ export default defineComponent({
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
-
+    const { showPositiveNotification, showErrorNotification } =
+      useNotifications();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -539,15 +560,9 @@ export default defineComponent({
 
         await getDashboards();
 
-        $q.notify({
-          type: "positive",
-          message: `Dashboard Duplicated Successfully`,
-        });
+        showPositiveNotification("Dashboard Duplicated Successfully.");
       } catch (err) {
-        $q.notify({
-          type: "negative",
-          message: err?.message ?? "Dashboard duplication failed",
-        });
+        showErrorNotification(err?.message ?? "Dashboard duplication failed");
       }
 
       dismiss();
@@ -614,15 +629,9 @@ export default defineComponent({
             selectedDelete.value.id,
             activeFolderId.value ?? "default"
           );
-          $q.notify({
-            type: "positive",
-            message: "Dashboard deleted successfully.",
-            timeout: 5000,
-          });
+          showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
-          $q.notify({
-            type: "negative",
-            message: err?.message ?? "Dashboard deletion failed",
+          showErrorNotification(err?.message ?? "Dashboard deletion failed", {
             timeout: 2000,
           });
         }
@@ -670,20 +679,18 @@ export default defineComponent({
           if (activeFolderId.value === selectedFolderDelete.value)
             activeFolderId.value = "default";
 
-          $q.notify({
-            type: "positive",
-            message: `Folder deleted successfully`,
+          showPositiveNotification("Folder deleted successfully.", {
             timeout: 2000,
           });
         } catch (err) {
-          $q.notify({
-            type: "negative",
-            message:
-              err?.response?.data?.message ||
+          showErrorNotification(
+            err?.response?.data?.message ||
               err?.message ||
               "Folder deletion failed",
-            timeout: 2000,
-          });
+            {
+              timeout: 2000,
+            }
+          );
         } finally {
           confirmDeleteFolderDialog.value = false;
         }
@@ -774,22 +781,47 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
 .dashboards-tabs {
+  .folder-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    border-radius: 0.25rem;
+    transition: background-color 0.3s;
+
+    &:hover {
+      .hover-actions {
+        display: flex;
+      }
+    }
+
+    .folder-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hover-actions {
+      display: none;
+      align-items: center;
+
+      .q-btn {
+        margin-left: 0.5rem;
+      }
+    }
+  }
+
   .q-tabs {
     &--vertical {
       margin: 5px;
+
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         text-transform: capitalize;
+
         &__content.tab_content {
           .q-tab {
             &__icon + &__label {
@@ -798,6 +830,7 @@ export default defineComponent({
             }
           }
         }
+
         &--active {
           background-color: $accent;
           color: black;

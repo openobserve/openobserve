@@ -261,7 +261,7 @@ test("should change stream settings and click on search stream", async ({ page }
     await page.locator("[title=\"Stream Detail\"]").first().click({ force: true });
     await page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     const scope = page.locator(".q-virtual-scroll__content");
-    await scope.getByText(/Inverted Index/).first().click();
+    await scope.getByText(/Full text search/).first().click();
     await page.locator('[data-test="schema-update-settings-button"]').click({force: true });
     await page.waitForTimeout(3000);
     await page.locator(".col-auto > .q-btn > .q-btn__content").click({ force: true });

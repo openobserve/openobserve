@@ -24,7 +24,6 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
-    common::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
@@ -39,7 +38,10 @@ use crate::{
     common::meta::stream::StreamParams,
     service::{
         db, file_list,
-        search::{datafusion::exec::register_table, match_source},
+        search::{
+            datafusion::{exec::register_table, file_type::FileType},
+            match_source,
+        },
     },
 };
 
@@ -157,6 +159,8 @@ pub(crate) async fn create_context(
         &files,
         FileType::PARQUET,
         false,
+        &[],
+        None,
     )
     .await?;
     Ok((ctx, schema, scan_stats))
@@ -165,7 +169,7 @@ pub(crate) async fn create_context(
 #[tracing::instrument(
     name = "promql:search:grpc:storage:get_file_list",
     skip_all,
-    fields(trace_id, org_id, stream_name)
+    fields(org_id, stream_name)
 )]
 async fn get_file_list(
     trace_id: &str,

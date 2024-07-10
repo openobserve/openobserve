@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod bitvec;
 pub mod cluster;
 pub mod logger;
 pub mod meta_store;

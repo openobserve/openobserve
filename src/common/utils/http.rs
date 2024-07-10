@@ -96,10 +96,7 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
 }
 
 #[inline(always)]
-pub(crate) fn get_or_create_trace_id_and_span(
-    headers: &HeaderMap,
-    ep: String,
-) -> (String, Option<tracing::Span>) {
+pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
     let cfg = config::get_config();
     if let Some(traceparent) = headers.get("traceparent") {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
@@ -108,16 +105,10 @@ pub(crate) fn get_or_create_trace_id_and_span(
                 propagator.extract(&RequestHeaderExtractor::new(headers))
             });
             let trace_id = ctx.span().span_context().trace_id().to_string();
-
-            let span = if cfg.common.tracing_search_enabled {
-                // Create the span and set parent context
-                let span = tracing::info_span!("{ep}", ep = ep);
+            if !span.is_none() {
                 span.set_parent(ctx);
-                Some(span)
-            } else {
-                None
-            };
-            (trace_id, span)
+            }
+            trace_id
         } else {
             // manually parse trace_id
             if let Ok(traceparent_str) = traceparent.to_str() {
@@ -128,20 +119,18 @@ pub(crate) fn get_or_create_trace_id_and_span(
                     // characters or all zeros), vendors MUST ignore the traceparent.
                     // https://www.w3.org/TR/trace-context/#traceparent-header
                     if trace_id.len() == 32 && !trace_id.chars().all(|c| c == '0') {
-                        return (trace_id, None);
+                        return trace_id;
                     }
                 }
             }
             // If parsing fails or trace_id is invalid, generate a new one
             log::warn!("Failed to parse valid trace_id from received [Traceparent] header");
-            (config::ider::uuid(), None)
+            config::ider::uuid()
         }
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("{ep}", ep = ep);
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        (trace_id, Some(span))
+    } else if !span.is_none() {
+        span.context().span().span_context().trace_id().to_string()
     } else {
-        (config::ider::uuid(), None)
+        config::ider::uuid()
     }
 }
 

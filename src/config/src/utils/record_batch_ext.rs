@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        make_builder, new_null_array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-        Float64Array, Float64Builder, Int64Array, Int64Builder, NullBuilder, RecordBatchOptions,
-        StringArray, StringBuilder, UInt64Array, UInt64Builder,
+        make_builder, new_null_array, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray,
+        BooleanBuilder, Float64Array, Float64Builder, Int64Array, Int64Builder, NullBuilder,
+        RecordBatchOptions, StringArray, StringBuilder, UInt64Array, UInt64Builder,
     },
     record_batch::RecordBatch,
 };
@@ -27,7 +27,10 @@ use arrow_schema::{ArrowError, DataType, Schema};
 use datafusion::error::DataFusionError;
 use hashbrown::{HashMap, HashSet};
 
-use super::{json::get_string_value, schema_ext::SchemaExt};
+use super::{
+    json::{get_bool_value, get_float_value, get_int_value, get_string_value, get_uint_value},
+    schema_ext::SchemaExt,
+};
 use crate::{get_config, FxIndexMap};
 
 const USIZE_SIZE: usize = std::mem::size_of::<usize>();
@@ -110,7 +113,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_i64().unwrap());
+                        b.append_value(get_int_value(v));
                     }
                 }
                 DataType::UInt64 => {
@@ -121,7 +124,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_u64().unwrap());
+                        b.append_value(get_uint_value(v));
                     }
                 }
                 DataType::Float64 => {
@@ -132,7 +135,7 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_f64().unwrap());
+                        b.append_value(get_float_value(v));
                     }
                 }
                 DataType::Boolean => {
@@ -143,7 +146,30 @@ pub fn convert_json_to_record_batch(
                     if v.is_null() {
                         b.append_null();
                     } else {
-                        b.append_value(v.as_bool().unwrap());
+                        b.append_value(get_bool_value(v));
+                    }
+                }
+                DataType::Binary => {
+                    let b = builder
+                        .as_any_mut()
+                        .downcast_mut::<BinaryBuilder>()
+                        .unwrap();
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        let v = v.as_str().ok_or_else(|| {
+                            ArrowError::SchemaError(
+                                "Cannot convert to [DataType::Binary] from non-string value"
+                                    .to_string(),
+                            )
+                        })?;
+                        let bin_data = hex::decode(v).map_err(|_| {
+                            ArrowError::SchemaError(
+                                "Cannot convert to [DataType::Binary] from non-hex string value"
+                                    .to_string(),
+                            )
+                        })?;
+                        b.append_value(bin_data);
                     }
                 }
                 DataType::Null => {
@@ -189,6 +215,12 @@ pub fn convert_json_to_record_batch(
                     DataType::Boolean => {
                         b.as_any_mut()
                             .downcast_mut::<BooleanBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Binary => {
+                        b.as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
                             .unwrap()
                             .append_null();
                     }
@@ -508,7 +540,7 @@ pub fn concat_batches(
         )?;
         arrays.push(array);
     }
-    RecordBatch::try_new(schema.clone(), arrays)
+    RecordBatch::try_new(schema, arrays)
 }
 
 // merge record batches, the record batch have same schema

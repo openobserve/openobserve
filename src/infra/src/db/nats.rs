@@ -85,7 +85,7 @@ pub struct NatsDb {
 
 impl NatsDb {
     pub fn new(prefix: &str) -> Self {
-        let prefix = prefix.trim_end_matches(|v| v == '/');
+        let prefix = prefix.trim_end_matches('/');
         Self {
             prefix: prefix.to_string(),
         }

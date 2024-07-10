@@ -295,9 +295,9 @@ pub async fn handle_trace_request(
     req_stats.response_time = time;
 
     let ep = if is_grpc {
-        "/grpc/export/traces"
+        "/grpc/otlp/traces"
     } else {
-        "/api/org/v1/traces"
+        "/api/otlp/v1/traces"
     };
 
     // record span metrics

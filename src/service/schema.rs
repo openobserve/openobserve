@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
+    SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
@@ -68,7 +69,6 @@ pub async fn check_for_schema(
     let schema = stream_schema_map.get(stream_name).unwrap();
     if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
         return Ok(SchemaEvolution {
-            schema_compatible: true,
             is_schema_changed: false,
             types_delta: None,
         });
@@ -81,7 +81,6 @@ pub async fn check_for_schema(
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
         return Ok(SchemaEvolution {
-            schema_compatible: true,
             is_schema_changed: false,
             types_delta: None,
         });
@@ -111,7 +110,6 @@ pub async fn check_for_schema(
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
             return Ok(SchemaEvolution {
-                schema_compatible: true,
                 is_schema_changed: false,
                 types_delta: Some(field_datatype_delta),
             });
@@ -140,7 +138,6 @@ pub async fn check_for_schema(
     )
     .await?
     .unwrap_or(SchemaEvolution {
-        schema_compatible: true,
         is_schema_changed: false,
         types_delta: None,
     });
@@ -201,6 +198,7 @@ async fn handle_diff_schema(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Result<Option<SchemaEvolution>> {
+    let cfg = get_config();
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
@@ -215,7 +213,7 @@ async fn handle_diff_schema(
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
     // retry x times for update schema
-    while retries < get_config().limit.meta_transaction_retries {
+    while retries < cfg.limit.meta_transaction_retries {
         match db::schema::merge(
             org_id,
             stream_name,
@@ -260,7 +258,7 @@ async fn handle_diff_schema(
         );
         return Err(e);
     }
-    let Some((final_schema, field_datatype_delta)) = ret else {
+    let Some((mut final_schema, field_datatype_delta)) = ret else {
         return Ok(None);
     };
 
@@ -274,14 +272,69 @@ async fn handle_diff_schema(
     }
 
     // check defined_schema_fields
-    let stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
-    let defined_schema_fields = stream_setting
+    let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
+    let mut defined_schema_fields = stream_setting
         .defined_schema_fields
         .clone()
         .unwrap_or_default();
-    let final_schema = SchemaCache::new(final_schema);
+
+    // Automatically enable User-defined schema when
+    // 1. allow_user_defined_schemas is enabled
+    // 2. log ingestion
+    // 3. user defined schema is not already enabled
+    // 4. final schema fields count exceeds udschema_max_fields
+    // user-defined schema does not include _timestamp or _all columns
+    if cfg.common.allow_user_defined_schemas
+        && cfg.limit.udschema_max_fields > 0
+        && stream_type == StreamType::Logs
+        && defined_schema_fields.is_empty()
+        && final_schema.fields().len() > cfg.limit.udschema_max_fields
+    {
+        let mut uds_fields = HashSet::with_capacity(cfg.limit.udschema_max_fields);
+        // add fts fields
+        for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+            if final_schema.field_with_name(field).is_ok() {
+                uds_fields.insert(field.to_string());
+            }
+        }
+        for field in final_schema.fields() {
+            let field_name = field.name();
+            // skip _timestamp and _all columns
+            if field_name == &cfg.common.column_timestamp || field_name == &cfg.common.column_all {
+                continue;
+            }
+            uds_fields.insert(field_name.to_string());
+            if uds_fields.len() == cfg.limit.udschema_max_fields {
+                break;
+            }
+        }
+        defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
+        stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
+        final_schema.metadata.insert(
+            "settings".to_string(),
+            json::to_string(&stream_setting).unwrap(),
+        );
+        // save the new settings
+        if let Err(e) = super::stream::save_stream_settings(
+            org_id,
+            stream_name,
+            stream_type,
+            stream_setting.clone(),
+        )
+        .await
+        {
+            log::error!(
+                "save_stream_settings [{}/{}/{}] error: {}",
+                org_id,
+                stream_type,
+                stream_name,
+                e
+            );
+        }
+    }
 
     // update node cache
+    let final_schema = SchemaCache::new(final_schema);
     let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
@@ -296,7 +349,6 @@ async fn handle_diff_schema(
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Ok(Some(SchemaEvolution {
-        schema_compatible: true,
         is_schema_changed: true,
         types_delta: Some(field_datatype_delta),
     }))
@@ -449,7 +501,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(result.schema_compatible);
+        assert!(!result.is_schema_changed);
     }
 
     #[tokio::test]

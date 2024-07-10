@@ -458,7 +458,8 @@ export default defineComponent({
     ]);
 
     const streamIndexType = [
-      { label: "Inverted Index", value: "fullTextSearchKey" },
+      { label: "Full text search", value: "fullTextSearchKey" },
+      { label: "Secondary index", value: "secondaryIndexKey" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
       { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
@@ -535,6 +536,13 @@ export default defineComponent({
           store.state.zoConfig.default_fts_keys.includes(property.name))
       ) {
         fieldIndices.push("fullTextSearchKey");
+      }
+
+      if (
+        settings.index_fields.length > 0 &&
+        settings.index_fields.includes(property.name)
+      ) {
+        fieldIndices.push("secondaryIndexKey");
       }
 
       if (
@@ -670,6 +678,7 @@ export default defineComponent({
     const onSubmit = async () => {
       let settings = {
         partition_keys: [],
+        index_fields: [],
         full_text_search_keys: [],
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
@@ -706,6 +715,10 @@ export default defineComponent({
         property.index_type?.forEach((index: string) => {
           if (index === "fullTextSearchKey") {
             settings.full_text_search_keys.push(property.name);
+          }
+
+          if (index === "secondaryIndexKey") {
+            settings.index_fields.push(property.name);
           }
 
           if (property.level && index === "keyPartition") {
