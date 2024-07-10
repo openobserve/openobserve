@@ -666,6 +666,12 @@ pub struct Common {
     )]
     pub inverted_index_split_chars: String,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
+        default = false,
+        help = "Use old format for inverted index, it will generate same stream name for index."
+    )]
+    pub inverted_index_old_format: bool,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."

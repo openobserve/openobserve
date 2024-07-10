@@ -943,10 +943,17 @@ async fn get_file_list_by_inverted_index(
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
     } else {
-        format!(
-            "(field='{}' AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
+        if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
+            format!(
+                "((field = '{}' OR field IS NULL) AND ({}))",
+                INDEX_FIELD_NAME_FOR_ALL, fts_condition
+            )
+        } else {
+            format!(
+                "(field = '{}' AND ({}))",
+                INDEX_FIELD_NAME_FOR_ALL, fts_condition
+            )
+        }
     };
 
     // Process index terms
@@ -955,9 +962,12 @@ async fn get_file_list_by_inverted_index(
         .iter()
         .map(|(field, values)| {
             if values.len() > 1 {
-                format!("(field='{field}' AND term IN ('{}'))", values.join("','"))
+                format!("(field = '{field}' AND term IN ('{}'))", values.join("','"))
             } else {
-                format!("(field='{field}' AND term='{}')", values.first().unwrap())
+                format!(
+                    "(field = '{field}' AND term = '{}')",
+                    values.first().unwrap()
+                )
             }
         })
         .collect::<Vec<_>>();
@@ -970,7 +980,12 @@ async fn get_file_list_by_inverted_index(
         format!("{} OR {}", fts_condition, index_condition)
     };
 
-    let index_stream_name = format!("{}_{}", meta.stream_name, stream_type);
+    let index_stream_name =
+        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+            meta.stream_name.to_string()
+        } else {
+            format!("{}_{}", meta.stream_name, stream_type)
+        };
     let query = format!(
         "SELECT term, file_name, _count, deleted, segment_ids FROM \"{}\" WHERE {} ORDER BY {} DESC",
         index_stream_name, search_condition, cfg.common.column_timestamp
@@ -1012,12 +1027,10 @@ async fn get_file_list_by_inverted_index(
             let term = hit.get("term").unwrap().as_str().unwrap().to_string();
             let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
             let count = hit.get("_count").unwrap().as_u64().unwrap();
-            let segment_ids = hit
-                .get("segment_ids")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string();
+            let segment_ids = match hit.get("segment_ids") {
+                None => "".to_string(),
+                Some(v) => v.as_str().unwrap().to_string(),
+            };
             if deleted_files.contains(&file_name) {
                 None
             } else {
@@ -1056,12 +1069,10 @@ async fn get_file_list_by_inverted_index(
                     .and_then(|value| value.as_str())
                     .filter(|&name| !deleted_files.contains(name))
                     .map(|v| {
-                        let segment_ids = hit
-                            .get("segment_ids")
-                            .unwrap()
-                            .as_str()
-                            .unwrap()
-                            .to_string();
+                        let segment_ids = match hit.get("segment_ids") {
+                            None => "".to_string(),
+                            Some(v) => v.as_str().unwrap().to_string(),
+                        };
                         (v.to_string(), segment_ids)
                     })
             })

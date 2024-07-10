@@ -690,7 +690,12 @@ pub(crate) async fn generate_index_on_ingester(
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    let index_stream_name = format!("{}_{}", stream_name, stream_type);
+    let index_stream_name =
+        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+            stream_name.to_string()
+        } else {
+            format!("{}_{}", stream_name, stream_type)
+        };
     let record_batches = prepare_index_record_batches(
         batches,
         org_id,
@@ -727,7 +732,7 @@ pub(crate) async fn generate_index_on_ingester(
         .await?
         else {
             return Err(anyhow::anyhow!(
-                "generate_index_on_ingester error: schema not found"
+                "generate_index_on_ingester create schema error: schema not found"
             ));
         };
         // update schema to enable bloomfilter for field: term, file_name
@@ -742,6 +747,27 @@ pub(crate) async fn generate_index_on_ingester(
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
+    } else if let Some(schema) = schema_map.get(&index_stream_name) {
+        // check if the schema has been updated <= v0.10.8-rc4
+        if get_config().common.inverted_index_old_format
+            && stream_type == StreamType::Logs
+            && !schema.fields_map().contains_key("segment_ids")
+        {
+            if let Err(e) = db::schema::merge(
+                org_id,
+                &index_stream_name,
+                StreamType::Index,
+                idx_schema.as_ref(),
+                Some(Utc::now().timestamp_micros()),
+            )
+            .await
+            {
+                return Err(anyhow::anyhow!(
+                    "generate_index_on_ingester update schema error: {}",
+                    e
+                ));
+            };
+        }
     }
     let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
@@ -801,7 +827,12 @@ pub(crate) async fn generate_index_on_compactor(
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(String, FileMeta), anyhow::Error> {
-    let index_stream_name = format!("{}_{}", stream_name, stream_type);
+    let index_stream_name =
+        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+            stream_name.to_string()
+        } else {
+            format!("{}_{}", stream_name, stream_type)
+        };
     let mut record_batches = prepare_index_record_batches(
         batches,
         org_id,
@@ -929,9 +960,9 @@ async fn prepare_index_record_batches(
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
-        Field::new("min_ts", DataType::Int64, false),
-        Field::new("max_ts", DataType::Int64, false),
-        Field::new("field", DataType::Utf8, false),
+        Field::new("min_ts", DataType::Int64, true),
+        Field::new("max_ts", DataType::Int64, true),
+        Field::new("field", DataType::Utf8, true),
         Field::new("term", DataType::Utf8, true),
         Field::new("file_name", DataType::Utf8, false),
         Field::new("_count", DataType::Int64, false),
