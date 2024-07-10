@@ -62,6 +62,15 @@ pub fn get_uint_value(val: &Value) -> u64 {
     }
 }
 
+pub fn get_bool_value(val: &Value) -> bool {
+    match val {
+        Value::String(v) => v.parse::<bool>().unwrap_or(false),
+        Value::Number(v) => v.as_f64().unwrap_or(0.0) > 0.0,
+        Value::Bool(v) => *v,
+        _ => false,
+    }
+}
+
 pub fn get_string_value(value: &Value) -> String {
     if value.is_string() {
         value.as_str().unwrap_or_default().to_string()

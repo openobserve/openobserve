@@ -20,10 +20,12 @@ use std::{
 
 use chrono::Duration;
 use config::{
-    get_config, meta::{
+    get_config,
+    meta::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
-    }, QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS
+    },
+    QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -338,7 +340,10 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty() && meta_time_range_is_empty && req_query.size > QUERY_WITH_NO_LIMIT {
+            if !time_range_sql.is_empty()
+                && meta_time_range_is_empty
+                && req_query.size > QUERY_WITH_NO_LIMIT
+            {
                 match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
