@@ -836,7 +836,7 @@ fn process_hist_data_point(
             bucket_rec["le"] = (*val.to_string()).into()
         }
         if i == len - 1 {
-            bucket_rec["le"] = std::f64::INFINITY.to_string().into();
+            bucket_rec["le"] = f64::INFINITY.to_string().into();
         }
         bucket_recs.push(bucket_rec);
     }

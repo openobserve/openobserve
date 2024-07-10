@@ -28,7 +28,7 @@ use config::{
     utils::{base64, json},
 };
 use infra::errors;
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 use crate::{
     common::{
@@ -36,8 +36,7 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request,
-                get_stream_type_from_request,
+                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
             },
         },
     },
@@ -120,12 +119,9 @@ pub async fn search_multi(
     let cfg = get_config();
     let started_at = Utc::now().timestamp_micros();
     let http_span = if cfg.common.tracing_search_enabled {
-        Some(tracing::info_span!(
-            "/api/{org_id}/_search_multi",
-            org_id = org_id.clone()
-        ))
+        tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone())
     } else {
-        None
+        Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
@@ -254,19 +250,15 @@ pub async fn search_multi(
 
         let trace_id = trace_id.clone();
         // do search
-        let search_fut = SearchService::search(
+        let search_res = SearchService::search(
             &trace_id,
             &org_id,
             stream_type,
             Some(user_id.to_string()),
             &req,
-        );
-
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        )
+        .instrument(http_span.clone())
+        .await;
 
         match search_res {
             Ok(mut res) => {
@@ -427,12 +419,12 @@ pub async fn _search_partition_multi(
     let start = std::time::Instant::now();
     let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
-        Some(tracing::info_span!(
+        tracing::info_span!(
             "/api/{org_id}/_search_partition_multi",
             org_id = org_id.clone()
-        ))
+        )
     } else {
-        None
+        Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
@@ -450,7 +442,7 @@ pub async fn _search_partition_multi(
 
     let search_fut = SearchService::search_partition_multi(&trace_id, &org_id, stream_type, &req);
     let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span.unwrap()).await
+        search_fut.instrument(http_span).await
     } else {
         search_fut.await
     };
@@ -568,13 +560,13 @@ pub async fn around_multi(
     let cfg = get_config();
 
     let http_span = if cfg.common.tracing_search_enabled {
-        Some(tracing::info_span!(
+        tracing::info_span!(
             "/api/{org_id}/{stream_names}/_around_multi",
             org_id = org_id.clone(),
             stream_names = stream_names.clone()
-        ))
+        )
     } else {
-        None
+        Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
@@ -715,13 +707,11 @@ pub async fn around_multi(
             timeout,
             search_type: Some(search::SearchEventType::UI),
         };
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_forward = match search_res {
             Ok(res) => res,
             Err(err) => {
@@ -792,13 +782,11 @@ pub async fn around_multi(
             timeout,
             search_type: Some(search::SearchEventType::UI),
         };
-        let search_fut =
-            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.clone().unwrap()).await
-        } else {
-            search_fut.await
-        };
+        let search_res =
+            SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+                .instrument(http_span.clone())
+                .await;
+
         let resp_backward = match search_res {
             Ok(res) => res,
             Err(err) => {

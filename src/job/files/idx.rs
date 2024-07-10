@@ -14,13 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    ider,
     meta::stream::{FileMeta, StreamType},
     utils::parquet::new_parquet_writer,
+    FILE_EXT_PARQUET,
 };
 use infra::storage;
 use tokio::task;
 
-use super::{ider, FILE_EXT_PARQUET};
 use crate::common::utils::stream::populate_file_meta;
 
 fn generate_index_file_name_from_compacted_file(
@@ -64,7 +65,14 @@ pub(crate) async fn write_to_disk(
         compressed_size: 0,
         flattened: false,
     };
-    populate_file_meta(schema.clone(), vec![batches.to_vec()], &mut file_meta).await?;
+    populate_file_meta(
+        schema.clone(),
+        vec![batches.to_vec()],
+        &mut file_meta,
+        Some("min_ts"),
+        Some("max_ts"),
+    )
+    .await?;
 
     // write parquet file
     let mut buf_parquet = Vec::new();

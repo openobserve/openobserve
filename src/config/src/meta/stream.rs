@@ -22,9 +22,9 @@ use proto::cluster_rpc;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
-use super::usage::Stats;
 use crate::{
     get_config,
+    meta::usage::Stats,
     utils::{
         hash::{gxhash, Sum64},
         json::{self, Map, Value},
@@ -54,6 +54,15 @@ pub enum StreamType {
     Filelist,
     Metadata,
     Index,
+}
+
+impl StreamType {
+    pub fn create_inverted_index(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+    }
 }
 
 impl From<&str> for StreamType {
@@ -90,6 +99,7 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
+    pub segment_ids: Option<Vec<u8>>,
 }
 
 impl FileKey {
@@ -98,6 +108,7 @@ impl FileKey {
             key: key.to_string(),
             meta,
             deleted,
+            segment_ids: None,
         }
     }
 
@@ -106,7 +117,12 @@ impl FileKey {
             key: file.to_string(),
             meta: FileMeta::default(),
             deleted: false,
+            segment_ids: None,
         }
+    }
+
+    pub fn with_segment_ids(&mut self, segment_ids: Vec<u8>) {
+        self.segment_ids = Some(segment_ids);
     }
 }
 
@@ -197,6 +213,22 @@ impl From<&String> for QueryPartitionStrategy {
             "file_size" => QueryPartitionStrategy::FileSize,
             "file_hash" => QueryPartitionStrategy::FileHash,
             _ => QueryPartitionStrategy::FileNum,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MergeStrategy {
+    FileSize,
+    FileTime,
+}
+
+impl From<&String> for MergeStrategy {
+    fn from(s: &String) -> Self {
+        match s.to_lowercase().as_str() {
+            "file_size" => MergeStrategy::FileSize,
+            "file_time" => MergeStrategy::FileTime,
+            _ => MergeStrategy::FileSize,
         }
     }
 }
@@ -361,6 +393,7 @@ impl From<&FileKey> for cluster_rpc::FileKey {
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
+            segment_ids: req.segment_ids.clone(),
         }
     }
 }
@@ -371,6 +404,7 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
+            segment_ids: req.segment_ids.clone(),
         }
     }
 }
@@ -417,14 +451,17 @@ impl std::fmt::Display for PartitionTimeLevel {
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
-    pub partition_keys: Vec<StreamPartition>,
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
+    pub partition_keys: Vec<StreamPartition>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub full_text_search_keys: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
@@ -447,12 +484,13 @@ impl Serialize for StreamSettings {
         for (index, key) in self.partition_keys.iter().enumerate() {
             part_keys.insert(format!("L{index}"), key);
         }
-        state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field(
             "partition_time_level",
             &self.partition_time_level.unwrap_or_default(),
         )?;
+        state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
+        state.serialize_field("index_fields", &self.index_fields)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
@@ -510,17 +548,26 @@ impl From<&str> for StreamSettings {
         }
 
         let mut full_text_search_keys = Vec::new();
-        let fts = settings.get("full_text_search_keys");
-        if let Some(value) = fts {
+        let fields = settings.get("full_text_search_keys");
+        if let Some(value) = fields {
             let v: Vec<_> = value.as_array().unwrap().iter().collect();
             for item in v {
                 full_text_search_keys.push(item.as_str().unwrap().to_string())
             }
         }
 
+        let mut index_fields = Vec::new();
+        let fields = settings.get("index_fields");
+        if let Some(value) = fields {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                index_fields.push(item.as_str().unwrap().to_string())
+            }
+        }
+
         let mut bloom_filter_fields = Vec::new();
-        let fts = settings.get("bloom_filter_fields");
-        if let Some(value) = fts {
+        let fields = settings.get("bloom_filter_fields");
+        if let Some(value) = fields {
             let v: Vec<_> = value.as_array().unwrap().iter().collect();
             for item in v {
                 bloom_filter_fields.push(item.as_str().unwrap().to_string())
@@ -553,9 +600,10 @@ impl From<&str> for StreamSettings {
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
 
         Self {
-            partition_keys,
             partition_time_level,
+            partition_keys,
             full_text_search_keys,
+            index_fields,
             bloom_filter_fields,
             data_retention,
             max_query_range,

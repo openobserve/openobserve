@@ -52,7 +52,7 @@ use datafusion::{
 };
 use datafusion_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType};
 use futures::{future, stream, StreamExt};
-use helpers::{expr_applicable_for_cols, list_files, split_files};
+use helpers::*;
 use object_store::ObjectStore;
 
 mod helpers;
@@ -148,6 +148,10 @@ impl NewListingTable {
                 if self.options.collect_stat {
                     let statistics = self.do_collect_statistics(ctx, &store, &part_file).await?;
                     part_file.statistics = Some(statistics.clone());
+                    let access_plan = generate_access_plan(&part_file);
+                    if let Some(access_plan) = access_plan {
+                        part_file.extensions = Some(access_plan as _);
+                    }
                     Ok((part_file, statistics)) as Result<(PartitionedFile, Statistics)>
                 } else {
                     Ok((part_file, Statistics::new_unknown(&self.file_schema)))
@@ -248,13 +252,28 @@ impl TableProvider for NewListingTable {
             .flatten()
         {
             Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
-            Some(Ok(new_groups)) => {
-                if new_groups.len() <= self.options.target_partitions {
-                    partitioned_file_lists = new_groups;
+            Some(Ok(groups)) => {
+                if groups.len() <= self.options.target_partitions {
+                    let query_limit = state
+                        .config()
+                        .get_extension::<super::ExtLimit>()
+                        .map(|x| x.0)
+                        .unwrap_or(0);
+                    let partition_num =
+                        if query_limit == 0 || query_limit >= config::PARQUET_BATCH_SIZE {
+                            self.options.target_partitions
+                        } else {
+                            config::get_config().limit.cpu_num
+                        };
+                    if partition_num > groups.len() {
+                        partitioned_file_lists = repartition_sorted_groups(groups, partition_num);
+                    } else {
+                        partitioned_file_lists = groups;
+                    }
                 } else {
                     log::info!(
                         "attempted to split file groups by statistics, but there were more file groups: {} than target_partitions: {}",
-                        new_groups.len(),
+                        groups.len(),
                         self.options.target_partitions
                     )
                 }
@@ -330,6 +349,65 @@ impl TableProvider for NewListingTable {
             .collect();
         Ok(support)
     }
+}
+
+// 1. first get larger group
+// 2. split larger groups based on odd and even numbers
+// 3. loop until the group reaches the number of partitions
+fn repartition_sorted_groups(
+    mut groups: Vec<Vec<PartitionedFile>>,
+    partition_num: usize,
+) -> Vec<Vec<PartitionedFile>> {
+    if groups.is_empty() {
+        return groups;
+    }
+
+    while groups.len() < partition_num {
+        let max_index = find_max_group_index(&groups);
+        let max_group = groups.remove(max_index);
+
+        // if the max group has less than 3 files, we don't split it further
+        if max_group.len() <= 3 {
+            groups.push(max_group);
+            break;
+        }
+
+        // split max_group into odd and even groups
+        let group_cap = (max_group.len() + 1) / 2;
+        let mut odd_group = Vec::with_capacity(group_cap);
+        let mut even_group = Vec::with_capacity(group_cap);
+
+        for (idx, file) in max_group.into_iter().enumerate() {
+            if idx % 2 == 0 {
+                even_group.push(file);
+            } else {
+                odd_group.push(file);
+            }
+        }
+
+        if !odd_group.is_empty() {
+            groups.push(odd_group);
+        }
+        if !even_group.is_empty() {
+            groups.push(even_group);
+        }
+    }
+
+    groups
+}
+
+// find the index of the group with the most files
+fn find_max_group_index(groups: &[Vec<PartitionedFile>]) -> usize {
+    groups
+        .iter()
+        .enumerate()
+        .fold(0, |max_index, (idx, group)| {
+            if group.len() > groups[max_index].len() {
+                idx
+            } else {
+                max_index
+            }
+        })
 }
 
 fn create_ordering(schema: &Schema, sort_order: &[Vec<Expr>]) -> Result<Vec<LexOrdering>> {

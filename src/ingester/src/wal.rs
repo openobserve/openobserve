@@ -192,7 +192,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
                     .context(InferJsonSchemaSnafu)?;
             let infer_schema = Arc::new(infer_schema);
             entry.schema_key = infer_schema.hash_key().into();
-            let batch = entry.into_batch(infer_schema.clone())?;
+            let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
             memtable.write(infer_schema, entry, batch)?;
         }
         log::warn!(

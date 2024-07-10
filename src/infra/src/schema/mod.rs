@@ -266,11 +266,11 @@ pub fn unwrap_partition_time_level(
     }
 }
 
-pub fn get_stream_setting_fts_fields(schema: &Schema) -> Vec<String> {
+pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
-    match unwrap_stream_settings(schema) {
-        Some(setting) => {
-            let mut fields = setting.full_text_search_keys;
+    match settings {
+        Some(settings) => {
+            let mut fields = settings.full_text_search_keys.clone();
             fields.extend(default_fields);
             fields.sort();
             fields.dedup();
@@ -280,17 +280,29 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Vec<String> {
     }
 }
 
-pub fn get_stream_setting_bloom_filter_fields(schema: &Schema) -> Vec<String> {
+pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = BLOOM_FILTER_DEFAULT_FIELDS.clone();
-    match unwrap_stream_settings(schema) {
-        Some(setting) => {
-            let mut fields = setting.bloom_filter_fields;
+    match settings {
+        Some(settings) => {
+            let mut fields = settings.bloom_filter_fields.clone();
             fields.extend(default_fields);
             fields.sort();
             fields.dedup();
             fields
         }
         None => default_fields,
+    }
+}
+
+pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    match settings {
+        Some(settings) => {
+            let mut fields = settings.index_fields.clone();
+            fields.sort();
+            fields.dedup();
+            fields
+        }
+        None => vec![],
     }
 }
 
@@ -303,8 +315,6 @@ pub async fn merge(
 ) -> Result<Option<(Schema, Vec<Field>)>> {
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
-    #[cfg(feature = "enterprise")]
-    let key_for_update = key.clone();
     let inferred_schema = schema.clone();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let db = infra_db::get_db().await;
@@ -417,10 +427,6 @@ pub async fn update_setting(
     metadata: std::collections::HashMap<String, String>,
 ) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
-    #[cfg(feature = "enterprise")]
-    let key_for_update = key.clone();
-    #[cfg(feature = "enterprise")]
-    let metadata_for_update = metadata.clone();
     let db = infra_db::get_db().await;
     db.get_for_update(
         &key.clone(),
@@ -472,18 +478,6 @@ pub async fn update_setting(
     )
     .await?;
 
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::schema_setting(
-            &key_for_update,
-            json::to_vec(&metadata_for_update).unwrap().into(),
-            infra::db::NEED_WATCH,
-            None,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
     Ok(())
 }
 
@@ -494,10 +488,6 @@ pub async fn delete_fields(
     deleted_fields: Vec<String>,
 ) -> Result<()> {
     let key = mk_key(org_id, stream_type, stream_name);
-    #[cfg(feature = "enterprise")]
-    let key_for_update = key.clone();
-    #[cfg(feature = "enterprise")]
-    let deleted_fields_for_update = deleted_fields.clone();
     let db = infra_db::get_db().await;
     db.get_for_update(
         &key.clone(),
@@ -565,19 +555,6 @@ pub async fn delete_fields(
         }),
     )
     .await?;
-
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::schema_delete_fields(
-            &key_for_update,
-            json::to_vec(&deleted_fields_for_update).unwrap().into(),
-            infra::db::NEED_WATCH,
-            None,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
 
     Ok(())
 }
@@ -749,8 +726,9 @@ mod tests {
 
     #[test]
     fn test_get_stream_setting_fts_fields() {
-        let sch = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = get_stream_setting_fts_fields(&sch);
+        let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
+        let settings = unwrap_stream_settings(&schema);
+        let res = get_stream_setting_fts_fields(&settings);
         assert!(!res.is_empty());
     }
 }

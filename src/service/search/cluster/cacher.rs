@@ -19,18 +19,16 @@ use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 
-use crate::{common::meta::search::CachedQueryResponse, service::search::infra_cluster};
+use crate::{
+    common::meta::search::{CacheQueryRequest, CachedQueryResponse},
+    service::search::infra_cluster,
+};
 
-#[allow(clippy::too_many_arguments)]
 pub async fn get_cached_results(
-    start_time: i64,
-    end_time: i64,
-    is_aggregate: bool,
     query_key: String,
     file_path: String,
     trace_id: String,
-    result_ts_column: String,
-    discard_interval: i64,
+    cache_req: CacheQueryRequest,
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
@@ -51,31 +49,32 @@ pub async fn get_cached_results(
         return None;
     };
 
+    let ts_column = cache_req.ts_column;
     let mut tasks = Vec::new();
     for node in nodes {
         let cfg = config::get_config();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:cacher:get_cached_results",
-            trace_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
         let query_key = query_key.clone();
         let file_path = file_path.clone();
         let trace_id = trace_id.clone();
-        let result_ts_column = result_ts_column.to_string();
+        let ts_column = ts_column.to_string();
         let task = tokio::task::spawn(
             async move {
                 let req = QueryCacheRequest {
-                    start_time,
-                    end_time,
-                    is_aggregate,
+                   start_time: cache_req.q_start_time,
+                    end_time: cache_req.q_end_time,
+                    is_aggregate :cache_req.is_aggregate,
                     query_key,
                     file_path,
-                    timestamp_col: result_ts_column,
+                    timestamp_col: ts_column.to_string(),
                     trace_id:trace_id.clone(),
-                    discard_interval,
+                    discard_interval:cache_req.discard_interval,
+                    is_descending:cache_req.is_descending,
                 };
 
                 let request = tonic::Request::new(req);
@@ -145,15 +144,6 @@ pub async fn get_cached_results(
             Ok(res) => match res {
                 Ok((node, node_res)) => match node_res.response {
                     Some(res) => {
-                        let deltas = res
-                            .deltas
-                            .iter()
-                            .map(|d| crate::common::meta::search::QueryDelta {
-                                delta_start_time: d.delta_start_time,
-                                delta_end_time: d.delta_end_time,
-                                delta_removed_hits: d.delta_removed_hits,
-                            })
-                            .collect();
                         let cached_res: config::meta::search::Response = match res.cached_response {
                             Some(cached_response) => {
                                 match serde_json::from_slice(&cached_response.data) {
@@ -181,13 +171,14 @@ pub async fn get_cached_results(
                             node,
                             CachedQueryResponse {
                                 cached_response: cached_res,
-                                deltas,
-                                has_pre_cache_delta: res.has_pre_cache_delta,
+                                deltas: vec![],
                                 has_cached_data: res.has_cached_data,
                                 cache_query_response: res.cache_query_response,
                                 response_start_time: res.cache_start_time,
                                 response_end_time: res.cache_end_time,
-                                ts_column: result_ts_column.to_string(),
+                                ts_column: ts_column.clone(),
+                                is_descending: res.is_descending,
+                                limit: -1,
                             },
                         ));
                     }
@@ -213,13 +204,16 @@ pub async fn get_cached_results(
     }
 
     if let Some(local_resp) = crate::service::search::cache::cacher::get_cached_results(
-        start_time,
-        end_time,
-        is_aggregate,
         &file_path,
-        result_ts_column.as_str(),
         &trace_id,
-        discard_interval,
+        CacheQueryRequest {
+            q_start_time: cache_req.q_start_time,
+            q_end_time: cache_req.q_end_time,
+            is_aggregate: cache_req.is_aggregate,
+            ts_column,
+            discard_interval: cache_req.discard_interval,
+            is_descending: cache_req.is_descending,
+        },
     )
     .await
     {
@@ -231,10 +225,12 @@ pub async fn get_cached_results(
         .filter(|(_, cache_meta)| {
             // to make sure there is overlap between cache time range and query time range &
 
-            cache_meta.response_start_time <= end_time && cache_meta.response_end_time >= start_time
+            cache_meta.response_start_time <= cache_req.q_end_time
+                && cache_meta.response_end_time >= cache_req.q_start_time
         })
         .max_by_key(|(_, result)| {
-            result.response_end_time.min(end_time) - result.response_start_time.max(start_time)
+            result.response_end_time.min(cache_req.q_end_time)
+                - result.response_start_time.max(cache_req.q_start_time)
         }) {
         Some((node, result)) => {
             log::info!(
@@ -277,7 +273,6 @@ pub async fn delete_cached_results(path: String) -> bool {
 
         let grpc_span = info_span!(
             "service:search:cluster:cacher:delete_cached_results",
-            trace_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );

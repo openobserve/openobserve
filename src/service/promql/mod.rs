@@ -30,6 +30,7 @@ pub mod common;
 mod engine;
 mod exec;
 mod functions;
+#[cfg(feature = "enterprise")]
 pub mod name_visitor;
 pub mod search;
 pub mod value;

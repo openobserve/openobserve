@@ -31,7 +31,9 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{get_stream_setting_fts_fields, STREAM_SCHEMAS_FIELDS},
+    schema::{
+        get_stream_setting_fts_fields, get_stream_setting_index_fields, STREAM_SCHEMAS_FIELDS,
+    },
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -90,7 +92,9 @@ pub struct Sql {
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
+    pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
+    pub use_inverted_index: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -336,7 +340,10 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty() && meta_time_range_is_empty {
+            if !time_range_sql.is_empty()
+                && meta_time_range_is_empty
+                && stream_type != StreamType::Index
+            {
                 match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
@@ -386,7 +393,7 @@ impl Sql {
         }
 
         // Hack offset limit and sort by for sql
-        if meta.limit == 0 {
+        if meta.limit == 0 && stream_type != StreamType::Index {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
             meta.limit = if req_query.size >= 0 {
@@ -439,10 +446,13 @@ impl Sql {
             Err(_) => Schema::empty(),
         };
         let schema_fields = schema.fields().to_vec();
+        let stream_settings = infra::schema::unwrap_stream_settings(&schema);
 
-        // fetch fts fields
+        // fetch inverted index fields
         let mut fts_terms = HashSet::new();
-        let fts_fields = get_stream_setting_fts_fields(&schema);
+        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+        let mut index_terms = HashMap::new();
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
 
         // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
@@ -559,6 +569,23 @@ impl Sql {
             }
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
+        }
+
+        // Hack for index fields
+        let filters = generate_filter_from_quick_text(&meta.quick_text);
+        if !index_fields.is_empty() && !filters.is_empty() {
+            let index_fields = index_fields.iter().collect::<HashSet<_>>();
+            for (key, value) in filters {
+                if !index_fields.contains(&key.to_string()) {
+                    continue;
+                }
+                let entry = index_terms
+                    .entry(key.to_string())
+                    .or_insert_with(HashSet::new);
+                for v in value {
+                    entry.insert(v);
+                }
+            }
         }
 
         // Hack for histogram
@@ -716,6 +743,15 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
+        // check if we can use inverted index
+        // if there are some OR conditions in the where clause and not all of index field, we can't
+        // use inverted index
+        let use_inverted_index = if stream_type == StreamType::Index {
+            false
+        } else {
+            checking_inverted_index(&meta, &fts_fields, &index_fields)
+        };
+
         Ok(Sql {
             origin_sql,
             rewrite_sql,
@@ -732,7 +768,12 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
+            index_terms: index_terms
+                .into_iter()
+                .map(|(k, v)| (k, v.into_iter().collect()))
+                .collect(),
             histogram_interval,
+            use_inverted_index,
         })
     }
 
@@ -1074,6 +1115,43 @@ async fn is_fast_mode(
     }
 }
 
+/// need check some things: all the conditions should be AND or all the fiels are index fields
+fn checking_inverted_index(meta: &MetaSql, fts_fields: &[String], index_fields: &[String]) -> bool {
+    let Some(selection) = &meta.selection else {
+        return false;
+    };
+    let index_fields =
+        itertools::chain(fts_fields.iter(), index_fields.iter()).collect::<HashSet<_>>();
+    checking_inverted_index_inner(&index_fields, selection)
+}
+
+fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
+    match expr {
+        Expr::Identifier(Ident {
+            value,
+            quote_style: _,
+        }) => index_fields.contains(value),
+        Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
+        Expr::BinaryOp { left, op, right } => match op {
+            BinaryOperator::And => true,
+            BinaryOperator::Or => {
+                checking_inverted_index_inner(index_fields, left)
+                    && checking_inverted_index_inner(index_fields, right)
+            }
+            BinaryOperator::Eq => checking_inverted_index_inner(index_fields, left),
+            _ => false,
+        },
+        Expr::Like {
+            negated: _,
+            expr,
+            pattern: _,
+            escape_char: _,
+        } => checking_inverted_index_inner(index_fields, expr),
+        Expr::Function(f) => f.name.to_string().starts_with("match_all"),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1367,6 +1445,82 @@ mod tests {
                     assert_eq!(resp.meta.limit, query.size);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_checking_inverted_index() {
+        let index_fields = vec!["log", "content", "namespace"];
+        let index_fields = index_fields
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<HashSet<_>>();
+        let index_fields = index_fields.iter().collect::<HashSet<_>>();
+        let sqls = vec![
+            ("SELECT * FROM tbl", false),
+            ("SELECT * FROM tbl WHERE log = 'abc'", true),
+            ("SELECT * FROM tbl WHERE match_all('abc')", true),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') AND f2='cba'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') OR f2='cba'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') AND namespace='cba'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') OR namespace='cba'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') AND str_match(log, 'abc')",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE match_all('abc') OR match_all('cba')",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) AND
+            namespace='abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) AND f2='abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) OR
+            namespace='abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE (match_all('abc') OR match_all('cba')) OR f2='abc'",
+                false,
+            ),
+            (
+                "SELECT * FROM tbl WHERE log = 'abc' AND content = 'abc'",
+                true,
+            ),
+            (
+                "SELECT * FROM tbl WHERE log = 'abc' OR content = 'abc'",
+                true,
+            ),
+            ("SELECT * FROM tbl WHERE log = 'abc' AND f2 = 'abc'", true),
+            ("SELECT * FROM tbl WHERE log = 'abc' OR f2 = 'abc'", false),
+        ];
+        for (sql, ok) in sqls {
+            let meta = MetaSql::new(sql).unwrap();
+            println!("meta: {:?}", meta);
+            let Some(expr) = meta.selection else {
+                continue;
+            };
+            let res = checking_inverted_index_inner(&index_fields, &expr);
+            assert_eq!(res, ok);
         }
     }
 }

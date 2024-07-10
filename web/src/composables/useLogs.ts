@@ -1537,14 +1537,12 @@ const useLogs = () => {
           searchObj.data.histogramQuery.aggs.histogram;
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
-        searchObj.data.histogramQuery.query.start_time =
-          searchObj.data.datetime.startTime.toString().length > 13
-            ? searchObj.data.datetime.startTime
-            : searchObj.data.datetime.startTime * 1000;
-        searchObj.data.histogramQuery.query.end_time =
-          searchObj.data.datetime.endTime.toString().length > 13
-            ? searchObj.data.datetime.endTime
-            : searchObj.data.datetime.endTime * 1000;
+        // searchObj.data.histogramQuery.query.start_time =
+        //   queryReq.query.start_time;             
+      
+        // searchObj.data.histogramQuery.query.end_time =
+        //   queryReq.query.end_time;
+   
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
 
@@ -2893,6 +2891,11 @@ const useLogs = () => {
       if (isNaN(endCount)) {
         endCount = 0;
       }
+
+      let plusSign: string = "";
+      if(searchObj.data.queryResults.partitionDetail.partitions.length > 1 && searchObj.meta.showHistogram == false) {
+        plusSign = "+";
+      }
       const title =
         "Showing " +
         startCount +
@@ -2900,10 +2903,12 @@ const useLogs = () => {
         endCount +
         " out of " +
         totalCount.toLocaleString() +
+        plusSign +
         " events in " +
         searchObj.data.queryResults.took +
         " ms. (Scan Size: " +
         formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+        plusSign +
         ")";
       return title;
     } catch (e: any) {
@@ -3168,9 +3173,6 @@ const useLogs = () => {
           if (searchObj.loading == false && searchObj.loadingHistogram == false) {
             searchObj.loading = true;
             await getQueryData(false);
-            generateHistogramData();
-            updateGridColumns();
-            searchObj.meta.histogramDirtyFlag = true;
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);

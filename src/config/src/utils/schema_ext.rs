@@ -19,6 +19,7 @@ use std::{
 };
 
 use arrow_schema::{Field, Schema};
+use hashbrown::HashSet;
 
 const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
 
@@ -26,6 +27,7 @@ const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
 pub trait SchemaExt {
     fn to_cloned_fields(&self) -> Vec<Field>;
     fn cloned_from(&self, schema: &Schema) -> Schema;
+    fn retain(&self, fields: HashSet<String>) -> Schema;
     fn hash_key(&self) -> String;
     fn size(&self) -> usize;
     fn simple_fields(&self) -> Vec<(String, String)>;
@@ -50,6 +52,17 @@ impl SchemaExt for Schema {
                 Some(f) => (*f).clone(),
                 None => f.clone(),
             })
+            .collect::<Vec<_>>();
+        Schema::new(fields)
+    }
+
+    // create a new schema with only the fields in the set and keep the order
+    fn retain(&self, fields: HashSet<String>) -> Schema {
+        let fields = self
+            .fields()
+            .iter()
+            .filter(|f| fields.contains(f.name()))
+            .cloned()
             .collect::<Vec<_>>();
         Schema::new(fields)
     }
@@ -83,5 +96,28 @@ impl SchemaExt for Schema {
             .iter()
             .map(|x| (x.name().to_string(), x.data_type().to_string()))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::DataType;
+
+    use super::*;
+
+    #[test]
+    fn test_schema_hash() {
+        let schema1 = Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("address", DataType::Utf8, false),
+            Field::new("priority", DataType::UInt8, false),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("address", DataType::Utf8, false),
+            Field::new("priority", DataType::UInt8, false),
+            Field::new("flag", DataType::UInt8, false),
+        ]);
+        assert_ne!(schema1.hash_key(), schema2.hash_key());
     }
 }

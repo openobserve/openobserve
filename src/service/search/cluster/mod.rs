@@ -29,6 +29,7 @@ use config::{
     },
     metrics,
     utils::{inverted_index::split_token, json},
+    INDEX_FIELD_NAME_FOR_ALL,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -36,7 +37,6 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
-use itertools::Itertools;
 use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
@@ -59,7 +59,7 @@ pub mod super_cluster;
 #[tracing::instrument(
     name = "service:search:cluster:run",
     skip_all,
-    fields(trace_id = req.job.as_ref().unwrap().trace_id, org_id = req.org_id)
+    fields(org_id = req.org_id)
 )]
 pub async fn search(
     trace_id: &str,
@@ -107,10 +107,13 @@ pub async fn search(
         partition: 0,
     };
 
-    let is_inverted_index = cfg.common.inverted_index_enabled && !meta.fts_terms.is_empty();
+    let is_inverted_index = cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && meta.use_inverted_index
+        && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] search: is_agg_query {:?} is_inverted_index {:?}",
+        "[trace_id {trace_id}] search: is_agg_query {} is_inverted_index {}",
         !req.aggs.is_empty(),
         is_inverted_index
     );
@@ -122,132 +125,7 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request
     let file_list = if is_inverted_index && req.aggs.is_empty() {
-        let mut idx_req = req.clone();
-
-        // Get all the unique terms which the user has searched.
-        let terms = meta
-            .fts_terms
-            .iter()
-            .map(|t| {
-                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-                tokens
-                    .into_iter()
-                    .max_by_key(|key| key.len())
-                    .unwrap_or_default()
-            })
-            .collect::<HashSet<String>>();
-
-        let search_condition = terms
-            .iter()
-            .map(|v| format!("term LIKE '%{v}%'"))
-            .collect::<Vec<_>>()
-            .join(" OR ");
-
-        let query = format!(
-            "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
-            meta.stream_name, search_condition
-        );
-
-        // fast_mode is for 1st page optimization
-        //  1. single WHERE clause of `match_all()`
-        //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
-        let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
-            && idx_req.query.as_ref().unwrap().size > 0);
-        idx_req.stream_type = StreamType::Index.to_string();
-        idx_req.query.as_mut().unwrap().sql = query;
-        idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
-        idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
-        idx_req.query.as_mut().unwrap().size = 99999;
-        idx_req.query.as_mut().unwrap().uses_zo_fn = false;
-        idx_req.query.as_mut().unwrap().track_total_hits = false;
-        idx_req.query.as_mut().unwrap().query_context = "".to_string();
-        idx_req.query.as_mut().unwrap().query_fn = "".to_string();
-        idx_req.aggs.clear();
-
-        let idx_resp: search::Response = http::search(idx_req).await?;
-        // get deleted file
-        let deleted_files = idx_resp
-            .hits
-            .iter()
-            .filter_map(|hit| {
-                if hit.get("deleted").unwrap().as_bool().unwrap() {
-                    Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<_>>();
-        let unique_files = if fast_mode {
-            let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
-            let mut total_count = 0;
-            let sorted_data = idx_resp
-                .hits
-                .iter()
-                .filter_map(|hit| {
-                    let term = hit.get("term").unwrap().as_str().unwrap().to_string();
-                    let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-                    let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
-                    let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    if deleted_files.contains(&file_name) {
-                        None
-                    } else {
-                        total_count += count;
-                        Some((term, file_name, count, timestamp))
-                    }
-                })
-                .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
-            let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
-            let mut term_counts: HashMap<String, u64> = HashMap::new();
-
-            for (term, filename, count, _timestamp) in sorted_data {
-                let term = term.as_str();
-                for search_term in terms.iter() {
-                    if term.contains(search_term) {
-                        let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
-                        if *current_count < limit_count {
-                            *current_count += count;
-                            term_map
-                                .entry(search_term.to_string())
-                                .or_insert_with(Vec::new)
-                                .push(filename.to_string());
-                        }
-                    }
-                }
-            }
-            term_map
-                .into_iter()
-                .flat_map(|(_, filenames)| filenames)
-                .collect::<HashSet<_>>()
-        } else {
-            idx_resp
-                .hits
-                .iter()
-                .filter_map(|hit| {
-                    hit.get("file_name")
-                        .and_then(|value| value.as_str())
-                        .filter(|&name| !deleted_files.contains(name))
-                        .map(String::from)
-                })
-                .collect::<HashSet<_>>()
-        };
-
-        let mut idx_file_list: Vec<FileKey> = vec![];
-        for filename in unique_files {
-            let prefixed_filename = format!(
-                "files/{}/{}/{}/{}",
-                meta.org_id, stream_type, meta.stream_name, filename
-            );
-            if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
-                idx_file_list.push(FileKey {
-                    key: prefixed_filename.to_string(),
-                    meta: file_meta,
-                    deleted: false,
-                });
-            }
-        }
-        // sorted by _timestamp
-        idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-        idx_file_list
+        get_file_list_by_inverted_index(meta.clone(), req.clone()).await?
     } else {
         get_file_list(
             trace_id,
@@ -460,7 +338,6 @@ pub async fn search(
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
-            trace_id,
             org_id = req.org_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
@@ -898,7 +775,7 @@ pub(crate) async fn get_file_list(
             .len()
             <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = match file_list::query(
+    let file_list = file_list::query(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
@@ -908,10 +785,7 @@ pub(crate) async fn get_file_list(
         is_local,
     )
     .await
-    {
-        Ok(file_list) => file_list,
-        Err(_) => vec![],
-    };
+    .unwrap_or_default();
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
@@ -1038,6 +912,193 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     }
 
     new_sources
+}
+
+async fn get_file_list_by_inverted_index(
+    meta: Arc<super::sql::Sql>,
+    mut idx_req: cluster_rpc::SearchRequest,
+) -> Result<Vec<FileKey>> {
+    let cfg = get_config();
+    let stream_type = StreamType::from(idx_req.stream_type.as_str());
+
+    // Get all the unique terms which the user has searched.
+    let terms = meta
+        .fts_terms
+        .iter()
+        .map(|t| {
+            let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+            tokens
+                .into_iter()
+                .max_by_key(|key| key.len())
+                .unwrap_or_default()
+        })
+        .collect::<HashSet<String>>();
+
+    let fts_condition = terms
+        .iter()
+        .map(|x| format!("term LIKE '%{x}%'"))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let fts_condition = if fts_condition.is_empty() {
+        fts_condition
+    } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
+        format!(
+            "((field = '{}' OR field IS NULL) AND ({}))",
+            INDEX_FIELD_NAME_FOR_ALL, fts_condition
+        )
+    } else {
+        format!(
+            "(field = '{}' AND ({}))",
+            INDEX_FIELD_NAME_FOR_ALL, fts_condition
+        )
+    };
+
+    // Process index terms
+    let index_terms = meta
+        .index_terms
+        .iter()
+        .map(|(field, values)| {
+            if values.len() > 1 {
+                format!("(field = '{field}' AND term IN ('{}'))", values.join("','"))
+            } else {
+                format!(
+                    "(field = '{field}' AND term = '{}')",
+                    values.first().unwrap()
+                )
+            }
+        })
+        .collect::<Vec<_>>();
+    let index_condition = index_terms.join(" OR ");
+    let search_condition = if fts_condition.is_empty() {
+        index_condition
+    } else if index_condition.is_empty() {
+        fts_condition
+    } else {
+        format!("{} OR {}", fts_condition, index_condition)
+    };
+
+    let index_stream_name =
+        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+            meta.stream_name.to_string()
+        } else {
+            format!("{}_{}", meta.stream_name, stream_type)
+        };
+    let query = format!(
+        "SELECT term, file_name, _count, deleted, segment_ids FROM \"{}\" WHERE {} ORDER BY {} DESC",
+        index_stream_name, search_condition, cfg.common.column_timestamp
+    );
+
+    // fast_mode is for 1st page optimization
+    //  1. single WHERE clause of `match_all()`
+    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
+    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+        && idx_req.query.as_ref().unwrap().size > 0);
+    idx_req.stream_type = StreamType::Index.to_string();
+    idx_req.query.as_mut().unwrap().sql = query;
+    idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
+    idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
+    idx_req.query.as_mut().unwrap().size = -1;
+    idx_req.query.as_mut().unwrap().uses_zo_fn = false;
+    idx_req.query.as_mut().unwrap().track_total_hits = false;
+    idx_req.query.as_mut().unwrap().query_context = "".to_string();
+    idx_req.query.as_mut().unwrap().query_fn = "".to_string();
+    idx_req.aggs.clear();
+
+    let idx_resp: search::Response = http::search(idx_req).await?;
+    // get deleted file
+    let deleted_files = idx_resp
+        .hits
+        .iter()
+        .filter_map(|hit| {
+            if hit.get("deleted").unwrap().as_bool().unwrap() {
+                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>();
+    let unique_files = if fast_mode {
+        let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
+        let mut total_count = 0;
+        let sorted_data = idx_resp.hits.iter().filter_map(|hit| {
+            let term = hit.get("term").unwrap().as_str().unwrap().to_string();
+            let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
+            let count = hit.get("_count").unwrap().as_u64().unwrap();
+            let segment_ids = match hit.get("segment_ids") {
+                None => "".to_string(),
+                Some(v) => v.as_str().unwrap().to_string(),
+            };
+            if deleted_files.contains(&file_name) {
+                None
+            } else {
+                total_count += count;
+                Some((term, file_name, count, segment_ids))
+            }
+        }); // Descending order of timestamp
+        let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        let mut term_counts: HashMap<String, u64> = HashMap::new();
+
+        for (term, filename, count, segment_ids) in sorted_data {
+            let term = term.as_str();
+            for search_term in terms.iter() {
+                if term.contains(search_term) {
+                    let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
+                    if *current_count < limit_count {
+                        *current_count += count;
+                        term_map
+                            .entry(search_term.to_string())
+                            .or_insert_with(Vec::new)
+                            .push((filename.to_string(), segment_ids.to_string()));
+                    }
+                }
+            }
+        }
+        term_map
+            .into_iter()
+            .flat_map(|(_, filenames)| filenames)
+            .collect::<HashSet<_>>()
+    } else {
+        idx_resp
+            .hits
+            .iter()
+            .filter_map(|hit| {
+                hit.get("file_name")
+                    .and_then(|value| value.as_str())
+                    .filter(|&name| !deleted_files.contains(name))
+                    .map(|v| {
+                        let segment_ids = match hit.get("segment_ids") {
+                            None => "".to_string(),
+                            Some(v) => v.as_str().unwrap().to_string(),
+                        };
+                        (v.to_string(), segment_ids)
+                    })
+            })
+            .collect::<HashSet<_>>()
+    };
+
+    let mut idx_file_list: Vec<FileKey> = vec![];
+    for (filename, segment_ids) in unique_files {
+        let prefixed_filename = format!(
+            "files/{}/{}/{}/{}",
+            meta.org_id, stream_type, meta.stream_name, filename
+        );
+        if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
+            let segment_ids = if segment_ids.is_empty() {
+                None
+            } else {
+                hex::decode(segment_ids).ok()
+            };
+            idx_file_list.push(FileKey {
+                key: prefixed_filename.to_string(),
+                meta: file_meta,
+                deleted: false,
+                segment_ids,
+            });
+        }
+    }
+    // sorted by _timestamp
+    idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    Ok(idx_file_list)
 }
 
 #[cfg(test)]

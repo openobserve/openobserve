@@ -262,7 +262,7 @@ describe("Logs testcases", () => {
     cy.get('[title="Stream Detail"]:first').click({ force: true });
     cy.get(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     cy.get(".q-virtual-scroll__content").within(() => {
-      cy.contains("Inverted Index").click();
+      cy.contains("Full text search").click();
     });
 
     cy.get('[data-test="schema-update-settings-button"]').click({

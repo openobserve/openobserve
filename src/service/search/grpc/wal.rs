@@ -27,10 +27,7 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
 };
-use datafusion::{
-    arrow::{datatypes::Schema, record_batch::RecordBatch},
-    common::FileType,
-};
+use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
 use futures::{future::try_join_all, StreamExt};
 use hashbrown::HashMap;
 use infra::{
@@ -46,7 +43,7 @@ use crate::{
     service::{
         db, file_list,
         search::{
-            datafusion::exec,
+            datafusion::{exec, file_type::FileType},
             grpc::{generate_search_schema, generate_select_start_search_schema},
             sql::Sql,
             RE_SELECT_WILDCARD,
@@ -55,7 +52,7 @@ use crate::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
     trace_id: &str,
     sql: Arc<Sql>,
@@ -280,7 +277,6 @@ pub async fn search_parquet(
 
         let datafusion_span = info_span!(
             "service:search:grpc:wal:parquet:datafusion",
-            trace_id,
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
@@ -697,27 +693,6 @@ async fn get_file_list(
         partition_keys,
         &get_config().common.data_wal_dir,
         "parquet",
-    )
-    .await
-}
-
-/// get file list from local mutable arrow idx file, each file will be searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list_arrow", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
-async fn get_file_list_arrow(
-    trace_id: &str,
-    sql: &Sql,
-    stream_type: StreamType,
-    _partition_time_level: &PartitionTimeLevel,
-    partition_keys: &[StreamPartition],
-) -> Result<Vec<FileKey>, Error> {
-    get_file_list_inner(
-        trace_id,
-        sql,
-        stream_type,
-        _partition_time_level,
-        partition_keys,
-        &get_config().common.data_idx_dir,
-        "arrow",
     )
     .await
 }
