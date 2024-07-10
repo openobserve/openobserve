@@ -431,15 +431,17 @@ pub async fn search_memtable(
         for r in batch.iter() {
             scan_stats.records += r.data.num_rows() as i64;
             scan_stats.original_size += r.data_json_size as i64;
+            scan_stats.compressed_size += r.data_arrow_size as i64;
         }
         entry.extend(batch.into_iter().map(|r| r.data.clone()));
     }
 
     log::info!(
-        "[trace_id {trace_id}] wal->mem->search: load groups {}, files {}, scan_size {}",
+        "[trace_id {trace_id}] wal->mem->search: load groups {}, files {}, scan_size {}, compressed_size {}",
         batch_groups.len(),
         scan_stats.files,
-        scan_stats.original_size
+        scan_stats.original_size,
+        scan_stats.compressed_size,
     );
 
     let cfg = get_config();
