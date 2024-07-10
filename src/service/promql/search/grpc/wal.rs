@@ -26,7 +26,6 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::Schema,
-    common::FileType,
     datasource::MemTable,
     error::{DataFusionError, Result},
     prelude::SessionContext,
@@ -46,7 +45,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     service::search::{
-        datafusion::exec::{prepare_datafusion_context, register_table},
+        datafusion::{
+            exec::{prepare_datafusion_context, register_table},
+            file_type::FileType,
+        },
         MetadataMap,
     },
 };

@@ -159,9 +159,10 @@ defineProps({
 const emits = defineEmits(["add", "remove", "input:update"]);
 
 const streamIndexType = [
-  { label: "Inverted Index", value: "fullTextSearchKey" },
-  { label: "Key Value partition", value: "keyPartition" },
+  { label: "Full text search", value: "fullTextSearchKey" },
+  { label: "Secondary index", value: "secondaryIndexKey" },
   { label: "Bloom filter", value: "bloomFilterKey" },
+  { label: "KeyValue partition", value: "keyPartition" },
   { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
   { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
   { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },

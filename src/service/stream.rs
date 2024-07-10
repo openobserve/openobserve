@@ -185,6 +185,7 @@ pub async fn save_stream_settings(
     stream_type: StreamType,
     mut settings: StreamSettings,
 ) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
     // check if we are allowed to ingest
     if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
         return Ok(
@@ -195,8 +196,37 @@ pub async fn save_stream_settings(
         );
     }
 
+    // only allow setting user defined schema for logs stream
+    if stream_type != StreamType::Logs
+        && settings.defined_schema_fields.is_some()
+        && !settings.defined_schema_fields.as_ref().unwrap().is_empty()
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "only logs stream can have user defined schema".to_string(),
+        )));
+    }
+
+    // _all field can't setting for inverted index & index field
+    for key in settings.full_text_search_keys.iter() {
+        if key == &cfg.common.column_all {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("field [{}] can't be used for full text search", key),
+            )));
+        }
+    }
+    for key in settings.index_fields.iter() {
+        if key == &cfg.common.column_all {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("field [{}] can't be used for secondary index", key),
+            )));
+        }
+    }
+
     for key in settings.partition_keys.iter() {
-        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) {
+        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) || key.field == cfg.common.column_all {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("field [{}] can't be used for partition key", key.field),

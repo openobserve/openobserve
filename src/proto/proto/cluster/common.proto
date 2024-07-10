@@ -62,7 +62,8 @@ message FileList {
 }
 
 message FileKey {
-    string   key     = 1;
-    FileMeta meta    = 2;
-    bool     deleted = 3;
+    string         key         = 1;
+    FileMeta       meta        = 2;
+    bool           deleted     = 3;
+    optional bytes segment_ids = 4;
 }

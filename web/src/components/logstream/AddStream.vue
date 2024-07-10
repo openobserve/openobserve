@@ -236,12 +236,14 @@ const saveStream = async () => {
 const getStreamPayload = () => {
   let settings: {
     partition_keys: any[];
+    index_fields: any[];
     full_text_search_keys: any[];
     bloom_filter_fields: any[];
     data_retention?: number;
     defined_schema_fields: any[];
   } = {
     partition_keys: [],
+    index_fields: [],
     full_text_search_keys: [],
     bloom_filter_fields: [],
     defined_schema_fields: [],
@@ -271,6 +273,10 @@ const getStreamPayload = () => {
     field.index_type?.forEach((index: string) => {
       if (index === "fullTextSearchKey") {
         settings.full_text_search_keys.push(field.name);
+      }
+
+      if (index === "secondaryIndexKey") {
+        settings.index_fields.push(field.name);
       }
 
       if (index === "keyPartition") {

@@ -52,7 +52,7 @@ use datafusion::{
 };
 use datafusion_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType};
 use futures::{future, stream, StreamExt};
-use helpers::{expr_applicable_for_cols, list_files, split_files};
+use helpers::*;
 use object_store::ObjectStore;
 
 mod helpers;
@@ -148,6 +148,10 @@ impl NewListingTable {
                 if self.options.collect_stat {
                     let statistics = self.do_collect_statistics(ctx, &store, &part_file).await?;
                     part_file.statistics = Some(statistics.clone());
+                    let access_plan = generate_access_plan(&part_file);
+                    if let Some(access_plan) = access_plan {
+                        part_file.extensions = Some(access_plan as _);
+                    }
                     Ok((part_file, statistics)) as Result<(PartitionedFile, Statistics)>
                 } else {
                     Ok((part_file, Statistics::new_unknown(&self.file_schema)))
