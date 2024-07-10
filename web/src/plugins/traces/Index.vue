@@ -584,7 +584,9 @@ export default defineComponent({
       } catch (e) {
         console.log(e);
         searchObj.loading = false;
-        showErrorNotification("Invalid SQL Syntax");
+        showErrorNotification(
+          "An error occurred while constructing the search query."
+        );
       }
     }
 
