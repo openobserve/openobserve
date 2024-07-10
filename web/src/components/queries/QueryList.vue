@@ -44,7 +44,7 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
@@ -91,45 +91,20 @@ export default defineComponent({
 
       const getDuration = (createdAt: number) => {
         const currentTime = localTimeToMicroseconds();
-
         const durationInSeconds = Math.floor(
           (currentTime - createdAt) / 1000000
         );
 
-        let formattedDuration;
-        if (durationInSeconds < 0) {
-          formattedDuration = "Invalid duration";
-        } else if (durationInSeconds < 60) {
-          formattedDuration = `${durationInSeconds}s`;
-        } else if (durationInSeconds < 3600) {
-          const minutes = Math.floor(durationInSeconds / 60);
-          formattedDuration = `${minutes}m`;
-        } else {
-          const hours = Math.floor(durationInSeconds / 3600);
-          formattedDuration = `${hours}h`;
-        }
-
-        return formattedDuration;
+        return durationFormatter(durationInSeconds);
       };
 
       //different between start and end time to show in UI as queryRange
       const queryRange = (startTime: number, endTime: number) => {
         const queryDuration = Math.floor((endTime - startTime) / 1000000);
-        let formattedDuration;
-        if (queryDuration < 0) {
-          formattedDuration = "Invalid duration";
-        } else if (queryDuration < 60) {
-          formattedDuration = `${queryDuration}s`;
-        } else if (queryDuration < 3600) {
-          const minutes = Math.floor(queryDuration / 60);
-          formattedDuration = `${minutes}m`;
-        } else {
-          const hours = Math.floor(queryDuration / 3600);
-          formattedDuration = `${hours}h`;
-        }
 
-        return formattedDuration;
+        return durationFormatter(queryDuration);
       };
+
       const originalSize =
         query?.original_size !== undefined
           ? getUnitValue(query?.original_size, "megabytes", "", 2)
@@ -154,11 +129,15 @@ export default defineComponent({
         ["Files", query?.files],
         [
           "Original Size",
-          originalSize.value ? `${originalSize.value} ${originalSize.unit}` : "",
+          originalSize.value
+            ? `${originalSize.value} ${originalSize.unit}`
+            : "",
         ],
         [
           "Compressed Size",
-          compressedSize.value ? `${compressedSize.value} ${compressedSize.unit}` : "",
+          compressedSize.value
+            ? `${compressedSize.value} ${compressedSize.unit}`
+            : "",
         ],
       ];
 
