@@ -5,6 +5,7 @@
       ref="qTable"
       :rows="rowsQuery"
       :columns="columns"
+      :pagination="pagination"
       row-key="trace_id"
       style="width: 100%"
       selection="multiple"
@@ -264,16 +265,9 @@ export default defineComponent({
       rowsPerPage: 20,
     });
     const changePagination = (val: { label: string; value: any }) => {
-      console.log("changePagination", val);
-
       selectedPerPage.value = val.value;
-      console.log("selectedPerPage", selectedPerPage.value);
-
       pagination.value.rowsPerPage = val.value;
-      console.log("pagination.value.rowsPerPage", pagination.value.rowsPerPage);
-
       qTable.value?.setPagination(pagination.value);
-      console.log("qTable.value?.setPagination", qTable.value?.setPagination);
     };
     const filterQuery = ref("");
 
@@ -644,6 +638,7 @@ export default defineComponent({
       selectedSearchField,
       searchFieldOptions,
       otherFieldOptions,
+      pagination,
     };
   },
 });
