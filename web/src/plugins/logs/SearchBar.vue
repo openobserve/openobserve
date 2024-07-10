@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="
                 config.isEnterprise == 'true' &&
-                searchObj.data.searchRequestTraceIds.length &&
+                !!searchObj.data.searchRequestTraceIds.length &&
                 (searchObj.loading == true ||
                   searchObj.loadingHistogram == true)
               "
