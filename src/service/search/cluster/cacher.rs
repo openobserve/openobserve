@@ -24,7 +24,7 @@ use crate::{
     service::search::infra_cluster,
 };
 
-#[tracing::instrument(name = "service:search:cluster:run", skip_all)]
+#[tracing::instrument(name = "service:search:cluster:cacher:get_cached_results", skip_all)]
 pub async fn get_cached_results(
     query_key: String,
     file_path: String,
