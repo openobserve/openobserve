@@ -738,20 +738,42 @@ export const generateTraceContext = () => {
   };
 };
 
-export const queryManagementFormatDuration = (durationInSeconds: number): string => {
+/**
+ * Formats the duration in seconds into a human-readable string representation.
+ * The format of the output string is:
+ * - For durations less than 60 seconds, returns the duration in seconds.
+ * - For durations less than 3600 seconds (1 hour), returns minutes and seconds.
+ * - For durations less than 86400 seconds (1 day), returns hours, minutes, and seconds.
+ * - For durations equal to or greater than 1 day, returns days, hours, minutes, and seconds.
+ * - If no value(0) than removes the duration from the string.
+ *
+ * @param {number} durationInSeconds - The duration in seconds to be formatted.
+ * @return {string} The formatted duration string.
+ */
+export const queryManagementFormatDuration = (
+  durationInSeconds: number
+): string => {
   let formattedDuration;
 
+  // If duration is invalid, set formatted duration to "Invalid duration"
+  // For example, if the duration is -1 seconds, the output string will be "Invalid duration".
   if (durationInSeconds < 0) {
     formattedDuration = "Invalid duration";
   } else if (durationInSeconds < 60) {
+    // If duration is less than 60 seconds, return duration in seconds
+    // For example, if the duration is 30 seconds, the output string will be "30s".
     formattedDuration = `${durationInSeconds}s`;
   } else if (durationInSeconds < 3600) {
+    // If duration is less than 1 hour, calculate minutes and seconds and return
+    // For example, if the duration is 150 seconds, the output string will be "2m 30s".
     const minutes = Math.floor(durationInSeconds / 60);
     const seconds = durationInSeconds % 60;
     formattedDuration = `${minutes > 0 ? `${minutes}m ` : ""}${
       seconds > 0 ? `${seconds}s` : ""
     }`.trim();
   } else if (durationInSeconds < 86400) {
+    // If duration is less than 1 day, calculate hours, minutes, and seconds and return
+    // For example, if the duration is 7200 seconds, the output string will be "2h".
     const hours = Math.floor(durationInSeconds / 3600);
     const minutes = Math.floor((durationInSeconds % 3600) / 60);
     const seconds = durationInSeconds % 60;
@@ -759,6 +781,8 @@ export const queryManagementFormatDuration = (durationInSeconds: number): string
       minutes > 0 ? `${minutes}m ` : ""
     }${seconds > 0 ? `${seconds}s` : ""}`.trim();
   } else {
+    // If duration is equal to or greater than 1 day, calculate days, hours, minutes, and seconds and return
+    // For example, if the durartion is 86900 seconds, the output string will be "1d 8m 20s".
     const days = Math.floor(durationInSeconds / 86400);
     const hours = Math.floor((durationInSeconds % 86400) / 3600);
     const minutes = Math.floor((durationInSeconds % 3600) / 60);
