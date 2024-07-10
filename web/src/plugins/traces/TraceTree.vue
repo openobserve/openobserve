@@ -215,41 +215,54 @@ export default defineComponent({
       emit("selectSpan", spanId);
     };
 
-    const viewSpanLogs = (span: any) => {
-      const stream: string =
-        searchObj.data.traceDetails.selectedLogStreams.join(",");
-
-      // 1 minute before and after the span
-      const from = span.startTimeMs * 1000 - 60000000;
-      const to = span.endTimeMs * 1000 + 60000000;
-      const refresh = 0;
+    // Function to build query details for navigation
+    const buildQueryDetails = (span: any) => {
+      const spanIdField =
+        store.state.organizationData?.organizationSettings?.span_id_field_name;
+      const traceIdField =
+        store.state.organizationData?.organizationSettings?.trace_id_field_name;
+      const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
       const query = b64EncodeStandard(
-        `${
-          store.state.organizationData?.organizationSettings?.span_id_field_name
-        }='${span.spanId}' ${
-          searchObj.data.traceDetails.selectedTrace?.trace_id
-            ? `AND ${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${searchObj.data.traceDetails.selectedTrace?.trace_id}'`
-            : ""
+        `${spanIdField}='${span.spanId}' ${
+          traceId ? `AND ${traceIdField}='${traceId}'` : ""
         }`
       );
 
+      return {
+        stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
+        from: span.startTimeMs * 1000 - 60000000,
+        to: span.endTimeMs * 1000 + 60000000,
+        refresh: 0,
+        query,
+        orgIdentifier: store.state.selectedOrganization.identifier,
+      };
+    };
+
+    // Function to navigate to logs with the provided query details
+    const navigateToLogs = (queryDetails: any) => {
       router.push({
         path: "/logs",
         query: {
           stream_type: "logs",
-          stream,
-          from,
-          to,
-          refresh,
+          stream: queryDetails.stream,
+          from: queryDetails.from,
+          to: queryDetails.to,
+          refresh: queryDetails.refresh,
           sql_mode: "false",
-          query,
-          org_identifier: store.state.selectedOrganization.identifier,
+          query: queryDetails.query,
+          org_identifier: queryDetails.orgIdentifier,
           show_histogram: "true",
           type: "trace_explorer",
           quick_mode: "false",
         },
       });
+    };
+
+    // Main function to view span logs
+    const viewSpanLogs = (span: any) => {
+      const queryDetails = buildQueryDetails(span);
+      navigateToLogs(queryDetails);
     };
 
     return {
