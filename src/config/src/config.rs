@@ -64,6 +64,7 @@ pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
+pub const QUERY_WITH_NO_LIMIT:i32 = -999;
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",

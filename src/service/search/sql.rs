@@ -20,12 +20,10 @@ use std::{
 
 use chrono::Duration;
 use config::{
-    get_config,
-    meta::{
+    get_config, meta::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
-    },
-    QUICK_MODEL_FIELDS,
+    }, QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -340,10 +338,7 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty()
-                && meta_time_range_is_empty
-                && stream_type != StreamType::Index
-            {
+            if !time_range_sql.is_empty() && meta_time_range_is_empty && req_query.size > QUERY_WITH_NO_LIMIT {
                 match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
@@ -393,7 +388,7 @@ impl Sql {
         }
 
         // Hack offset limit and sort by for sql
-        if meta.limit == 0 && stream_type != StreamType::Index {
+        if meta.limit == 0 && req_query.size > QUERY_WITH_NO_LIMIT {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
             meta.limit = if req_query.size >= 0 {
