@@ -35,7 +35,7 @@ use crate::{
 };
 
 pub(crate) struct Partition {
-    schema: Arc<Schema>,
+    schema: Arc<Schema>, // this schema maybe not include all fields in the files
     files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
@@ -120,8 +120,16 @@ impl Partition {
                 };
 
             let batches = data.data.iter().map(|r| &r.data).collect::<Vec<_>>();
+
+            // generate format schema for record batches
+            let schemas = batches
+                .iter()
+                .map(|batch| batch.schema().as_ref().clone())
+                .collect::<Vec<_>>();
+            let schema = Arc::new(Schema::try_merge(schemas).context(MergeSchemaSnafu)?);
+
             let (schema, batches) =
-                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), &batches)
+                merge_record_batches("INGESTER:PERSIST", 0, schema.clone(), &batches)
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();
@@ -137,12 +145,10 @@ impl Partition {
                 persist_stat.arrow_size += entry.data_arrow_size;
             }
 
-            for batch in batches.iter() {
-                writer
-                    .write(batch)
-                    .await
-                    .context(WriteParquetRecordBatchSnafu)?;
-            }
+            writer
+                .write(&batches)
+                .await
+                .context(WriteParquetRecordBatchSnafu)?;
             writer.close().await.context(WriteParquetRecordBatchSnafu)?;
             file_meta.compressed_size = buf_parquet.len() as i64;
 

@@ -517,11 +517,18 @@ pub fn merge_record_batches(
     thread_id: usize,
     mut schema: Arc<Schema>,
     record_batches: &[&RecordBatch],
-) -> Result<(Arc<Schema>, Vec<RecordBatch>), DataFusionError> {
-    // 1. concatenate all record batches into one single RecordBatch
-    let mut concated_record_batch = concat_batches(schema.clone(), record_batches)?;
+) -> Result<(Arc<Schema>, RecordBatch), DataFusionError> {
+    // 1. format the record batch by schema (after format all record batch have the same schema)
+    let record_batches = record_batches
+        .into_iter()
+        .map(|b| format_recordbatch_by_schema(schema.clone(), (*b).clone()))
+        .collect::<Vec<_>>();
 
-    // 2. delete all the null columns
+    // 2. concatenate all record batches into one single RecordBatch
+    let record_batches = record_batches.iter().collect::<Vec<_>>();
+    let mut concated_record_batch = concat_batches(schema.clone(), &record_batches)?;
+
+    // 3. delete all the null columns
     let num_rows = concated_record_batch.num_rows();
     let mut null_columns = Vec::new();
     for idx in 0..schema.fields().len() {
@@ -536,7 +543,7 @@ pub fn merge_record_batches(
         schema = concated_record_batch.schema().clone();
     }
 
-    // 3. sort concatenated record batch by timestamp col in desc order
+    // 4. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
         concated_record_batch
             .column_by_name(&get_config().common.column_timestamp)
@@ -568,7 +575,7 @@ pub fn merge_record_batches(
     let final_record_batch = RecordBatch::try_new(schema.clone(), sorted_columns)?;
     let schema = final_record_batch.schema();
 
-    Ok((schema, vec![final_record_batch]))
+    Ok((schema, final_record_batch))
 }
 
 #[cfg(test)]
