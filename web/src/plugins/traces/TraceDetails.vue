@@ -995,8 +995,9 @@ export default defineComponent({
       const to =
         searchObj.data.traceDetails.selectedTrace?.trace_end_time + 60000000;
       const refresh = 0;
+
       const query = b64EncodeUnicode(
-        `trace_id='${spanList.value[0]["trace_id"]}'`
+        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`
       );
 
       router.push({

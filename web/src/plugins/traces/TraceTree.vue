@@ -223,10 +223,13 @@ export default defineComponent({
       const from = span.startTimeMs * 1000 - 60000000;
       const to = span.endTimeMs * 1000 + 60000000;
       const refresh = 0;
+
       const query = b64EncodeStandard(
-        `span_id='${span.spanId}' ${
+        `${
+          store.state.organizationData?.organizationSettings?.span_id_field_name
+        }='${span.spanId}' ${
           searchObj.data.traceDetails.selectedTrace?.trace_id
-            ? `AND trace_id='${searchObj.data.traceDetails.selectedTrace?.trace_id}'`
+            ? `AND ${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${searchObj.data.traceDetails.selectedTrace?.trace_id}'`
             : ""
         }`
       );

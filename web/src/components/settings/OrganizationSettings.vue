@@ -94,8 +94,8 @@ import organizations from "@/services/organizations";
 import { useStore } from "vuex";
 
 const { t } = useI18n();
-const traceIdFieldName = ref("trace_id");
-const spanIdFieldName = ref("span_id");
+const traceIdFieldName = ref("traceId");
+const spanIdFieldName = ref("spanId");
 const store = useStore();
 
 const isValidSpanField = ref(true);
