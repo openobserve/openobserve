@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="trace-details full-width"
-    :style="{
-      background: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-    }"
-  >
+  <div class="trace-details full-width" :style="backgroundStyle">
     <div
       class="row q-px-sm"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
@@ -456,6 +451,12 @@ export default defineComponent({
         }
       }
     );
+
+    const backgroundStyle = computed(() => {
+      return {
+        background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
+      };
+    });
 
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
@@ -1077,6 +1078,7 @@ export default defineComponent({
       showTraceDetails,
       traceDetails,
       updateSelectedSpan,
+      backgroundStyle,
     };
   },
 });
