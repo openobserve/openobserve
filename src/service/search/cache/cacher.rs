@@ -34,7 +34,7 @@ use crate::{
 };
 
 #[tracing::instrument(
-    name = "service:search:cluster:run",
+    name = "service:search:cache:cacher:check_cache",
     skip_all,
     fields(org_id = rpc_req.org_id)
 )]
