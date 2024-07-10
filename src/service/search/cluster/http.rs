@@ -29,7 +29,7 @@ use crate::common::meta::functions::VRLResultResolver;
 #[tracing::instrument(
     name = "service:search:cluster",
     skip(req),
-    fields(trace_id = req.job.as_ref().unwrap().trace_id, org_id = req.org_id)
+    fields(org_id = req.org_id)
 )]
 pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Response> {
     let start = std::time::Instant::now();

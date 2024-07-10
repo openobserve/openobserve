@@ -56,7 +56,6 @@ pub async fn get_cached_results(
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:cacher:get_cached_results",
-            trace_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
@@ -274,7 +273,6 @@ pub async fn delete_cached_results(path: String) -> bool {
 
         let grpc_span = info_span!(
             "service:search:cluster:cacher:delete_cached_results",
-            trace_id,
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
