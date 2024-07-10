@@ -28,7 +28,7 @@ use config::{
         usage::RequestStats,
     },
     utils::{
-        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Number, Value},
+        json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
         schema_ext::SchemaExt,
     },
     DISTINCT_FIELDS,
@@ -97,11 +97,15 @@ pub fn cast_to_type(
                 value.insert(field_name, Value::String(get_string_value(val)));
             }
             DataType::Int64 | DataType::Int32 | DataType::Int16 | DataType::Int8 => {
-                if val.is_i64() {
-                    continue;
-                }
-                let val = get_string_value(val);
-                match val.parse::<i64>() {
+                let ret = match val {
+                    Value::Number(_) => {
+                        continue;
+                    }
+                    Value::String(v) => v.parse::<i64>().map_err(|e| e.to_string()),
+                    Value::Bool(v) => Ok(if *v { 1 } else { 0 }),
+                    _ => Err("".to_string()),
+                };
+                match ret {
                     Ok(val) => {
                         value.insert(field_name, Value::Number(val.into()));
                     }
@@ -109,11 +113,15 @@ pub fn cast_to_type(
                 };
             }
             DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
-                if val.is_u64() {
-                    continue;
-                }
-                let val = get_string_value(val);
-                match val.parse::<u64>() {
+                let ret = match val {
+                    Value::Number(_) => {
+                        continue;
+                    }
+                    Value::String(v) => v.parse::<u64>().map_err(|e| e.to_string()),
+                    Value::Bool(v) => Ok(if *v { 1 } else { 0 }),
+                    _ => Err("".to_string()),
+                };
+                match ret {
                     Ok(val) => {
                         value.insert(field_name, Value::Number(val.into()));
                     }
@@ -121,11 +129,15 @@ pub fn cast_to_type(
                 };
             }
             DataType::Float64 | DataType::Float32 | DataType::Float16 => {
-                if val.is_f64() {
-                    continue;
-                }
-                let val = get_string_value(val);
-                match val.parse::<f64>() {
+                let ret = match val {
+                    Value::Number(_) => {
+                        continue;
+                    }
+                    Value::String(v) => v.parse::<f64>().map_err(|e| e.to_string()),
+                    Value::Bool(v) => Ok(if *v { 1.0 } else { 0.0 }),
+                    _ => Err("".to_string()),
+                };
+                match ret {
                     Ok(val) => {
                         value.insert(
                             field_name,
@@ -136,11 +148,15 @@ pub fn cast_to_type(
                 };
             }
             DataType::Boolean => {
-                if val.is_boolean() {
-                    continue;
-                }
-                let val = get_string_value(val);
-                match val.parse::<bool>() {
+                let ret = match val {
+                    Value::Bool(_) => {
+                        continue;
+                    }
+                    Value::Number(v) => Ok(v.as_f64().unwrap_or(0.0) > 0.0),
+                    Value::String(v) => v.parse::<bool>().map_err(|e| e.to_string()),
+                    _ => Err("".to_string()),
+                };
+                match ret {
                     Ok(val) => {
                         value.insert(field_name, Value::Bool(val));
                     }
@@ -152,136 +168,6 @@ pub fn cast_to_type(
     }
     if !parse_error.is_empty() {
         Err(anyhow::Error::msg(parse_error))
-    } else {
-        Ok(())
-    }
-}
-
-pub fn cast_to_schema_v1(
-    value: &mut Map<String, Value>,
-    schema_map: &HashMap<&String, &DataType>,
-) -> Result<(), anyhow::Error> {
-    let mut errors = Vec::new();
-    for (key, val) in value.iter_mut() {
-        if val.is_null() {
-            continue;
-        }
-        let Some(data_type) = schema_map.get(key) else {
-            continue;
-        };
-        match data_type {
-            DataType::Utf8 => {
-                if val.is_string() {
-                    continue;
-                }
-                *val = Value::String(get_string_value(val));
-            }
-            DataType::Int64 | DataType::Int32 | DataType::Int16 | DataType::Int8 => {
-                if val.is_i64() {
-                    continue;
-                }
-                if val.is_u64() {
-                    continue;
-                }
-                if val.is_f64() {
-                    *val = Value::Number((val.as_f64().unwrap() as i64).into());
-                    continue;
-                }
-                if val.is_boolean() {
-                    *val = Value::Number((val.as_bool().unwrap() as i64).into());
-                    continue;
-                }
-                let local_val = get_string_value(val);
-                match local_val.parse::<i64>() {
-                    Ok(v) => {
-                        *val = Value::Number(v.into());
-                    }
-                    Err(_) => errors.push((key, *data_type)),
-                };
-            }
-            DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
-                if val.is_i64() {
-                    continue;
-                }
-                if val.is_u64() {
-                    continue;
-                }
-                if val.is_f64() {
-                    *val = Value::Number((val.as_f64().unwrap() as u64).into());
-                    continue;
-                }
-                if val.is_boolean() {
-                    *val = Value::Number((val.as_bool().unwrap() as u64).into());
-                    continue;
-                }
-                let local_val = get_string_value(val);
-                match local_val.parse::<u64>() {
-                    Ok(v) => {
-                        *val = Value::Number(v.into());
-                    }
-                    Err(_) => errors.push((key, *data_type)),
-                };
-            }
-            DataType::Float64 | DataType::Float32 | DataType::Float16 => {
-                if val.is_f64() {
-                    continue;
-                }
-                if val.is_i64() {
-                    *val = Value::Number(Number::from_f64(val.as_i64().unwrap() as f64).unwrap());
-                    continue;
-                }
-                if val.is_u64() {
-                    *val = Value::Number(Number::from_f64(val.as_u64().unwrap() as f64).unwrap());
-                    continue;
-                }
-                if val.is_boolean() {
-                    *val = Value::Number(
-                        Number::from_f64((val.as_bool().unwrap() as i64) as f64).unwrap(),
-                    );
-                    continue;
-                }
-                let local_val = get_string_value(val);
-                match local_val.parse::<f64>() {
-                    Ok(local_val) => {
-                        *val = Value::Number(serde_json::Number::from_f64(local_val).unwrap());
-                    }
-                    Err(_) => errors.push((key, *data_type)),
-                };
-            }
-            DataType::Boolean => {
-                if val.is_boolean() {
-                    continue;
-                }
-                if val.is_i64() {
-                    *val = Value::Bool(val.as_i64().unwrap() > 0);
-                    continue;
-                }
-                if val.is_u64() {
-                    *val = Value::Bool(val.as_u64().unwrap() > 0);
-                    continue;
-                }
-                if val.is_f64() {
-                    *val = Value::Bool(val.as_f64().unwrap() > 0.0);
-                    continue;
-                }
-                let local_val: String = get_string_value(val);
-                match local_val.parse::<bool>() {
-                    Ok(local_val) => {
-                        *val = Value::Bool(local_val);
-                    }
-                    Err(_) => errors.push((key, *data_type)),
-                };
-            }
-            _ => errors.push((key, *data_type)),
-        };
-    }
-    if !errors.is_empty() {
-        let error_message = errors
-            .iter()
-            .map(|(field, dt)| format!("Failed to cast Field: {}, DataType: {:?}", field, dt))
-            .collect::<Vec<_>>()
-            .join(", ");
-        Err(anyhow::Error::msg(error_message))
     } else {
         Ok(())
     }
