@@ -941,18 +941,16 @@ async fn get_file_list_by_inverted_index(
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
+    } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
+        format!(
+            "((field = '{}' OR field IS NULL) AND ({}))",
+            INDEX_FIELD_NAME_FOR_ALL, fts_condition
+        )
     } else {
-        if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-            format!(
-                "((field = '{}' OR field IS NULL) AND ({}))",
-                INDEX_FIELD_NAME_FOR_ALL, fts_condition
-            )
-        } else {
-            format!(
-                "(field = '{}' AND ({}))",
-                INDEX_FIELD_NAME_FOR_ALL, fts_condition
-            )
-        }
+        format!(
+            "(field = '{}' AND ({}))",
+            INDEX_FIELD_NAME_FOR_ALL, fts_condition
+        )
     };
 
     // Process index terms
