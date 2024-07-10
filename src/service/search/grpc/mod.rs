@@ -38,7 +38,7 @@ mod wal;
 
 pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, ScanStats), Error>;
 
-#[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(trace_id = req.job.as_ref().unwrap().trace_id, org_id = req.org_id))]
+#[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
@@ -79,7 +79,6 @@ pub async fn search(
     let sql1 = sql.clone();
     let wal_parquet_span = info_span!(
         "service:search:grpc:in_wal_parquet",
-        trace_id = trace_id1.as_ref().clone(),
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -101,7 +100,6 @@ pub async fn search(
     let sql2 = sql.clone();
     let wal_mem_span = info_span!(
         "service:search:grpc:in_wal_memory",
-        trace_id = trace_id2.as_ref().clone(),
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -125,7 +123,6 @@ pub async fn search(
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     let storage_span = info_span!(
         "service:search:grpc:in_storage",
-        trace_id = trace_id3.as_ref().clone(),
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
