@@ -660,9 +660,10 @@ export default defineComponent({
 
     function generateNewColor() {
       // Generate a color in HSL format
-      const hue = colors.value.length * (360 / 50);
-      const lightness = 50 + (colors.value.length % 2) * 15;
-      colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
+      const hue = (colors.value.length * 137.508) % 360; // Using golden angle approximation
+      const saturation = 70 + (colors.value.length % 2) * 15;
+      const lightness = 50;
+      colors.value.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
       return colors;
     }
 
