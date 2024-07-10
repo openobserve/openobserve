@@ -222,6 +222,7 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
         );
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
+            _timestamp: now,
             org: alert.org_id.to_string(),
             module: TriggerDataType::Alert,
             key: module_key.clone(),

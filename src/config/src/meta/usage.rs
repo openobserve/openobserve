@@ -45,6 +45,7 @@ pub enum TriggerDataType {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TriggerData {
+    pub _timestamp: i64,
     pub org: String,
     pub module: TriggerDataType,
     pub key: String,
