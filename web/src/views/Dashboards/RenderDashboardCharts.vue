@@ -279,6 +279,10 @@ export default defineComponent({
       return isAllVariablesAndPanelsDataLoaded;
     });
 
+    watch(isDashboardVariablesAndPanelsDataLoaded, () => {
+      emit("panelsValues", isDashboardVariablesAndPanelsDataLoaded.value);
+    });
+
     const currentQueryTraceIds = computed(() => {
       console.log(
         "variablesAndPanelsDataLoadingState",
@@ -300,20 +304,6 @@ export default defineComponent({
       console.log("currentQueryTraceIds", currentQueryTraceIds.value);
       emit("searchRequestTraceIds", currentQueryTraceIds.value);
     });
-
-    watch(
-      variablesAndPanelsDataLoadingState,
-      (newValue) => {
-        const panelsValues = Object.values(newValue.panels);
-        // const searchRequestTraceIdsWatch = newValue.searchRequestTraceIds;
-        // console.log("searchRequestTraceIdsWatch", searchRequestTraceIdsWatch);
-
-        console.log("panelsValues emitted from child:", panelsValues);
-        emit("panelsValues", panelsValues);
-        // emit("searchRequestTraceIds", searchRequestTraceIdsWatch);
-      },
-      { deep: true }
-    );
 
     // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
     let {

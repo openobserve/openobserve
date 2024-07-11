@@ -83,9 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
               v-if="selectedDate"
-              v-show="
-                store.state.printMode === false && !disableDateTimeRefresh
-              "
+              v-show="store.state.printMode === false"
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
@@ -106,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="refresh"
                 @click="refreshData"
                 data-test="dashboard-refresh-btn"
-                :disable="disableDateTimeRefresh"
+                :disable="!disableDateTimeRefresh"
                 style="width: 80%"
               >
                 <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
@@ -314,11 +312,8 @@ export default defineComponent({
       useNotifications();
     const disableDateTimeRefresh = ref(false);
 
-    const receivedData = ref([]);
     const handleEmittedData = (panelsValues) => {
-      console.log("handleEmittedData called with:", panelsValues);
-      receivedData.value = panelsValues;
-      disableDateTimeRefresh.value = panelsValues.some((item) => item === true);
+      disableDateTimeRefresh.value = panelsValues;
     };
 
     const traceIdRef = ref(null);
@@ -551,7 +546,7 @@ export default defineComponent({
           console.log("cancelQuery response:", res);
           const isCancelled = res.data.some((item: any) => item.is_success);
           console.log("isCancelled:", isCancelled);
-          
+
           $q.notify({
             message: isCancelled
               ? "Running query cancelled successfully"
