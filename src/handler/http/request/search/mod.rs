@@ -1594,11 +1594,11 @@ fn merge_response(
     if is_descending {
         cache_response
             .hits
-            .sort_by(|a, b| get_ts_value(ts_column, b).cmp(&get_ts_value(ts_column, a)));
+            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
     } else {
         cache_response
             .hits
-            .sort_by(|a, b| get_ts_value(ts_column, a).cmp(&get_ts_value(ts_column, b)));
+            .sort_by_key(|a| get_ts_value(ts_column, a));
     }
 
     if cache_response.hits.len() > limit as usize {
