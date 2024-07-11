@@ -52,7 +52,7 @@ use crate::{
     service::format_partition_key,
 };
 
-pub mod cache;
+pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
