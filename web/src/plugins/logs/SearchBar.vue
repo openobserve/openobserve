@@ -17,20 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div class="row">
-      <div class="float-right col q-mb-xs">
-        <q-btn-toggle
-          class="q-ml-xs no-outline q-pa-none no-border"
-          v-model="searchObj.meta.logsVisualizeToggle"
-          style="margin-left: 5px; border-radius: 4px"
-          no-caps
-          padding="5px"
-          size="sm"
-          toggle-color="primary"
-          :options="[
-            { label: 'Search', value: 'logs' },
-            { label: 'Visualize', value: 'visualize' },
-          ]"
-        />
+      <div class="float-right col q-mb-xs flex">
+        <div class="button-group logs-visualize-toggle q-ml-xs">
+          <div class="row">
+            <div>
+              <button
+                data-test="logs-logs-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'logs'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-left"
+                @click="onLogsVisualizeToggleUpdate('logs')"
+              >
+                Search
+              </button>
+            </div>
+            <div>
+              <button
+                data-test="logs-visualize-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'visualize'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-right"
+                @click="onLogsVisualizeToggleUpdate('visualize')"
+              >
+                Visualize
+              </button>
+            </div>
+          </div>
+        </div>
         <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
@@ -831,6 +850,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <ConfirmDialog
+      title="Erase Visualizations?"
+      message="Navigating away from this page will erase your current data visualizations and any unsaved changes. Are you sure you want to proceed?"
+      @update:ok="changeLogsVisualizeToggle"
+      @update:cancel="confirmLogsVisualizeModeChangeDialog = false"
+      v-model="confirmLogsVisualizeModeChangeDialog"
+    />
   </div>
 </template>
 
@@ -1036,6 +1062,9 @@ export default defineComponent({
     const savedFunctionName: string = ref("");
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
+
+    // confirm dialog for logs visualization toggle
+    const confirmLogsVisualizeModeChangeDialog = ref(false);
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -2378,6 +2407,20 @@ export default defineComponent({
       }
     };
 
+    const onLogsVisualizeToggleUpdate = (value: any) => {
+      if (value == "logs") {
+        confirmLogsVisualizeModeChangeDialog.value = true;
+      } else {
+        searchObj.meta.logsVisualizeToggle = value;
+      }
+    };
+
+    const changeLogsVisualizeToggle = () => {
+      // change logs visualize toggle
+      searchObj.meta.logsVisualizeToggle = "logs";
+      confirmLogsVisualizeModeChangeDialog.value = false;
+    };
+
     return {
       t,
       store,
@@ -2452,6 +2495,9 @@ export default defineComponent({
       resetRegionFilter,
       validateFilterForMultiStream,
       cancelQuery,
+      confirmLogsVisualizeModeChangeDialog,
+      changeLogsVisualizeToggle,
+      onLogsVisualizeToggleUpdate,
     };
   },
   computed: {
@@ -2904,52 +2950,83 @@ export default defineComponent({
   }
 }
 .saved-view-table {
-    td {
-      padding: 0;
-      height: 25px !important;
-      min-height: 25px !important;
+  td {
+    padding: 0;
+    height: 25px !important;
+    min-height: 25px !important;
+  }
+
+  .q-table__control {
+    margin: 0px !important;
+    width: 100% !important;
+    text-align: right;
+  }
+
+  .q-table__bottom {
+    padding: 0px !important;
+    min-height: 35px;
+
+    .q-table__control {
+      padding: 0px 10px !important;
+    }
+  }
+
+  .q-table__top {
+    padding: 0px !important;
+    margin: 0px !important;
+    left: 0px;
+    width: 100%;
+
+    .q-table__separator {
+      display: none;
     }
 
     .q-table__control {
-      margin: 0px !important;
-      width: 100% !important;
-      text-align: right;
-    }
-
-    .q-table__bottom {
       padding: 0px !important;
-      min-height: 35px;
-
-      .q-table__control {
-        padding: 0px 10px !important;
-      }
-    }
-
-    .q-table__top {
-      padding: 0px !important;
-      margin: 0px !important;
-      left: 0px;
-      width: 100%;
-
-      .q-table__separator {
-        display: none;
-      }
-
-      .q-table__control {
-        padding: 0px !important;
-      }
-    }
-
-    .q-field--filled .q-field__control {
-      padding: 0px 5px !important;
-    }
-
-    .saved-view-item {
-      padding: 4px 5px 4px 10px !important;
-    }
-
-    .q-item__section--main ~ .q-item__section--side {
-      padding-left: 5px !important;
     }
   }
+
+  .q-field--filled .q-field__control {
+    padding: 0px 5px !important;
+  }
+
+  .saved-view-item {
+    padding: 4px 5px 4px 10px !important;
+  }
+
+  .q-item__section--main ~ .q-item__section--side {
+    padding-left: 5px !important;
+  }
+}
+
+.logs-visualize-toggle {
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
+  }
+
+  .button-group {
+    border: 1px solid gray !important;
+    border-radius: 9px;
+  }
+
+  .button {
+    display: block;
+    cursor: pointer;
+    background-color: #f0eaea;
+    border: none;
+    font-size: 12px;
+    padding: 6px 4px;
+  }
+
+  .button-left {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+  }
+
+  .button-right {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+  }
+}
 </style>

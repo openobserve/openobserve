@@ -382,6 +382,7 @@ export default defineComponent({
     const {
       dashboardPanelData,
       resetDashboardPanelData,
+      resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
     } = useDashboardPanelData("dashboard");
@@ -456,7 +457,7 @@ export default defineComponent({
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
-        resetDashboardPanelData();
+        resetDashboardPanelDataAndAddTimeField();
         chartData.value = {};
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);

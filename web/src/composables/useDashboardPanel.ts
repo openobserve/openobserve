@@ -216,7 +216,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetDashboardPanelData = () => {
-    Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
+    Object.assign(dashboardPanelData.data, getDefaultDashboardPanelData().data);
+  };
+
+  const resetDashboardPanelDataAndAddTimeField = () => {
+    resetDashboardPanelData();
 
     // add _timestamp field in x axis as default
     addXAxisItem({
@@ -2657,6 +2661,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   return {
     dashboardPanelData,
     resetDashboardPanelData,
+    resetDashboardPanelDataAndAddTimeField,
     updateArrayAlias,
     addXAxisItem,
     addYAxisItem,

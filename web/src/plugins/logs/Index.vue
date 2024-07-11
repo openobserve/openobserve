@@ -270,6 +270,9 @@ export default defineComponent({
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue")
     ),
+    ConfirmDialog: defineAsyncComponent(
+      () => import("@/components/ConfirmDialog.vue")
+    ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
   },
@@ -416,8 +419,12 @@ export default defineComponent({
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
-    const { dashboardPanelData, validatePanel, generateLabelFromName } =
-      useDashboardPanelData("logs");
+    const {
+      dashboardPanelData,
+      validatePanel,
+      generateLabelFromName,
+      resetDashboardPanelData,
+    } = useDashboardPanelData("logs");
     const visualizeErrorData: any = reactive({
       errors: [],
     });
@@ -864,10 +871,8 @@ export default defineComponent({
     }
 
     const setFieldsAndConditions = async () => {
-      // set fields and conditions for first time only
-      if (dashboardPanelData.data.queries[0].query) {
-        return;
-      }
+      // reset old dashboardPanelData
+      resetDashboardPanelData();
 
       let logsQuery = searchObj.data.query ?? "";
 

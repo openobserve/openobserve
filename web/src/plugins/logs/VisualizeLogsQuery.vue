@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="no-border"
                             no-caps
                             dense
-                            style="padding: 2px 4px"
+                            style="padding: 2px 4px; z-index: 1"
                             color="primary"
                             @click="addToDashboard"
                             title="Add To Dashboard"
