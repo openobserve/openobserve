@@ -980,205 +980,233 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="axis-container droppable scroll row"
         data-test="dashboard-filter-layout"
       >
-        <q-btn-group
-          class="axis-field q-mr-sm q-my-xs"
-          v-for="(filteredItem, index) in dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.filter"
-          :key="index"
-        >
-          <q-btn
-            square
-            icon-right="arrow_drop_down"
-            no-caps
-            dense
-            :no-wrap="true"
-            color="primary"
-            size="sm"
-            :label="filteredItem.column"
-            :data-test="`dashboard-filter-item-${filteredItem.column}`"
-            class="q-pl-sm"
+        <div>
+          <q-btn-group
+            class="axis-field q-mr-sm q-my-xs"
+            v-for="(filteredItem, index) in dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.filter"
+            :key="index"
           >
-            <q-menu
-              class="q-pa-md"
-              @show="(e: any) => loadFilterItem(filteredItem.column)"
-              :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
+            <q-btn
+              square
+              icon-right="arrow_drop_down"
+              no-caps
+              dense
+              :no-wrap="true"
+              color="primary"
+              size="sm"
+              :label="filteredItem.column"
+              :data-test="`dashboard-filter-item-${filteredItem.column}`"
+              class="q-pl-sm"
             >
-              <div style="height: 100%">
-                <div class="q-pa-xs" style="height: 100%">
-                  <div class="q-gutter-xs" style="height: 100%">
-                    <q-tabs
-                      v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.filter[index].type
-                      "
-                      dense
-                    >
-                      <q-tab
+              <q-menu
+                class="q-pa-md"
+                @show="(e: any) => loadFilterItem(filteredItem.column)"
+                :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
+              >
+                <div style="height: 100%">
+                  <div class="q-pa-xs" style="height: 100%">
+                    <div class="q-gutter-xs" style="height: 100%">
+                      <q-tabs
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.filter[index].type
+                        "
                         dense
-                        name="list"
-                        :label="t('common.list')"
-                        style="width: auto"
-                        data-test="dashboard-filter-list-tab"
-                      ></q-tab>
-                      <q-tab
-                        dense
-                        name="condition"
-                        :label="t('common.condition')"
-                        style="width: auto"
-                        data-test="dashboard-filter-condition-tab"
-                      ></q-tab>
-                    </q-tabs>
-                    <q-separator></q-separator>
-                    <q-tab-panels
-                      dense
-                      v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.filter[index].type
-                      "
-                      animated
-                      style="height: 100%"
-                    >
-                      <q-tab-panel
-                        data-test="dashboard-filter-condition-panel"
-                        dense
-                        name="condition"
-                        class="q-pa-none"
                       >
-                        <div class="flex column" style="height: 220px">
+                        <q-tab
+                          dense
+                          name="list"
+                          :label="t('common.list')"
+                          style="width: auto"
+                          data-test="dashboard-filter-list-tab"
+                        ></q-tab>
+                        <q-tab
+                          dense
+                          name="condition"
+                          :label="t('common.condition')"
+                          style="width: auto"
+                          data-test="dashboard-filter-condition-tab"
+                        ></q-tab>
+                      </q-tabs>
+                      <q-separator></q-separator>
+                      <q-tab-panels
+                        dense
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.filter[index].type
+                        "
+                        animated
+                        style="height: 100%"
+                      >
+                        <q-tab-panel
+                          data-test="dashboard-filter-condition-panel"
+                          dense
+                          name="condition"
+                          class="q-pa-none"
+                        >
+                          <div class="flex column" style="height: 220px">
+                            <q-select
+                              dense
+                              filled
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.filter[index].operator
+                              "
+                              :options="options"
+                              :label="t('common.operator')"
+                              data-test="dashboard-filter-condition-dropdown"
+                              style="width: 100%"
+                              :rules="[(val: any) => !!val || 'Required']"
+                            />
+                            <CommonAutoComplete
+                              v-if="
+                                !['Is Null', 'Is Not Null'].includes(
+                                  dashboardPanelData.data.queries[
+                                    dashboardPanelData.layout.currentQueryIndex
+                                  ].fields?.filter[index]?.operator,
+                                )
+                              "
+                              :label="t('common.value')"
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.filter[index].value
+                              "
+                              :items="dashboardVariablesFilterItems(index)"
+                              searchRegex="(?:^|[^$])\$?(\w+)"
+                              :rules="[
+                              (val: any) => val?.length > 0 || 'Required',
+                            ]"
+                            ></CommonAutoComplete>
+                          </div>
+                        </q-tab-panel>
+                        <q-tab-panel
+                          data-test="dashboard-filter-list-panel"
+                          dense
+                          name="list"
+                          class="q-pa-none"
+                        >
                           <q-select
                             dense
                             filled
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.filter[index].operator
+                              ].fields.filter[index].values
                             "
-                            :options="options"
-                            :label="t('common.operator')"
-                            data-test="dashboard-filter-condition-dropdown"
-                            style="width: 100%"
-                            :rules="[(val: any) => !!val || 'Required']"
-                          />
-                          <CommonAutoComplete
-                            v-if="
-                              !['Is Null', 'Is Not Null'].includes(
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.filter[index]?.operator,
-                              )
-                            "
-                            :label="t('common.value')"
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.filter[index].value
-                            "
-                            :items="dashboardVariablesFilterItems(index)"
-                            searchRegex="(?:^|[^$])\$?(\w+)"
-                            :rules="[
-                              (val: any) => val?.length > 0 || 'Required',
-                            ]"
-                          ></CommonAutoComplete>
-                        </div>
-                      </q-tab-panel>
-                      <q-tab-panel
-                        data-test="dashboard-filter-list-panel"
-                        dense
-                        name="list"
-                        class="q-pa-none"
-                      >
-                        <q-select
-                          dense
-                          filled
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.filter[index].values
-                          "
-                          data-test="dashboard-filter-list-dropdown"
-                          :options="
+                            data-test="dashboard-filter-list-dropdown"
+                            :options="
                             dashboardPanelData.meta.filterValue.find(
                               (it: any) => it.column == filteredItem.column,
                             )?.value
                           "
-                          :label="t('common.selectFilter')"
-                          multiple
-                          emit-value
-                          map-options
-                          :rules="[
-                            (val: any) =>
-                              val.length > 0 || 'At least 1 item required',
-                          ]"
-                        >
-                          <template v-slot:selected>
-                            {{
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.filter[index].values[0]?.length > 15
-                                ? dashboardPanelData.data.queries[
-                                    dashboardPanelData.layout.currentQueryIndex
-                                  ].fields.filter[index].values[0]?.substring(
-                                    0,
-                                    15,
-                                  ) + "..."
-                                : dashboardPanelData.data.queries[
-                                    dashboardPanelData.layout.currentQueryIndex
-                                  ].fields.filter[index].values[0]
-                            }}
-
-                            {{
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.filter[index].values?.length > 1
-                                ? " +" +
-                                  (dashboardPanelData.data.queries[
-                                    dashboardPanelData.layout.currentQueryIndex
-                                  ].fields.filter[index].values?.length -
-                                    1)
-                                : ""
-                            }}
-                          </template>
-                          <template
-                            v-slot:option="{
-                              itemProps,
-                              opt,
-                              selected,
-                              toggleOption,
-                            }"
+                            :label="t('common.selectFilter')"
+                            multiple
+                            emit-value
+                            map-options
+                            :rules="[
+                              (val: any) =>
+                                val.length > 0 || 'At least 1 item required',
+                            ]"
                           >
-                            <q-item v-bind="itemProps">
-                              <q-item-section side>
-                                <q-checkbox
-                                  dense
-                                  :model-value="selected"
-                                  data-test="dashboard-filter-item-input"
-                                  @update:model-value="toggleOption(opt)"
-                                ></q-checkbox>
-                              </q-item-section>
-                              <q-item-section>
-                                <SanitizedHtmlRenderer :html-content="opt" />
-                              </q-item-section>
-                            </q-item>
-                          </template>
-                        </q-select>
-                      </q-tab-panel>
-                    </q-tab-panels>
+                            <template v-slot:selected>
+                              {{
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.filter[index].values[0]?.length > 15
+                                  ? dashboardPanelData.data.queries[
+                                      dashboardPanelData.layout
+                                        .currentQueryIndex
+                                    ].fields.filter[index].values[0]?.substring(
+                                      0,
+                                      15,
+                                    ) + "..."
+                                  : dashboardPanelData.data.queries[
+                                      dashboardPanelData.layout
+                                        .currentQueryIndex
+                                    ].fields.filter[index].values[0]
+                              }}
+
+                              {{
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.filter[index].values?.length > 1
+                                  ? " +" +
+                                    (dashboardPanelData.data.queries[
+                                      dashboardPanelData.layout
+                                        .currentQueryIndex
+                                    ].fields.filter[index].values?.length -
+                                      1)
+                                  : ""
+                              }}
+                            </template>
+                            <template
+                              v-slot:option="{
+                                itemProps,
+                                opt,
+                                selected,
+                                toggleOption,
+                              }"
+                            >
+                              <q-item v-bind="itemProps">
+                                <q-item-section side>
+                                  <q-checkbox
+                                    dense
+                                    :model-value="selected"
+                                    data-test="dashboard-filter-item-input"
+                                    @update:model-value="toggleOption(opt)"
+                                  ></q-checkbox>
+                                </q-item-section>
+                                <q-item-section>
+                                  <SanitizedHtmlRenderer :html-content="opt" />
+                                </q-item-section>
+                              </q-item>
+                            </template>
+                          </q-select>
+                        </q-tab-panel>
+                      </q-tab-panels>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </q-menu>
-          </q-btn>
-          <q-btn
-            size="xs"
-            dense
-            :data-test="`dashboard-filter-item-${filteredItem.column}-remove`"
-            @click="removeFilterItem(filteredItem.column)"
-            icon="close"
-          />
-        </q-btn-group>
+              </q-menu>
+            </q-btn>
+            <q-btn
+              size="xs"
+              dense
+              :data-test="`dashboard-filter-item-${filteredItem.column}-remove`"
+              @click="removeFilterItem(filteredItem.column)"
+              icon="close"
+            />
+            <div v-if="showSelect">
+              <q-select
+                v-model="addLabel"
+                dense
+                filled
+                :options="filterOptions"
+              />
+            </div>
+
+            <q-btn icon="add" color="primary" size="xs" round>
+              <q-menu v-model="showAddMenu">
+                <q-list>
+                  <q-item clickable @click="addFilter('condition')">
+                    <q-item-section>{{
+                      t("common.addCondition")
+                    }}</q-item-section>
+                  </q-item>
+                  <q-item clickable @click="addFilter('group')">
+                    <q-item-section>{{ t("common.addGroup") }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-btn>
+          </q-btn-group>
+        </div>
         <div
           class="text-caption text-weight-bold text-center q-py-xs q-mt-xs"
           v-if="
@@ -1294,6 +1322,20 @@ export default defineComponent({
     const triggerOperatorsWithHistogram: any = [
       { label: t("dashboard.histogram"), value: "histogram" },
     ];
+    const showAddMenu = ref(false);
+    const showSelect = ref(false);
+    const addLabel = ref("AND");
+
+    const addFilter = (type: any) => {
+      showAddMenu.value = false;
+      showSelect.value = true;
+
+      if (type === "condition") {
+        addLabel.value = "AND";
+      } else if (type === "group") {
+        addLabel.value = "OR";
+      }
+    };
 
     // v-model for histogram interval
     // if no args object in the field, set it with object with interval = null
@@ -1724,6 +1766,7 @@ export default defineComponent({
       }),
       model: ref([]),
       tab: ref("General"),
+      filterOptions: ["AND", "OR"],
       options: [
         "=",
         "<>",
@@ -1757,6 +1800,10 @@ export default defineComponent({
       getHistoramIntervalField,
       onDragEnd,
       dashboardVariablesFilterItems,
+      showAddMenu,
+      showSelect,
+      addFilter,
+      addLabel,
     };
   },
 });
