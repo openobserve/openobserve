@@ -123,10 +123,6 @@ pub async fn search(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let user_id = match in_req.headers().get("user_id") {
-        Some(v) => v.to_str().unwrap().to_string(),
-        None => "".to_string(),
-    };
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
@@ -137,6 +133,12 @@ pub async fn search(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -221,7 +223,6 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
- 
     // run search with cache
     let res = SearchService::cache::search(
         &trace_id,
@@ -335,6 +336,10 @@ pub async fn around(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .map(|v| v.to_str().unwrap_or("").to_string());
 
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -455,13 +460,6 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
     };
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .unwrap()
-        .to_str()
-        .ok()
-        .map(|v| v.to_string());
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
         .await;
@@ -515,7 +513,7 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)
         .await;
 
@@ -563,16 +561,12 @@ pub async fn around(
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, &org_id, stream_type, &stream_name, "200", "_around");
 
-    let user_id = match in_req.headers().get("user_id") {
-        Some(v) => v.to_str().unwrap(),
-        None => "",
-    };
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
-        user_email: Some(user_id.to_string()),
+        user_email: user_id,
         min_ts: Some(around_start_time),
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
@@ -660,10 +654,12 @@ pub async fn values(
         None => "".to_string(),
         Some(v) => base64::decode_url(v).unwrap_or("".to_string()),
     };
-    let user_id = match in_req.headers().get("user_id") {
-        Some(v) => v.to_str().unwrap(),
-        None => "",
-    };
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
     let http_span = if config::get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_values",
@@ -691,7 +687,7 @@ pub async fn values(
                         &fields[0],
                         Some((column[0], column[1])),
                         &query,
-                        user_id,
+                        &user_id,
                         trace_id,
                         http_span,
                     )
@@ -706,7 +702,7 @@ pub async fn values(
                     &fields[0],
                     None,
                     &query,
-                    user_id,
+                    &user_id,
                     trace_id,
                     http_span,
                 )
@@ -721,7 +717,7 @@ pub async fn values(
                 &fields[0],
                 None,
                 &query,
-                user_id,
+                &user_id,
                 trace_id,
                 http_span,
             )
@@ -734,7 +730,7 @@ pub async fn values(
         stream_type,
         &stream_name,
         &query,
-        user_id,
+        &user_id,
         trace_id,
         http_span,
     )
