@@ -115,7 +115,7 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:enter", skip_all, fields(org_id = req.get_ref().org_id))]
+    #[tracing::instrument(name = "grpc:search", skip_all, fields(org_id = req.get_ref().org_id))]
     async fn search(
         &self,
         req: Request<SearchRequest>,
@@ -198,7 +198,7 @@ impl Search for Searcher {
         }
     }
 
-    #[tracing::instrument(name = "grpc:cluster_search:enter", skip_all, fields(org_id = req.get_ref().org_id))]
+    #[tracing::instrument(name = "grpc:cluster_search", skip_all, fields(org_id = req.get_ref().org_id))]
     async fn cluster_search(
         &self,
         req: Request<SearchRequest>,

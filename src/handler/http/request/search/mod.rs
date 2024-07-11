@@ -233,6 +233,7 @@ pub async fn search(
         use_cache,
         search_type,
     )
+    .instrument(http_span)
     .await;
     match res {
         Ok(mut res) => {

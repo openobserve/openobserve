@@ -29,7 +29,7 @@ use infra::{
     errors::Error,
 };
 use result_utils::get_ts_value;
-use tracing::{info_span, Instrument};
+use tracing::Instrument;
 
 use crate::{
     common::{
@@ -183,8 +183,7 @@ pub async fn search(
             };
             let user_id = user_id.clone();
 
-            let http_span = info_span!("service:search:cacher:search");
-
+            let enter_span = tracing::span::Span::current();
             let task = tokio::task::spawn(async move {
                 let trace_id = trace_id.clone();
                 req.query.start_time = delta.delta_start_time;
@@ -202,9 +201,10 @@ pub async fn search(
                     );
                 }
 
-                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
-            })
-            .instrument(http_span);
+                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
+                    .instrument(enter_span)
+                    .await
+            });
             tasks.push(task);
         }
 
