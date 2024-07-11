@@ -25,7 +25,6 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
-use itertools::Itertools;
 use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
@@ -41,12 +40,9 @@ pub(crate) struct Partition {
 }
 
 impl Partition {
-    pub(crate) fn new(schema: Arc<Schema>) -> Self {
-        metrics::INGEST_MEMTABLE_ARROW_BYTES
-            .with_label_values(&[])
-            .add(schema.size() as i64);
+    pub(crate) fn new() -> Self {
         Self {
-            schema,
+            schema: Arc::new(Schema::empty()),
             files: BTreeMap::default(),
         }
     }
@@ -60,6 +56,25 @@ impl Partition {
             .files
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
+
+        let old_schema_size = self.schema.size();
+        let schema = batch.as_ref().map(|r| r.data.schema().as_ref().clone());
+        self.schema = Arc::new(
+            Schema::try_merge(vec![
+                self.schema.as_ref().clone(),
+                schema.unwrap_or(Schema::empty()),
+            ])
+            .context(MergeSchemaSnafu)?,
+        );
+        let new_schema_size = self.schema.size();
+
+        // update schema change
+        if old_schema_size != new_schema_size {
+            metrics::INGEST_MEMTABLE_ARROW_BYTES
+                .with_label_values(&[])
+                .add(new_schema_size as i64 - old_schema_size as i64);
+        }
+
         partition.write(batch)
     }
 
@@ -121,18 +136,16 @@ impl Partition {
                     (vec![], vec![])
                 };
 
-            let batches = data.data.iter().map(|r| &r.data).collect::<Vec<_>>();
-
-            // generate format schema for record batches
-            let schemas = batches
+            let batches = data
+                .data
                 .iter()
-                .map(|batch| batch.schema().as_ref().clone())
+                .map(|r| {
+                    persist_stat.arrow_size += r.data_arrow_size;
+                    r.data.clone()
+                })
                 .collect::<Vec<_>>();
-            let schema = Arc::new(Schema::try_merge(schemas).context(MergeSchemaSnafu)?);
-
-            let batches = batches.into_iter().cloned().collect_vec();
             let (schema, batches) =
-                merge_record_batches("INGESTER:PERSIST", 0, schema.clone(), batches)
+                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();
@@ -143,10 +156,6 @@ impl Partition {
                 &full_text_search_fields,
                 &file_meta,
             );
-
-            for entry in data.data.iter() {
-                persist_stat.arrow_size += entry.data_arrow_size;
-            }
 
             writer
                 .write(&batches)

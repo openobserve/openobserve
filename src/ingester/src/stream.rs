@@ -49,7 +49,7 @@ impl Stream {
                 arrow_size += schema.size();
                 self.partitions
                     .entry(entry.schema_key.clone())
-                    .or_insert_with(|| Partition::new(schema))
+                    .or_insert_with(Partition::new)
             }
         };
         arrow_size += partition.write(entry, batch)?;
