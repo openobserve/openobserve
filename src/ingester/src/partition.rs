@@ -35,7 +35,7 @@ use crate::{
 };
 
 pub(crate) struct Partition {
-    schema: Arc<Schema>, // this schema maybe not include all fields in the files
+    schema: Arc<Schema>,
     files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 

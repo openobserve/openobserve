@@ -48,7 +48,6 @@ impl MemTable {
         }
     }
 
-    // NOTE: do we need remove the data in entry and remove Option in batch?
     pub(crate) fn write(
         &mut self,
         schema: Arc<Schema>,
