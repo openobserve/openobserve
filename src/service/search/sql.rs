@@ -913,11 +913,39 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
 
     let intervals = [
         (
-            Duration::try_hours(24 * 30)
+            Duration::try_hours(24 * 60)
                 .unwrap()
                 .num_microseconds()
                 .unwrap(),
             "1 day",
+        ),
+        (
+            Duration::try_hours(24 * 30)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+            "12 hour",
+        ),
+        (
+            Duration::try_hours(24 * 28)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+            "6 hour",
+        ),
+        (
+            Duration::try_hours(24 * 21)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+            "3 hour",
+        ),
+        (
+            Duration::try_hours(24 * 14)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+            "2 hour",
         ),
         (
             Duration::try_hours(24 * 7)
