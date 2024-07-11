@@ -421,6 +421,7 @@ pub async fn search(
                 &results,
                 &c_resp.ts_column,
                 c_resp.limit,
+                c_resp.is_descending,
             );
             c_resp.cached_response
         } else {
@@ -1536,6 +1537,7 @@ fn merge_response(
     search_response: &Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
+    is_descending: bool,
 ) {
     if cache_response.hits.is_empty() && search_response.is_empty() {
         return;
@@ -1578,7 +1580,7 @@ fn merge_response(
             continue;
         }
         let search_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-        if search_ts < cache_ts {
+        if search_ts < cache_ts && is_descending {
             cache_response.hits.extend(res.hits.clone());
         } else {
             cache_response.hits = res
@@ -1589,6 +1591,16 @@ fn merge_response(
                 .collect();
         }
     }
+    if is_descending {
+        cache_response
+            .hits
+            .sort_by(|a, b| get_ts_value(ts_column, b).cmp(&get_ts_value(ts_column, a)));
+    } else {
+        cache_response
+            .hits
+            .sort_by(|a, b| get_ts_value(ts_column, a).cmp(&get_ts_value(ts_column, b)));
+    }
+
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
     }
