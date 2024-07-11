@@ -47,7 +47,7 @@ use crate::service::{
 type CachedFiles = (usize, usize);
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
@@ -56,6 +56,7 @@ pub async fn search(
     work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
+    let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
     let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
         .await
@@ -67,6 +68,7 @@ pub async fn search(
         stream_type,
         sql.meta.time_range,
     )
+    .instrument(enter_span.clone())
     .await
     {
         Ok(versions) => versions,
@@ -104,6 +106,7 @@ pub async fn search(
                 partition_time_level,
                 &stream_settings.partition_keys,
             )
+            .instrument(enter_span.clone())
             .await?
         }
         false => file_list.to_vec(),
@@ -181,7 +184,9 @@ pub async fn search(
 
     // load files to local cache
     let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) =
-        cache_parquet_files(trace_id, &files, &scan_stats).await?;
+        cache_parquet_files(trace_id, &files, &scan_stats)
+            .instrument(enter_span.clone())
+            .await?;
     if !deleted_files.is_empty() {
         // remove deleted files from files_group
         for (_, g_files) in files_group.iter_mut() {

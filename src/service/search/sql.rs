@@ -912,54 +912,23 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
     }
 
     let intervals = [
-        (
-            Duration::try_hours(24 * 30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "1 day",
-        ),
-        (
-            Duration::try_hours(24 * 7)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "1 hour",
-        ),
-        (
-            Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
-            "30 minute",
-        ),
-        (
-            Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
-            "5 minute",
-        ),
-        (
-            Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
-            "1 minute",
-        ),
-        (
-            Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
-            "30 second",
-        ),
-        (
-            Duration::try_minutes(30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "15 second",
-        ),
-        (
-            Duration::try_minutes(15)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "10 second",
-        ),
+        (Duration::try_hours(24 * 60), "1 day"),
+        (Duration::try_hours(24 * 30), "12 hour"),
+        (Duration::try_hours(24 * 28), "6 hour"),
+        (Duration::try_hours(24 * 21), "3 hour"),
+        (Duration::try_hours(24 * 14), "2 hour"),
+        (Duration::try_hours(24 * 7), "1 hour"),
+        (Duration::try_hours(24), "30 minute"),
+        (Duration::try_hours(6), "5 minute"),
+        (Duration::try_hours(2), "1 minute"),
+        (Duration::try_hours(1), "30 second"),
+        (Duration::try_minutes(30), "15 second"),
+        (Duration::try_minutes(15), "10 second"),
     ];
-    for interval in intervals.iter() {
-        if (time_range.1 - time_range.0) >= interval.0 {
-            return interval.1.to_string();
+    for (time, interval) in intervals.iter() {
+        let time = time.unwrap().num_microseconds().unwrap();
+        if (time_range.1 - time_range.0) >= time {
+            return interval.to_string();
         }
     }
     "10 second".to_string()
