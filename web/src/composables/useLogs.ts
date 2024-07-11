@@ -3927,10 +3927,10 @@ const useLogs = () => {
         $q.notify({
           message: isCancelled
             ? "Running query cancelled successfully"
-            : "Query execution was completed before cancellation.",
-          color: "positive",
+            : "Cancellation failed: Query already executed.",
+          color: isCancelled ? "positive" : "negative",
           position: "bottom",
-          timeout: 1500,
+          timeout: 4000,
         });
       })
       .catch((error: any) => {
