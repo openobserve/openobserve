@@ -144,7 +144,7 @@ pub async fn search(
 
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(&trace_id).await;
+    SEARCH_SERVER.remove(&trace_id, false).await;
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[org_id])
