@@ -774,9 +774,7 @@ pub struct Limit {
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
-    pub query_partition_by_secs: usize,
-    #[env_config(name = "ZO_QUERY_PARTITION_MIN_SECS", default = 600)] // seconds
-    pub query_partition_min_secs: i64,
+    pub query_partition_by_secs: usize, 
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
