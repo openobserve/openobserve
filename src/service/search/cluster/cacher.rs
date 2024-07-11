@@ -229,7 +229,6 @@ pub async fn get_cached_results(
                 "[CACHE CANDIDATES {trace_id}] get_cached_results->grpc: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
                 cache_meta.response_start_time,
                 cache_meta.response_end_time);
-                
 
             cache_meta.response_start_time <= cache_req.q_end_time
                 && cache_meta.response_end_time >= cache_req.q_start_time
