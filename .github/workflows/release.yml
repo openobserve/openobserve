@@ -48,7 +48,7 @@ jobs:
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-2022-16-cores
-            features: "--features mimalloc"
+            features: ""
             file_name: openobserve-${{ github.ref_name }}-windows-amd64
             file_ext: .zip
     runs-on: ${{ matrix.os }}
