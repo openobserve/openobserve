@@ -48,13 +48,11 @@ use crate::{
 pub mod cacher;
 pub mod result_utils;
 
-#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
-    stream_name: &str,
     user_id: Option<String>,
     in_req: &search::Request,
     use_cache: bool,
@@ -67,13 +65,16 @@ pub async fn search(
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
+    let parsed_sql = match config::meta::sql::Sql::new(&origin_sql) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
+        }
+    };
+    let stream_name = &parsed_sql.source;
 
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&origin_sql);
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
@@ -82,13 +83,11 @@ pub async fn search(
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
-    let parsed_sql = match config::meta::sql::Sql::new(&req.query.sql) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(Error::Message(e.to_string()));
-        }
-    };
 
+    let mut file_path = format!(
+        "{}/{}/{}/{}",
+        org_id, stream_type, stream_name, hashed_query
+    );
     let mut c_resp: CachedQueryResponse = if use_cache {
         check_cache(
             trace_id,

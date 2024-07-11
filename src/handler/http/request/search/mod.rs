@@ -228,7 +228,6 @@ pub async fn search(
         &trace_id,
         &org_id,
         stream_type,
-        stream_name,
         Some(user_id),
         &req,
         use_cache,
