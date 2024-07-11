@@ -774,7 +774,7 @@ pub struct Limit {
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
-    pub query_partition_by_secs: usize, 
+    pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
@@ -1470,9 +1470,6 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_partition_by_secs == 0 {
         cfg.limit.query_partition_by_secs = 30;
-    }
-    if cfg.limit.query_partition_min_secs == 0 {
-        cfg.limit.query_partition_min_secs = 600;
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
