@@ -1556,7 +1556,7 @@ fn merge_response(
     let cache_hits_len = cache_response.hits.len();
 
     let mut files_cache_ratio = 0;
-    let mut result_cache_ratio = 0;
+    let mut result_cache_len = 0;
     let cache_ts = if cache_response.hits.is_empty() {
         get_ts_value(
             ts_column,
@@ -1572,7 +1572,7 @@ fn merge_response(
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
 
-        result_cache_ratio += res.total;
+        result_cache_len += res.total;
 
         if res.hits.is_empty() {
             continue;
@@ -1593,8 +1593,13 @@ fn merge_response(
         cache_response.hits.truncate(limit as usize);
     }
     cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    log::info!(
+        "cache_response.hits.len: {}, Result cache len: {}",
+        cache_hits_len,
+        result_cache_len,
+    );
     cache_response.result_cache_ratio =
-        (cache_hits_len as f64 * 100_f64 / (result_cache_ratio + cache_hits_len) as f64) as usize;
+        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
 }
 
 #[allow(clippy::too_many_arguments)]
