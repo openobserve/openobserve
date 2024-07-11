@@ -255,9 +255,6 @@ pub async fn search_partition(
         return Err(Error::Message("no querier node online".to_string()));
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
-    if nodes.is_empty() {
-        return Err(Error::Message("no querier node online".to_string()));
-    }
 
     let (records, original_size, compressed_size) =
         files

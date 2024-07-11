@@ -18,7 +18,7 @@ use core::cmp::min;
 use config::{
     cluster::*,
     get_config,
-    meta::cluster::{Node, NodeStatus, Role},
+    meta::cluster::{load_role_group, Node, NodeStatus, Role},
     utils::json,
 };
 use infra::{
@@ -137,6 +137,7 @@ async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
+        role_group: load_role_group(),
     };
     let val = json::to_vec(&node).unwrap();
 
@@ -198,6 +199,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
+            role_group: load_role_group(),
         },
     };
     let val = json::to_string(&node).unwrap();
