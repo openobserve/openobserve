@@ -1190,22 +1190,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="filterOptions"
               />
             </div>
-
-            <q-btn icon="add" color="primary" size="xs" round>
-              <q-menu v-model="showAddMenu">
-                <q-list>
-                  <q-item clickable @click="addFilter('condition')">
-                    <q-item-section>{{
-                      t("common.addCondition")
-                    }}</q-item-section>
-                  </q-item>
-                  <q-item clickable @click="addFilter('group')">
-                    <q-item-section>{{ t("common.addGroup") }}</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-btn>
           </q-btn-group>
+          <q-btn icon="add" color="primary" size="xs" round>
+            <q-menu v-model="showAddMenu">
+              <q-list>
+                <q-item clickable @click="addFilter('condition')">
+                  <q-item-section>{{
+                    t("common.addCondition")
+                  }}</q-item-section>
+                </q-item>
+                <q-item clickable @click="addFilter('group')">
+                  <q-item-section>{{ t("common.addGroup") }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
         </div>
         <div
           class="text-caption text-weight-bold text-center q-py-xs q-mt-xs"
