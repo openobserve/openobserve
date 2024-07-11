@@ -851,8 +851,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Erase Visualizations?"
-      message="Navigating away from this page will erase your current data visualizations and any unsaved changes. Are you sure you want to proceed?"
+      title="Reset Changes"
+      message="Navigating away from visualize will reset your changes. Are you sure you want to proceed?"
       @update:ok="changeLogsVisualizeToggle"
       @update:cancel="confirmLogsVisualizeModeChangeDialog = false"
       v-model="confirmLogsVisualizeModeChangeDialog"
