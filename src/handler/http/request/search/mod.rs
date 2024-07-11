@@ -221,6 +221,7 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
+ 
     // run search with cache
     let res = SearchService::cache::search(
         &trace_id,

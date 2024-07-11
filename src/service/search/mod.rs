@@ -144,7 +144,7 @@ pub async fn search(
 
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(&trace_id).await;
+    SEARCH_SERVER.remove(&trace_id, false).await;
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[org_id])
@@ -285,17 +285,11 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
-    let mut step = max(
-        Duration::try_seconds(cfg.limit.query_partition_min_secs)
-            .unwrap()
-            .num_microseconds()
-            .unwrap(),
-        (req.end_time - req.start_time) / part_num as i64,
-    );
-    // step must be times of minute
+    let mut step = (req.end_time - req.start_time) / part_num as i64;
+    // step must be times of second
     step = step
         - step
-            % Duration::try_minutes(1)
+            % Duration::try_seconds(1)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
