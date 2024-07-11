@@ -452,3 +452,34 @@ async fn publish_audit(
 ) -> Result<cluster_rpc::UsageResponse, anyhow::Error> {
     ingestion_service::ingest(&get_config().common.usage_org, req).await
 }
+
+#[inline]
+pub fn http_report_metrics(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    code: &str,
+    uri: &str,
+) {
+    let time = start.elapsed().as_secs_f64();
+    let uri = format!("/api/org/{}", uri);
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
+}

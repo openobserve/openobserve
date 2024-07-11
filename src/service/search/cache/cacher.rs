@@ -40,6 +40,7 @@ use crate::{
 )]
 #[allow(clippy::too_many_arguments)]
 pub async fn check_cache(
+    trace_id: &str,
     rpc_req: &proto::cluster_rpc::SearchRequest,
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
@@ -47,7 +48,6 @@ pub async fn check_cache(
     file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
-    trace_id: &str,
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
