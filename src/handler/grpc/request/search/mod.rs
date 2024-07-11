@@ -54,8 +54,12 @@ impl Searcher {
     }
 
     // remove the trace_id from the query_manager
-    pub async fn remove(&self, trace_id: &str) -> Option<(String, TaskStatus)> {
-        self.query_manager.remove(trace_id).await
+    pub async fn remove(
+        &self,
+        trace_id: &str,
+        to_cancel: bool,
+    ) -> Option<Vec<(String, TaskStatus)>> {
+        self.query_manager.remove(trace_id, to_cancel).await
     }
 
     // check is the trace_id in the query_manager and is_leader
@@ -157,7 +161,7 @@ impl Search for Searcher {
         // remove task
         #[cfg(feature = "enterprise")]
         if !O2_CONFIG.super_cluster.enabled && !self.is_leader(&trace_id).await {
-            self.remove(&trace_id).await;
+            self.remove(&trace_id, false).await;
         }
 
         match result {
@@ -240,7 +244,7 @@ impl Search for Searcher {
         // remove task
         #[cfg(feature = "enterprise")]
         if !self.is_leader(&trace_id).await {
-            self.remove(&trace_id).await;
+            self.remove(&trace_id, false).await;
         }
 
         metrics::QUERY_RUNNING_NUMS
@@ -300,14 +304,16 @@ impl Search for Searcher {
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
         let trace_id = req.into_inner().trace_id;
-        match self.remove(&trace_id).await {
-            Some((_, senders)) => {
-                for sender in senders.abort_senders.into_iter().rev() {
-                    let _ = sender.send(());
+        match self.remove(&trace_id, true).await {
+            Some(cancelled) => {
+                for (_, senders) in cancelled {
+                    for sender in senders.abort_senders.into_iter().rev() {
+                        let _ = sender.send(());
+                    }
+                    metrics::QUERY_CANCELED_NUMS
+                        .with_label_values(&[&senders.org_id.unwrap()])
+                        .inc();
                 }
-                metrics::QUERY_CANCELED_NUMS
-                    .with_label_values(&[&senders.org_id.unwrap()])
-                    .inc();
                 Ok(Response::new(CancelQueryResponse { is_success: true }))
             }
             None => Ok(Response::new(CancelQueryResponse { is_success: false })),
