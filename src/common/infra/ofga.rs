@@ -20,7 +20,9 @@ use {
     hashbrown::HashSet,
     infra::dist_lock,
     o2_enterprise::enterprise::openfga::{
-        authorizer::authz::{get_org_creation_tuples, get_user_role_tuple, update_tuples},
+        authorizer::authz::{
+            get_index_creation_tuples, get_org_creation_tuples, get_user_role_tuple, update_tuples,
+        },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     },
 };
@@ -56,18 +58,17 @@ pub async fn init() {
             o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
                 .insert("store_id".to_owned(), store_id);
 
-            if migrate_native_objects {
-                let mut tuples = vec![];
-                let r = infra::schema::STREAM_SCHEMAS.read().await;
-                let mut orgs = HashSet::new();
-                for key in r.keys() {
-                    if !key.contains('/') {
-                        continue;
-                    }
-                    let org_name = key.split('/').collect::<Vec<&str>>()[0];
-                    orgs.insert(org_name);
+            let mut tuples = vec![];
+            let r = infra::schema::STREAM_SCHEMAS.read().await;
+            let mut orgs = HashSet::new();
+            for key in r.keys() {
+                if !key.contains('/') {
+                    continue;
                 }
-
+                let org_name = key.split('/').collect::<Vec<&str>>()[0];
+                orgs.insert(org_name);
+            }
+            if migrate_native_objects {
                 for org_name in orgs {
                     get_org_creation_tuples(
                         org_name,
@@ -109,24 +110,30 @@ pub async fn init() {
                         get_user_role_tuple(&role, &user.email, &user.org, &mut tuples);
                     }
                 }
+            } else {
+                log::info!("Hello from migration index");
+                for org_name in orgs {
+                    get_index_creation_tuples(org_name, &mut tuples).await;
+                }
+            }
 
-                if tuples.is_empty() {
-                    log::info!("No orgs to update to the openfga");
-                } else {
-                    match update_tuples(tuples, vec![]).await {
-                        Ok(_) => {
-                            log::info!("Data migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "Error updating orgs & users to the openfga during migration: {}",
-                                e
-                            );
-                        }
+            if tuples.is_empty() {
+                log::info!("No orgs to update to the openfga");
+            } else {
+                log::info!("tuples not empty: {:#?}", tuples);
+                match update_tuples(tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("Data migrated to openfga");
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Error updating orgs & users to the openfga during migration: {}",
+                            e
+                        );
                     }
                 }
-                drop(r);
             }
+            drop(r);
         }
         Err(e) => {
             log::error!("Error setting OFGA model: {:?}", e);
