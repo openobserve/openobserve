@@ -29,7 +29,10 @@ use {
 
 #[cfg(feature = "enterprise")]
 pub async fn init() {
+    use o2_enterprise::enterprise::openfga::authorizer::authz::get_tuple_for_new_index;
+
     let mut migrate_native_objects = false;
+    let mut need_migrate_index_streams = false;
     let existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
@@ -43,6 +46,15 @@ pub async fn init() {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
             return;
+        }
+        // Check if ofga migration of index streams are needed
+        let meta_version = version_compare::Version::from(&meta.version).unwrap();
+        let existing_model_version =
+            version_compare::Version::from(&existing_model.version).unwrap();
+        let v0_0_4 = version_compare::Version::from("0.0.4").unwrap();
+        let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
+        if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
+            need_migrate_index_streams = true;
         }
     }
 
@@ -65,8 +77,16 @@ pub async fn init() {
                 if !key.contains('/') {
                     continue;
                 }
-                let org_name = key.split('/').collect::<Vec<&str>>()[0];
+                let key_splitted = key.split('/').collect::<Vec<&str>>();
+                let org_name = key_splitted[0];
                 orgs.insert(org_name);
+                if need_migrate_index_streams
+                    && key_splitted.len() > 2
+                    && key_splitted[1] == "index"
+                    && !migrate_native_objects
+                {
+                    get_tuple_for_new_index(org_name, key_splitted[2], &mut tuples);
+                }
             }
             if migrate_native_objects {
                 for org_name in orgs {
@@ -111,7 +131,6 @@ pub async fn init() {
                     }
                 }
             } else {
-                log::info!("Hello from migration index");
                 for org_name in orgs {
                     get_index_creation_tuples(org_name, &mut tuples).await;
                 }
@@ -120,7 +139,7 @@ pub async fn init() {
             if tuples.is_empty() {
                 log::info!("No orgs to update to the openfga");
             } else {
-                log::info!("tuples not empty: {:#?}", tuples);
+                log::debug!("tuples not empty: {:#?}", tuples);
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("Data migrated to openfga");

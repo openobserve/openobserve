@@ -69,7 +69,10 @@ use tokio::{
 };
 
 use crate::{
-    common::{infra::wal, meta::stream::SchemaRecords},
+    common::{
+        infra::wal,
+        meta::{authz::Authz, stream::SchemaRecords},
+    },
     job::files::idx::write_to_disk,
     service::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
@@ -747,6 +750,13 @@ pub(crate) async fn generate_index_on_ingester(
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
+
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            &StreamType::Index.to_string(),
+            Authz::new(&index_stream_name),
+        )
+        .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
         if get_config().common.inverted_index_old_format
