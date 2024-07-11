@@ -91,6 +91,7 @@ pub async fn search(
 
     let mut c_resp: CachedQueryResponse = if use_cache {
         check_cache(
+            trace_id,
             &rpc_req,
             &mut req,
             &mut origin_sql,
@@ -98,7 +99,6 @@ pub async fn search(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
-            trace_id,
         )
         .await
     } else {
@@ -214,10 +214,12 @@ pub async fn search(
         }
         if c_resp.has_cached_data {
             merge_response(
+                trace_id,
                 &mut c_resp.cached_response,
                 &results,
                 &c_resp.ts_column,
                 c_resp.limit,
+                c_resp.is_descending,
             );
             c_resp.cached_response
         } else {
@@ -289,10 +291,12 @@ pub async fn search(
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
 fn merge_response(
+    trace_id: &str,
     cache_response: &mut config::meta::search::Response,
     search_response: &Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
+    is_descending: bool,
 ) {
     if cache_response.hits.is_empty() && search_response.is_empty() {
         return;
@@ -313,7 +317,7 @@ fn merge_response(
     let cache_hits_len = cache_response.hits.len();
 
     let mut files_cache_ratio = 0;
-    let mut result_cache_ratio = 0;
+    let mut result_cache_len = 0;
     let cache_ts = if cache_response.hits.is_empty() {
         get_ts_value(
             ts_column,
@@ -329,13 +333,13 @@ fn merge_response(
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
 
-        result_cache_ratio += res.total;
+        result_cache_len += res.total;
 
         if res.hits.is_empty() {
             continue;
         }
         let search_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-        if search_ts < cache_ts {
+        if search_ts < cache_ts && is_descending {
             cache_response.hits.extend(res.hits.clone());
         } else {
             cache_response.hits = res
@@ -346,12 +350,27 @@ fn merge_response(
                 .collect();
         }
     }
+    if is_descending {
+        cache_response
+            .hits
+            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
+    } else {
+        cache_response
+            .hits
+            .sort_by_key(|a| get_ts_value(ts_column, a));
+    }
+
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
     }
     cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    log::info!(
+        "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
+        cache_hits_len,
+        result_cache_len,
+    );
     cache_response.result_cache_ratio =
-        (cache_hits_len as f64 * 100_f64 / (result_cache_ratio + cache_hits_len) as f64) as usize;
+        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
 }
 
 #[allow(clippy::too_many_arguments)]
