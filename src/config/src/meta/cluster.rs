@@ -17,6 +17,8 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
+use crate::{config, meta::search::SearchEventType};
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Node {
     pub id: i32,
@@ -31,6 +33,8 @@ pub struct Node {
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
+    #[serde(default)]
+    pub role_group: RoleGroup,
 }
 
 impl Node {
@@ -46,6 +50,7 @@ impl Node {
             status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
+            role_group: load_role_group(),
         }
     }
 }
@@ -103,4 +108,49 @@ impl std::fmt::Display for Role {
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
         }
     }
+}
+
+/// Categorizes nodes into different groups.
+/// None        -> All tasks
+/// Background  -> Low-priority tasks
+/// Interactive -> High-priority tasks
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub enum RoleGroup {
+    #[default]
+    None,
+    Interactive,
+    Background,
+}
+
+impl From<&str> for RoleGroup {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "background" => RoleGroup::Background,
+            "interactive" => RoleGroup::Interactive,
+            _ => RoleGroup::None,
+        }
+    }
+}
+
+impl From<SearchEventType> for RoleGroup {
+    fn from(value: SearchEventType) -> Self {
+        match value {
+            SearchEventType::Reports | SearchEventType::Alerts => RoleGroup::Background,
+            _ => RoleGroup::Interactive,
+        }
+    }
+}
+
+impl std::fmt::Display for RoleGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RoleGroup::None => write!(f, ""),
+            RoleGroup::Interactive => write!(f, "interactive"),
+            RoleGroup::Background => write!(f, "background"),
+        }
+    }
+}
+
+pub fn load_role_group() -> RoleGroup {
+    RoleGroup::from(config::get_config().common.node_role_group.as_str())
 }

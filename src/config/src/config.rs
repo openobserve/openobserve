@@ -492,6 +492,12 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
+    #[env_config(
+        name = "ZO_NODE_ROLE_GROUP",
+        default = "",
+        help = "Role group can be empty (default), interactive, or background"
+    )]
+    pub node_role_group: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
@@ -478,6 +478,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
             timeout: req.timeout,
             work_group: "".to_string(),
             user_id: None,
+            search_event_type: req.search_type.map(|event| event.to_string()),
         }
     }
 }
@@ -531,6 +532,23 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Other => write!(f, "Other"),
             SearchEventType::Values => write!(f, "_values"),
             SearchEventType::RUM => write!(f, "RUM"),
+        }
+    }
+}
+
+impl FromStr for SearchEventType {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let s = s.to_lowercase();
+        match s.as_str() {
+            "ui" => Ok(SearchEventType::UI),
+            "dashboards" => Ok(SearchEventType::Dashboards),
+            "reports" => Ok(SearchEventType::Reports),
+            "alerts" => Ok(SearchEventType::Alerts),
+            "values" => Ok(SearchEventType::Values),
+            "other" => Ok(SearchEventType::Other),
+            "rum" => Ok(SearchEventType::RUM),
+            _ => Err(format!("Invalid search event type: {s}")),
         }
     }
 }
