@@ -477,6 +477,53 @@
       </div>
       <div class="flex items-center q-mr-sm">
         <div
+          data-test="scheduled-alert-cron-toggle-title"
+          class="text-bold flex items-center"
+          style="width: 190px"
+        >
+          {{ t("alerts.crontitle") + " *" }}
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >Configure the option to enable a cron job for this alert.</span
+              >
+            </q-tooltip>
+          </q-icon>
+        </div>
+        <div style="min-height: 58px">
+          <div
+            class="flex items-center q-mr-sm"
+            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+          >
+            <div
+              data-test="scheduled-alert-cron-input"
+              style="width: 87px; margin-left: 0 !important"
+              class="silence-notification-input"
+            >
+              <q-toggle
+                data-test="scheduled-alert-cron-toggle-btn"
+                class="q-mt-sm"
+                v-model="triggerData.frequency_type"
+                :true-value="'cron'"
+                :false-value="'minutes'"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center q-mr-sm">
+        <div
           data-test="scheduled-alert-frequency-title"
           class="text-bold flex items-center"
           style="width: 190px"
@@ -493,12 +540,27 @@
             <q-tooltip
               anchor="center right"
               self="center left"
-              max-width="300px"
+              max-width="auto"
             >
-              <span style="font-size: 14px"
+              <span
+                style="font-size: 14px"
+                v-if="triggerData.frequency_type == 'minutes'"
                 >How often the alert should be evaluated.<br />
                 e.g. 2 minutes means that the query will be run every 2 minutes
                 and evaluated based on the other parameters provided.</span
+              >
+              <span style="font-size: 14px" v-else>
+                Pattern: * * * * * * means every second.
+                <br />
+                Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day
+                of Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0
+                and 7 for Sunday].
+                <br />
+                Use '*' to represent any value, 'L' for the last day/weekday.
+                <br />
+                Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
+                second, minute, hour, day of month, month, and day of week,
+                respectively.</span
               >
             </q-tooltip>
           </q-icon>
@@ -510,10 +572,16 @@
           >
             <div
               data-test="scheduled-alert-frequency-input"
-              style="width: 87px; margin-left: 0 !important"
+              :style="
+                triggerData.frequency_type == 'minutes'
+                  ? 'width: 87px; margin-left: 0 !important'
+                  : 'width: 180px !important'
+              "
               class="silence-notification-input"
             >
               <q-input
+                data-test="scheduled-alert-frequency-input-field"
+                v-if="triggerData.frequency_type == 'minutes'"
                 v-model="triggerData.frequency"
                 type="number"
                 dense
@@ -522,8 +590,18 @@
                 style="background: none"
                 @update:model-value="updateTrigger"
               />
+              <q-input
+                data-test="scheduled-alert-cron-input-field"
+                v-else
+                v-model="triggerData.cron"
+                dense
+                filled
+                style="background: none"
+                @update:model-value="updateTrigger"
+              />
             </div>
             <div
+              v-if="triggerData.frequency_type == 'minutes'"
               data-test="scheduled-alert-frequency-unit"
               style="
                 min-width: 90px;
@@ -539,7 +617,11 @@
           </div>
           <div
             data-test="scheduled-alert-frequency-error-text"
-            v-if="!Number(triggerData.frequency)"
+            v-if="
+              (!Number(triggerData.frequency) &&
+                triggerData.frequency_type == 'minutes') ||
+              (triggerData.frequency_type == 'cron' && triggerData.cron == '')
+            "
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
           >
