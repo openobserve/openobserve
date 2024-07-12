@@ -670,6 +670,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .tonic()
                 .with_endpoint(&cfg.common.otel_otlp_grpc_url)
                 .with_metadata(metadata)
+                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
         })
     };
     let tracer = tracer
