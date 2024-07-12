@@ -318,6 +318,30 @@ async fn move_files(
     };
     let stream_fields_num = latest_schema.fields().len();
 
+    // check stream is existing
+    if stream_fields_num == 0 {
+        for file in files {
+            log::warn!(
+                "[INGESTER:JOB:{thread_id}] the stream [{}/{}/{}] was deleted, just delete file: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                file.key,
+            );
+            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                log::error!(
+                    "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
+                    file.key,
+                    e
+                );
+            }
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            PROCESSING_FILES.write().await.remove(&file.key);
+        }
+        return Ok(());
+    }
+
     // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
     let wal_dir = wal_dir.clone();
