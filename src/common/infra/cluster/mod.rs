@@ -207,7 +207,6 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 
     for item in items {
         let node: Node = json::from_slice(&item)?;
-        log::debug!("node role group: {}", node.role_group);
         nodes.push(node.to_owned());
     }
 
