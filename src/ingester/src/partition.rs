@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs::create_dir_all,
+    path::PathBuf,
+    sync::Arc,
+};
 
 use arrow_schema::Schema;
 use config::{
@@ -36,6 +41,7 @@ use crate::{
 
 pub(crate) struct Partition {
     schema: Arc<Schema>,
+    schema_set: HashSet<String>, // use for quick check schema change
     files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
@@ -43,6 +49,7 @@ impl Partition {
     pub(crate) fn new() -> Self {
         Self {
             schema: Arc::new(Schema::empty()),
+            schema_set: HashSet::new(),
             files: BTreeMap::default(),
         }
     }
@@ -57,22 +64,47 @@ impl Partition {
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
 
-        let old_schema_size = self.schema.size();
-        let schema = batch.as_ref().map(|r| r.data.schema().as_ref().clone());
-        self.schema = Arc::new(
-            Schema::try_merge(vec![
-                self.schema.as_ref().clone(),
-                schema.unwrap_or(Schema::empty()),
-            ])
-            .context(MergeSchemaSnafu)?,
-        );
-        let new_schema_size = self.schema.size();
-
-        // update schema change
-        if old_schema_size != new_schema_size {
+        // handle unwrap
+        let schema = batch
+            .as_ref()
+            .map(|r| r.data.schema().as_ref().clone())
+            .unwrap();
+        let mut schema_size = 0;
+        if self.schema_set.is_empty() {
+            self.schema = Arc::new(schema);
+            self.schema_set = self
+                .schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_string())
+                .collect();
+            schema_size = self.schema.size();
+        } else {
+            let mut new_fields = Vec::new();
+            schema.fields().iter().for_each(|f| {
+                if !self.schema_set.contains(f.name()) {
+                    self.schema_set.insert(f.name().to_string());
+                    new_fields.push(f.clone());
+                }
+            });
+            if !new_fields.is_empty() {
+                let old_schema_size = self.schema.size();
+                let schema_fields = self
+                    .schema
+                    .fields()
+                    .iter()
+                    .cloned()
+                    .chain(new_fields)
+                    .collect::<Vec<_>>();
+                self.schema = Arc::new(Schema::new(schema_fields));
+                let new_schema_size = self.schema.size();
+                schema_size = new_schema_size - old_schema_size;
+            }
+        }
+        if schema_size != 0 {
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
-                .add(new_schema_size as i64 - old_schema_size as i64);
+                .add(schema_size as i64);
         }
 
         partition.write(batch)
