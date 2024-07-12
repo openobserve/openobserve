@@ -3181,12 +3181,16 @@ const useLogs = () => {
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
-        $q.notify({
-          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-          color: "positive",
-          position: "top",
-          timeout: 1000,
-        });
+
+        // only notify if user is in logs page
+        if(searchObj.meta.logsVisualizeToggle == "logs"){
+          $q.notify({
+            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            color: "positive",
+            position: "top",
+            timeout: 1000,
+          });
+        }
       } else {
         clearInterval(store.state.refreshIntervalID);
       }
