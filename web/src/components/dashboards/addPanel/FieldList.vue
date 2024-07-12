@@ -759,20 +759,6 @@ export default defineComponent({
         }
       }
     );
-    const selectedStreamForQueries: any = ref({});
-
-    // Watch for changes in the current query selected stream
-    watch(
-      () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-      (newStream) => {
-        selectedStreamForQueries.value[
-          dashboardPanelData.layout.currentQueryIndex
-        ] = newStream;
-      }
-    );
 
     watch(
       () => [
@@ -808,14 +794,18 @@ export default defineComponent({
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
           if (
-            selectedStreamForQueries.value[currentIndex] &&
             data.indexOptions.find(
               (it: any) =>
-                it.name == selectedStreamForQueries.value[currentIndex]
+                it.name ==
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
-              selectedStreamForQueries.value[currentIndex];
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream;
           } else {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
               data.indexOptions[0]?.name;

@@ -467,32 +467,38 @@ export default defineComponent({
     // });
 
     onActivated(async () => {
-      const queryParams: any = router.currentRoute.value.query;
+      // if search tab
+      if (searchObj.meta.logsVisualizeToggle == "logs") {
+        const queryParams: any = router.currentRoute.value.query;
 
-      const isStreamChanged =
-        queryParams.stream_type !== searchObj.data.stream.streamType ||
-        queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
+        const isStreamChanged =
+          queryParams.stream_type !== searchObj.data.stream.streamType ||
+          queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
-      if (
-        isStreamChanged &&
-        queryParams.type === "stream_explorer" &&
-        searchObj.loading == false
-      ) {
-        resetSearchObj();
-        resetStreamData();
-        restoreUrlQueryParams();
-        // loadLogsData();
-        return;
+        if (
+          isStreamChanged &&
+          queryParams.type === "stream_explorer" &&
+          searchObj.loading == false
+        ) {
+          resetSearchObj();
+          resetStreamData();
+          restoreUrlQueryParams();
+          // loadLogsData();
+          return;
+        }
+
+        if (
+          searchObj.organizationIdetifier !=
+          store.state.selectedOrganization.identifier
+        ) {
+          loadLogsData();
+        } else if (!searchObj.loading) updateStreams();
+
+        refreshHistogramChart();
+      } else {
+        // visualize tab
+        handleRunQueryFn();
       }
-
-      if (
-        searchObj.organizationIdetifier !=
-        store.state.selectedOrganization.identifier
-      ) {
-        loadLogsData();
-      } else if (!searchObj.loading) updateStreams();
-
-      refreshHistogramChart();
     });
 
     onBeforeMount(async () => {
