@@ -503,26 +503,27 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+      if (searchObj.meta.logsVisualizeToggle == "logs") {
+        searchObj.loading = true;
+        searchObj.meta.pageType = "logs";
+        if (
+          config.isEnterprise == "true" &&
+          store.state.zoConfig.super_cluster_enabled
+        ) {
+          await getRegionInfo();
+        }
 
-      searchObj.loading = true;
-      searchObj.meta.pageType = "logs";
-      if (
-        config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
-      ) {
-        await getRegionInfo();
+        resetSearchObj();
+        resetStreamData();
+        searchObj.organizationIdetifier =
+          store.state.selectedOrganization.identifier;
+        restoreUrlQueryParams();
+        loadLogsData();
+        if (config.isCloud == "true") {
+          MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
+        }
+        searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
       }
-
-      resetSearchObj();
-      resetStreamData();
-      searchObj.organizationIdetifier =
-        store.state.selectedOrganization.identifier;
-      restoreUrlQueryParams();
-      loadLogsData();
-      if (config.isCloud == "true") {
-        MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
-      }
-      searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
     });
 
     /**
