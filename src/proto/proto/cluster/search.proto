@@ -88,6 +88,12 @@ message QueryStatus {
     optional string   stream_type = 7;
     optional Query          query = 8;
     optional ScanStats scan_stats = 9;
+    optional WorkGroup work_group = 10;
+}
+
+enum WorkGroup{
+    SHORT = 0;
+    LONG = 1;
 }
 
 message Query {
