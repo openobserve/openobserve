@@ -235,6 +235,7 @@ import { toRefs } from "vue";
 import { inject } from "vue";
 import { computed } from "vue";
 import { isEqual } from "lodash-es";
+import { onActivated } from "vue";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -390,6 +391,10 @@ export default defineComponent({
     const addPanelToDashboard = () => {
       showAddToDashboardDialog.value = false;
     };
+
+    onActivated(() => {
+      dashboardPanelData.layout.querySplitter = 20;
+    });
 
     return {
       t,
