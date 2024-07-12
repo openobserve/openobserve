@@ -52,7 +52,7 @@ use crate::{
     service::format_partition_key,
 };
 
-pub mod cache;
+pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -212,7 +212,7 @@ pub async fn search(
     }
 }
 
-#[tracing::instrument(name = "service:search_partition:enter", skip(req))]
+#[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
@@ -656,7 +656,7 @@ pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }
 
-#[tracing::instrument(name = "service:search_partition_multi:enter", skip(req))]
+#[tracing::instrument(name = "service:search_partition_multi", skip(req))]
 pub async fn search_partition_multi(
     trace_id: &str,
     org_id: &str,

@@ -52,7 +52,7 @@ use crate::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:parquet", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
     trace_id: &str,
     sql: Arc<Sql>,
@@ -386,7 +386,7 @@ pub async fn search_parquet(
 }
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:mem:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:memtable", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_memtable(
     trace_id: &str,
     sql: Arc<Sql>,

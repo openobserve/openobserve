@@ -77,14 +77,10 @@ pub(crate) fn get_search_type_from_request(
 
 #[inline(always)]
 pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>) -> bool {
-    match query.get("use_cache") {
-        Some(s) => match s.to_lowercase().as_str() {
-            "true" => true,
-            "false" => false,
-            _ => true,
-        },
-        None => true,
-    }
+    let Some(v) = query.get("use_cache") else {
+        return true;
+    };
+    v.to_lowercase().as_str().parse::<bool>().unwrap_or(true)
 }
 
 #[inline(always)]
