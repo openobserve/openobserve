@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Trace Details
           </div>
 
+          <!-- TODO OK: Create component for this usecase multi select with button -->
           <div class="o2-input flex items-center trace-logs-selector">
             <q-select
               data-test="log-search-index-list-select-stream"

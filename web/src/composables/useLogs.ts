@@ -130,6 +130,7 @@ const defaultObject = {
     clusters: [],
     useUserDefinedSchemas: "user_defined_schema",
     hasUserDefinedSchemas: false,
+    selectedTraceStream: "",
   },
   data: {
     query: <any>"",

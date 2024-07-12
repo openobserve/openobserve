@@ -522,9 +522,9 @@ export default defineComponent({
           queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
         if (queryParams.type === "trace_explorer") {
-          searchObj.organizationIdetifier = "";
-          searchObj.data.stream.selectedStream.value = "";
-          searchObj.data.stream.streamType = "";
+          searchObj.organizationIdetifier = queryParams.org_identifier;
+          searchObj.data.stream.selectedStream.value = queryParams.stream;
+          searchObj.data.stream.streamType = queryParams.stream_type;
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();

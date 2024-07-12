@@ -722,18 +722,29 @@ export default defineComponent({
       const to = log[store.state.zoConfig.timestamp_column] + 900000000;
       const refresh = 0;
 
-      router.push({
-        path: "/traces",
+      const query: any = {
+        name: "traceDetails",
         query: {
-          stream: "default",
+          stream: searchObj.meta.selectedTraceStream,
           from,
           to,
           refresh,
           org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: log.trace_id,
+          trace_id:
+            log[
+              store.state.organizationData.organizationSettings
+                .trace_id_field_name
+            ],
           reload: "true",
         },
-      });
+      };
+
+      query["span_id"] =
+        log[
+          store.state.organizationData.organizationSettings.span_id_field_name
+        ];
+
+      router.push(query);
     };
 
     return {
