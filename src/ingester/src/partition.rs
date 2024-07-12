@@ -64,21 +64,20 @@ impl Partition {
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
 
-        // handle unwrap
         let schema = batch
             .as_ref()
-            .map(|r| r.data.schema().as_ref().clone())
-            .unwrap();
-        let mut schema_size = 0;
+            .map(|r| r.data.schema().clone())
+            .unwrap_or(Schema::empty().into());
+        let mut schema_change_size = 0;
         if self.schema_set.is_empty() {
-            self.schema = Arc::new(schema);
+            self.schema = schema.clone();
             self.schema_set = self
                 .schema
                 .fields()
                 .iter()
                 .map(|f| f.name().to_string())
                 .collect();
-            schema_size = self.schema.size();
+            schema_change_size = self.schema.size();
         } else {
             let mut new_fields = Vec::new();
             schema.fields().iter().for_each(|f| {
@@ -98,13 +97,13 @@ impl Partition {
                     .collect::<Vec<_>>();
                 self.schema = Arc::new(Schema::new(schema_fields));
                 let new_schema_size = self.schema.size();
-                schema_size = new_schema_size - old_schema_size;
+                schema_change_size = new_schema_size - old_schema_size;
             }
         }
-        if schema_size != 0 {
+        if schema_change_size != 0 {
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
-                .add(schema_size as i64);
+                .add(schema_change_size as i64);
         }
 
         partition.write(batch)
