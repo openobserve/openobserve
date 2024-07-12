@@ -359,7 +359,7 @@ export default {
 
     .q-btn__content {
       span {
-        font-size: 10px;
+        font-size: 11px;
         color: #343434;
       }
     }
