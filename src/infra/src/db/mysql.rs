@@ -228,7 +228,7 @@ impl super::Db for MysqlDb {
             }
         } else {
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY id DESC;"#
             )
             .bind(&module)
             .bind(&key1)

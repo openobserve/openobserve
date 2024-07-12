@@ -33,8 +33,14 @@ use crate::{
     },
 };
 
+#[tracing::instrument(
+    name = "service:search:cache:cacher:check_cache",
+    skip_all,
+    fields(org_id = rpc_req.org_id)
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn check_cache(
+    trace_id: &str,
     rpc_req: &proto::cluster_rpc::SearchRequest,
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
@@ -42,7 +48,6 @@ pub async fn check_cache(
     file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
-    trace_id: &str,
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -204,13 +209,15 @@ pub async fn get_cached_results(
             .iter()
             .filter(|cache_meta| {
                 // to make sure there is overlap between cache time range and query time range
-
+                log::info!(
+                "[CACHE CANDIDATES {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                cache_meta.start_time ,
+                cache_meta.end_time);
                 cache_meta.start_time <= cache_req.q_end_time
                     && cache_meta.end_time >= cache_req.q_start_time
             })
             .max_by_key(|result| {
-                result.end_time.min(cache_req.q_end_time)
-                    - result.start_time.max(cache_req.q_start_time)
+                result.end_time -result.start_time
             }) {
             Some(matching_meta) => {
                 let file_name = format!(
@@ -281,7 +288,7 @@ pub async fn get_cached_results(
                         };
 
                         log::info!(
-                            "[trace_id {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
+                            "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
                             query_key,
                             matching_cache_meta.start_time,
                             matching_cache_meta.end_time

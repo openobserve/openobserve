@@ -583,6 +583,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 }
 
 pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64) -> Option<usize> {
+    let versions = schemas.len();
     for (i, schema) in schemas.iter().enumerate() {
         let metadata = schema.metadata();
         let schema_end_dt: i64 = metadata
@@ -590,11 +591,15 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
             .unwrap_or(&"0".to_string())
             .parse()
             .unwrap();
-        if schema_end_dt == 0 || end_dt < schema_end_dt {
+        if end_dt < schema_end_dt {
             return Some(i);
         }
     }
-    None
+    if versions > 0 {
+        Some(versions - 1)
+    } else {
+        None
+    }
 }
 
 pub async fn list_organizations_from_cache() -> Vec<String> {

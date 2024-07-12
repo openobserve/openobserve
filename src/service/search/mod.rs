@@ -52,7 +52,7 @@ use crate::{
     service::format_partition_key,
 };
 
-pub mod cache;
+pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -144,7 +144,7 @@ pub async fn search(
 
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(&trace_id).await;
+    SEARCH_SERVER.remove(&trace_id, false).await;
 
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[org_id])
@@ -212,7 +212,7 @@ pub async fn search(
     }
 }
 
-#[tracing::instrument(name = "service:search_partition:enter", skip(req))]
+#[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
@@ -285,17 +285,11 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
-    let mut step = max(
-        Duration::try_seconds(cfg.limit.query_partition_min_secs)
-            .unwrap()
-            .num_microseconds()
-            .unwrap(),
-        (req.end_time - req.start_time) / part_num as i64,
-    );
-    // step must be times of minute
+    let mut step = (req.end_time - req.start_time) / part_num as i64;
+    // step must be times of second
     step = step
         - step
-            % Duration::try_minutes(1)
+            % Duration::try_seconds(1)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
@@ -662,7 +656,7 @@ pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }
 
-#[tracing::instrument(name = "service:search_partition_multi:enter", skip(req))]
+#[tracing::instrument(name = "service:search_partition_multi", skip(req))]
 pub async fn search_partition_multi(
     trace_id: &str,
     org_id: &str,
