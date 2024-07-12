@@ -56,7 +56,6 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
     use_cache: bool,
-    search_type: Option<SearchEventType>,
 ) -> Result<search::Response, Error> {
     let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
@@ -241,7 +240,7 @@ pub async fn search(
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
         cached_ratio: Some(res.cached_ratio),
-        search_type,
+        search_type: req.search_type,
         trace_id: Some(trace_id.to_string()),
         took_wait_in_queue: if res.took_detail.is_some() {
             let resp_took = res.took_detail.as_ref().unwrap();

@@ -91,10 +91,11 @@ pub async fn search(
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     if let Some(search_event_type) = req.search_event_type.clone() {
         nodes.retain(|node| {
-            SearchEventType::from_str(search_event_type.as_str())
-                .map_or(true, |search_event_type| {
-                    RoleGroup::from(search_event_type) == node.role_group
-                })
+            node.role_group == RoleGroup::None
+                || SearchEventType::from_str(search_event_type.as_str())
+                    .map_or(true, |search_event_type| {
+                        RoleGroup::from(search_event_type) == node.role_group
+                    })
         });
     }
     nodes.sort_by_key(|x| x.id);

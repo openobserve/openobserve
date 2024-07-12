@@ -494,8 +494,8 @@ pub struct Common {
     pub node_role: String,
     #[env_config(
         name = "ZO_NODE_ROLE_GROUP",
-        default = "interactive",
-        help = "Role group can be either interactive (default) or background"
+        default = "",
+        help = "Role group can be empty (default), interactive, or background"
     )]
     pub node_role_group: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]

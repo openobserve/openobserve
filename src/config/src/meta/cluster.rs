@@ -111,11 +111,13 @@ impl std::fmt::Display for Role {
 }
 
 /// Categorizes nodes into different groups.
-/// Low-priority tasks -> [Background] nodes
-/// High-priority tasks -> [Interactive] nodes
+/// None        -> All tasks
+/// Background  -> Low-priority tasks
+/// Interactive -> High-priority tasks
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum RoleGroup {
     #[default]
+    None,
     Interactive,
     Background,
 }
@@ -124,7 +126,8 @@ impl From<&str> for RoleGroup {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "background" => RoleGroup::Background,
-            _ => RoleGroup::Interactive,
+            "interactive" => RoleGroup::Interactive,
+            _ => RoleGroup::None,
         }
     }
 }
@@ -141,6 +144,7 @@ impl From<SearchEventType> for RoleGroup {
 impl std::fmt::Display for RoleGroup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            RoleGroup::None => write!(f, ""),
             RoleGroup::Interactive => write!(f, "interactive"),
             RoleGroup::Background => write!(f, "background"),
         }
