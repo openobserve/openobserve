@@ -29,7 +29,7 @@ use config::{
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::{format_recordbatch_by_schema, merge_record_batches},
+        record_batch_ext::merge_record_batches,
         schema_ext::SchemaExt,
     },
     FILE_EXT_PARQUET,
@@ -1138,22 +1138,14 @@ pub async fn merge_parquet_files(
     // create new schema with the shared fields
     let schema = Arc::new(schema.retain(shared_fields));
 
-    // format recordbatch
-    let record_batches = record_batches
-        .into_iter()
-        .map(|b| format_recordbatch_by_schema(schema.clone(), b))
-        .collect::<Vec<_>>();
-
     // merge record batches, the record batch have same schema
-    let record_batches = record_batches.iter().collect::<Vec<_>>();
     let (schema, new_record_batches) =
-        merge_record_batches("MERGE", thread_id, schema, &record_batches)?;
-    drop(record_batches);
+        merge_record_batches("MERGE", thread_id, schema, record_batches)?;
 
     log::info!(
         "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, new_record_batches))
+    Ok((schema, vec![new_record_batches]))
 }

@@ -180,7 +180,7 @@ impl Writer {
         let (entry_bytes, entry_batch) = if !check_ttl {
             let bytes = entry.into_bytes()?;
             let batch = entry.into_batch(self.key.stream_type.clone(), schema.clone())?;
-            (bytes, batch)
+            (bytes, Some(batch))
         } else {
             (Vec::new(), None)
         };
@@ -242,6 +242,9 @@ impl Writer {
             // write into wal
             wal.write(&entry_bytes, false).context(WalSnafu)?;
             // write into memtable
+            let Some(entry_batch) = entry_batch else {
+                return Ok(());
+            };
             mem.write(schema, entry, entry_batch)?;
         }
 

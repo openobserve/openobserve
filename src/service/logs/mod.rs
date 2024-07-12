@@ -228,7 +228,7 @@ async fn write_logs(
 
     // start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let schema_evolution = check_for_schema(
+    let (schema_evolution, infer_schema) = check_for_schema(
         org_id,
         stream_name,
         StreamType::Logs,
@@ -239,14 +239,20 @@ async fn write_logs(
     .await?;
 
     // get schema
-    let rec_schema = stream_schema_map
+    let latest_schema = stream_schema_map
         .get(stream_name)
         .unwrap()
         .schema()
         .clone()
         .with_metadata(HashMap::new());
-    let rec_schema = Arc::new(rec_schema);
-    let schema_key = rec_schema.hash_key();
+    let schema_key = latest_schema.hash_key();
+    // use latest schema as schema key
+    // use inferred schema as record schema
+    let rec_schema = match infer_schema {
+        // use latest_schema's datetype for record schema
+        Some(schema) => Arc::new(schema.cloned_from(&latest_schema)),
+        None => Arc::new(latest_schema),
+    };
 
     let mut distinct_values = Vec::with_capacity(16);
 

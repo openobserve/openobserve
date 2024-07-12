@@ -100,17 +100,17 @@ impl Entry {
         &self,
         stream_type: Arc<str>,
         schema: Arc<Schema>,
-    ) -> Result<Option<Arc<RecordBatchEntry>>> {
+    ) -> Result<Arc<RecordBatchEntry>> {
         let batch =
             convert_json_to_record_batch(&schema, &self.data).context(ArrowJsonEncodeSnafu)?;
 
         let arrow_size = batch.size();
-        Ok(Some(RecordBatchEntry::new(
+        Ok(RecordBatchEntry::new(
             stream_type,
             batch,
             self.data_size,
             arrow_size,
-        )))
+        ))
     }
 }
 

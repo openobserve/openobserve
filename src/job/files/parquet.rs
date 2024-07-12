@@ -142,7 +142,9 @@ async fn scan_wal_files(
         )
         .await
         {
-            log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
+            if !e.to_string().contains("No such file or directory") {
+                log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
+            }
         }
     });
     let mut files_num = 0;
@@ -971,11 +973,9 @@ async fn prepare_index_record_batches(
         batches.remove(0)
     } else {
         let schema = batches.first().unwrap().schema();
-        let batches = batches.iter().collect::<Vec<_>>();
-        concat_batches(schema, &batches)
+        concat_batches(schema, batches)
             .map_err(|e| anyhow::anyhow!("concat_batches error: {}", e))?
     };
-    drop(batches);
 
     let mut null_columns = 0;
     for i in 0..new_batch.num_columns() {
