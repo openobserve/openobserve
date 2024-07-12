@@ -17,7 +17,7 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search::{self, SearchEventType},
+        search,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
