@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, io::Cursor, sync::Arc};
+use std::{cmp::min, io::Cursor, str::FromStr, sync::Arc};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, record_batch::RecordBatch};
 use async_recursion::async_recursion;
@@ -21,8 +21,8 @@ use config::{
     cluster::{is_ingester, is_querier},
     get_config,
     meta::{
-        cluster::{Node, Role},
-        search::{self, ScanStats},
+        cluster::{Node, Role, RoleGroup},
+        search::{self, ScanStats, SearchEventType},
         stream::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
@@ -89,6 +89,15 @@ pub async fn search(
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    if let Some(search_event_type) = req.search_event_type.clone() {
+        nodes.retain(|node| {
+            node.role_group == RoleGroup::None
+                || SearchEventType::from_str(search_event_type.as_str())
+                    .map_or(true, |search_event_type| {
+                        RoleGroup::from(search_event_type) == node.role_group
+                    })
+        });
+    }
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 

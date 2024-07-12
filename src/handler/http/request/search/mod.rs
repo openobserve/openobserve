@@ -146,11 +146,6 @@ pub async fn search(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let search_type = match get_search_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
-
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -160,6 +155,12 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+
+    // set search event type
+    req.search_type = match get_search_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
 
     // get stream name
     let parsed_sql = match config::meta::sql::Sql::new(&req.query.sql) {
@@ -231,7 +232,6 @@ pub async fn search(
         Some(user_id),
         &req,
         use_cache,
-        search_type,
     )
     .instrument(http_span)
     .await;
