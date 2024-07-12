@@ -384,6 +384,7 @@ pub struct QueryStatus {
     pub status: String,
     pub created_at: i64,
     pub started_at: i64,
+    pub work_group: String,
     pub user_id: Option<String>,
     pub org_id: Option<String>,
     pub stream_type: Option<String>,

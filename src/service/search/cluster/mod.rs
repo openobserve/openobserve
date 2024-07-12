@@ -165,6 +165,10 @@ pub async fn search(
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
         o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list),
     );
+    #[cfg(feature = "enterprise")]
+    super::SEARCH_SERVER
+        .add_work_group(trace_id, work_group.clone())
+        .await;
     // 2. check concurrency
     let work_group_str = if let Some(wg) = &work_group {
         wg.to_string()
