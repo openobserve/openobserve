@@ -438,6 +438,13 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "processing"
         };
+        let work_group = if result.work_group.is_none() {
+            "Unknown"
+        } else if *result.work_group.as_ref().unwrap() == 0 {
+            "Short"
+        } else {
+            "Long"
+        };
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -448,6 +455,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             stream_type: result.stream_type,
             query,
             scan_stats,
+            work_group: work_group.to_string(),
         });
     }
 
