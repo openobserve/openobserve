@@ -25,7 +25,7 @@ use config::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
-    QUICK_MODEL_FIELDS,
+    QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -342,7 +342,7 @@ impl Sql {
             };
             if !time_range_sql.is_empty()
                 && meta_time_range_is_empty
-                && stream_type != StreamType::Index
+                && req_query.size > QUERY_WITH_NO_LIMIT
             {
                 match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
                     Some(caps) => {
@@ -393,7 +393,7 @@ impl Sql {
         }
 
         // Hack offset limit and sort by for sql
-        if meta.limit == 0 && stream_type != StreamType::Index {
+        if meta.limit == 0 && req_query.size > QUERY_WITH_NO_LIMIT {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
             meta.limit = if req_query.size >= 0 {
@@ -912,54 +912,23 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
     }
 
     let intervals = [
-        (
-            Duration::try_hours(24 * 30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "1 day",
-        ),
-        (
-            Duration::try_hours(24 * 7)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "1 hour",
-        ),
-        (
-            Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
-            "30 minute",
-        ),
-        (
-            Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
-            "5 minute",
-        ),
-        (
-            Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
-            "1 minute",
-        ),
-        (
-            Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
-            "30 second",
-        ),
-        (
-            Duration::try_minutes(30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "15 second",
-        ),
-        (
-            Duration::try_minutes(15)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-            "10 second",
-        ),
+        (Duration::try_hours(24 * 60), "1 day"),
+        (Duration::try_hours(24 * 30), "12 hour"),
+        (Duration::try_hours(24 * 28), "6 hour"),
+        (Duration::try_hours(24 * 21), "3 hour"),
+        (Duration::try_hours(24 * 14), "2 hour"),
+        (Duration::try_hours(24 * 7), "1 hour"),
+        (Duration::try_hours(24), "30 minute"),
+        (Duration::try_hours(6), "5 minute"),
+        (Duration::try_hours(2), "1 minute"),
+        (Duration::try_hours(1), "30 second"),
+        (Duration::try_minutes(30), "15 second"),
+        (Duration::try_minutes(15), "10 second"),
     ];
-    for interval in intervals.iter() {
-        if (time_range.1 - time_range.0) >= interval.0 {
-            return interval.1.to_string();
+    for (time, interval) in intervals.iter() {
+        let time = time.unwrap().num_microseconds().unwrap();
+        if (time_range.1 - time_range.0) >= time {
+            return interval.to_string();
         }
     }
     "10 second".to_string()

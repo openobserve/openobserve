@@ -64,6 +64,7 @@ pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
+pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
@@ -491,6 +492,12 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
+    #[env_config(
+        name = "ZO_NODE_ROLE_GROUP",
+        default = "",
+        help = "Role group can be empty (default), interactive, or background"
+    )]
+    pub node_role_group: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
@@ -774,8 +781,6 @@ pub struct Limit {
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
     pub query_partition_by_secs: usize,
-    #[env_config(name = "ZO_QUERY_PARTITION_MIN_SECS", default = 600)] // seconds
-    pub query_partition_min_secs: i64,
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
@@ -1471,9 +1476,6 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_partition_by_secs == 0 {
         cfg.limit.query_partition_by_secs = 30;
-    }
-    if cfg.limit.query_partition_min_secs == 0 {
-        cfg.limit.query_partition_min_secs = 600;
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;

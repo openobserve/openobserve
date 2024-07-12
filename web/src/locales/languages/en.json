@@ -379,6 +379,7 @@
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
     "labelTraces": "Traces",
+    "labelMetadata": "Metadata",
     "labelIndex": "Index",
     "add": "Add Stream",
     "dataRetention": "Data Retention (in days)",

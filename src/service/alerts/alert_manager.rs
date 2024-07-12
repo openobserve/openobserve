@@ -153,6 +153,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     let mut trigger_data_stream = TriggerData {
+        _timestamp: trigger.start_time.unwrap_or_default(),
         org: trigger.org,
         module: TriggerDataType::Alert,
         key: trigger.module_key.clone(),
@@ -315,6 +316,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     }
 
     let mut trigger_data_stream = TriggerData {
+        _timestamp: trigger.start_time.unwrap_or_default(),
         org: trigger.org.clone(),
         module: TriggerDataType::Report,
         key: trigger.module_key.clone(),

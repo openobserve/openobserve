@@ -113,6 +113,7 @@ pub async fn get_from_db(
     })
 }
 
+#[tracing::instrument(name = "infra:schema:get_versions", skip_all)]
 pub async fn get_versions(
     org_id: &str,
     stream_name: &str,

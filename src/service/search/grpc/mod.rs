@@ -29,7 +29,7 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
-use tracing::{info_span, Instrument};
+use tracing::Instrument;
 
 use super::{datafusion, sql::Sql};
 use crate::service::db;
@@ -77,43 +77,31 @@ pub async fn search(
     let work_group1 = work_group.clone();
     let trace_id1 = trace_id.clone();
     let sql1 = sql.clone();
-    let wal_parquet_span = info_span!(
-        "service:search:grpc:in_wal_parquet",
-        org_id = sql.org_id,
-        stream_name = sql.stream_name,
-        stream_type = stream_type.to_string(),
-    );
-    let task1 = tokio::task::spawn(
-        async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
-                wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout).await
-            } else {
-                Ok((HashMap::new(), ScanStats::default()))
-            }
+    let wal_parquet_span = tracing::span::Span::current();
+    let task1 = tokio::task::spawn(async move {
+        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
+            wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout)
+                .instrument(wal_parquet_span)
+                .await
+        } else {
+            Ok((HashMap::new(), ScanStats::default()))
         }
-        .instrument(wal_parquet_span),
-    );
+    });
 
     // search in WAL memory
     let work_group2 = work_group.clone();
     let trace_id2 = trace_id.clone();
     let sql2 = sql.clone();
-    let wal_mem_span = info_span!(
-        "service:search:grpc:in_wal_memory",
-        org_id = sql.org_id,
-        stream_name = sql.stream_name,
-        stream_type = stream_type.to_string(),
-    );
-    let task2 = tokio::task::spawn(
-        async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
-                wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout).await
-            } else {
-                Ok((HashMap::new(), ScanStats::default()))
-            }
+    let wal_mem_span = tracing::span::Span::current();
+    let task2 = tokio::task::spawn(async move {
+        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
+            wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout)
+                .instrument(wal_mem_span)
+                .await
+        } else {
+            Ok((HashMap::new(), ScanStats::default()))
         }
-        .instrument(wal_mem_span),
-    );
+    });
 
     // search in object storage
     let req_stype = req.stype;
@@ -121,30 +109,23 @@ pub async fn search(
     let trace_id3 = trace_id.clone();
     let sql3 = sql.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-    let storage_span = info_span!(
-        "service:search:grpc:in_storage",
-        org_id = sql.org_id,
-        stream_name = sql.stream_name,
-        stream_type = stream_type.to_string(),
-    );
-    let task3 = tokio::task::spawn(
-        async move {
-            if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
-                Ok((HashMap::new(), ScanStats::default()))
-            } else {
-                storage::search(
-                    &trace_id3,
-                    sql3,
-                    &file_list,
-                    stream_type,
-                    &work_group3,
-                    timeout,
-                )
-                .await
-            }
+    let storage_span = tracing::span::Span::current();
+    let task3 = tokio::task::spawn(async move {
+        if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
+            Ok((HashMap::new(), ScanStats::default()))
+        } else {
+            storage::search(
+                &trace_id3,
+                sql3,
+                &file_list,
+                stream_type,
+                &work_group3,
+                timeout,
+            )
+            .instrument(storage_span)
+            .await
         }
-        .instrument(storage_span),
-    );
+    });
 
     // merge result
     let mut results = HashMap::new();

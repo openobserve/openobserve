@@ -19,7 +19,7 @@ use config::{
     cluster::*,
     get_config, get_instance_id,
     meta::{
-        cluster::{Node, NodeStatus, Role},
+        cluster::{load_role_group, Node, NodeStatus, Role},
         meta_store::MetaStore,
     },
     utils::{hash::Sum64, json},
@@ -390,6 +390,7 @@ pub fn load_local_mode_node() -> Node {
         status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,
+        role_group: load_role_group(),
     }
 }
 

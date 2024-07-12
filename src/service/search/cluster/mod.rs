@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, io::Cursor, sync::Arc};
+use std::{cmp::min, io::Cursor, str::FromStr, sync::Arc};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, record_batch::RecordBatch};
 use async_recursion::async_recursion;
@@ -21,15 +21,15 @@ use config::{
     cluster::{is_ingester, is_querier},
     get_config,
     meta::{
-        cluster::{Node, Role},
-        search::{self, ScanStats},
+        cluster::{Node, Role, RoleGroup},
+        search::{self, ScanStats, SearchEventType},
         stream::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
     metrics,
     utils::{inverted_index::split_token, json},
-    INDEX_FIELD_NAME_FOR_ALL,
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -89,6 +89,15 @@ pub async fn search(
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    if let Some(search_event_type) = req.search_event_type.clone() {
+        nodes.retain(|node| {
+            node.role_group == RoleGroup::None
+                || SearchEventType::from_str(search_event_type.as_str())
+                    .map_or(true, |search_event_type| {
+                        RoleGroup::from(search_event_type) == node.role_group
+                    })
+        });
+    }
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
@@ -996,8 +1005,8 @@ async fn get_file_list_by_inverted_index(
     idx_req.stream_type = StreamType::Index.to_string();
     idx_req.query.as_mut().unwrap().sql = query;
     idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
-    idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
-    idx_req.query.as_mut().unwrap().size = -1;
+    idx_req.query.as_mut().unwrap().from = 0;
+    idx_req.query.as_mut().unwrap().size = QUERY_WITH_NO_LIMIT;
     idx_req.query.as_mut().unwrap().uses_zo_fn = false;
     idx_req.query.as_mut().unwrap().track_total_hits = false;
     idx_req.query.as_mut().unwrap().query_context = "".to_string();

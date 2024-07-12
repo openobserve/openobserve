@@ -57,11 +57,11 @@ pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 7] = [
     },
     ZoFunction {
         name: MATCH_UDF_NAME,
-        text: "match_all('v')",
+        text: "str_match(field, 'v')",
     },
     ZoFunction {
         name: MATCH_UDF_IGNORE_CASE_NAME,
-        text: "match_all_ignore_case('v')",
+        text: "str_match_ignore_case(field, 'v')",
     },
     ZoFunction {
         name: REGEX_MATCH_UDF_NAME,

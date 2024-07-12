@@ -2338,7 +2338,7 @@ dependencies = [
  "proto",
  "rand",
  "regex",
- "reqwest 0.12.4",
+ "reqwest 0.11.27",
  "segment",
  "serde",
  "serde_json",
@@ -5508,7 +5508,7 @@ dependencies = [
  "regex",
  "regex-syntax 0.8.4",
  "report_server",
- "reqwest 0.12.4",
+ "reqwest 0.11.27",
  "rust-embed-for-web",
  "segment",
  "serde",
@@ -6578,6 +6578,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "rustls 0.21.12",
+ "rustls-native-certs 0.6.3",
  "rustls-pemfile 1.0.4",
  "serde",
  "serde_json",
@@ -6586,10 +6587,12 @@ dependencies = [
  "system-configuration",
  "tokio",
  "tokio-rustls 0.24.1",
+ "tokio-util",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots 0.25.4",
  "winreg 0.50.0",
@@ -6636,7 +6639,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
- "webpki-roots 0.26.2",
  "winreg 0.52.0",
 ]
 
@@ -7073,12 +7075,12 @@ dependencies = [
 
 [[package]]
 name = "segment"
-version = "0.2.4"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bdca318192c89bb31bffa2ef8e9e9898bc80f15a78db2fdd41cd051f1b41d01"
+checksum = "12485833e00457a6bbba60397d3f19362751a0caefe27f6755fff1a2be4fd601"
 dependencies = [
  "async-trait",
- "reqwest 0.12.4",
+ "reqwest 0.11.27",
  "serde",
  "serde_json",
  "thiserror",

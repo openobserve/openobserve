@@ -69,7 +69,10 @@ use tokio::{
 };
 
 use crate::{
-    common::{infra::wal, meta::stream::SchemaRecords},
+    common::{
+        infra::wal,
+        meta::{authz::Authz, stream::SchemaRecords},
+    },
     job::files::idx::write_to_disk,
     service::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
@@ -317,6 +320,30 @@ async fn move_files(
         }
     };
     let stream_fields_num = latest_schema.fields().len();
+
+    // check stream is existing
+    if stream_fields_num == 0 {
+        for file in files {
+            log::warn!(
+                "[INGESTER:JOB:{thread_id}] the stream [{}/{}/{}] was deleted, just delete file: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                file.key,
+            );
+            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                log::error!(
+                    "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
+                    file.key,
+                    e
+                );
+            }
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            PROCESSING_FILES.write().await.remove(&file.key);
+        }
+        return Ok(());
+    }
 
     // log::debug!("[INGESTER:JOB:{thread_id}] start processing for partition: {}", prefix);
 
@@ -747,6 +774,13 @@ pub(crate) async fn generate_index_on_ingester(
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
         db::schema::update_setting(org_id, &index_stream_name, StreamType::Index, metadata).await?;
+
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            &StreamType::Index.to_string(),
+            Authz::new(&index_stream_name),
+        )
+        .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
         if get_config().common.inverted_index_old_format
