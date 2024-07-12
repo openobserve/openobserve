@@ -93,7 +93,48 @@ test.describe("Compare SQL query execution times", () => {
     await applyQueryButton(page);
   });
 
-  test("should compare match_all_indexed and match_all query times", async ({ page }) => {
+  test("should compare match_all_raw and match_all query times", async ({ page }) => {
+    const oneMinuteAgo = Date.now() - 60 * 1000;
+    const query1 = {
+      query: {
+        sql: "select * from 'e2e_automate'  WHERE match_all_raw('provide_credentials')",
+        start_time: oneMinuteAgo,
+        end_time: Date.now(),
+        from: 0,
+        size: 250,
+        quick_mode: false
+      },
+      regions: []
+    };
+
+    const query2 = {
+      query: {
+        sql: "select * from 'e2e_automate'  WHERE match_all('provide_credentials')",
+        start_time: oneMinuteAgo,
+        end_time: Date.now(),
+        from: 0,
+        size: 250,
+        quick_mode: false
+      },
+      regions: []
+    };
+
+    const result1 = await runQuery(page, query1);
+    const result2 = await runQuery(page, query2);
+
+    console.log(`Query 1 (match_all_raw) took ${result1.duration} ms and returned ${result1.response.total} records.`);
+    console.log(`Query 2 (match_all) took ${result2.duration} ms and returned ${result2.response.total} records.`);
+
+    try {
+      expect(result2.duration).toBeLessThan(result1.duration);
+      console.log('Assertion passed: match_all query took less time than match_all_raw query.');
+    } catch (error) {
+      console.error('Assertion failed: match_all query did not take less time than match_all_raw query.');
+    }
+  });
+
+
+  test("should compare match_all and match_all_raw_ignore_case query times", async ({ page }) => {
     const oneMinuteAgo = Date.now() - 60 * 1000;
     const query1 = {
       query: {
@@ -109,7 +150,7 @@ test.describe("Compare SQL query execution times", () => {
 
     const query2 = {
       query: {
-        sql: "select * from 'e2e_automate'  WHERE match_all_indexed('provide_credentials')",
+        sql: "select * from 'e2e_automate'  WHERE match_all_raw_ignorecase('provide_credentials')",
         start_time: oneMinuteAgo,
         end_time: Date.now(),
         from: 0,
@@ -123,54 +164,13 @@ test.describe("Compare SQL query execution times", () => {
     const result2 = await runQuery(page, query2);
 
     console.log(`Query 1 (match_all) took ${result1.duration} ms and returned ${result1.response.total} records.`);
-    console.log(`Query 2 (match_all_indexed) took ${result2.duration} ms and returned ${result2.response.total} records.`);
+    console.log(`Query 2 (match_all_raw_ignorecase) took ${result2.duration} ms and returned ${result2.response.total} records.`);
 
     try {
-      expect(result2.duration).toBeLessThan(result1.duration);
-      console.log('Assertion passed: match_all_indexed query took less time than match_all query.');
+      expect(result1.duration).toBeLessThan(result2.duration);
+      console.log('Assertion passed: match_all query took less time than match_all_raw_ignorecase query.');
     } catch (error) {
-      console.error('Assertion failed: match_all_indexed query did not take less time than match_all query.');
-    }
-  });
-
-
-  test("should compare match_all_ignore_case and match_all_indexed_ignore_case query times", async ({ page }) => {
-    const oneMinuteAgo = Date.now() - 60 * 1000;
-    const query1 = {
-      query: {
-        sql: "select * from 'e2e_automate'  WHERE match_all_ignore_case('provide_credentials')",
-        start_time: oneMinuteAgo,
-        end_time: Date.now(),
-        from: 0,
-        size: 250,
-        quick_mode: false
-      },
-      regions: []
-    };
-
-    const query2 = {
-      query: {
-        sql: "select * from 'e2e_automate'  WHERE match_all_indexed_ignore_case('provide_credentials')",
-        start_time: oneMinuteAgo,
-        end_time: Date.now(),
-        from: 0,
-        size: 250,
-        quick_mode: false
-      },
-      regions: []
-    };
-
-    const result1 = await runQuery(page, query1);
-    const result2 = await runQuery(page, query2);
-
-    console.log(`Query 1 (match_all_ignorecase) took ${result1.duration} ms and returned ${result1.response.total} records.`);
-    console.log(`Query 2 (match_all_indexed_ignorecase) took ${result2.duration} ms and returned ${result2.response.total} records.`);
-
-    try {
-      expect(result2.duration).toBeLessThan(result1.duration);
-      console.log('Assertion passed: match_all_indexed_ignorecase query took less time than match_all query.');
-    } catch (error) {
-      console.error('Assertion failed: match_all_indexed_ignorecase query did not take less time than match_all query.');
+      console.error('Assertion failed: match_all query did not take less time than match_all_raw_ignorecase query.');
     }
   });
 });
