@@ -634,7 +634,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let tracer = opentelemetry_otlp::new_pipeline().tracing();
-    let tracer = if !cfg.common.tracing_type_grpc {
+    let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
         tracer.with_exporter({
             let mut headers = HashMap::new();
             headers.insert(

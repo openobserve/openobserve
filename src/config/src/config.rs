@@ -577,12 +577,6 @@ pub struct Common {
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
     pub otel_otlp_grpc_url: String,
     #[env_config(
-        name = "ZO_TRACING_TYPE_GRPC",
-        default = false,
-        help = "If true, it uses OTEL_OTLP_GRPC_ENDPOINT for trace export."
-    )]
-    pub tracing_type_grpc: bool,
-    #[env_config(
         name = "ZO_TRACING_GRPC_ORGANIZATION",
         default = "",
         help = "Used in metadata when exporting traces to grpc endpoint."
