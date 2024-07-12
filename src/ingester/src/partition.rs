@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    fs::create_dir_all,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{
@@ -30,6 +25,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use hashbrown::HashSet;
 use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
@@ -41,7 +37,7 @@ use crate::{
 
 pub(crate) struct Partition {
     schema: Arc<Schema>,
-    schema_set: HashSet<String>, // use for quick check schema change
+    schema_fields: HashSet<String>, // use for quick check schema change
     files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
@@ -49,29 +45,22 @@ impl Partition {
     pub(crate) fn new() -> Self {
         Self {
             schema: Arc::new(Schema::empty()),
-            schema_set: HashSet::new(),
+            schema_fields: HashSet::new(),
             files: BTreeMap::default(),
         }
     }
 
-    pub(crate) fn write(
-        &mut self,
-        entry: Entry,
-        batch: Option<Arc<RecordBatchEntry>>,
-    ) -> Result<usize> {
+    pub(crate) fn write(&mut self, entry: Entry, batch: Arc<RecordBatchEntry>) -> Result<usize> {
         let partition = self
             .files
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
 
-        let schema = batch
-            .as_ref()
-            .map(|r| r.data.schema().clone())
-            .unwrap_or(Schema::empty().into());
+        let schema = batch.data.schema();
         let mut schema_change_size = 0;
-        if self.schema_set.is_empty() {
+        if self.schema_fields.is_empty() {
             self.schema = schema.clone();
-            self.schema_set = self
+            self.schema_fields = self
                 .schema
                 .fields()
                 .iter()
@@ -79,14 +68,20 @@ impl Partition {
                 .collect();
             schema_change_size = self.schema.size();
         } else {
-            let mut new_fields = Vec::new();
-            schema.fields().iter().for_each(|f| {
-                if !self.schema_set.contains(f.name()) {
-                    self.schema_set.insert(f.name().to_string());
-                    new_fields.push(f.clone());
-                }
-            });
+            let new_fields = schema
+                .fields()
+                .iter()
+                .filter_map(|f| {
+                    if !self.schema_fields.contains(f.name()) {
+                        Some(f.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
             if !new_fields.is_empty() {
+                self.schema_fields
+                    .extend(new_fields.iter().map(|f| f.name().to_string()));
                 let old_schema_size = self.schema.size();
                 let schema_fields = self
                     .schema
@@ -100,7 +95,7 @@ impl Partition {
                 schema_change_size = new_schema_size - old_schema_size;
             }
         }
-        if schema_change_size != 0 {
+        if schema_change_size > 0 {
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
                 .add(schema_change_size as i64);
@@ -252,10 +247,7 @@ impl PartitionFile {
         Self { data: Vec::new() }
     }
 
-    fn write(&mut self, batch: Option<Arc<RecordBatchEntry>>) -> Result<usize> {
-        let Some(batch) = batch else {
-            return Ok(0);
-        };
+    fn write(&mut self, batch: Arc<RecordBatchEntry>) -> Result<usize> {
         let json_size = batch.data_json_size;
         let arrow_size = batch.data_arrow_size;
         self.data.push(batch);

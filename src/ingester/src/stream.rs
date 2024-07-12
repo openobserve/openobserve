@@ -40,7 +40,7 @@ impl Stream {
         &mut self,
         schema: Arc<Schema>,
         entry: Entry,
-        batch: Option<Arc<RecordBatchEntry>>,
+        batch: Arc<RecordBatchEntry>,
     ) -> Result<usize> {
         let mut arrow_size = 0;
         let partition = match self.partitions.get_mut(&entry.stream) {
