@@ -110,7 +110,7 @@ const getDefaultDashboardPanelData: any = () => ({
   },
   layout: {
     splitter: 20,
-    querySplitter: 20,
+    querySplitter: 41,
     showQueryBar: false,
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
