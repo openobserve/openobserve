@@ -105,20 +105,24 @@ export const restHandlers = [
         telemetry_enabled: true,
         default_functions: [
           {
+            name: "match_all_raw",
+            text: "match_all_raw('v')",
+          },
+          {
+            name: "match_all_raw_ignore_case",
+            text: "match_all_raw_ignore_case('v')",
+          },
+          {
             name: "match_all",
             text: "match_all('v')",
           },
           {
-            name: "match_all_ignore_case",
-            text: "match_all_ignore_case('v')",
-          },
-          {
             name: "str_match",
-            text: "match_all('v')",
+            text: "str_match(field, 'v')",
           },
           {
             name: "str_match_ignore_case",
-            text: "match_all_ignore_case('v')",
+            text: "str_match_ignore_case(field, 'v')",
           },
           {
             name: "re_match",

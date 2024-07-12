@@ -128,7 +128,7 @@ export default defineComponent({
       }
 
       const regex =
-        /(?:match_all\((['"])([^'"]+)\1\)|match_all_ignore_case\((['"])([^'"]+)\3\)|(['"])([^'"]+)\5)/g;
+        /(?:match_all\((['"])([^'"]+)\1\)|(['"])([^'"]+)\5)/g;
 
       let result = [];
       let match;
@@ -138,15 +138,11 @@ export default defineComponent({
         if (match[2]) {
           result.push(match[2]);
         }
-        // Group 2: match_all_ignore_case values
+        // Group 2: other string values
         else if (match[4]) {
-          result.push(match[4]);
-        }
-        // Group 3: other string values
-        else if (match[6]) {
           const columnNamePattern = /^[a-zA-Z_]+\s*=\s*$/;
-          if (!columnNamePattern.test(match[6])) {
-            result.push(match[6]);
+          if (!columnNamePattern.test(match[4])) {
+            result.push(match[4]);
           }
         }
       }
