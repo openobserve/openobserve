@@ -16,7 +16,7 @@
 use config::{
     cluster::*,
     get_config,
-    meta::cluster::{Node, NodeStatus, Role},
+    meta::cluster::{load_role_group, Node, NodeStatus, Role},
     utils::json,
 };
 use etcd_client::PutOptions;
@@ -145,6 +145,7 @@ async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
+        role_group: load_role_group(),
     };
     let val = json::to_string(&node).unwrap();
 
@@ -219,6 +220,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
+            role_group: load_role_group(),
         },
     };
     let val = json::to_string(&node).unwrap();
