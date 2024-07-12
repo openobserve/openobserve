@@ -111,7 +111,7 @@ size="sm" color="secondary" />
                     emit-value
                     no-caps
                     class="visual-selection-btn"
-                    style="height: 30px; padding: 4px 12px"
+                    style="height: 30px; margin: 0 2px; padding: 4px 12px"
                     @click="onChangeStreamFilter(visual.value)"
                   >
                     {{ visual.label }}</q-btn
@@ -282,6 +282,7 @@ export default defineComponent({
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
+      { label: t("logStream.labelMetadata"), value: "metadata" },
       { label: t("logStream.labelIndex"), value: "index" },
     ];
     const { getStreams, resetStreams, removeStream } = useStreams();
