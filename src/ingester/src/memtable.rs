@@ -52,7 +52,7 @@ impl MemTable {
         &mut self,
         schema: Arc<Schema>,
         entry: Entry,
-        batch: Option<Arc<RecordBatchEntry>>,
+        batch: Arc<RecordBatchEntry>,
     ) -> Result<()> {
         let partitions = match self.streams.get_mut(&entry.stream) {
             Some(v) => v,
