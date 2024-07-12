@@ -775,7 +775,8 @@
     "pause": "Pause",
     "groupBy": "Group by",
     "row": "Row Template",
-    "preview": "Preview"
+    "preview": "Preview",
+    "crontitle": "Enable Cron"
   },
   "alert_templates": {
     "header": "Templates",
