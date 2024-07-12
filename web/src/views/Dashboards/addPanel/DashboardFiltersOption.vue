@@ -209,16 +209,16 @@
             @click="removeFilterItem(filteredItem.column)"
             icon="close"
           />
-          <!-- <div v-if="showSelect">
+          <div v-if="showSelect">
             <q-select
               v-model="addLabel"
               dense
               filled
               :options="filterOptions"
             />
-          </div> -->
+          </div>
         </q-btn-group>
-        <!-- <q-btn icon="add" color="primary" size="xs" round>
+        <q-btn icon="add" color="primary" size="xs" round>
           <q-menu v-model="showAddMenu">
             <q-list>
               <q-item clickable @click="addFilter('condition')">
@@ -229,7 +229,7 @@
               </q-item>
             </q-list>
           </q-menu>
-        </q-btn> -->
+        </q-btn>
       </div>
       <div
         class="text-caption text-weight-bold text-center q-py-xs q-mt-xs"
@@ -254,7 +254,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import useDashboardPanelData from "../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -268,22 +268,22 @@ export default defineComponent({
   props: ["dashboardData"],
 
   setup(props) {
-    const {
-      dashboardPanelData,
-      removeFilterItem,
-      addFilteredItem,
-      loadFilterItem,
-    } = useDashboardPanelData();
+    const { dashboardPanelData, removeFilterItem, loadFilterItem } =
+      useDashboardPanelData();
     const { t } = useI18n();
     const showAddMenu = ref(false);
     const showSelect = ref(false);
     const addLabel = ref("AND");
 
     const addFilter = (type: any) => {
+      console.log(type);
+
       showAddMenu.value = false;
       showSelect.value = true;
 
       if (type === "condition") {
+        console.log("add condition");
+
         addLabel.value = "AND";
       } else if (type === "group") {
         addLabel.value = "OR";

@@ -983,7 +983,7 @@ import HistogramIntervalDropDown from "@/components/dashboards/addPanel/Histogra
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
-import DashboardFiltersOption from "@/views/Dashboards/DashboardFiltersOption.vue";
+import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
