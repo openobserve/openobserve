@@ -18,7 +18,7 @@ use infra::errors::{Error::ErrorCode, ErrorCodes};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
     common::infra::config::O2_CONFIG,
-    search::{QueryManager, TaskStatus},
+    search::{QueryManager, TaskStatus, WorkGroup},
 };
 use proto::cluster_rpc::{
     search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
@@ -92,6 +92,13 @@ impl Searcher {
     ) {
         self.query_manager
             .add_file_stats(trace_id, files, records, original_size, compressed_size)
+            .await;
+    }
+
+    // add work group
+    pub async fn add_work_group(&self, trace_id: &str, work_group: Option<WorkGroup>) {
+        self.query_manager
+            .add_work_group(trace_id, work_group)
             .await;
     }
 }
