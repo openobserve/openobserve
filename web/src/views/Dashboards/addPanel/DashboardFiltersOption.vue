@@ -32,7 +32,7 @@
             :no-wrap="true"
             color="primary"
             size="sm"
-            :label="filteredItem.column"
+            :label="computedLabel(filteredItem)"
             :data-test="`dashboard-filter-item-${filteredItem.column}`"
             class="q-pl-sm"
           >
@@ -41,6 +41,20 @@
               @show="(e) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
+              <q-select
+                v-model="selectedSchema"
+                :options="schemaOptions"
+                label="FieldList"
+                dense
+                filled
+                style="width: 100%"
+                use-input
+                borderless
+                hide-selected
+                fill-input
+                emit-value
+                @filter="filterStreamFn"
+              />
               <div style="height: 100%">
                 <div class="q-pa-xs" style="height: 100%">
                   <div class="q-gutter-xs" style="height: 100%">
@@ -253,7 +267,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
@@ -274,10 +288,10 @@ export default defineComponent({
     const showAddMenu = ref(false);
     const showSelect = ref(false);
     const addLabel = ref("AND");
+    const selectedSchema = ref(null);
 
     const addFilter = (type: any) => {
       console.log(type);
-
       showAddMenu.value = false;
       showSelect.value = true;
 
@@ -316,6 +330,43 @@ export default defineComponent({
         })
     );
 
+    const schemaOptions = computed(() =>
+      dashboardPanelData.meta.stream.selectedStreamFields.map((field: any) => ({
+        label: field.name,
+        value: field.name,
+      }))
+    );
+
+    const filterStreamFn = (search: any, update: any) => {
+      const needle = search.toLowerCase().trim();
+      // console.log("needle", needle);
+      // console.log(
+      //   "schemaOptions",
+      //   schemaOptions.value.filter((option: any) =>
+      //     option.label.toLowerCase().includes(needle)
+      //   )
+      // );
+
+      update(() => {
+        return schemaOptions.value.filter((option: any) =>
+          option.label.toLowerCase().includes(needle)
+        );
+      });
+    };
+
+    const computedLabel = (filteredItem: any) => {
+      console.log("schemaOptions", selectedSchema.value, filteredItem);
+
+      const foundOption = schemaOptions.value.find(
+        (option: any) => option.value === filteredItem.column
+      );
+      console.log("foundOption", foundOption);
+
+      return selectedSchema.value === null
+        ? filteredItem.column
+        : selectedSchema.value;
+    };
+
     return {
       t,
       dashboardPanelData,
@@ -340,6 +391,10 @@ export default defineComponent({
       showSelect,
       addFilter,
       addLabel,
+      selectedSchema,
+      schemaOptions,
+      filterStreamFn,
+      computedLabel,
     };
   },
 });
