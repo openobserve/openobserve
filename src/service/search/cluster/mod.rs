@@ -1000,7 +1000,7 @@ async fn get_file_list_by_inverted_index(
     if fast_mode && time_min > 0 && time_max > 0 {
         search_condition = format!(
             "({}) AND max_ts >= {} AND min_ts <= {}",
-            search_condition, time_min, time_max
+            search_condition, time_max, time_min
         );
     }
 
