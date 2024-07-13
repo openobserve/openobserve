@@ -1041,7 +1041,7 @@ async fn get_file_list_by_inverted_index(
             } else {
                 Some((term, file_name, count, segment_ids))
             }
-        }); // Descending order of timestamp
+        });
         let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
         let mut term_counts: HashMap<String, u64> = HashMap::new();
         for (term, filename, count, segment_ids) in sorted_data {
