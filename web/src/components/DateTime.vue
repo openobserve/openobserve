@@ -326,7 +326,7 @@ import { date, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { utcToZonedTime } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
   props: {
@@ -604,7 +604,7 @@ export default defineComponent({
 
     function convertUnixTime(unixTimeMicros) {
       // Convert microseconds to milliseconds and create a new Date object
-      var date = utcToZonedTime(unixTimeMicros / 1000, store.state.timezone);
+      var date = toZonedTime(unixTimeMicros / 1000, store.state.timezone);
 
       // Extract hour, minute, day, month, and year
       const hours = ("0" + date.getHours()).slice(-2); // pad with leading zero if needed

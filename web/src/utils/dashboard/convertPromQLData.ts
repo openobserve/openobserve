@@ -18,7 +18,7 @@ import {
   formatUnitValue,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
-import { utcToZonedTime } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 
 let moment: any;
@@ -90,7 +90,7 @@ export const convertPromQLData = async (
     xAxisData[index] = [
       value,
       store.state.timezone != "UTC"
-        ? utcToZonedTime(value * 1000, store.state.timezone)
+        ? toZonedTime(value * 1000, store.state.timezone)
         : new Date(value * 1000).toISOString().slice(0, -1),
     ];
   });

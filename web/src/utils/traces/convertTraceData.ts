@@ -1,4 +1,4 @@
-import { utcToZonedTime, format } from "date-fns-tz";
+import { toZonedTime, format } from "date-fns-tz";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -81,7 +81,7 @@ export const convertTraceData = (props: any, timezone: string) => {
     series: [
       {
         data: [...(props.data[0]?.x || [])]?.map((it: any, index: any) => [
-          timezone != "UTC" ? utcToZonedTime(it, timezone) : it,
+          timezone != "UTC" ? toZonedTime(it, timezone) : it,
           props.data[0]?.y[index] || 0,
         ]),
         type: "scatter",
