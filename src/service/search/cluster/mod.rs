@@ -937,8 +937,9 @@ async fn get_file_list_by_inverted_index(
     // fast_mode is for 1st page optimization
     //  1. single WHERE clause of `match_all()`
     //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
-    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+    let _fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
         && idx_req.query.as_ref().unwrap().size > 0);
+    let fast_mode = false;
 
     // Get all the unique terms which the user has searched.
     let terms = meta
