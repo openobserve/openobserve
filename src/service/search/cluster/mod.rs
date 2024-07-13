@@ -21,6 +21,7 @@ use config::{
     cluster::{is_ingester, is_querier},
     get_config,
     meta::{
+        bitvec::BitVec,
         cluster::{Node, Role},
         search::{self, ScanStats},
         stream::{
@@ -123,19 +124,21 @@ pub async fn search(
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    // If the query is of type inverted index and this is not an aggregations request
-    let file_list = if is_inverted_index && req.aggs.is_empty() {
-        get_file_list_by_inverted_index(meta.clone(), req.clone()).await?
-    } else {
-        get_file_list(
-            trace_id,
-            &meta,
-            stream_type,
-            partition_time_level,
-            &stream_settings.partition_keys,
-        )
-        .await
-    };
+    // get file list
+    let mut file_list = get_file_list(
+        trace_id,
+        &meta,
+        stream_type,
+        partition_time_level,
+        &stream_settings.partition_keys,
+    )
+    .await;
+
+    // If the query is of type inverted index and this is not an aggregations request,
+    // then filter the file list based on the inverted index.
+    if is_inverted_index && req.aggs.is_empty() {
+        file_list = get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
+    }
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
@@ -917,9 +920,20 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
+    file_list: &[FileKey],
 ) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
+    let file_list = file_list
+        .iter()
+        .map(|f| (&f.key, &f.meta))
+        .collect::<HashMap<_, _>>();
+
+    // fast_mode is for 1st page optimization
+    //  1. single WHERE clause of `match_all()`
+    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
+    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+        && idx_req.query.as_ref().unwrap().size > 0);
 
     // Get all the unique terms which the user has searched.
     let terms = meta
@@ -969,13 +983,21 @@ async fn get_file_list_by_inverted_index(
         })
         .collect::<Vec<_>>();
     let index_condition = index_terms.join(" OR ");
-    let search_condition = if fts_condition.is_empty() {
+    let mut search_condition = if fts_condition.is_empty() {
         index_condition
     } else if index_condition.is_empty() {
         fts_condition
     } else {
         format!("{} OR {}", fts_condition, index_condition)
     };
+
+    let (time_min, time_max) = meta.meta.time_range.unwrap_or((0, 0));
+    if fast_mode && time_min > 0 && time_max > 0 {
+        search_condition = format!(
+            "({}) AND max_ts >= {} AND min_ts <= {}",
+            search_condition, time_min, time_max
+        );
+    }
 
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -988,11 +1010,6 @@ async fn get_file_list_by_inverted_index(
         index_stream_name, search_condition, cfg.common.column_timestamp
     );
 
-    // fast_mode is for 1st page optimization
-    //  1. single WHERE clause of `match_all()`
-    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
-    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
-        && idx_req.query.as_ref().unwrap().size > 0);
     idx_req.stream_type = StreamType::Index.to_string();
     idx_req.query.as_mut().unwrap().sql = query;
     idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -1019,7 +1036,6 @@ async fn get_file_list_by_inverted_index(
         .collect::<HashSet<_>>();
     let unique_files = if fast_mode {
         let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
-        let mut total_count = 0;
         let sorted_data = idx_resp.hits.iter().filter_map(|hit| {
             let term = hit.get("term").unwrap().as_str().unwrap().to_string();
             let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
@@ -1031,14 +1047,19 @@ async fn get_file_list_by_inverted_index(
             if deleted_files.contains(&file_name) {
                 None
             } else {
-                total_count += count;
                 Some((term, file_name, count, segment_ids))
             }
         }); // Descending order of timestamp
         let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
         let mut term_counts: HashMap<String, u64> = HashMap::new();
-
         for (term, filename, count, segment_ids) in sorted_data {
+            let prefixed_filename = format!(
+                "files/{}/{}/{}/{}",
+                meta.org_id, stream_type, meta.stream_name, filename
+            );
+            if !file_list.contains_key(&prefixed_filename) {
+                continue;
+            };
             let term = term.as_str();
             for search_term in terms.iter() {
                 if term.contains(search_term) {
@@ -1056,7 +1077,7 @@ async fn get_file_list_by_inverted_index(
         term_map
             .into_iter()
             .flat_map(|(_, filenames)| filenames)
-            .collect::<HashSet<_>>()
+            .collect::<Vec<_>>()
     } else {
         idx_resp
             .hits
@@ -1073,29 +1094,48 @@ async fn get_file_list_by_inverted_index(
                         (v.to_string(), segment_ids)
                     })
             })
-            .collect::<HashSet<_>>()
+            .collect::<Vec<_>>()
     };
 
-    let mut idx_file_list: Vec<FileKey> = vec![];
+    // Merge bitmap segment_ids of the same file
+    let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
     for (filename, segment_ids) in unique_files {
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
         );
-        if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
-            let segment_ids = if segment_ids.is_empty() {
-                None
-            } else {
-                hex::decode(segment_ids).ok()
-            };
-            idx_file_list.push(FileKey {
-                key: prefixed_filename.to_string(),
-                meta: file_meta,
+        let Some(file_meta) = file_list.get(&prefixed_filename) else {
+            continue;
+        };
+        let segment_ids = if segment_ids.is_empty() {
+            None
+        } else {
+            hex::decode(segment_ids).ok()
+        };
+        let entry = idx_file_list
+            .entry(prefixed_filename.clone())
+            .or_insert(FileKey {
+                key: prefixed_filename,
+                meta: (*file_meta).clone(),
                 deleted: false,
-                segment_ids,
+                segment_ids: None,
             });
+        match (&entry.segment_ids, &segment_ids) {
+            (Some(_), None) => {}
+            (Some(bin_data), Some(segment_ids)) => {
+                let mut bv = BitVec::from_slice(bin_data);
+                bv |= BitVec::from_slice(segment_ids);
+                entry.segment_ids = Some(bv.into_vec());
+            }
+            (None, _) => {
+                entry.segment_ids = segment_ids;
+            }
         }
     }
+    let mut idx_file_list = idx_file_list
+        .into_iter()
+        .map(|(_, f)| f)
+        .collect::<Vec<_>>();
     // sorted by _timestamp
     idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
     Ok(idx_file_list)
