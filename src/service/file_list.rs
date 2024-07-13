@@ -310,11 +310,6 @@ async fn query_inner(
 }
 
 #[inline]
-pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
-    Ok(file_list::get(file).await?)
-}
-
-#[inline]
 pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
     stats.files = files.len() as i64;
@@ -397,18 +392,4 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
         _ = storage::del(&[key]).await;
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_get_file_meta() {
-        let res = get_file_meta(
-            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-        )
-        .await;
-        assert!(res.is_err());
-    }
 }
