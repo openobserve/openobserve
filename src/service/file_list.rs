@@ -311,6 +311,7 @@ async fn query_inner(
 
 #[inline]
 pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
+    // TODO: get file meta from cache
     Ok(file_list::get(file).await?)
 }
 
