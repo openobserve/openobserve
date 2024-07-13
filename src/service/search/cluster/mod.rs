@@ -983,21 +983,13 @@ async fn get_file_list_by_inverted_index(
         })
         .collect::<Vec<_>>();
     let index_condition = index_terms.join(" OR ");
-    let mut search_condition = if fts_condition.is_empty() {
+    let search_condition = if fts_condition.is_empty() {
         index_condition
     } else if index_condition.is_empty() {
         fts_condition
     } else {
         format!("{} OR {}", fts_condition, index_condition)
     };
-
-    let (time_min, time_max) = meta.meta.time_range.unwrap_or((0, 0));
-    if fast_mode && time_min > 0 && time_max > 0 {
-        search_condition = format!(
-            "({}) AND max_ts >= {} AND min_ts <= {}",
-            search_condition, time_min, time_max
-        );
-    }
 
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
