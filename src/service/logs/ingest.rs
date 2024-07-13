@@ -23,7 +23,10 @@ use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
-    meta::{stream::StreamType, usage::UsageType},
+    meta::{
+        stream::{Routing, StreamType},
+        usage::UsageType,
+    },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
 };
@@ -58,8 +61,7 @@ pub async fn ingest(
     let mut need_usage_report = true;
 
     // check stream
-    let stream_name = format_stream_name(in_stream_name);
-    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    let mut stream_name = format_stream_name(in_stream_name);
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
     let cfg = get_config();
@@ -75,10 +77,31 @@ pub async fn ingest(
     );
     // End Register Transforms for stream
 
+    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+
+    // Start get routing keys
+    let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
+    crate::service::ingestion::get_stream_routing(
+        StreamParams::new(org_id, &stream_name, StreamType::Logs),
+        &mut stream_routing_map,
+    )
+    .await;
+
+    if let Some(routes) = stream_routing_map.get(&stream_name) {
+        for route in routes {
+            stream_params.push(StreamParams::new(
+                org_id,
+                &route.destination,
+                StreamType::Logs,
+            ));
+        }
+    }
+    // End get routing keys
+
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
-        &[stream_params],
+        &stream_params,
         &mut user_defined_schema_map,
     )
     .await;
@@ -149,6 +172,27 @@ pub async fn ingest(
             }
         }
 
+        // Start re-routing if exists
+        if let Some(routings) = stream_routing_map.get(&stream_name) {
+            if !routings.is_empty() {
+                for route in routings {
+                    let mut is_routed = true;
+                    let val = &route.routing;
+                    for q_condition in val.iter() {
+                        if !q_condition.evaluate(item.as_object().unwrap()).await {
+                            is_routed = false;
+                            break;
+                        }
+                    }
+                    if !val.is_empty() && is_routed {
+                        stream_name = route.destination.clone();
+                        break;
+                    }
+                }
+            }
+        }
+        // End re-routing
+
         // Start row based transform
         let mut res = match apply_functions(
             item,
@@ -165,12 +209,13 @@ pub async fn ingest(
                 continue;
             }
         };
+        // end row based transform
 
+        // get json object
         let mut local_val = match res.take() {
             json::Value::Object(val) => val,
             _ => unreachable!(),
         };
-        // end row based transform
 
         if let Some(fields) = user_defined_schema_map.get(&stream_name) {
             local_val = crate::service::logs::refactor_map(local_val, fields);
@@ -258,6 +303,7 @@ pub async fn ingest(
     // drop variables
     drop(runtime);
     drop(stream_vrl_map);
+    drop(stream_routing_map);
     drop(user_defined_schema_map);
 
     stream_status.status = match status {

@@ -167,14 +167,17 @@ pub async fn ingest(
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
 
+            // Start re-routing if exists
             if let Some(routing) = stream_routing_map.get(&stream_name) {
                 if !routing.is_empty() {
                     for route in routing {
                         let mut is_routed = true;
                         let val = &route.routing;
                         for q_condition in val.iter() {
-                            is_routed =
-                                is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
+                            if !q_condition.evaluate(value.as_object().unwrap()).await {
+                                is_routed = false;
+                                break;
+                            }
                         }
                         if is_routed && !val.is_empty() {
                             stream_name = route.destination.clone();
@@ -183,6 +186,7 @@ pub async fn ingest(
                     }
                 }
             }
+            // End re-routing
 
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             // Start row based transform

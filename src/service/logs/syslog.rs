@@ -23,7 +23,7 @@ use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
-    meta::stream::StreamType,
+    meta::stream::{Routing, StreamType},
     metrics,
     utils::{flatten, json},
 };
@@ -64,8 +64,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let org_id = &route.org_id;
 
     // check stream
-    let stream_name = format_stream_name(in_stream_name);
-    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
+    let mut stream_name = format_stream_name(in_stream_name);
     if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -88,10 +87,31 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     );
     // End Register Transforms for stream
 
+    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+
+    // Start get routing keys
+    let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
+    crate::service::ingestion::get_stream_routing(
+        StreamParams::new(org_id, &stream_name, StreamType::Logs),
+        &mut stream_routing_map,
+    )
+    .await;
+
+    if let Some(routes) = stream_routing_map.get(&stream_name) {
+        for route in routes {
+            stream_params.push(StreamParams::new(
+                org_id,
+                &route.destination,
+                StreamType::Logs,
+            ));
+        }
+    }
+    // End get routing keys
+
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
-        &[stream_params],
+        &stream_params,
         &mut user_defined_schema_map,
     )
     .await;
@@ -105,6 +125,27 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
+
+    // Start re-rerouting if exists
+    if let Some(routings) = stream_routing_map.get(&stream_name) {
+        if !routings.is_empty() {
+            for route in routings {
+                let mut is_routed = true;
+                let val = &route.routing;
+                for q_condition in val.iter() {
+                    if !q_condition.evaluate(value.as_object().unwrap()).await {
+                        is_routed = false;
+                        break;
+                    }
+                }
+                if !val.is_empty() && is_routed {
+                    stream_name = route.destination.clone();
+                    break;
+                }
+            }
+        }
+    }
+    // End re-routing
 
     // Start row based transform
     if !local_trans.is_empty() {
@@ -193,6 +234,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // drop variables
     drop(runtime);
     drop(stream_vrl_map);
+    drop(stream_routing_map);
     drop(user_defined_schema_map);
 
     stream_status.status = match status {
