@@ -103,6 +103,7 @@ pub async fn report_request_usage_stats(
             search_type: stats.search_type,
             trace_id: None,
             took_wait_in_queue: stats.took_wait_in_queue,
+            result_cache_ratio: None,
         });
     };
 
@@ -136,6 +137,7 @@ pub async fn report_request_usage_stats(
         search_type: stats.search_type,
         trace_id: stats.trace_id,
         took_wait_in_queue: stats.took_wait_in_queue,
+        result_cache_ratio: stats.result_cache_ratio,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;
