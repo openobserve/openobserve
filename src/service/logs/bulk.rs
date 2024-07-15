@@ -276,7 +276,6 @@ pub async fn ingest(
                 json::Value::Number(timestamp.into()),
             );
 
-            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             let fns_length = stream_functions_map
                 .get(&key)
                 .map(|v| v.len())
