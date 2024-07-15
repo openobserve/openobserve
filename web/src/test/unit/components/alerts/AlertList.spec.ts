@@ -20,6 +20,7 @@ import { Dialog, Notify } from "quasar";
 import AlertList from "@/components/alerts/AlertList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
+// @ts-ignore
 import { rest } from "msw";
 import AlertService from "@/services/alerts";
 import router from "../../helpers/router";

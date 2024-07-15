@@ -20,6 +20,7 @@ import { Dialog, Notify } from "quasar";
 import DestinationList from "@/components/alerts/DestinationList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
+// @ts-ignore
 import { rest } from "msw";
 import destinationService from "@/services/alert_destination";
 

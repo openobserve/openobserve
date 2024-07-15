@@ -1,4 +1,5 @@
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
+// @ts-ignore
 import { rest } from "msw";
 import { setupServer } from "msw/node";
 import { associate_members } from "../mockData/mockAssociateMembers";

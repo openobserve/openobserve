@@ -21,6 +21,7 @@ import { Dialog, Notify } from "quasar";
 import Index from "@/plugins/logs/Index.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
+// @ts-ignore
 import { rest } from "msw";
 import "plotly.js";
 import SearchResult from "@/plugins/logs/SearchResult.vue";

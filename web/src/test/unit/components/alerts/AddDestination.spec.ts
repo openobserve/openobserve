@@ -20,6 +20,7 @@ import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 import DestinationService from "@/services/alert_destination";
+// @ts-ignore
 import { rest } from "msw";
 import { AddDestination } from "@/components/alerts";
 import router from "../../helpers/router";

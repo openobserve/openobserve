@@ -21,6 +21,7 @@ import AddAlert from "@/components/alerts/AddAlert.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 import AlertService from "@/services/alerts";
+// @ts-ignore
 import { rest } from "msw";
 import router from "../../helpers/router";
 

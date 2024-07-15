@@ -20,6 +20,7 @@ import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 import TemplateService from "@/services/alert_templates";
+// @ts-ignore
 import { rest } from "msw";
 import { AddTemplate } from "@/components/alerts";
 import router from "../../helpers/router";
