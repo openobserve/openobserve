@@ -309,9 +309,6 @@ export default defineComponent({
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue")
     ),
-    ConfirmDialog: defineAsyncComponent(
-      () => import("@/components/ConfirmDialog.vue")
-    ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
   },
