@@ -245,7 +245,6 @@ export default {
 
     const tracesStreams = ref([]);
 
-    const router = useRouter();
     const copyLogToClipboard = () => {
       emit("copy", props.value);
     };

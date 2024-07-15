@@ -894,6 +894,7 @@
     "queryType": "Query Type"
   },
   "traces": {
-    "viewLogs": "View Logs"
+    "viewLogs": "View Logs",
+    "backToLogs": "Back to Logs"
   }
 }

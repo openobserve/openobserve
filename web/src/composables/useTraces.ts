@@ -72,6 +72,7 @@ const defaultObject = {
     },
     scrollInfo: {},
     serviceColors: {} as any,
+    redirectedFromLogs: false,
   },
   data: {
     query: "",

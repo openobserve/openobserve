@@ -130,7 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-view-logs-btn"
               v-close-popup="true"
               class="text-bold traces-view-logs-btn"
-              :label="t('traces.viewLogs')"
+              :label="
+                searchObj.meta.redirectedFromLogs
+                  ? t('traces.backToLogs')
+                  : t('traces.viewLogs')
+              "
               text-color="light-text"
               padding="sm sm"
               size="sm"
@@ -294,6 +298,7 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   onActivated,
+  onDeactivated,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -433,6 +438,17 @@ export default defineComponent({
     onBeforeMount(async () => {
       setupTraceDetails();
     });
+
+    watch(
+      () => router.currentRoute.value.name,
+      (curr, prev) => {
+        if (prev === "logs" && curr === "traceDetails") {
+          searchObj.meta.redirectedFromLogs = true;
+        } else {
+          searchObj.meta.redirectedFromLogs = false;
+        }
+      }
+    );
 
     watch(
       () => router.currentRoute.value.query.trace_id,
