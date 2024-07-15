@@ -16,7 +16,7 @@
 use config::{
     cluster::*,
     get_config,
-    meta::cluster::{load_role_group, Node, NodeStatus, Role},
+    meta::cluster::{load_role_group, Node, NodeStatus, Role, RoleGroup},
     utils::json,
 };
 use etcd_client::PutOptions;
@@ -100,14 +100,19 @@ async fn register() -> Result<()> {
     let mut node_ids = Vec::new();
     let mut w = super::NODES.write().await;
     for node in node_list {
-        if is_querier(&node.role) {
-            super::add_node_to_consistent_hash(&node, &Role::Querier).await;
+        if node.is_interactive_querier() {
+            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
         }
-        if is_compactor(&node.role) {
-            super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
+        if node.is_background_querier() {
+            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
+                .await;
         }
-        if is_flatten_compactor(&node.role) {
-            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
+        if node.is_compactor() {
+            super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        }
+        if node.is_flatten_compactor() {
+            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         }
         node_ids.push(node.id);
         w.insert(node.uuid.clone(), node);
@@ -150,14 +155,19 @@ async fn register() -> Result<()> {
     let val = json::to_string(&node).unwrap();
 
     // cache local node
-    if is_querier(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::Querier).await;
+    if node.is_interactive_querier() {
+        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+            .await;
     }
-    if is_compactor(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
+    if node.is_background_querier() {
+        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
+            .await;
     }
-    if is_flatten_compactor(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
+    if node.is_compactor() {
+        super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+    }
+    if node.is_flatten_compactor() {
+        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
     }
 
     let mut w = super::NODES.write().await;

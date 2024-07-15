@@ -33,7 +33,7 @@ pub async fn get_cached_results(
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
@@ -254,7 +254,7 @@ pub async fn delete_cached_results(path: String) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));

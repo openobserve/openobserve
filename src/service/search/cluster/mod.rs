@@ -84,21 +84,17 @@ pub async fn search(
     let user_id = user_id.as_deref();
 
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let req_node_group = req
+        .search_event_type
+        .as_ref()
+        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
+        .unwrap_or(None);
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(req_node_group)
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    if let Some(search_event_type) = req.search_event_type.clone() {
-        nodes.retain(|node| {
-            node.role_group == RoleGroup::None
-                || SearchEventType::from_str(search_event_type.as_str())
-                    .map_or(true, |search_event_type| {
-                        RoleGroup::from(search_event_type) == node.role_group
-                    })
-        });
-    }
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
@@ -263,7 +259,7 @@ pub async fn search(
             1
         }
         QueryPartitionStrategy::FileHash => {
-            let files = partition_file_by_hash(&file_list, &nodes).await;
+            let files = partition_file_by_hash(&file_list, &nodes, req_node_group).await;
             file_num = files.len();
             partition_files = files;
             1
@@ -785,7 +781,7 @@ pub(crate) async fn get_file_list(
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
     let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes()
+        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
             .await
             .unwrap_or_default()
             .len()
@@ -845,6 +841,7 @@ pub(crate) fn partition_file_by_bytes(
 pub(crate) async fn partition_file_by_hash<'a>(
     file_keys: &'a [FileKey],
     nodes: &'a [Node],
+    group: Option<RoleGroup>,
 ) -> Vec<Vec<&'a FileKey>> {
     let mut node_idx = HashMap::with_capacity(nodes.len());
     let mut idx = 0;
@@ -857,9 +854,10 @@ pub(crate) async fn partition_file_by_hash<'a>(
     }
     let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); idx];
     for fk in file_keys {
-        let node_uuid = infra_cluster::get_node_from_consistent_hash(&fk.key, &Role::Querier)
-            .await
-            .expect("there is no querier node in consistent hash ring");
+        let node_uuid =
+            infra_cluster::get_node_from_consistent_hash(&fk.key, &Role::Querier, group)
+                .await
+                .expect("there is no querier node in consistent hash ring");
         let idx = node_idx.get(&node_uuid).unwrap_or(&0);
         partitions[*idx].push(fk);
     }

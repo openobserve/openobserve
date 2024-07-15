@@ -170,7 +170,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
                 data.insert(
                     "querier_nodes".to_string(),
-                    crate::common::infra::cluster::get_cached_online_querier_nodes()
+                    crate::common::infra::cluster::get_cached_online_querier_nodes(None)
                         .await
                         .unwrap_or_default()
                         .len()

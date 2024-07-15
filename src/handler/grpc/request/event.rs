@@ -17,7 +17,10 @@ use chrono::{Duration, Utc};
 use config::{
     cluster::{is_compactor, is_querier, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     get_config,
-    meta::{cluster::Role, stream::FileKey},
+    meta::{
+        cluster::{Role, RoleGroup},
+        stream::FileKey,
+    },
     metrics,
     utils::parquet::read_recordbatch_from_bytes,
 };
@@ -92,7 +95,12 @@ impl Event for Eventer {
         if cfg.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
             let mut cached_field_stream = HashSet::new();
             for item in put_items.iter() {
-                let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
+                let Some(node) = get_node_from_consistent_hash(
+                    &item.key,
+                    &Role::Querier,
+                    Some(RoleGroup::Interactive),
+                )
+                .await
                 else {
                     continue; // no querier node
                 };

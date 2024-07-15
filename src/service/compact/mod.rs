@@ -58,7 +58,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node) =
-                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
                     continue; // no compactor node
                 };
@@ -103,7 +103,8 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let stream_name = columns[2];
         let retention = columns[3];
 
-        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor).await else {
+        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor, None).await
+        else {
             continue; // no compactor node
         };
         if LOCAL_NODE_UUID.ne(&node) {
@@ -150,7 +151,7 @@ pub async fn run_generate_job() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node) =
-                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
                     continue; // no compactor node
                 };
@@ -237,7 +238,8 @@ pub async fn run_merge(
             unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
         if partition_time_level == PartitionTimeLevel::Daily || cfg.compact.step_secs < 3600 {
             // check if this stream need process by this node
-            let Some(node) = get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+            let Some(node) =
+                get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
             else {
                 continue; // no compactor node
             };

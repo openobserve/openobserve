@@ -19,6 +19,7 @@ use chrono::Duration;
 use config::{
     get_config, ider,
     meta::{
+        cluster::RoleGroup,
         search,
         stream::{FileKey, StreamType},
         usage::{RequestStats, UsageType},
@@ -247,7 +248,7 @@ pub async fn search_partition(
     )
     .await;
 
-    let nodes = infra_cluster::get_cached_online_querier_nodes()
+    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {

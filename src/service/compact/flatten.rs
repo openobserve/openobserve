@@ -70,7 +70,8 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
 
                 // check running node
                 let Some(node) =
-                    get_node_from_consistent_hash(&stream_name, &Role::FlattenCompactor).await
+                    get_node_from_consistent_hash(&stream_name, &Role::FlattenCompactor, None)
+                        .await
                 else {
                     continue; // no compactor node
                 };

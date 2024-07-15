@@ -53,6 +53,32 @@ impl Node {
             role_group: load_role_group(),
         }
     }
+    pub fn is_router(&self) -> bool {
+        self.role.contains(&Role::Router) || self.role.contains(&Role::All)
+    }
+    pub fn is_ingester(&self) -> bool {
+        self.role.contains(&Role::Ingester) || self.role.contains(&Role::All)
+    }
+    pub fn is_querier(&self) -> bool {
+        self.role.contains(&Role::Querier) || self.role.contains(&Role::All)
+    }
+    pub fn is_interactive_querier(&self) -> bool {
+        self.is_querier()
+            && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Interactive)
+    }
+    pub fn is_background_querier(&self) -> bool {
+        self.is_querier()
+            && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Background)
+    }
+    pub fn is_compactor(&self) -> bool {
+        self.role.contains(&Role::Compactor) || self.role.contains(&Role::All)
+    }
+    pub fn is_flatten_compactor(&self) -> bool {
+        self.role.contains(&Role::FlattenCompactor) || self.role.contains(&Role::All)
+    }
+    pub fn is_alert_manager(&self) -> bool {
+        self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
+    }
 }
 
 impl Default for Node {
@@ -114,7 +140,7 @@ impl std::fmt::Display for Role {
 /// None        -> All tasks
 /// Background  -> Low-priority tasks
 /// Interactive -> High-priority tasks
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum RoleGroup {
     #[default]
     None,

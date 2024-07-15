@@ -19,7 +19,7 @@ use config::{
     cluster::LOCAL_NODE_UUID,
     get_config, ider,
     meta::{
-        cluster::Node,
+        cluster::{Node, RoleGroup},
         search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
@@ -73,7 +73,7 @@ pub async fn query(
 
     // cluster mode
     let start: std::time::Instant = std::time::Instant::now();
-    let nodes = cluster::get_cached_online_querier_nodes()
+    let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
