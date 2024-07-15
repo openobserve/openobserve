@@ -2185,6 +2185,7 @@ const useLogs = () => {
               searchObj.data.queryResults.aggs = res.data.hits;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
+              searchObj.data.queryResults.result_cache_ratio += res.data.result_cache_ratio;
               // if (hasAggregationFlag) {
               //   searchObj.data.queryResults.total = res.data.total;
               // }
@@ -2896,20 +2897,25 @@ const useLogs = () => {
       if(searchObj.data.queryResults.partitionDetail.partitions.length > 1 && searchObj.meta.showHistogram == false) {
         plusSign = "+";
       }
+    
+      const scanSizeLabel = searchObj.data.queryResults.result_cache_ratio > 0 ? "Delta Scan Size" : "Scan Size";
+
       const title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        totalCount.toLocaleString() +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms. (Scan Size: " +
-        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-        plusSign +
-        ")";
+          "Showing " +
+          startCount +
+          " to " +
+          endCount +
+          " out of " +
+          totalCount.toLocaleString() +
+          plusSign +
+          " events in " +
+          searchObj.data.queryResults.took +
+          " ms. (" +
+          scanSizeLabel +
+          ": " +
+          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+          plusSign +
+          ")";
       return title;
     } catch (e: any) {
       console.log("Error while generating histogram title", e);
