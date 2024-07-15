@@ -89,32 +89,33 @@ export const addLabelToSQlQuery = async (
   }
 
   // Construct condition based on operator
-  condition = operator === "IS NULL" || operator === "IS NOT NULL" ?
-    {
-      type: "binary_expr",
-      operator: operator,
-      left: {
-        type: "column_ref",
-        table: null,
-        column: label,
-      },
-      right: {
-        type: "",
-      },
-    } :
-    {
-      type: "binary_expr",
-      operator: operator,
-      left: {
-        type: "column_ref",
-        table: null,
-        column: label,
-      },
-      right: {
-        type: "string",
-        value: value,
-      },
-    };
+  condition =
+    operator === "IS NULL" || operator === "IS NOT NULL"
+      ? {
+          type: "binary_expr",
+          operator: operator,
+          left: {
+            type: "column_ref",
+            table: null,
+            column: label,
+          },
+          right: {
+            type: "",
+          },
+        }
+      : {
+          type: "binary_expr",
+          operator: operator,
+          left: {
+            type: "column_ref",
+            table: null,
+            column: label,
+          },
+          right: {
+            type: "string",
+            value: value,
+          },
+        };
 
   const ast: any = parser.astify(originalQuery);
 
@@ -187,4 +188,277 @@ export const isGivenFieldInOrderBy = async (
   }
 
   return null;
+};
+
+// Function to extract field names, aliases, and aggregation functions
+function extractFields(parsedAst: any, timeField: string) {
+  let fields = parsedAst.columns.map((column: any) => {
+    const field = {
+      column: "",
+      alias: "",
+      aggregationFunction: null,
+    };
+
+    if (column.expr.type === "column_ref") {
+      field.column = column?.expr?.column ?? timeField;
+    } else if (column.expr.type === "aggr_func") {
+      field.column = column?.expr?.args?.expr?.column ?? timeField;
+      field.aggregationFunction = column?.expr?.name?.toLowerCase() ?? "count";
+    } else if (column.expr.type === "function") {
+      // histogram field
+      field.column = column?.expr?.args?.value[0]?.column ?? timeField;
+      field.aggregationFunction =
+        column?.expr?.name?.toLowerCase() ?? "histogram";
+    }
+
+    field.alias = column?.as ?? field?.column ?? timeField;
+
+    return field;
+  });
+
+  // Check if all fields are selected and remove the `*` entry
+  const allFieldsSelected = parsedAst.columns.some(
+    (column: any) => column.expr && column.expr.column === "*"
+  );
+
+  if (allFieldsSelected) {
+    // Add histogram(_timestamp) and count(_timestamp) to the fields array
+    fields.push(
+      {
+        column: timeField,
+        alias: "x_axis_1",
+        aggregationFunction: "histogram",
+      },
+      {
+        column: timeField,
+        alias: "y_axis_1",
+        aggregationFunction: "count",
+      }
+    );
+
+    // Filter out the `*` entry from fields
+    fields = fields.filter((field: any) => field.column !== "*");
+  }
+
+  return fields;
+}
+
+// Function to extract conditions from the WHERE clause
+function extractConditions(parsedAst: any) {
+  const conditions: any = [];
+
+  function traverseCondition(node: any) {
+    if (node.type === "binary_expr") {
+      const condition = {
+        column: "",
+        operator: node.operator,
+        value: "",
+      };
+
+      if (node.left.type === "column_ref") {
+        condition.column = node.left.column;
+      }
+
+      if (
+        node.right.type === "string" ||
+        node.right.type === "number" ||
+        node.right.type === "single_quote_string"
+      ) {
+        condition.value = node.right.value;
+      } else if (node.right.type === "column_ref") {
+        condition.value = node.right.column;
+      } else if (node.right.type === "expr_list") {
+        condition.value = node.right.value.map(
+          (item: any) => item.value || item.column
+        );
+      } else if (node.right.type === "null") {
+        condition.operator += " NULL";
+      }
+
+      conditions.push(condition);
+    } else if (node.type === "unary_expr" && node.operator === "NOT") {
+      const condition = {
+        column: "",
+        operator: "NOT",
+        value: "",
+      };
+
+      if (node.expr.type === "binary_expr") {
+        condition.operator = `NOT ${node.expr.operator}`;
+        if (node.expr.left.type === "column_ref") {
+          condition.column = node.expr.left.column;
+        }
+        if (
+          node.expr.right.type === "string" ||
+          node.expr.right.type === "number" ||
+          node.expr.right.type === "single_quote_string"
+        ) {
+          condition.value = node.expr.right.value;
+        } else if (node.expr.right.type === "column_ref") {
+          condition.value = node.expr.right.column;
+        }
+      }
+
+      conditions.push(condition);
+    }
+
+    if (node.left && node.left.type === "binary_expr") {
+      traverseCondition(node.left);
+    }
+
+    if (node.right && node.right.type === "binary_expr") {
+      traverseCondition(node.right);
+    }
+  }
+
+  if (parsedAst.where) {
+    traverseCondition(parsedAst.where);
+  }
+
+  return conditions;
+}
+
+// Function to extract the table name
+function extractTableName(parsedAst: any) {
+  return parsedAst.from[0].table ?? null;
+}
+
+export const getFieldsFromQuery = async (
+  query: any,
+  timeField: string = "_timestamp"
+) => {
+  try {
+    await importSqlParser();
+
+    const ast: any = parser.astify(query);
+
+    const streamName = extractTableName(ast) ?? null;
+    const fields = extractFields(ast, timeField);
+    const conditions = extractConditions(ast);
+
+    // filter fields and conditions
+    const filteredFields = fields.filter((field: any) => field.column);
+    const filteredConditions = conditions.filter(
+      (condition: any) => condition.column
+    );
+
+    return {
+      fields: filteredFields,
+      conditions: filteredConditions,
+      streamName,
+    };
+  } catch (error) {
+    return {
+      fields: [
+        {
+          column: timeField,
+          alias: "x_axis_1",
+          aggregationFunction: "histogram",
+        },
+        {
+          column: timeField,
+          alias: "y_axis_1",
+          aggregationFunction: "count",
+        },
+      ],
+      conditions: [],
+      streamName: null,
+    };
+  }
+};
+
+export const buildSqlQuery = (
+  tableName: string,
+  fields: any,
+  whereClause: string
+) => {
+  let query = "SELECT ";
+
+  // If the fields array is empty, use *, otherwise join the fields with commas
+  if (fields.length === 0) {
+    query += "*";
+  } else {
+    query += fields.join(", ");
+  }
+
+  // Add the table name
+  query += ` FROM "${tableName}"`;
+
+  // If the whereClause is not empty, add it
+  if (whereClause.trim() !== "") {
+    query += " WHERE " + whereClause;
+  }
+
+  // Return the constructed query
+  return query;
+};
+
+export const getValidConditionObj = (condition: any) => {
+  switch (condition.operator) {
+    case "in": {
+      condition.type = "list";
+      condition.values = condition.value;
+      condition.operator = "IN";
+      condition.operator = null;
+      condition.value = null;
+      break;
+    }
+    case "not in": {
+      // currently not supported
+      break;
+    }
+    case "is null": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Is Null";
+      condition.value = null;
+
+      break;
+    }
+    case "is not null": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Is Not Null";
+      condition.value = null;
+      break;
+    }
+    case "like": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Contains";
+      // remove % from the start and end
+      condition.value = condition?.value?.replace(/^%|%$/g, "");
+      break;
+    }
+    case "not like": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Not Contains";
+      // remove % from the start and end
+      condition.value = condition?.value?.replace(/^%|%$/g, "");
+      break;
+    }
+    case "<>":
+    case "!=": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "<>";
+      condition.value = `'${condition.value}'`;
+      break;
+    }
+    case "=":
+    case "<":
+    case ">":
+    case "<=":
+    case ">=": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.value = `'${condition.value}'`;
+      break;
+    }
+    default:
+      break;
+  }
+
+  return condition;
 };
