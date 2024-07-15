@@ -310,7 +310,7 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio
@@ -466,7 +466,7 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio
