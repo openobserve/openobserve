@@ -93,7 +93,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, inject, ref } from "vue";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -108,7 +108,14 @@ export default defineComponent({
     const showDrilldownPopUp = ref(false);
     const isDrilldownEditMode = ref(false);
     const selectedDrilldownIndexToEdit: any = ref(null);
-    const { dashboardPanelData } = useDashboardPanelData();
+
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
 
     onBeforeMount(() => {
       // Ensure that the drilldown object is initialized in config

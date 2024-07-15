@@ -94,6 +94,7 @@ const defaultObject = {
     ],
   },
   meta: {
+    logsVisualizeToggle: "logs",
     refreshInterval: <number>0,
     refreshIntervalLabel: "Off",
     showFields: true,
@@ -3170,18 +3171,26 @@ const useLogs = () => {
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
-          if (searchObj.loading == false && searchObj.loadingHistogram == false) {
+          if (
+            searchObj.loading == false &&
+            searchObj.loadingHistogram == false &&
+            searchObj.meta.logsVisualizeToggle == "logs"
+          ) {
             searchObj.loading = true;
             await getQueryData(false);
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
-        $q.notify({
-          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-          color: "positive",
-          position: "top",
-          timeout: 1000,
-        });
+
+        // only notify if user is in logs page
+        if(searchObj.meta.logsVisualizeToggle == "logs"){
+          $q.notify({
+            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            color: "positive",
+            position: "top",
+            timeout: 1000,
+          });
+        }
       } else {
         clearInterval(store.state.refreshIntervalID);
       }
