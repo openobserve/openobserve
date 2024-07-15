@@ -24,6 +24,14 @@
           ].fields?.filter"
           :key="index"
         >
+          <div v-if="showSelect">
+            <q-select
+              v-model="addLabel"
+              dense
+              filled
+              :options="filterOptions"
+            />
+          </div>
           <q-btn
             square
             icon-right="arrow_drop_down"
@@ -32,7 +40,7 @@
             :no-wrap="true"
             color="primary"
             size="sm"
-            :label="computedLabel(filteredItem)"
+            :label="computedLabel(filteredItem, index)"
             :data-test="`dashboard-filter-item-${filteredItem.column}`"
             class="q-pl-sm"
           >
@@ -42,7 +50,7 @@
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
               <q-select
-                v-model="selectedSchema"
+                v-model="selectedSchemas[index]"
                 :options="schemaOptions"
                 label="FieldList"
                 dense
@@ -223,14 +231,6 @@
             @click="removeFilterItem(filteredItem.column)"
             icon="close"
           />
-          <div v-if="showSelect">
-            <q-select
-              v-model="addLabel"
-              dense
-              filled
-              :options="filterOptions"
-            />
-          </div>
         </q-btn-group>
         <q-btn icon="add" color="primary" size="xs" round>
           <q-menu v-model="showAddMenu">
@@ -272,12 +272,14 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import Group from "./Group.vue";
 
 export default defineComponent({
   name: "DashboardFiltersOption",
   components: {
     CommonAutoComplete,
     SanitizedHtmlRenderer,
+    Group,
   },
   props: ["dashboardData"],
 
@@ -287,20 +289,62 @@ export default defineComponent({
     const { t } = useI18n();
     const showAddMenu = ref(false);
     const showSelect = ref(false);
-    const addLabel = ref("AND");
-    const selectedSchema = ref(null);
+    const addLabel = ref("");
+    const selectedSchemas = ref<any[]>([]);
 
-    const addFilter = (type: any) => {
-      console.log(type);
+    const addFilter = (filterType: any) => {
+      console.log(filterType);
       showAddMenu.value = false;
       showSelect.value = true;
 
-      if (type === "condition") {
-        console.log("add condition");
+      if (filterType === "condition") {
+        console.log("condition");
 
         addLabel.value = "AND";
-      } else if (type === "group") {
-        addLabel.value = "OR";
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.length < 1
+        ) {
+          const defaultFilter = {
+            column: "",
+            filterType: "condition",
+            operator: "",
+            value: "",
+          };
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.push(defaultFilter);
+        } else {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter;
+        }
+      } else if (filterType === "group") {
+        console.log("group");
+
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.length < 1
+        ) {
+          console.log("here");
+
+          const defaultFilter = {
+            column: "",
+            filterType: "group",
+            operator: "",
+            value: "",
+          };
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.push(defaultFilter);
+        } else {
+          addLabel.value = "OR";
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter;
+        }
       }
     };
 
@@ -339,13 +383,6 @@ export default defineComponent({
 
     const filterStreamFn = (search: any, update: any) => {
       const needle = search.toLowerCase().trim();
-      // console.log("needle", needle);
-      // console.log(
-      //   "schemaOptions",
-      //   schemaOptions.value.filter((option: any) =>
-      //     option.label.toLowerCase().includes(needle)
-      //   )
-      // );
 
       update(() => {
         return schemaOptions.value.filter((option: any) =>
@@ -354,17 +391,10 @@ export default defineComponent({
       });
     };
 
-    const computedLabel = (filteredItem: any) => {
-      console.log("schemaOptions", selectedSchema.value, filteredItem);
-
-      const foundOption = schemaOptions.value.find(
-        (option: any) => option.value === filteredItem.column
-      );
-      console.log("foundOption", foundOption);
-
-      return selectedSchema.value === null
+    const computedLabel = (filteredItem: any, index: number) => {
+      return selectedSchemas.value[index] === undefined
         ? filteredItem.column
-        : selectedSchema.value;
+        : selectedSchemas.value[index];
     };
 
     return {
@@ -391,7 +421,7 @@ export default defineComponent({
       showSelect,
       addFilter,
       addLabel,
-      selectedSchema,
+      selectedSchemas,
       schemaOptions,
       filterStreamFn,
       computedLabel,
