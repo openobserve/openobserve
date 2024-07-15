@@ -256,7 +256,11 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import {
+  buildSqlQuery,
+  getFieldsFromQuery,
+  getValidConditionObj,
+} from "@/utils/query/sqlUtils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -855,32 +859,7 @@ export default defineComponent({
       }
     };
 
-    function buildSqlQuery(tableName, fields, whereClause) {
-      let query = "SELECT ";
-
-      // If the fields array is empty, use *, otherwise join the fields with commas
-      if (fields.length === 0) {
-        query += "*";
-      } else {
-        query += fields.join(", ");
-      }
-
-      // Add the table name
-      query += ` FROM "${tableName}"`;
-
-      // If the whereClause is not empty, add it
-      if (whereClause.trim() !== "") {
-        query += " WHERE " + whereClause;
-      }
-
-      // Return the constructed query
-      return query;
-    }
-
     const setFieldsAndConditions = async () => {
-      // reset old dashboardPanelData
-      resetDashboardPanelData();
-
       let logsQuery = searchObj.data.query ?? "";
 
       // if sql mode is off, then need to make query
@@ -942,71 +921,8 @@ export default defineComponent({
       conditions.forEach((condition) => {
         condition.operator = condition.operator.toLowerCase();
 
-        switch (condition.operator) {
-          case "in": {
-            condition.type = "list";
-            condition.values = condition.value;
-            condition.operator = "IN";
-            condition.operator = null;
-            condition.value = null;
-            break;
-          }
-          case "not in": {
-            // currently not supported
-            break;
-          }
-          case "is null": {
-            condition.type = "condition";
-            condition.values = [];
-            condition.operator = "Is Null";
-            condition.value = null;
-
-            break;
-          }
-          case "is not null": {
-            condition.type = "condition";
-            condition.values = [];
-            condition.operator = "Is Not Null";
-            condition.value = null;
-            break;
-          }
-          case "like": {
-            condition.type = "condition";
-            condition.values = [];
-            condition.operator = "Contains";
-            // remove % from the start and end
-            condition.value = condition?.value?.replace(/^%|%$/g, "");
-            break;
-          }
-          case "not like": {
-            condition.type = "condition";
-            condition.values = [];
-            condition.operator = "Not Contains";
-            // remove % from the start and end
-            condition.value = condition?.value?.replace(/^%|%$/g, "");
-            break;
-          }
-          case "<>":
-          case "!=": {
-            condition.type = "condition";
-            condition.values = [];
-            condition.operator = "<>";
-            condition.value = `'${condition.value}'`;
-            break;
-          }
-          case "=":
-          case "<":
-          case ">":
-          case "<=":
-          case ">=": {
-            condition.type = "condition";
-            condition.values = [];
-            condition.value = `'${condition.value}'`;
-            break;
-          }
-          default:
-            break;
-        }
+        // get valid condition object
+        condition = getValidConditionObj(condition);
 
         dashboardPanelData.data.queries[0].fields.filter.push(condition);
       });

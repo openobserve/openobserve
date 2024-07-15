@@ -678,7 +678,7 @@ export default defineComponent({
     };
 
     const selectedMetricTypeIcon = computed(() => {
-      return dashboardPanelData.meta.stream.streamResults.find(
+      return data.schemaList.find(
         (it: any) =>
           it.name ==
           dashboardPanelData.data.queries[
@@ -765,7 +765,7 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
-        dashboardPanelData.meta.stream.streamResults,
+        data.schemaList,
       ],
       () => {
         if (!props.editMode) {
@@ -774,7 +774,7 @@ export default defineComponent({
           ].fields.stream = "";
         }
 
-        data.indexOptions = dashboardPanelData.meta.stream.streamResults.filter(
+        data.indexOptions = data.schemaList.filter(
           (data: any) =>
             data.stream_type ==
             dashboardPanelData.data.queries[
@@ -862,6 +862,7 @@ export default defineComponent({
     // get the stream list by making an API call
     const getStreamList = async (stream_type: any) => {
       await getStreams(stream_type, false).then((res: any) => {
+        data.schemaList = [];
         data.schemaList = res.list;
         // below line required for pass by reference
         // if we don't set blank, then same object from cache is being set
@@ -979,8 +980,8 @@ export default defineComponent({
         const schemaFields: any = [];
         let userDefineSchemaSettings: any = [];
 
-        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
-          for (const stream of dashboardPanelData.meta.stream.streamResults) {
+        if (data.schemaList.length > 0) {
+          for (const stream of data.schemaList) {
             if (
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -1041,9 +1042,7 @@ export default defineComponent({
     }
 
     const toggleSchema = async () => {
-      setTimeout(async () => {
-        await extractFields();
-      }, 0);
+      await extractFields();
     };
 
     return {

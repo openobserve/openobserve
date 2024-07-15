@@ -216,7 +216,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetDashboardPanelData = () => {
-    Object.assign(dashboardPanelData.data, getDefaultDashboardPanelData().data);
+    Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
   };
 
   const resetDashboardPanelDataAndAddTimeField = () => {

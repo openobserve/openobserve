@@ -366,3 +366,99 @@ export const getFieldsFromQuery = async (
     };
   }
 };
+
+export const buildSqlQuery = (
+  tableName: string,
+  fields: any,
+  whereClause: string
+) => {
+  let query = "SELECT ";
+
+  // If the fields array is empty, use *, otherwise join the fields with commas
+  if (fields.length === 0) {
+    query += "*";
+  } else {
+    query += fields.join(", ");
+  }
+
+  // Add the table name
+  query += ` FROM "${tableName}"`;
+
+  // If the whereClause is not empty, add it
+  if (whereClause.trim() !== "") {
+    query += " WHERE " + whereClause;
+  }
+
+  // Return the constructed query
+  return query;
+};
+
+export const getValidConditionObj = (condition: any) => {
+  switch (condition.operator) {
+    case "in": {
+      condition.type = "list";
+      condition.values = condition.value;
+      condition.operator = "IN";
+      condition.operator = null;
+      condition.value = null;
+      break;
+    }
+    case "not in": {
+      // currently not supported
+      break;
+    }
+    case "is null": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Is Null";
+      condition.value = null;
+
+      break;
+    }
+    case "is not null": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Is Not Null";
+      condition.value = null;
+      break;
+    }
+    case "like": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Contains";
+      // remove % from the start and end
+      condition.value = condition?.value?.replace(/^%|%$/g, "");
+      break;
+    }
+    case "not like": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "Not Contains";
+      // remove % from the start and end
+      condition.value = condition?.value?.replace(/^%|%$/g, "");
+      break;
+    }
+    case "<>":
+    case "!=": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.operator = "<>";
+      condition.value = `'${condition.value}'`;
+      break;
+    }
+    case "=":
+    case "<":
+    case ">":
+    case "<=":
+    case ">=": {
+      condition.type = "condition";
+      condition.values = [];
+      condition.value = `'${condition.value}'`;
+      break;
+    }
+    default:
+      break;
+  }
+
+  return condition;
+};

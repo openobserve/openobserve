@@ -903,6 +903,8 @@ import {
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { inject } from "vue";
 
 const defaultValue: any = () => {
   return {
@@ -2415,10 +2417,20 @@ export default defineComponent({
       }
     };
 
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "logs"
+    );
+    const { resetDashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
+
     const changeLogsVisualizeToggle = () => {
       // change logs visualize toggle
       searchObj.meta.logsVisualizeToggle = "logs";
       confirmLogsVisualizeModeChangeDialog.value = false;
+      // reset old dashboardPanelData
+      resetDashboardPanelData();
     };
 
     return {
