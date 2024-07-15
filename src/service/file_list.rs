@@ -16,7 +16,7 @@
 use std::io::Write;
 
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
         cluster::{Node, RoleGroup},
@@ -171,7 +171,7 @@ pub async fn query(
         return Ok(Vec::new());
     }
     let node = max_id_node.unwrap();
-    if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
+    if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
         // local node, no need grpc call
         let files = query_inner(
             org_id,

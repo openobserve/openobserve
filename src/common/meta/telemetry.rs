@@ -16,10 +16,7 @@
 use std::collections::HashMap;
 
 use config::{
-    cluster::{is_single_node, load_local_node_role},
-    get_config, get_instance_id,
-    utils::json,
-    SIZE_IN_MB, TELEMETRY_CLIENT,
+    cluster::LOCAL_NODE, get_config, get_instance_id, utils::json, SIZE_IN_MB, TELEMETRY_CLIENT,
 };
 use hashbrown::HashSet;
 use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS_LATEST};
@@ -162,8 +159,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
         }
     }
 
-    let roles = load_local_node_role();
-    if !is_single_node(&roles) {
+    if !LOCAL_NODE.is_single_node() {
         match get_cached_online_nodes().await {
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));

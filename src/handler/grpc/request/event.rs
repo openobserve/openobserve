@@ -15,7 +15,7 @@
 
 use chrono::{Duration, Utc};
 use config::{
-    cluster::{is_compactor, is_querier, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         cluster::{Role, RoleGroup},
@@ -65,7 +65,7 @@ impl Event for Eventer {
         // querier and compactor can accept add new files
         // ingester only accept remove old files
         if !cfg.common.meta_store_external {
-            if is_querier(&LOCAL_NODE_ROLE) || is_compactor(&LOCAL_NODE_ROLE) {
+            if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_compactor() {
                 if let Err(e) = infra_file_list::batch_add(&put_items).await {
                     // metrics
                     let time = start.elapsed().as_secs_f64();
@@ -92,7 +92,7 @@ impl Event for Eventer {
         }
 
         // cache latest files for querier
-        if cfg.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
+        if cfg.memory_cache.cache_latest_files && LOCAL_NODE.is_querier() {
             let mut cached_field_stream = HashSet::new();
             for item in put_items.iter() {
                 let Some(node) = get_node_from_consistent_hash(
@@ -104,7 +104,7 @@ impl Event for Eventer {
                 else {
                     continue; // no querier node
                 };
-                if LOCAL_NODE_UUID.ne(&node) {
+                if LOCAL_NODE.uuid.ne(&node) {
                     continue; // not this node
                 }
                 if infra::cache::file_data::download("download", &item.key)

@@ -23,7 +23,8 @@ use actix_web::{
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
-    cluster, get_config,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamType},
         usage::UsageType,
@@ -65,7 +66,7 @@ pub async fn save_enrichment_data(
     let table_name = table_name.trim();
     let stream_name = &format_stream_name(table_name);
 
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

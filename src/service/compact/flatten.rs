@@ -21,7 +21,7 @@ use arrow::array::{
 };
 use arrow_schema::{DataType, Field};
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         cluster::Role,
@@ -75,7 +75,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE_UUID.ne(&node) {
+                if LOCAL_NODE.uuid.ne(&node) {
                     continue; // not this node
                 }
 

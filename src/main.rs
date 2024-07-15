@@ -17,10 +17,7 @@ use std::{cmp::max, collections::HashMap, net::SocketAddr, str::FromStr, time::D
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use config::{
-    cluster::{is_router, LOCAL_NODE_ROLE},
-    get_config,
-};
+use config::get_config;
 use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
@@ -202,7 +199,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    if is_router(&LOCAL_NODE_ROLE) {
+    if config::cluster::LOCAL_NODE.is_router() {
         init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     } else {
         init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
@@ -402,7 +399,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!("starting HTTP server at: {}", haddr);
         let mut app = App::new().wrap(prometheus.clone());
-        if is_router(&LOCAL_NODE_ROLE) {
+        if config::cluster::LOCAL_NODE.is_router() {
             let client = awc::Client::builder()
                 .connector(awc::Connector::new().limit(cfg.route.max_connections))
                 .timeout(Duration::from_secs(cfg.route.timeout))
@@ -481,7 +478,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!("starting HTTP server at: {}", haddr);
         let mut app = App::new().wrap(prometheus.clone());
-        if is_router(&LOCAL_NODE_ROLE) {
+        if config::cluster::LOCAL_NODE.is_router() {
             let client = awc::Client::builder()
                 .connector(awc::Connector::new().limit(cfg.route.max_connections))
                 .timeout(Duration::from_secs(cfg.route.timeout))

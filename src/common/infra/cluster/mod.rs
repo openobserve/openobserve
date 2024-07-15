@@ -19,7 +19,7 @@ use config::{
     cluster::*,
     get_config, get_instance_id,
     meta::{
-        cluster::{load_role_group, Node, NodeStatus, Role, RoleGroup},
+        cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
     },
     utils::{hash::Sum64, json},
@@ -131,8 +131,7 @@ pub fn get_internal_grpc_token() -> String {
 pub async fn register_and_keepalive() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
-        let roles = load_local_node_role();
-        if !is_single_node(&roles) {
+        if !LOCAL_NODE.is_single_node() {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
@@ -141,7 +140,7 @@ pub async fn register_and_keepalive() -> Result<()> {
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
         add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
-        NODES.write().await.insert(LOCAL_NODE_UUID.clone(), node);
+        NODES.write().await.insert(LOCAL_NODE.uuid.clone(), node);
         return Ok(());
     }
 
@@ -295,11 +294,11 @@ async fn watch_node_list() -> Result<()> {
                 log::info!("[CLUSTER] join {:?}", item_value);
                 if !cfg.common.meta_store_external && !broadcasted {
                     // The ingester need broadcast local file list to the new node
-                    if is_ingester(&LOCAL_NODE_ROLE)
+                    if LOCAL_NODE.is_ingester()
                         && (item_value.status.eq(&NodeStatus::Prepare)
                             || item_value.status.eq(&NodeStatus::Online))
                     {
-                        let notice_uuid = if item_key.eq(LOCAL_NODE_UUID.as_str()) {
+                        let notice_uuid = if item_key.eq(LOCAL_NODE.uuid.as_str()) {
                             log::info!("[CLUSTER] broadcast file_list to other nodes");
                             None
                         } else {
@@ -388,7 +387,7 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let cfg = get_config();
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
-        if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
+        if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
             continue;
         }
         let url = format!("{}{}/healthz", node.http_addr, cfg.common.base_uri);
@@ -458,16 +457,16 @@ pub fn load_local_mode_node() -> Node {
     let cfg = get_config();
     Node {
         id: 1,
-        uuid: LOCAL_NODE_UUID.clone(),
+        uuid: LOCAL_NODE.uuid.clone(),
         name: cfg.common.instance_name.clone(),
         http_addr: format!("http://127.0.0.1:{}", cfg.http.port),
         grpc_addr: format!("http://127.0.0.1:{}", cfg.grpc.port),
         role: [Role::All].to_vec(),
+        role_group: RoleGroup::None,
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,
-        role_group: load_role_group(),
     }
 }
 
@@ -484,7 +483,7 @@ pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
 #[inline]
 pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && is_ingester(&node.role)
+        node.status == NodeStatus::Online && node.scheduled && node.is_ingester()
     })
     .await
 }
@@ -492,7 +491,7 @@ pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
 #[inline]
 pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
     let nodes = get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && is_querier(&node.role)
+        node.status == NodeStatus::Online && node.scheduled && node.is_querier()
     })
     .await;
     filter_nodes_with_group(nodes, group)
@@ -503,7 +502,7 @@ pub async fn get_cached_online_query_nodes(group: Option<RoleGroup>) -> Option<V
     let nodes = get_cached_nodes(|node| {
         node.status == NodeStatus::Online
             && node.scheduled
-            && (is_querier(&node.role) || is_ingester(&node.role))
+            && (node.is_querier() || node.is_ingester())
     })
     .await;
     filter_nodes_with_group(nodes, group)

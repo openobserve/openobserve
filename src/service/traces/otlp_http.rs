@@ -18,7 +18,8 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{http, web, HttpResponse};
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json},
@@ -63,7 +64,7 @@ pub async fn traces_json(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

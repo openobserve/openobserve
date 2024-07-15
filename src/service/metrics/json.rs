@@ -18,7 +18,7 @@ use std::{collections::HashMap, io::BufReader, sync::Arc};
 use actix_web::{http, web};
 use anyhow::{anyhow, Result};
 use config::{
-    cluster,
+    cluster::LOCAL_NODE,
     meta::{
         stream::{PartitioningDetails, StreamType},
         usage::UsageType,
@@ -50,7 +50,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
 
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Err(anyhow::anyhow!("not an ingester"));
     }
 

@@ -18,7 +18,6 @@ use std::{cmp::min, io::Cursor, str::FromStr, sync::Arc};
 use ::datafusion::arrow::{datatypes::Schema, ipc, record_batch::RecordBatch};
 use async_recursion::async_recursion;
 use config::{
-    cluster::{is_ingester, is_querier},
     get_config,
     meta::{
         bitvec::BitVec,
@@ -98,7 +97,7 @@ pub async fn search(
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
-    let querier_num = nodes.iter().filter(|node| is_querier(&node.role)).count();
+    let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
@@ -310,7 +309,7 @@ pub async fn search(
         job.partition = partition_no as i32;
         req.job = Some(job);
         req.stype = cluster_rpc::SearchType::WalOnly as _;
-        let is_querier = is_querier(&node.role);
+        let is_querier = node.is_querier();
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as _;
@@ -333,7 +332,7 @@ pub async fn search(
                             .collect();
                         offset_start += offset;
                         if req.file_list.is_empty() {
-                            if is_ingester(&node.role) {
+                            if node.is_ingester() {
                                 req.stype = cluster_rpc::SearchType::WalOnly as _;
                             } else {
                                 continue; // no need more querier
@@ -341,7 +340,7 @@ pub async fn search(
                         }
                     }
                 };
-            } else if !is_ingester(&node.role) {
+            } else if !node.is_ingester() {
                 continue; // no need more querier
             }
         }
@@ -846,7 +845,7 @@ pub(crate) async fn partition_file_by_hash<'a>(
     let mut node_idx = HashMap::with_capacity(nodes.len());
     let mut idx = 0;
     for node in nodes {
-        if !is_querier(&node.role) {
+        if !node.is_querier() {
             continue;
         }
         node_idx.insert(&node.uuid, idx);
