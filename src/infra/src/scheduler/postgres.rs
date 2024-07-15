@@ -47,7 +47,7 @@ impl super::Scheduler for PostgresScheduler {
             r#"
 CREATE TABLE IF NOT EXISTS scheduled_jobs
 (
-    id           BIGINT GENERATED ALWAYS AS IDENTITY,
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org          VARCHAR(100) not null,
     module       INT not null,
     module_key   VARCHAR(256) not null,
