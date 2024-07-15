@@ -249,6 +249,7 @@ pub async fn search(
         } else {
             None
         },
+        result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -313,7 +314,7 @@ fn merge_response(
         return;
     }
     let cache_hits_len = cache_response.hits.len();
-
+    cache_response.scan_size = 0;
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
     let cache_ts = if cache_response.hits.is_empty() {
