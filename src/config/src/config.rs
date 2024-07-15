@@ -517,6 +517,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_RESULT_CACHE_DIR", default = "")] // ./data/openobserve/result_cache/
+    pub result_cache_dir: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
@@ -1407,6 +1409,9 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.common.data_cache_dir.is_empty() {
         cfg.common.data_cache_dir = format!("{}cache/", cfg.common.data_dir);
+    }
+    if cfg.common.result_cache_dir.is_empty() {
+        cfg.common.result_cache_dir = format!("{}cache/", cfg.common.data_dir);
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);

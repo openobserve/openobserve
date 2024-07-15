@@ -15,6 +15,7 @@
 
 pub mod file_data;
 pub mod meta;
+pub mod results;
 pub mod stats;
 pub mod tmpfs;
 

@@ -298,6 +298,44 @@ pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// querier disk result cache stats
+pub static QUERY_DISK_RESULT_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_result_cache_limit_bytes",
+            "Querier disk result cache limit bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_result_cache_used_bytes",
+            "Querier disk result cache used bytes. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_RESULT_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_result_cache_files",
+            "Querier disk result cached files. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
 // compactor stats
 pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
