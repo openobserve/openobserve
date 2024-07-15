@@ -54,7 +54,6 @@ import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
-import { fr } from "date-fns/locale";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -205,6 +204,7 @@ const defaultObject = {
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
+    isOperationCancelled: false,
   },
 };
 
@@ -2072,6 +2072,14 @@ const useLogs = () => {
       // ) {
       //   delete queryReq.query.track_total_hits;
       // }
+
+      if (searchObj.data.isOperationCancelled) {
+        notificationMsg.value = "Search operation is cancelled.";
+        searchObj.loading = false;
+        searchObj.data.isOperationCancelled = false;
+        return;
+      }
+
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
@@ -2357,6 +2365,13 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
+      if (searchObj.data.isOperationCancelled) {
+        searchObj.loadingHistogram = false;
+        searchObj.data.histogram.errorDetail = "Search operation was cancelled";
+        searchObj.data.isOperationCancelled = false;
+        return;
+      }
+
       const dismiss = () => {};
       try {
         const { traceparent, traceId } = generateTraceContext();
@@ -3918,6 +3933,7 @@ const useLogs = () => {
 
   const cancelQuery = () => {
     const tracesIds = [...searchObj.data.searchRequestTraceIds];
+    searchObj.data.isOperationCancelled = true;
     searchService
       .delete_running_queries(
         store.state.selectedOrganization.identifier,
@@ -3925,14 +3941,15 @@ const useLogs = () => {
       )
       .then((res) => {
         const isCancelled = res.data.some((item: any) => item.is_success);
-        $q.notify({
-          message: isCancelled
-            ? "Running query cancelled successfully"
-            : "Cancellation failed: Query already executed.",
-          color: isCancelled ? "positive" : "negative",
-          position: "bottom",
-          timeout: 4000,
-        });
+        if (isCancelled) {
+          searchObj.data.isOperationCancelled = false;
+          $q.notify({
+            message: "Running query cancelled successfully",
+            color: "positive",
+            position: "bottom",
+            timeout: 4000,
+          });
+        }
       })
       .catch((error: any) => {
         $q.notify({
@@ -3946,7 +3963,7 @@ const useLogs = () => {
       .finally(() => {
         searchObj.data.searchRequestTraceIds =
           searchObj.data.searchRequestTraceIds.filter(
-            (id: string) => !tracesIds.includes(id)
+            (id: string) => !tracesIds.includes(id),
           );
       });
   };
