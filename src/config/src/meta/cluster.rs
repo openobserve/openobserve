@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{config, meta::search::SearchEventType};
+use crate::meta::search::SearchEventType;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Node {
@@ -27,14 +27,14 @@ pub struct Node {
     pub http_addr: String,
     pub grpc_addr: String,
     pub role: Vec<Role>,
+    #[serde(default)]
+    pub role_group: RoleGroup,
     pub cpu_num: u64,
     pub status: NodeStatus,
     #[serde(default)]
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
-    #[serde(default)]
-    pub role_group: RoleGroup,
 }
 
 impl Node {
@@ -46,12 +46,41 @@ impl Node {
             http_addr: "".to_string(),
             grpc_addr: "".to_string(),
             role: vec![],
+            role_group: RoleGroup::None,
             cpu_num: 0,
             status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
-            role_group: load_role_group(),
         }
+    }
+    pub fn is_single_node(&self) -> bool {
+        self.role.len() == 1 && self.role.contains(&Role::All)
+    }
+    pub fn is_router(&self) -> bool {
+        self.role.contains(&Role::Router)
+    }
+    pub fn is_ingester(&self) -> bool {
+        self.role.contains(&Role::Ingester) || self.role.contains(&Role::All)
+    }
+    pub fn is_querier(&self) -> bool {
+        self.role.contains(&Role::Querier) || self.role.contains(&Role::All)
+    }
+    pub fn is_interactive_querier(&self) -> bool {
+        self.is_querier()
+            && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Interactive)
+    }
+    pub fn is_background_querier(&self) -> bool {
+        self.is_querier()
+            && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Background)
+    }
+    pub fn is_compactor(&self) -> bool {
+        self.role.contains(&Role::Compactor) || self.role.contains(&Role::All)
+    }
+    pub fn is_flatten_compactor(&self) -> bool {
+        self.role.contains(&Role::FlattenCompactor) || self.role.contains(&Role::All)
+    }
+    pub fn is_alert_manager(&self) -> bool {
+        self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
 }
 
@@ -114,7 +143,7 @@ impl std::fmt::Display for Role {
 /// None        -> All tasks
 /// Background  -> Low-priority tasks
 /// Interactive -> High-priority tasks
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub enum RoleGroup {
     #[default]
     None,
@@ -149,8 +178,4 @@ impl std::fmt::Display for RoleGroup {
             RoleGroup::Background => write!(f, "background"),
         }
     }
-}
-
-pub fn load_role_group() -> RoleGroup {
-    RoleGroup::from(config::get_config().common.node_role_group.as_str())
 }

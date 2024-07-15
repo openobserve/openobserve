@@ -20,7 +20,7 @@ use std::{
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     utils::{json, time::BASE_TIME},
@@ -82,7 +82,7 @@ pub async fn delete_all(
     let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
     let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
@@ -94,7 +94,7 @@ pub async fn delete_all(
         stream_type,
         stream_name,
         None,
-        &LOCAL_NODE_UUID.clone(),
+        &LOCAL_NODE.uuid.clone(),
     )
     .await;
     // already bind to this node, we can unlock now
@@ -179,7 +179,7 @@ pub async fn delete_by_date(
     let node =
         db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))
             .await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::error!(
             "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
@@ -194,7 +194,7 @@ pub async fn delete_by_date(
         stream_type,
         stream_name,
         Some(date_range),
-        &LOCAL_NODE_UUID.clone(),
+        &LOCAL_NODE.uuid.clone(),
     )
     .await;
     // already bind to this node, we can unlock now

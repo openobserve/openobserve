@@ -15,12 +15,7 @@
 
 use std::{fs, path::Path};
 
-use config::{
-    cluster::{is_compactor, is_ingester, is_querier, LOCAL_NODE_ROLE},
-    get_config,
-    meta::stream::StreamType,
-    utils::file::scan_files,
-};
+use config::{cluster::LOCAL_NODE, get_config, meta::stream::StreamType, utils::file::scan_files};
 use infra::storage;
 use tokio::time;
 
@@ -42,7 +37,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
-    if !is_ingester(&LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
     }
 
@@ -145,7 +140,7 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
 }
 
 async fn _run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
-    if !is_querier(&LOCAL_NODE_ROLE) && !is_compactor(&LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_compactor() {
         return Ok(()); // only querier or compactor need to sync
     }
 

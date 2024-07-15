@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, meta::stream::StreamType, FILE_EXT_PARQUET};
+use config::{
+    cluster::{is_offline, LOCAL_NODE},
+    ider,
+    meta::stream::StreamType,
+    FILE_EXT_PARQUET,
+};
 use tokio::time;
 
 pub mod broadcast;
@@ -21,7 +26,7 @@ pub mod idx;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
     }
 
@@ -34,7 +39,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
     loop {
-        if cluster::is_offline() {
+        if is_offline() {
             break;
         }
         time::sleep(time::Duration::from_secs(3600)).await;

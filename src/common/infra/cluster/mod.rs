@@ -19,7 +19,7 @@ use config::{
     cluster::*,
     get_config, get_instance_id,
     meta::{
-        cluster::{load_role_group, Node, NodeStatus, Role},
+        cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
     },
     utils::{hash::Sum64, json},
@@ -41,15 +41,22 @@ const HEALTH_CHECK_FAILED_TIMES: usize = 3;
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
-static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
+static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
+    Lazy::new(Default::default);
+static QUERIER_BACKGROUND_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
+    Lazy::new(Default::default);
 static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
 static FLATTEN_COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
 static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
 
-pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
+pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option<RoleGroup>) {
     let mut nodes = match role {
-        Role::Querier => QUERIER_CONSISTENT_HASH.write().await,
+        Role::Querier => match group {
+            Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await,
+            Some(RoleGroup::Background) => QUERIER_BACKGROUND_CONSISTENT_HASH.write().await,
+            _ => QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await,
+        },
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
@@ -62,9 +69,13 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
     }
 }
 
-pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
+pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role, group: Option<RoleGroup>) {
     let mut nodes = match role {
-        Role::Querier => QUERIER_CONSISTENT_HASH.write().await,
+        Role::Querier => match group {
+            Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await,
+            Some(RoleGroup::Background) => QUERIER_BACKGROUND_CONSISTENT_HASH.write().await,
+            _ => QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await,
+        },
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
@@ -77,9 +88,17 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
     }
 }
 
-pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<String> {
+pub async fn get_node_from_consistent_hash(
+    key: &str,
+    role: &Role,
+    group: Option<RoleGroup>,
+) -> Option<String> {
     let nodes = match role {
-        Role::Querier => QUERIER_CONSISTENT_HASH.read().await,
+        Role::Querier => match group {
+            Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+            Some(RoleGroup::Background) => QUERIER_BACKGROUND_CONSISTENT_HASH.read().await,
+            _ => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
+        },
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.read().await,
         Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.read().await,
         _ => return None,
@@ -112,16 +131,16 @@ pub fn get_internal_grpc_token() -> String {
 pub async fn register_and_keepalive() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
-        let roles = load_local_node_role();
-        if !is_single_node(&roles) {
+        if !LOCAL_NODE.is_single_node() {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
         let node = load_local_mode_node();
-        add_node_to_consistent_hash(&node, &Role::Querier).await;
-        add_node_to_consistent_hash(&node, &Role::Compactor).await;
-        add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
-        NODES.write().await.insert(LOCAL_NODE_UUID.clone(), node);
+        add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+        add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
+        add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        NODES.write().await.insert(LOCAL_NODE.uuid.clone(), node);
         return Ok(());
     }
 
@@ -242,15 +261,32 @@ async fn watch_node_list() -> Result<()> {
                 }
                 if item_value.status == NodeStatus::Offline {
                     log::info!("[CLUSTER] offline {:?}", item_value);
-                    if is_querier(&item_value.role) {
-                        remove_node_from_consistent_hash(&item_value, &Role::Querier).await;
+                    if item_value.is_interactive_querier() {
+                        remove_node_from_consistent_hash(
+                            &item_value,
+                            &Role::Querier,
+                            Some(RoleGroup::Interactive),
+                        )
+                        .await;
                     }
-                    if is_compactor(&item_value.role) {
-                        remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
+                    if item_value.is_background_querier() {
+                        remove_node_from_consistent_hash(
+                            &item_value,
+                            &Role::Querier,
+                            Some(RoleGroup::Background),
+                        )
+                        .await;
                     }
-                    if is_flatten_compactor(&item_value.role) {
-                        remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor)
-                            .await;
+                    if item_value.is_compactor() {
+                        remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
+                    }
+                    if item_value.is_flatten_compactor() {
+                        remove_node_from_consistent_hash(
+                            &item_value,
+                            &Role::FlattenCompactor,
+                            None,
+                        )
+                        .await;
                     }
                     NODES.write().await.remove(item_key);
                     continue;
@@ -258,11 +294,11 @@ async fn watch_node_list() -> Result<()> {
                 log::info!("[CLUSTER] join {:?}", item_value);
                 if !cfg.common.meta_store_external && !broadcasted {
                     // The ingester need broadcast local file list to the new node
-                    if is_ingester(&LOCAL_NODE_ROLE)
+                    if LOCAL_NODE.is_ingester()
                         && (item_value.status.eq(&NodeStatus::Prepare)
                             || item_value.status.eq(&NodeStatus::Online))
                     {
-                        let notice_uuid = if item_key.eq(LOCAL_NODE_UUID.as_str()) {
+                        let notice_uuid = if item_key.eq(LOCAL_NODE.uuid.as_str()) {
                             log::info!("[CLUSTER] broadcast file_list to other nodes");
                             None
                         } else {
@@ -282,14 +318,27 @@ async fn watch_node_list() -> Result<()> {
                     }
                 }
                 item_value.broadcasted = true;
-                if is_querier(&item_value.role) {
-                    add_node_to_consistent_hash(&item_value, &Role::Querier).await;
+                if item_value.is_interactive_querier() {
+                    add_node_to_consistent_hash(
+                        &item_value,
+                        &Role::Querier,
+                        Some(RoleGroup::Interactive),
+                    )
+                    .await;
                 }
-                if is_compactor(&item_value.role) {
-                    add_node_to_consistent_hash(&item_value, &Role::Compactor).await;
+                if item_value.is_background_querier() {
+                    add_node_to_consistent_hash(
+                        &item_value,
+                        &Role::Querier,
+                        Some(RoleGroup::Background),
+                    )
+                    .await;
                 }
-                if is_flatten_compactor(&item_value.role) {
-                    add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor).await;
+                if item_value.is_compactor() {
+                    add_node_to_consistent_hash(&item_value, &Role::Compactor, None).await;
+                }
+                if item_value.is_flatten_compactor() {
+                    add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
                 }
                 NODES.write().await.insert(item_key.to_string(), item_value);
             }
@@ -302,14 +351,28 @@ async fn watch_node_list() -> Result<()> {
                     }
                 };
                 log::info!("[CLUSTER] leave {:?}", item_value);
-                if is_querier(&item_value.role) {
-                    remove_node_from_consistent_hash(&item_value, &Role::Querier).await;
+                if item_value.is_interactive_querier() {
+                    remove_node_from_consistent_hash(
+                        &item_value,
+                        &Role::Querier,
+                        Some(RoleGroup::Interactive),
+                    )
+                    .await;
                 }
-                if is_compactor(&item_value.role) {
-                    remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
+                if item_value.is_background_querier() {
+                    remove_node_from_consistent_hash(
+                        &item_value,
+                        &Role::Querier,
+                        Some(RoleGroup::Background),
+                    )
+                    .await;
                 }
-                if is_flatten_compactor(&item_value.role) {
-                    remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor).await;
+                if item_value.is_compactor() {
+                    remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
+                }
+                if item_value.is_flatten_compactor() {
+                    remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor, None)
+                        .await;
                 }
                 NODES.write().await.remove(item_key);
             }
@@ -324,7 +387,7 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let cfg = get_config();
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
-        if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
+        if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
             continue;
         }
         let url = format!("{}{}/healthz", node.http_addr, cfg.common.base_uri);
@@ -339,14 +402,27 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                     "[CLUSTER] node {} health check failed 3 times, remove it",
                     node.name
                 );
-                if is_querier(&node.role) {
-                    remove_node_from_consistent_hash(&node, &Role::Querier).await;
+                if node.is_interactive_querier() {
+                    remove_node_from_consistent_hash(
+                        &node,
+                        &Role::Querier,
+                        Some(RoleGroup::Interactive),
+                    )
+                    .await;
                 }
-                if is_compactor(&node.role) {
-                    remove_node_from_consistent_hash(&node, &Role::Compactor).await;
+                if node.is_background_querier() {
+                    remove_node_from_consistent_hash(
+                        &node,
+                        &Role::Querier,
+                        Some(RoleGroup::Background),
+                    )
+                    .await;
                 }
-                if is_flatten_compactor(&node.role) {
-                    remove_node_from_consistent_hash(&node, &Role::FlattenCompactor).await;
+                if node.is_compactor() {
+                    remove_node_from_consistent_hash(&node, &Role::Compactor, None).await;
+                }
+                if node.is_flatten_compactor() {
+                    remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
                 }
                 NODES.write().await.remove(&node.uuid);
             }
@@ -381,16 +457,16 @@ pub fn load_local_mode_node() -> Node {
     let cfg = get_config();
     Node {
         id: 1,
-        uuid: LOCAL_NODE_UUID.clone(),
+        uuid: LOCAL_NODE.uuid.clone(),
         name: cfg.common.instance_name.clone(),
         http_addr: format!("http://127.0.0.1:{}", cfg.http.port),
         grpc_addr: format!("http://127.0.0.1:{}", cfg.grpc.port),
         role: [Role::All].to_vec(),
+        role_group: RoleGroup::None,
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,
-        role_group: load_role_group(),
     }
 }
 
@@ -407,27 +483,45 @@ pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
 #[inline]
 pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && is_ingester(&node.role)
+        node.status == NodeStatus::Online && node.scheduled && node.is_ingester()
     })
     .await
 }
 
 #[inline]
-pub async fn get_cached_online_querier_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| {
-        node.status == NodeStatus::Online && node.scheduled && is_querier(&node.role)
+pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
+    let nodes = get_cached_nodes(|node| {
+        node.status == NodeStatus::Online && node.scheduled && node.is_querier()
     })
-    .await
+    .await;
+    filter_nodes_with_group(nodes, group)
 }
 
 #[inline]
-pub async fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| {
+pub async fn get_cached_online_query_nodes(group: Option<RoleGroup>) -> Option<Vec<Node>> {
+    let nodes = get_cached_nodes(|node| {
         node.status == NodeStatus::Online
             && node.scheduled
-            && (is_querier(&node.role) || is_ingester(&node.role))
+            && (node.is_querier() || node.is_ingester())
     })
-    .await
+    .await;
+    filter_nodes_with_group(nodes, group)
+}
+
+#[inline(always)]
+fn filter_nodes_with_group(
+    nodes: Option<Vec<Node>>,
+    group: Option<RoleGroup>,
+) -> Option<Vec<Node>> {
+    let mut nodes = nodes?;
+    match group {
+        Some(RoleGroup::Interactive) => nodes
+            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Interactive),
+        Some(RoleGroup::Background) => nodes
+            .retain(|n| n.role_group == RoleGroup::None || n.role_group == RoleGroup::Background),
+        _ => {}
+    };
+    Some(nodes)
 }
 
 #[cfg(test)]
@@ -446,9 +540,9 @@ mod tests {
         set_online(false).await.unwrap();
         leave().await.unwrap();
         assert!(get_cached_online_nodes().await.is_some());
-        assert!(get_cached_online_query_nodes().await.is_some());
+        assert!(get_cached_online_query_nodes(None).await.is_some());
         assert!(get_cached_online_ingester_nodes().await.is_some());
-        assert!(get_cached_online_querier_nodes().await.is_some());
+        assert!(get_cached_online_querier_nodes(None).await.is_some());
     }
 
     #[tokio::test]
@@ -465,21 +559,21 @@ mod tests {
                 role: [Role::Compactor].to_vec(),
                 ..node.clone()
             };
-            add_node_to_consistent_hash(&node_q, &Role::Querier).await;
-            add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
-            add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor).await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, None).await;
+            add_node_to_consistent_hash(&node_c, &Role::Compactor, None).await;
+            add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor, None).await;
         }
 
         for key in ["test", "test1", "test2", "test3"] {
             println!(
                 "{key}-q: {}",
-                get_node_from_consistent_hash(key, &Role::Querier)
+                get_node_from_consistent_hash(key, &Role::Querier, None)
                     .await
                     .unwrap()
             );
             println!(
                 "{key}-c: {}",
-                get_node_from_consistent_hash(key, &Role::Compactor)
+                get_node_from_consistent_hash(key, &Role::Compactor, None)
                     .await
                     .unwrap()
             );
@@ -515,11 +609,11 @@ mod tests {
         ];
         for key in data {
             assert_eq!(
-                get_node_from_consistent_hash(key.first().unwrap(), &Role::Querier).await,
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Querier, None).await,
                 Some(key.get(1).unwrap().to_string())
             );
             assert_eq!(
-                get_node_from_consistent_hash(key.first().unwrap(), &Role::Compactor).await,
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Compactor, None).await,
                 Some(key.get(2).unwrap().to_string())
             );
         }
