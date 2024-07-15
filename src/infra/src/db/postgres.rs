@@ -515,7 +515,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     module   VARCHAR(100) not null,
     key1     VARCHAR(256) not null,
     key2     VARCHAR(256) not null,
