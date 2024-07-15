@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    cluster::{is_compactor, is_querier},
-    get_config,
-};
+use config::{cluster::LOCAL_NODE, get_config};
 use tokio::time;
 
 use crate::service::{compact::stats::update_stats_from_file_list, db, usage};
@@ -30,7 +27,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn _usage_report_stats() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) || !cfg.common.usage_enabled {
+    if !LOCAL_NODE.is_compactor() || !cfg.common.usage_enabled {
         return Ok(());
     }
 
@@ -50,9 +47,7 @@ async fn _usage_report_stats() -> Result<(), anyhow::Error> {
 // get stats from file_list to update stream_stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if (cfg.common.meta_store_external || !is_querier(&super::cluster::LOCAL_NODE_ROLE))
-        && !is_compactor(&super::cluster::LOCAL_NODE_ROLE)
-    {
+    if (cfg.common.meta_store_external || !LOCAL_NODE.is_querier()) && !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
 
@@ -80,7 +75,7 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
 }
 
 async fn cache_stream_stats() -> Result<(), anyhow::Error> {
-    if !is_querier(&super::cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_querier() {
         return Ok(());
     }
 

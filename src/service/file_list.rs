@@ -16,10 +16,10 @@
 use std::io::Write;
 
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        cluster::Node,
+        cluster::{Node, RoleGroup},
         search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
@@ -73,7 +73,7 @@ pub async fn query(
 
     // cluster mode
     let start: std::time::Instant = std::time::Instant::now();
-    let nodes = cluster::get_cached_online_querier_nodes()
+    let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -171,7 +171,7 @@ pub async fn query(
         return Ok(Vec::new());
     }
     let node = max_id_node.unwrap();
-    if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
+    if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
         // local node, no need grpc call
         let files = query_inner(
             org_id,

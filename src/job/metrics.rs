@@ -16,7 +16,7 @@
 use std::path::Path;
 
 use config::{
-    cluster, get_config,
+    get_config,
     meta::{cluster::Role, stream::StreamType},
     metrics,
     utils::file::scan_files,
@@ -118,27 +118,27 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         let nodes = get_cached_online_nodes().await;
         if nodes.is_some() {
             for node in nodes.unwrap() {
-                if cluster::is_ingester(&node.role) {
+                if node.is_ingester() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::Ingester.to_string().as_str()])
                         .inc();
                 }
-                if cluster::is_querier(&node.role) {
+                if node.is_querier() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::Querier.to_string().as_str()])
                         .inc();
                 }
-                if cluster::is_compactor(&node.role) {
+                if node.is_compactor() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::Compactor.to_string().as_str()])
                         .inc();
                 }
-                if cluster::is_router(&node.role) {
+                if node.is_router() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::Router.to_string().as_str()])
                         .inc();
                 }
-                if cluster::is_alert_manager(&node.role) {
+                if node.is_alert_manager() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::AlertManager.to_string().as_str()])
                         .inc();

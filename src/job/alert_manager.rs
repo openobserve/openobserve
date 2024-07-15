@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, get_config};
+use config::{cluster::LOCAL_NODE, get_config};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use tokio::time;
@@ -21,7 +21,7 @@ use tokio::time;
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
 

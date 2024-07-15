@@ -20,7 +20,7 @@ use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config, ider,
     meta::stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
@@ -88,16 +88,16 @@ pub async fn generate_job_by_stream(
 ) -> Result<(), anyhow::Error> {
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
 
-    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
@@ -108,7 +108,7 @@ pub async fn generate_job_by_stream(
             stream_type,
             stream_name,
             offset,
-            Some(&LOCAL_NODE_UUID.clone()),
+            Some(&LOCAL_NODE.uuid.clone()),
         )
         .await;
         dist_lock::unlock(&locker).await?;
@@ -191,7 +191,7 @@ pub async fn generate_job_by_stream(
         stream_type,
         stream_name,
         offset,
-        Some(&LOCAL_NODE_UUID.clone()),
+        Some(&LOCAL_NODE.uuid.clone()),
     )
     .await?;
 

@@ -18,7 +18,8 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::web;
 use chrono::{TimeZone, Utc};
 use config::{
-    cluster, get_config,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         stream::{PartitioningDetails, StreamType},
         usage::UsageType,
@@ -64,7 +65,7 @@ pub async fn remote_write(
 ) -> std::result::Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
@@ -849,7 +850,7 @@ async fn prom_ha_handler(
             ClusterLeader {
                 name: replica_label.to_owned(),
                 last_received: curr_ts,
-                updated_by: cluster::LOCAL_NODE_UUID.to_string(),
+                updated_by: LOCAL_NODE.uuid.clone(),
             },
         );
         _accept_record = true;

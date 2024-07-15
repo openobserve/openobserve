@@ -21,7 +21,7 @@ use arrow::array::{
 };
 use arrow_schema::{DataType, Field};
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         cluster::Role,
@@ -70,11 +70,12 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
 
                 // check running node
                 let Some(node) =
-                    get_node_from_consistent_hash(&stream_name, &Role::FlattenCompactor).await
+                    get_node_from_consistent_hash(&stream_name, &Role::FlattenCompactor, None)
+                        .await
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE_UUID.ne(&node) {
+                if LOCAL_NODE.uuid.ne(&node) {
                     continue; // not this node
                 }
 

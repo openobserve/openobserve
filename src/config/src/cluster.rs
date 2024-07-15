@@ -19,21 +19,41 @@ use once_cell::sync::Lazy;
 
 use crate::{
     get_config, ider,
-    meta::cluster::{NodeStatus, Role},
+    meta::cluster::{Node, NodeStatus, Role, RoleGroup},
 };
 
 pub static mut LOCAL_NODE_ID: i32 = 0;
 pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
-pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
-pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
+pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 
-#[inline(always)]
-pub fn load_local_node_uuid() -> String {
+fn load_local_node() -> Node {
+    Node {
+        uuid: load_local_node_uuid(),
+        role: load_local_node_role(),
+        role_group: load_role_group(),
+        ..Default::default()
+    }
+}
+
+fn load_local_node_uuid() -> String {
     ider::uuid()
 }
 
-#[inline(always)]
+fn load_local_node_role() -> Vec<Role> {
+    get_config()
+        .common
+        .node_role
+        .clone()
+        .split(',')
+        .map(|s| s.parse().unwrap())
+        .collect()
+}
+
+fn load_role_group() -> RoleGroup {
+    RoleGroup::from(get_config().common.node_role_group.as_str())
+}
+
 pub fn get_local_http_ip() -> String {
     let cfg = get_config();
     if !cfg.http.addr.is_empty() {
@@ -43,7 +63,6 @@ pub fn get_local_http_ip() -> String {
     }
 }
 
-#[inline(always)]
 pub fn get_local_grpc_ip() -> String {
     let cfg = get_config();
     if !cfg.grpc.addr.is_empty() {
@@ -53,7 +72,6 @@ pub fn get_local_grpc_ip() -> String {
     }
 }
 
-#[inline(always)]
 pub fn get_local_node_ip() -> String {
     for adapter in get_if_addrs::get_if_addrs().unwrap() {
         if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
@@ -64,52 +82,6 @@ pub fn get_local_node_ip() -> String {
 }
 
 #[inline(always)]
-pub fn load_local_node_role() -> Vec<Role> {
-    get_config()
-        .common
-        .node_role
-        .clone()
-        .split(',')
-        .map(|s| s.parse().unwrap())
-        .collect()
-}
-
-#[inline(always)]
-pub fn is_ingester(role: &[Role]) -> bool {
-    role.contains(&Role::Ingester) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_querier(role: &[Role]) -> bool {
-    role.contains(&Role::Querier) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_compactor(role: &[Role]) -> bool {
-    role.contains(&Role::Compactor) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_flatten_compactor(role: &[Role]) -> bool {
-    role.contains(&Role::FlattenCompactor) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_router(role: &[Role]) -> bool {
-    role.contains(&Role::Router)
-}
-
-#[inline(always)]
-pub fn is_alert_manager(role: &[Role]) -> bool {
-    role.contains(&Role::AlertManager) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_single_node(role: &[Role]) -> bool {
-    role.contains(&Role::All)
-}
-
-#[inline(always)]
 pub fn is_offline() -> bool {
     unsafe { LOCAL_NODE_STATUS == NodeStatus::Offline }
 }
@@ -117,6 +89,7 @@ pub fn is_offline() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::meta::cluster::Role;
 
     #[test]
     fn test_convert_role() {
@@ -131,41 +104,6 @@ mod tests {
         assert_eq!(parse("alertManager"), Role::AlertManager);
         assert_eq!(parse("AlertManager"), Role::AlertManager);
         assert!("alert_manager".parse::<Role>().is_ok());
-    }
-
-    #[test]
-    fn test_is_querier() {
-        assert!(is_querier(&[Role::Querier]));
-        assert!(is_querier(&[Role::All]));
-        assert!(!is_querier(&[Role::Ingester]));
-    }
-
-    #[test]
-    fn test_is_ingester() {
-        assert!(is_ingester(&[Role::Ingester]));
-        assert!(is_ingester(&[Role::All]));
-        assert!(!is_ingester(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_is_compactor() {
-        assert!(is_compactor(&[Role::Compactor]));
-        assert!(is_compactor(&[Role::All]));
-        assert!(!is_compactor(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_is_router() {
-        assert!(is_router(&[Role::Router]));
-        assert!(!is_router(&[Role::All]));
-        assert!(!is_router(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_is_alert_manager() {
-        assert!(is_alert_manager(&[Role::AlertManager]));
-        assert!(is_alert_manager(&[Role::All]));
-        assert!(!is_alert_manager(&[Role::Querier]));
     }
 
     #[test]

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, RwAHashMap};
+use config::{cluster::LOCAL_NODE, meta::stream::StreamType, RwAHashMap};
 use once_cell::sync::Lazy;
 
 use crate::service::db;
@@ -55,7 +55,7 @@ pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str
         (value.parse().unwrap(), String::from(""))
     };
     // only cache the value if it's empty or it's from this node
-    if node.is_empty() || LOCAL_NODE_UUID.eq(&node) {
+    if node.is_empty() || LOCAL_NODE.uuid.eq(&node) {
         let mut w = CACHES.write().await;
         w.insert(key.clone(), (offset, node.clone()));
         drop(w);

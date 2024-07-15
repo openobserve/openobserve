@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster;
+use config::cluster::LOCAL_NODE;
 use hashbrown::HashMap;
 use tokio::time::{self, Duration};
 
@@ -23,7 +23,7 @@ use crate::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
     }
 

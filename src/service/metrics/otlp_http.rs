@@ -19,7 +19,8 @@ use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
-    cluster, get_config,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         stream::{PartitioningDetails, StreamType},
         usage::UsageType,
@@ -79,7 +80,7 @@ pub async fn metrics_json_handler(
     org_id: &str,
     body: web::Bytes,
 ) -> Result<HttpResponse, std::io::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
