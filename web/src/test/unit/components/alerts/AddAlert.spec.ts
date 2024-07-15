@@ -156,7 +156,7 @@ describe("Alert List", async () => {
       global.server.use(
         rest.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/${stream_name}/alerts/${alert_name}`,
-          (req, res, ctx) => {
+          (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
           }
         )

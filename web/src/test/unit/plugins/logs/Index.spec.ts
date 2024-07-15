@@ -105,7 +105,7 @@ describe("Logs Index", async () => {
     global.server.use(
       rest.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        (req, res, ctx) => {
+        (req: any, res: any, ctx: any) => {
           return res(
             ctx.status(200),
             ctx.json({
@@ -145,7 +145,7 @@ describe("Logs Index", async () => {
     global.server.use(
       rest.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        (req, res, ctx) => {
+        (req: any, res: any, ctx: any) => {
           return res(
             ctx.status(400),
             ctx.json({
@@ -173,7 +173,7 @@ describe("Logs Index", async () => {
     global.server.use(
       rest.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        (req, res, ctx) => {
+        (req: any, res: any, ctx: any) => {
           return res(
             ctx.status(400),
             ctx.json({

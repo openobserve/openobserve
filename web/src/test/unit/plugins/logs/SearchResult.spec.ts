@@ -142,7 +142,7 @@ describe("Search Result", async () => {
       global.server.use(
         rest.get(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/_around`,
-          (req, res, ctx) => {
+          (req: any, res: any, ctx: any) => {
             return res(
               ctx.status(200),
               ctx.json({

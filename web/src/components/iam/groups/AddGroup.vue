@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               :rules="[
-                (val, rules) =>
+                (val: any, rules: any) =>
                   !!val
                     ? isValidGroupName ||
                       `Use alphanumeric and '_' characters only, without spaces.`

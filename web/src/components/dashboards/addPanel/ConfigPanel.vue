@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (value: any) => (dashboardPanelData.data.config.decimals = ( typeof value == 'number' && value >= 0) ? value : 2)
       "
         :rules="[
-          (val) =>
+          (val: any) =>
             (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
         ]"
         label="Decimals"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value="0"
         :min="0"
         @update:model-value="
-          (value) =>
+          (value: any) =>
             (dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.limit = value ? value : 0)
@@ -663,7 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :value="0"
         @update:model-value="
-          (value) =>
+          (value: any) =>
             (dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.min = value ? value : 0)
@@ -693,7 +693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :value="100"
         @update:model-value="
-          (value) =>
+          (value: any) =>
             (dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.max = value ? value : 100)
@@ -739,7 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :type="'number'"
         placeholder="Auto"
         @update:model-value="
-          (value) =>
+          (value: any) =>
             (dashboardPanelData.data.config.axis_width =
               value !== '' ? value : null)
         "
