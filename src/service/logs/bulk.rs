@@ -39,8 +39,7 @@ use crate::{
         stream::StreamParams,
     },
     service::{
-        db, format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
-        usage::report_request_usage_stats,
+        format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
     },
 };
 
@@ -277,49 +276,39 @@ pub async fn ingest(
                 json::Value::Number(timestamp.into()),
             );
 
-            json_data_by_stream
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+            let fns_length = stream_functions_map
+                .get(&key)
+                .map(|v| v.len())
+                .unwrap_or_default();
+
+            let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
-                .or_insert(Vec::new())
-                .push((timestamp, local_val));
+                .or_insert((Vec::new(), None));
+            ts_data.push((timestamp, local_val));
+            *fn_num = Some(fns_length);
         }
     }
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let mut status = IngestionStatus::Bulk(bulk_res);
-    for (stream_name, json_data) in json_data_by_stream {
-        // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
-        {
-            log::warn!("stream [{stream_name}] is being deleted");
-            continue; // skip
-        }
-
-        // write json data by stream
-        let mut req_stats = super::write_logs(org_id, &stream_name, &mut status, json_data).await?;
-
-        req_stats.response_time += took_time;
-        req_stats.user_email = if user_email.is_empty() {
-            None
-        } else {
-            Some(user_email.to_string())
+    if let Err(e) = super::write_logs_by_stream(
+        org_id,
+        user_email,
+        (started_at, took_time),
+        UsageType::Bulk,
+        &mut status,
+        json_data_by_stream,
+    )
+    .await
+    {
+        log::error!("Error while writing logs: {}", e);
+        let bulk_res = match status {
+            IngestionStatus::Bulk(bulk_res) => bulk_res,
+            IngestionStatus::Record(_) => unreachable!(),
         };
-
-        let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-        let fns_length = stream_functions_map
-            .get(&key)
-            .map(|v| v.len())
-            .unwrap_or_default();
-        report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Logs,
-            UsageType::Bulk,
-            fns_length as u16,
-            started_at,
-        )
-        .await;
+        return Ok(bulk_res);
     }
 
     metrics::HTTP_RESPONSE_TIME

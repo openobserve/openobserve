@@ -45,7 +45,6 @@ use crate::{
         format_stream_name,
         ingestion::{check_ingestion_allowed, get_val_for_attr},
         schema::get_upto_discard_error,
-        usage::report_request_usage_stats,
     },
 };
 
@@ -137,7 +136,7 @@ pub async fn logs_json_handler(
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
-    let mut json_data = Vec::new();
+    let mut json_data_by_stream = HashMap::new();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -359,7 +358,11 @@ pub async fn logs_json_handler(
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
-                json_data.push((timestamp, local_val));
+                let (ts_data, fn_num) = json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_insert((Vec::new(), None));
+                ts_data.push((timestamp, local_val));
+                *fn_num = Some(local_trans.len());
             }
         }
     }
@@ -369,7 +372,7 @@ pub async fn logs_json_handler(
     };
 
     // if no data, fast return
-    if json_data.is_empty() {
+    if json_data_by_stream.is_empty() {
         let mut out = BytesMut::with_capacity(res.encoded_len());
         res.encode(&mut out).expect("Out of memory");
         return Ok(HttpResponse::Ok()
@@ -379,29 +382,35 @@ pub async fn logs_json_handler(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let mut req_stats = match super::write_logs(org_id, &stream_name, &mut status, json_data).await
+    let took_time = start.elapsed().as_secs_f64();
+    if let Err(e) = super::write_logs_by_stream(
+        org_id,
+        user_email,
+        (started_at, took_time),
+        UsageType::Logs,
+        &mut status,
+        json_data_by_stream,
+    )
+    .await
     {
-        Ok(rs) => rs,
-        Err(e) => {
-            log::error!("Error while writing logs: {}", e);
-            stream_status.status = match status {
-                IngestionStatus::Record(status) => status,
-                IngestionStatus::Bulk(_) => unreachable!(),
-            };
-            res.partial_success = Some(ExportLogsPartialSuccess {
-                rejected_log_records: stream_status.status.failed as i64,
-                error_message: stream_status.status.error,
-            });
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            return Ok(HttpResponse::Ok()
-                .status(http::StatusCode::OK)
-                .content_type(CONTENT_TYPE_JSON)
-                .body(out));
-        }
-    };
+        log::error!("Error while writing logs: {}", e);
+        stream_status.status = match status {
+            IngestionStatus::Record(status) => status,
+            IngestionStatus::Bulk(_) => unreachable!(),
+        };
+        res.partial_success = Some(ExportLogsPartialSuccess {
+            rejected_log_records: stream_status.status.failed as i64,
+            error_message: stream_status.status.error,
+        });
+        let mut out = BytesMut::with_capacity(res.encoded_len());
+        res.encode(&mut out).expect("Out of memory");
+        return Ok(HttpResponse::Ok()
+            .status(http::StatusCode::OK)
+            .content_type(CONTENT_TYPE_JSON)
+            .body(out));
+    }
 
-    let time = start.elapsed().as_secs_f64();
+    // metric
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/oltp/v1/logs",
@@ -410,7 +419,7 @@ pub async fn logs_json_handler(
             &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
-        .observe(time);
+        .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             "/api/oltp/v1/logs",
@@ -420,24 +429,6 @@ pub async fn logs_json_handler(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-
-    req_stats.response_time = start.elapsed().as_secs_f64();
-    req_stats.user_email = if user_email.is_empty() {
-        None
-    } else {
-        Some(user_email.to_string())
-    };
-    // metric + data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        &stream_name,
-        StreamType::Logs,
-        UsageType::Logs,
-        local_trans.len() as u16,
-        started_at,
-    )
-    .await;
 
     // drop variables
     drop(runtime);

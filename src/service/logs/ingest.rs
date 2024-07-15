@@ -45,7 +45,6 @@ use crate::{
     },
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
-        usage::report_request_usage_stats,
     },
 };
 
@@ -156,7 +155,7 @@ pub async fn ingest(
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
-    let mut json_data = Vec::new();
+    let mut json_data_by_stream = HashMap::new();
     for ret in data.iter() {
         let mut item = match ret {
             Ok(item) => item,
@@ -231,11 +230,15 @@ pub async fn ingest(
             }
         };
 
-        json_data.push((timestamp, local_val));
+        let (ts_data, fn_num) = json_data_by_stream
+            .entry(stream_name.clone())
+            .or_insert((Vec::new(), None));
+        ts_data.push((timestamp, local_val));
+        *fn_num = need_usage_report.then_some(local_trans.len());
     }
 
     // if no data, fast return
-    if json_data.is_empty() {
+    if json_data_by_stream.is_empty() {
         return Ok(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],
@@ -243,24 +246,29 @@ pub async fn ingest(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let mut req_stats = match super::write_logs(org_id, &stream_name, &mut status, json_data).await
+    let took_time = start.elapsed().as_secs_f64();
+    if let Err(e) = super::write_logs_by_stream(
+        org_id,
+        user_email,
+        (started_at, took_time),
+        usage_type,
+        &mut status,
+        json_data_by_stream,
+    )
+    .await
     {
-        Ok(rs) => rs,
-        Err(e) => {
-            log::error!("Error while writing logs: {}", e);
-            stream_status.status = match status {
-                IngestionStatus::Record(status) => status,
-                IngestionStatus::Bulk(_) => unreachable!(),
-            };
-            return Ok(IngestionResponse::new(
-                http::StatusCode::OK.into(),
-                vec![stream_status],
-            ));
-        }
-    };
+        log::error!("Error while writing logs: {}", e);
+        stream_status.status = match status {
+            IngestionStatus::Record(status) => status,
+            IngestionStatus::Bulk(_) => unreachable!(),
+        };
+        return Ok(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ));
+    }
 
     // update ingestion metrics
-    let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             endpoint,
@@ -269,7 +277,7 @@ pub async fn ingest(
             &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
-        .observe(time);
+        .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             endpoint,
@@ -279,26 +287,6 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-    req_stats.response_time = start.elapsed().as_secs_f64();
-    req_stats.user_email = if user_email.is_empty() {
-        None
-    } else {
-        Some(user_email.to_string())
-    };
-
-    // report data usage
-    if need_usage_report {
-        report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Logs,
-            usage_type,
-            local_trans.len() as u16,
-            started_at,
-        )
-        .await;
-    }
 
     // drop variables
     drop(runtime);
