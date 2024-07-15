@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width: 22px;
               height: 22px;
             "
-            title="Go Back"
-            @click="router.back()"
+            title="Traces List"
+            @click="routeToTracesList"
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
@@ -1038,6 +1038,25 @@ export default defineComponent({
       searchObj.data.traceDetails.selectedSpanId = spanId;
     };
 
+    const routeToTracesList = () => {
+      const query = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+
+      if (searchObj.data.datetime.type === "relative") {
+        query.period = searchObj.data.datetime.relativeTimePeriod;
+      } else {
+        query.from = searchObj.data.datetime.startTime.toString();
+        query.to = searchObj.data.datetime.endTime.toString();
+      }
+
+      router.push({
+        name: "traces",
+        query: {
+          ...query,
+        },
+      });
+    };
+
     return {
       router,
       t,
@@ -1081,6 +1100,7 @@ export default defineComponent({
       traceDetails,
       updateSelectedSpan,
       backgroundStyle,
+      routeToTracesList,
     };
   },
 });

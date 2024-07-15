@@ -332,6 +332,8 @@ export default defineComponent({
     };
 
     const updateDateTime = async (value: object) => {
+      if (router.currentRoute.value.name !== "traces") return;
+
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
