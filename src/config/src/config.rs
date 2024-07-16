@@ -1179,7 +1179,11 @@ pub fn init() -> Config {
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
-        cfg.limit.query_thread_num = cpu_num * 4;
+        if cfg.common.local_mode {
+            cfg.limit.query_thread_num = cpu_num * 2;
+        } else {
+            cfg.limit.query_thread_num = cpu_num * 4;
+        }
     }
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
