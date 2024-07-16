@@ -1192,7 +1192,7 @@ pub fn init() -> Config {
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
         if cfg.common.local_mode {
-            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
+            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
         } else {
             cfg.limit.file_merge_thread_num = cpu_num;
         }
