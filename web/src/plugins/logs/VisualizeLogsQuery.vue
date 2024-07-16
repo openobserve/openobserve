@@ -236,6 +236,7 @@ import { inject } from "vue";
 import { computed } from "vue";
 import { isEqual } from "lodash-es";
 import { onActivated } from "vue";
+import { useQuasar } from "quasar";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -285,12 +286,13 @@ export default defineComponent({
     );
     const { t } = useI18n();
     const store = useStore();
-    const { dashboardPanelData, resetAggregationFunction } =
+    const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
+    const $q = useQuasar();
 
     const { visualizeChartData }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
@@ -385,7 +387,22 @@ export default defineComponent({
     };
 
     const addToDashboard = () => {
-      showAddToDashboardDialog.value = true;
+      const errors: any = [];
+      // will push errors in errors array
+      validatePanel(errors);
+
+      if (errors.length) {
+        // set errors into errorData
+        props.errorData.errors = errors;
+        $q.notify({
+          type: "negative",
+          message: "There are some errors, please fix them and try again",
+          timeout: 5000,
+        });
+        return;
+      } else {
+        showAddToDashboardDialog.value = true;
+      }
     };
 
     const addPanelToDashboard = () => {
