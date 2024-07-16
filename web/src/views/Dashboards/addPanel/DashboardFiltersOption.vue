@@ -28,9 +28,9 @@
             <div v-if="filteredItem.filterType === 'group'">
               <Group
                 :group="filteredItem"
-                @add-condition="addConditionToGroup(filteredItem)"
-                @add-group="addGroupToGroup(filteredItem)"
-                @remove-group="removeGroup(index)"
+                @add-condition="addConditionToGroup"
+                @add-group="addGroupToGroup"
+                @remove-group="() => removeGroup(index)"
               />
             </div>
             <div v-else>
@@ -251,12 +251,12 @@
           <q-btn icon="add" color="primary" size="xs" round>
             <q-menu v-model="showAddMenu">
               <q-list>
-                <q-item clickable @click="addFilter('condition')">
+                <q-item clickable @click="() => addFilter('condition')">
                   <q-item-section>{{
                     t("common.addCondition")
                   }}</q-item-section>
                 </q-item>
-                <q-item clickable @click="addFilter('group')">
+                <q-item clickable @click="() => addFilter('group')">
                   <q-item-section>{{ t("common.addGroup") }}</q-item-section>
                 </q-item>
               </q-list>

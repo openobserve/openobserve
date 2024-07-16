@@ -5,7 +5,7 @@
       <q-btn size="xs" dense @click="$emit('remove-group')" icon="close" />
     </div>
     <div class="group-conditions">
-      <q-btn-group
+      <div
         v-for="(condition, index) in group.conditions"
         :key="index"
         class="condition-group"
@@ -27,7 +27,7 @@
             icon="close"
           />
         </div>
-      </q-btn-group>
+      </div>
       <q-btn icon="add" color="primary" size="xs" round>
         <q-menu v-model="showAddMenu">
           <q-list>
