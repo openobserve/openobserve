@@ -1161,6 +1161,13 @@ pub struct RUM {
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().unwrap();
+
+    // set local mode
+    if cfg.common.local_mode {
+        cfg.common.node_role = "all".to_string();
+        cfg.common.node_role_group = "".to_string();
+    }
+
     // set cpu num
     let cpu_num = cgroup::get_cpu_limit();
     cfg.limit.cpu_num = cpu_num;
@@ -1172,15 +1179,27 @@ pub fn init() -> Config {
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
-        cfg.limit.query_thread_num = cpu_num * 4;
+        if cfg.common.local_mode {
+            cfg.limit.query_thread_num = cpu_num * 2;
+        } else {
+            cfg.limit.query_thread_num = cpu_num * 4;
+        }
     }
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num;
+        if cfg.common.local_mode {
+            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.file_move_thread_num = cpu_num;
+        }
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
-        cfg.limit.file_merge_thread_num = cpu_num;
+        if cfg.common.local_mode {
+            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.file_merge_thread_num = cpu_num;
+        }
     }
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
@@ -1438,7 +1457,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let mem_total = cgroup::get_memory_limit();
     cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
-        cfg.memory_cache.max_size = mem_total / 2; // 50%
+        if cfg.common.local_mode {
+            cfg.memory_cache.max_size = mem_total / 4; // 25%
+        } else {
+            cfg.memory_cache.max_size = mem_total / 2; // 50%
+        }
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
@@ -1462,7 +1485,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
-        cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
+        if cfg.common.local_mode {
+            cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
+        } else {
+            cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
+        }
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
@@ -1476,7 +1503,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // for memtable limit check
     if cfg.limit.mem_table_max_size == 0 {
-        cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+        if cfg.common.local_mode {
+            cfg.limit.mem_table_max_size = mem_total / 4; // 25%
+        } else {
+            cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+        }
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
