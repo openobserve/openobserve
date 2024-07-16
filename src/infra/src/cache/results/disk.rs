@@ -33,14 +33,19 @@ use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
-use super::CacheStrategy;
-use crate::{cache::meta::ResultCacheMeta, storage};
+use crate::{
+    cache::{
+        file_data::disk::{FileData, FileType},
+        meta::ResultCacheMeta,
+    },
+    storage,
+};
 
 static RESULT_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
-        files.push(RwLock::new(FileData::new()));
+        files.push(RwLock::new(FileData::new(FileType::RESULT)));
     }
     files
 });
@@ -57,7 +62,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
-        let root_dir = FILES[0].read().await.root_dir.clone();
+        let root_dir = RESULT_FILES[0].read().await.root_dir.clone();
         let root_dir = Path::new(&root_dir).canonicalize().unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
@@ -88,7 +93,7 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         return None;
     }
     let idx = get_bucket_idx(file);
-    let files = FILES[idx].read().await;
+    let files = RESULT_FILES[idx].read().await;
     files.get(file, range).await
 }
 
@@ -98,7 +103,7 @@ pub async fn exist(file: &str) -> bool {
         return false;
     }
     let idx = get_bucket_idx(file);
-    let files = FILES[idx].read().await;
+    let files = RESULT_FILES[idx].read().await;
     files.exist(file).await
 }
 
@@ -108,7 +113,7 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
         return Ok(());
     }
     let idx = get_bucket_idx(file);
-    let mut files = FILES[idx].write().await;
+    let mut files = RESULT_FILES[idx].write().await;
     if files.exist(file).await {
         return Ok(());
     }
@@ -121,7 +126,7 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let idx = get_bucket_idx(file);
-    let mut files = FILES[idx].write().await;
+    let mut files = RESULT_FILES[idx].write().await;
     files.remove(trace_id, file).await
 }
 
@@ -179,7 +184,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                     // write into cache
                     let idx = get_bucket_idx(&file_key);
-                    let mut w = FILES[idx].write().await;
+                    let mut w = RESULT_FILES[idx].write().await;
                     w.cur_size += data_size;
                     w.data.insert(file_key.clone(), data_size);
                     let total = w.len();
@@ -227,7 +232,7 @@ async fn gc() -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
-    for file in FILES.iter() {
+    for file in RESULT_FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
             drop(r);
@@ -245,7 +250,7 @@ async fn gc() -> Result<(), anyhow::Error> {
 pub async fn stats() -> (usize, usize) {
     let mut total_size = 0;
     let mut used_size = 0;
-    for file in FILES.iter() {
+    for file in RESULT_FILES.iter() {
         let r = file.read().await;
         let (max_size, cur_size) = r.size();
         total_size += max_size;
@@ -257,7 +262,7 @@ pub async fn stats() -> (usize, usize) {
 #[inline]
 pub async fn len() -> usize {
     let mut total = 0;
-    for file in FILES.iter() {
+    for file in RESULT_FILES.iter() {
         let r = file.read().await;
         total += r.len();
     }
@@ -266,7 +271,7 @@ pub async fn len() -> usize {
 
 #[inline]
 pub async fn is_empty() -> bool {
-    for file in FILES.iter() {
+    for file in RESULT_FILES.iter() {
         let r = file.read().await;
         if !r.is_empty() {
             return false;
@@ -276,7 +281,7 @@ pub async fn is_empty() -> bool {
 }
 #[inline]
 pub async fn get_dir() -> String {
-    FILES[0].read().await.root_dir.clone()
+    RESULT_FILES[0].read().await.root_dir.clone()
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
@@ -311,11 +316,12 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_set_file() {
         let trace_id = "session_123";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(1024, "lru", FileType::RESULT);
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
             let file_key = format!(
-                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
+                "results/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
             let resp = file_data.set(trace_id, &file_key, content.clone()).await;
@@ -326,9 +332,13 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_get_file() {
         let trace_id = "session_123";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            get_config().disk_cache.max_size,
+            "lru",
+            FileType::RESULT,
+        );
+        let file_key =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
@@ -348,9 +358,11 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_miss() {
         let trace_id = "session_456";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
-        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
-        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
+        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru", FileType::RESULT);
+        let file_key1 =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
+        let file_key2 =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
@@ -371,11 +383,12 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
         let trace_id = "session_123";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(1024, "fifo", FileType::RESULT);
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
             let file_key = format!(
-                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
+                "results/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
             let resp = file_data.set(trace_id, &file_key, content.clone()).await;
@@ -386,9 +399,13 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
         let trace_id = "session_123";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            get_config().disk_cache.max_size,
+            "fifo",
+            FileType::RESULT,
+        );
+        let file_key =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
@@ -408,9 +425,12 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_miss() {
         let trace_id = "session_456";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
-        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
-        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(10, "fifo", FileType::RESULT);
+        let file_key1 =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
+        let file_key2 =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
@@ -437,10 +457,14 @@ mod tests {
             .collect();
 
         let trace_id = "session_123";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            get_config().disk_cache.max_size,
+            "lru",
+            FileType::RESULT,
+        );
         file_data.multi_dir = multi_dir;
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let file_key =
+            "results/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data

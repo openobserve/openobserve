@@ -45,15 +45,12 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     files
 });
 
-pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
-    Lazy::new(Default::default);
-
 pub struct FileData {
-    max_size: usize,
-    cur_size: usize,
-    root_dir: String,
-    multi_dir: Vec<String>,
-    data: CacheStrategy,
+    pub max_size: usize,
+    pub cur_size: usize,
+    pub root_dir: String,
+    pub multi_dir: Vec<String>,
+    pub data: CacheStrategy,
 }
 
 #[derive(Debug)]
@@ -85,17 +82,21 @@ impl FileData {
     ) -> FileData {
         let cfg = get_config();
         let root_dir = match file_type {
-            FileType::DATA => cfg.common.data_cache_dir.clone(),
-            FileType::RESULT => cfg.common.data_result_cache_dir.clone(),
-        };
-        FileData {
-            max_size,
-            cur_size: 0,
-            root_dir: format!(
+            FileType::DATA => format!(
                 "{}{}",
                 cfg.common.data_cache_dir,
                 storage::format_key("", true),
             ),
+            FileType::RESULT => format!(
+                "{}{}",
+                cfg.common.result_cache_dir,
+                storage::format_key("", true),
+            ),
+        };
+        FileData {
+            max_size,
+            cur_size: 0,
+            root_dir,
             multi_dir: cfg
                 .disk_cache
                 .multi_dir
@@ -107,11 +108,11 @@ impl FileData {
         }
     }
 
-    async fn exist(&self, file: &str) -> bool {
+    pub async fn exist(&self, file: &str) -> bool {
         self.data.contains_key(file)
     }
 
-    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    pub async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         let data = match get_file_contents(&file_path).await {
             Ok(data) => Bytes::from(data),
@@ -126,7 +127,12 @@ impl FileData {
         })
     }
 
-    async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+    pub async fn set(
+        &mut self,
+        trace_id: &str,
+        file: &str,
+        data: Bytes,
+    ) -> Result<(), anyhow::Error> {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
@@ -160,7 +166,11 @@ impl FileData {
         Ok(())
     }
 
-    async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+    pub async fn gc(
+        &mut self,
+        trace_id: &str,
+        need_release_size: usize,
+    ) -> Result<(), anyhow::Error> {
         log::info!(
             "[trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
@@ -214,7 +224,7 @@ impl FileData {
         Ok(())
     }
 
-    async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
+    pub async fn remove(&mut self, trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
         log::debug!("[trace_id {trace_id}] File disk cache remove file {}", file);
 
         let item = self.data.remove_key(file);
@@ -255,7 +265,7 @@ impl FileData {
         Ok(())
     }
 
-    fn choose_multi_dir(&self, file: &str) -> String {
+    pub fn choose_multi_dir(&self, file: &str) -> String {
         if self.multi_dir.is_empty() {
             return "".to_string();
         }
@@ -265,15 +275,15 @@ impl FileData {
         format!("{}/", self.multi_dir.get(index as usize).unwrap())
     }
 
-    fn size(&self) -> (usize, usize) {
+    pub fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
@@ -359,8 +369,6 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
 
-    let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
-
     loop {
         match entries.next_entry().await {
             Err(e) => return Err(e.into()),
@@ -420,23 +428,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                     // metrics
                     let columns = file_key.split('/').collect::<Vec<&str>>();
-                    if columns[0] == "results" {
-                        let query_key = format!(
-                            "{}_{}_{}_{}",
-                            columns[1], columns[2], columns[3], columns[4]
-                        );
-                        let meta = columns[5].split('_').collect::<Vec<&str>>();
-                        let is_aggregate = meta[2] == "1";
-                        let is_descending = meta[3] == "1";
-                        result_cache.entry(query_key).or_insert_with(Vec::new).push(
-                            ResultCacheMeta {
-                                start_time: meta[0].parse().unwrap(),
-                                end_time: meta[1].parse().unwrap(),
-                                is_aggregate,
-                                is_descending,
-                            },
-                        );
-                    };
+
                     metrics::QUERY_DISK_CACHE_FILES
                         .with_label_values(&[columns[1], columns[2]])
                         .inc();
@@ -447,8 +439,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             }
         }
     }
-    // write all data from result_cache to QUERY_RESULT_CACHE
-    QUERY_RESULT_CACHE.write().await.extend(result_cache);
+
     Ok(())
 }
 
