@@ -299,18 +299,7 @@ pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // querier disk result cache stats
-pub static QUERY_DISK_RESULT_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "query_disk_result_cache_limit_bytes",
-            "Querier disk result cache limit bytes",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
+
 pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -798,6 +787,13 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+
+    registry
+        .register(Box::new(QUERY_DISK_RESULT_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_RESULT_CACHE_FILES.clone()))
         .expect("Metric registered");
 }
 
