@@ -538,6 +538,17 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc("global", cfg.disk_cache.gc_size).await?;
         drop(w);
     }
+    for file in RESULT_FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + cfg.disk_cache.release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc("global", cfg.disk_cache.gc_size).await?;
+        drop(w);
+    }
     Ok(())
 }
 
