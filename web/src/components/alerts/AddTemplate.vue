@@ -46,11 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-splitter
       v-model="splitterModel"
       unit="%"
-      style="min-height: calc(100vh - 122px)"
+      style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
         <div class="row q-pa-md">
-          <div class="col-12 q-pb-md q-pt-sm">
+          <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"
               v-model="formData.name"
@@ -74,7 +74,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
           </div>
-          <div class="col-12 q-pb-md q-pt-xs">
+          <div class="col-12 q-pb-md">
+            <app-tabs
+              style="
+                border: 1px solid #8a8a8a;
+                border-radius: 4px;
+                overflow: hidden;
+                width: fit-content;
+              "
+              :tabs="tabs"
+              v-model:active-tab="formData.type"
+            />
+          </div>
+          <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
+            <q-input
+              data-test="add-template-email-title-input"
+              v-model="formData.title"
+              :label="t('alerts.title') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="isUpdatingTemplate"
+              v-bind:disable="isUpdatingTemplate"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+              tabindex="0"
+            />
+          </div>
+          <div class="col-12 q-pb-md">
             <div
               class="q-pb-sm text-bold"
               data-test="add-template-body-input-title"
@@ -83,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <query-editor
               editor-id="add-template-editor"
-              class="monaco-editor q-mt-sm"
+              class="monaco-editor q-mt-sm q-mb-md"
               language="json"
               ref="editorRef"
               v-model:query="formData.body"
@@ -92,11 +122,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
-          <div class="col-12 flex justify-center q-mt-lg">
+          <div class="col-12 flex justify-center">
             <q-btn
               data-test="add-template-cancel-btn"
               v-close-popup="true"
-              class="q-mb-md text-bold"
+              class="text-bold"
               :label="t('alerts.cancel')"
               text-color="light-text"
               padding="sm md"
@@ -106,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="add-template-submit-btn"
               :label="t('alerts.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
+              class="text-bold no-border q-ml-md"
               color="secondary"
               padding="sm xl"
               @click="saveTemplate"
@@ -168,7 +198,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, defineProps, onBeforeMount, onActivated, defineEmits } from "vue";
+import {
+  ref,
+  onMounted,
+  defineProps,
+  onBeforeMount,
+  onActivated,
+  defineEmits,
+  watch,
+  computed,
+} from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -178,6 +217,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
+import AppTabs from "@/components/common/AppTabs.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 
 const props = defineProps<{ template: TemplateData | null }>();
@@ -187,6 +227,8 @@ const splitterModel: Ref<number> = ref(75);
 const formData: Ref<Template> = ref({
   name: "",
   body: "",
+  type: "web_hook",
+  title: "",
 });
 const store = useStore();
 const q = useQuasar();
@@ -223,11 +265,44 @@ onActivated(() => setupTemplateData());
 onBeforeMount(() => {
   setupTemplateData();
 });
+
+const tabs = computed(() => [
+  {
+    label: "Web Hook",
+    value: "web_hook",
+    style: {
+      width: "fit-content",
+      padding: "4px 14px",
+      background: formData.value.type === "web_hook" ? "#5960B2" : "",
+      border: "none !important",
+      color: formData.value.type === "web_hook" ? "#ffffff !important" : "",
+    },
+  },
+  {
+    label: "Email",
+    value: "email",
+    style: {
+      width: "fit-content",
+      padding: "4px 14px",
+      background: formData.value.type === "email" ? "#5960B2" : "#ffffff",
+      border: "none !important",
+      color: formData.value.type === "email" ? "#ffffff !important" : "",
+    },
+  },
+]);
+
 const setupTemplateData = () => {
+  const params = router.currentRoute.value.query;
   if (props.template) {
     isUpdatingTemplate.value = true;
     formData.value.name = props.template.name;
     formData.value.body = props.template.body;
+    formData.value.type = props.template.type;
+    formData.value.title = props.template.title;
+  }
+
+  if (params.type) {
+    formData.value.type = params.type;
   }
 };
 
@@ -262,7 +337,7 @@ const saveTemplate = () => {
   }
 
   // Here checking is template body json valid
-  if (!isTemplateBodyValid()) return;
+  if (formData.value.type !== "email" && !isTemplateBodyValid()) return;
 
   const dismiss = q.notify({
     spinner: true,
@@ -278,6 +353,8 @@ const saveTemplate = () => {
         data: {
           name: formData.value.name.trim(),
           body: formData.value.body,
+          type: formData.value.type,
+          title: formData.value.title,
         },
       })
       .then(() => {
@@ -305,6 +382,8 @@ const saveTemplate = () => {
           data: {
             name: formData.value.name.trim(),
             body: formData.value.body,
+            type: formData.value.type,
+            title: formData.value.title,
           },
         })
         .then(() => {
@@ -341,6 +420,9 @@ const copyTemplateBody = (text: any) => {
   width: 100%;
   min-height: 310px !important;
   border-radius: 5px;
+  // padding-bottom: 14px;
+  resize: vertical;
+  overflow: auto;
 }
 
 .example-template-body {
