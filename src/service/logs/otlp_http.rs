@@ -382,7 +382,7 @@ pub async fn logs_json_handler(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    if let Err(e) = super::write_logs_by_stream(
+    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
         org_id,
         user_email,
         (started_at, &start),
@@ -392,29 +392,33 @@ pub async fn logs_json_handler(
     )
     .await
     {
-        log::error!("Error while writing logs: {}", e);
-        stream_status.status = match status {
-            IngestionStatus::Record(status) => status,
-            IngestionStatus::Bulk(_) => unreachable!(),
-        };
-        res.partial_success = Some(ExportLogsPartialSuccess {
-            rejected_log_records: stream_status.status.failed as i64,
-            error_message: stream_status.status.error,
-        });
-        let mut out = BytesMut::with_capacity(res.encoded_len());
-        res.encode(&mut out).expect("Out of memory");
-        return Ok(HttpResponse::Ok()
-            .status(http::StatusCode::OK)
-            .content_type(CONTENT_TYPE_JSON)
-            .body(out));
-    }
+        Ok(()) => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            ("200", out)
+        }
+        Err(e) => {
+            log::error!("Error while writing logs: {}", e);
+            stream_status.status = match status {
+                IngestionStatus::Record(status) => status,
+                IngestionStatus::Bulk(_) => unreachable!(),
+            };
+            res.partial_success = Some(ExportLogsPartialSuccess {
+                rejected_log_records: stream_status.status.failed as i64,
+                error_message: stream_status.status.error,
+            });
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            ("500", out)
+        }
+    };
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/oltp/v1/logs",
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -423,7 +427,7 @@ pub async fn logs_json_handler(
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             "/api/oltp/v1/logs",
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -436,21 +440,8 @@ pub async fn logs_json_handler(
     drop(stream_routing_map);
     drop(user_defined_schema_map);
 
-    stream_status.status = match status {
-        IngestionStatus::Record(status) => status,
-        IngestionStatus::Bulk(_) => unreachable!(),
-    };
-    let res = ExportLogsServiceResponse {
-        partial_success: Some(ExportLogsPartialSuccess {
-            rejected_log_records: stream_status.status.failed as i64,
-            error_message: stream_status.status.error,
-        }),
-    };
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
-
     return Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_JSON)
-        .body(out));
+        .body(response_body));
 }

@@ -245,34 +245,36 @@ pub async fn ingest(
         ));
     }
 
-    let mut status = IngestionStatus::Record(stream_status.status);
-    if let Err(e) = super::write_logs_by_stream(
-        org_id,
-        user_email,
-        (started_at, &start),
-        usage_type,
-        &mut status,
-        json_data_by_stream,
-    )
-    .await
-    {
-        log::error!("Error while writing logs: {}", e);
+    let (metric_rpt_status_code, response_body) = {
+        let mut status = IngestionStatus::Record(stream_status.status);
+        let write_result = super::write_logs_by_stream(
+            org_id,
+            user_email,
+            (started_at, &start),
+            usage_type,
+            &mut status,
+            json_data_by_stream,
+        )
+        .await;
         stream_status.status = match status {
             IngestionStatus::Record(status) => status,
             IngestionStatus::Bulk(_) => unreachable!(),
         };
-        return Ok(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ));
-    }
+        match write_result {
+            Ok(()) => ("200", stream_status),
+            Err(e) => {
+                log::error!("Error while writing logs: {}", e);
+                ("500", stream_status)
+            }
+        }
+    };
 
     // update ingestion metrics
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             endpoint,
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -281,7 +283,7 @@ pub async fn ingest(
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             endpoint,
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -294,14 +296,9 @@ pub async fn ingest(
     drop(stream_routing_map);
     drop(user_defined_schema_map);
 
-    stream_status.status = match status {
-        IngestionStatus::Record(status) => status,
-        IngestionStatus::Bulk(_) => unreachable!(),
-    };
-
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
-        vec![stream_status],
+        vec![response_body],
     ))
 }
 

@@ -191,31 +191,33 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         }
     };
 
-    let mut status = IngestionStatus::Record(stream_status.status);
-    if let Err(e) = super::write_logs(
-        org_id,
-        &stream_name,
-        &mut status,
-        vec![(timestamp, local_val)],
-    )
-    .await
-    {
-        log::error!("Error while writing logs: {}", e);
+    let (metric_rpt_status_code, response_body) = {
+        let mut status = IngestionStatus::Record(stream_status.status);
+        let write_result = super::write_logs(
+            org_id,
+            &stream_name,
+            &mut status,
+            vec![(timestamp, local_val)],
+        )
+        .await;
         stream_status.status = match status {
             IngestionStatus::Record(status) => status,
             IngestionStatus::Bulk(_) => unreachable!(),
         };
-        return Ok(HttpResponse::Ok().json(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ))); // just return
+        match write_result {
+            Ok(_) => ("200", stream_status),
+            Err(e) => {
+                log::error!("Error while writing logs: {}", e);
+                ("500", stream_status)
+            }
+        }
     };
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/logs/_syslog",
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -224,7 +226,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             "/api/org/ingest/logs/_syslog",
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -237,13 +239,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     drop(stream_routing_map);
     drop(user_defined_schema_map);
 
-    stream_status.status = match status {
-        IngestionStatus::Record(status) => status,
-        IngestionStatus::Bulk(_) => unreachable!(),
-    };
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),
-        vec![stream_status],
+        vec![response_body],
     )))
 }
 

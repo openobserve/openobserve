@@ -289,31 +289,37 @@ pub async fn ingest(
         }
     }
 
-    let mut status = IngestionStatus::Bulk(bulk_res);
-    if let Err(e) = super::write_logs_by_stream(
-        org_id,
-        user_email,
-        (started_at, &start),
-        UsageType::Bulk,
-        &mut status,
-        json_data_by_stream,
-    )
-    .await
-    {
-        log::error!("Error while writing logs: {}", e);
-        let bulk_res = match status {
-            IngestionStatus::Bulk(bulk_res) => bulk_res,
-            IngestionStatus::Record(_) => unreachable!(),
+    let (metric_rpt_status_code, response_body) = {
+        let mut status = IngestionStatus::Bulk(bulk_res);
+        let write_result = super::write_logs_by_stream(
+            org_id,
+            user_email,
+            (started_at, &start),
+            UsageType::Bulk,
+            &mut status,
+            json_data_by_stream,
+        )
+        .await;
+        let IngestionStatus::Bulk(mut bulk_res) = status else {
+            unreachable!();
         };
-        return Ok(bulk_res);
-    }
+        bulk_res.took = start.elapsed().as_millis();
+        match write_result {
+            Ok(()) => ("200", bulk_res),
+            Err(e) => {
+                log::error!("Error while writing logs: {}", e);
+                bulk_res.errors = true;
+                ("500", bulk_res)
+            }
+        }
+    };
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",
-            "200",
+            metric_rpt_status_code,
             org_id,
             "",
             StreamType::Logs.to_string().as_str(),
@@ -322,19 +328,14 @@ pub async fn ingest(
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",
-            "200",
+            metric_rpt_status_code,
             org_id,
             "",
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-    let mut bulk_res = match status {
-        IngestionStatus::Bulk(bulk_res) => bulk_res,
-        IngestionStatus::Record(_) => unreachable!(),
-    };
-    bulk_res.took = start.elapsed().as_millis();
 
-    Ok(bulk_res)
+    Ok(response_body)
 }
 
 pub fn add_record_status(

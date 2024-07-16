@@ -207,7 +207,7 @@ async fn write_logs_by_stream(
         let mut req_stats = write_logs(org_id, &stream_name, status, json_data).await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
-        req_stats.response_time += time_took;
+        req_stats.response_time = time_took;
         req_stats.user_email = if user_email.is_empty() {
             None
         } else {

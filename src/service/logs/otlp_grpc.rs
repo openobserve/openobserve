@@ -267,7 +267,7 @@ pub async fn handle_grpc_request(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    if let Err(e) = super::write_logs_by_stream(
+    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
         org_id,
         user_email,
         (started_at, &start),
@@ -277,35 +277,38 @@ pub async fn handle_grpc_request(
     )
     .await
     {
-        log::error!("Error while writing logs: {}", e);
-        stream_status.status = match status {
-            IngestionStatus::Record(status) => status,
-            IngestionStatus::Bulk(_) => unreachable!(),
-        };
-        res.partial_success = Some(ExportLogsPartialSuccess {
-            rejected_log_records: stream_status.status.failed as i64,
-            error_message: stream_status.status.error,
-        });
-        let mut out = BytesMut::with_capacity(res.encoded_len());
-        res.encode(&mut out).expect("Out of memory");
-        return Ok(HttpResponse::Ok()
-            .status(http::StatusCode::OK)
-            .content_type(CONTENT_TYPE_PROTO)
-            .body(out)); // just return
-    }
+        Ok(()) => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            ("200", out)
+        }
+        Err(e) => {
+            log::error!("Error while writing logs: {}", e);
+            stream_status.status = match status {
+                IngestionStatus::Record(status) => status,
+                IngestionStatus::Bulk(_) => unreachable!(),
+            };
+            res.partial_success = Some(ExportLogsPartialSuccess {
+                rejected_log_records: stream_status.status.failed as i64,
+                error_message: stream_status.status.error,
+            });
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            ("500", out)
+        }
+    };
 
     let ep = if is_grpc {
         "/grpc/otlp/logs"
     } else {
         "/api/oltp/v1/logs"
     };
-
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             ep,
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -314,7 +317,7 @@ pub async fn handle_grpc_request(
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             ep,
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
@@ -327,13 +330,10 @@ pub async fn handle_grpc_request(
     drop(stream_routing_map);
     drop(user_defined_schema_map);
 
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
-
     return Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_PROTO)
-        .body(out));
+        .body(response_body));
 }
 
 #[cfg(test)]
