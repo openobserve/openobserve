@@ -109,16 +109,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alert_templates.body") + " *" }}
             </div>
-            <query-editor
-              editor-id="add-template-editor"
-              class="monaco-editor q-mt-sm q-mb-md"
-              language="json"
-              ref="editorRef"
-              v-model:query="formData.body"
-              data-test="add-template-body-input"
-              :label="t('alerts.sql')"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
+            <template v-if="formData.type === 'email'">
+              <query-editor
+                data-test="template-body-editor"
+                ref="queryEditorRef"
+                editor-id="template-body-editor"
+                class="monaco-editor q-mb-md"
+                language="markdown"
+                v-model:query="formData.body"
+              />
+            </template>
+            <template v-else>
+              <query-editor
+                data-test="template-body-editor"
+                ref="queryEditorRef"
+                editor-id="template-body-editor"
+                class="monaco-editor q-mb-md"
+                language="json"
+                v-model:query="formData.body"
+              />
+            </template>
           </div>
           <div class="col-12 flex justify-center">
             <q-btn
