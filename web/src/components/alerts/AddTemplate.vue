@@ -98,8 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
-              v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate"
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
             />
