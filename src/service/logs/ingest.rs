@@ -246,11 +246,10 @@ pub async fn ingest(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let took_time = start.elapsed().as_secs_f64();
     if let Err(e) = super::write_logs_by_stream(
         org_id,
         user_email,
-        (started_at, took_time),
+        (started_at, &start),
         usage_type,
         &mut status,
         json_data_by_stream,
@@ -269,6 +268,7 @@ pub async fn ingest(
     }
 
     // update ingestion metrics
+    let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             endpoint,

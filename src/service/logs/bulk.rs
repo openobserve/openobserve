@@ -289,13 +289,11 @@ pub async fn ingest(
         }
     }
 
-    // metric + data usage
-    let took_time = start.elapsed().as_secs_f64();
     let mut status = IngestionStatus::Bulk(bulk_res);
     if let Err(e) = super::write_logs_by_stream(
         org_id,
         user_email,
-        (started_at, took_time),
+        (started_at, &start),
         UsageType::Bulk,
         &mut status,
         json_data_by_stream,
@@ -310,6 +308,8 @@ pub async fn ingest(
         return Ok(bulk_res);
     }
 
+    // metric + data usage
+    let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",

@@ -17,6 +17,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::Result;
@@ -189,7 +190,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
 async fn write_logs_by_stream(
     org_id: &str,
     user_email: &str,
-    time_stats: (i64, f64), // (started_at, time_took)
+    time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, LogJsonData>,
@@ -205,7 +206,8 @@ async fn write_logs_by_stream(
         // write json data by stream
         let mut req_stats = write_logs(org_id, &stream_name, status, json_data).await?;
 
-        req_stats.response_time += time_stats.1;
+        let time_took = time_stats.1.elapsed().as_secs_f64();
+        req_stats.response_time += time_took;
         req_stats.user_email = if user_email.is_empty() {
             None
         } else {
