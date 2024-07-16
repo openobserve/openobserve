@@ -918,7 +918,12 @@ fn merge_rewrite_sql(
             "AS \"".to_string() + schema_field + "\""
         };
         if fn_name == "count" {
-            fn_name = "sum".to_string();
+            // the special case for count / count
+            if field.contains("/") {
+                fn_name = "avg".to_string();
+            } else {
+                fn_name = "sum".to_string();
+            }
         }
         if fn_name == "approx_percentile_cont" {
             let re =
