@@ -979,6 +979,9 @@ pub struct DiskCache {
     // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
+    // MB, default is 10% of local volume available space and maximum 20GB
+    #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub result_max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 80% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1565,6 +1568,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.disk_cache.max_size *= 1024 * 1024;
+    }
+
+    if cfg.disk_cache.result_max_size == 0 {
+        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
+    } else {
+        cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
