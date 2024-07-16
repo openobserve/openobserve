@@ -740,6 +740,8 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
+    pub swagger_enabled: bool,
 }
 
 #[derive(EnvConfig)]
