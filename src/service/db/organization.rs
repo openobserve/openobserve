@@ -20,7 +20,7 @@ use infra::errors::{self, Error};
 
 use crate::{
     common::{
-        infra::config::ORGANIZATION_SETTING,
+        infra::config::{ORGANIZATIONS, ORGANIZATION_SETTING},
         meta::organization::{Organization, OrganizationSetting},
     },
     service::db,
@@ -66,7 +66,7 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
 }
 
 /// Cache the existing org settings in the beginning
-pub async fn cache() -> Result<(), anyhow::Error> {
+pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;
     let ret = db::list(prefix).await?;
     for (key, item_value) in ret {
@@ -81,7 +81,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn watch() -> Result<(), anyhow::Error> {
+pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
     let key = ORG_SETTINGS_KEY_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
@@ -125,6 +125,62 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     }
 }
 
+/// Cache the existing orgs in the beginning
+pub async fn cache() -> Result<(), anyhow::Error> {
+    let prefix = ORG_KEY_PREFIX;
+    let ret = db::list(prefix).await?;
+    for (key, item_value) in ret {
+        let json_val: Organization = json::from_slice(&item_value).unwrap();
+        ORGANIZATIONS.clone().write().await.insert(key, json_val);
+    }
+    log::info!("Organizations Cached");
+    Ok(())
+}
+
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let key = ORG_KEY_PREFIX;
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching organizations");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_orgs: event channel closed");
+                return Ok(());
+            }
+        };
+
+        if let db::Event::Put(ev) = ev {
+            let item_key = ev.key;
+            let item_value = ev.value.unwrap();
+            let json_val: Organization = if config::get_config().common.meta_store_external {
+                match db::get(&item_key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("Error getting value: {}", e);
+                        continue;
+                    }
+                }
+            } else {
+                json::from_slice(&item_value).unwrap()
+            };
+            ORGANIZATIONS
+                .clone()
+                .write()
+                .await
+                .insert(item_key, json_val);
+        }
+    }
+}
+
 pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
     let key = format!("{ORG_KEY_PREFIX}/{}", org.identifier);
     match db::put(
@@ -145,9 +201,21 @@ pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn get(org_id: &str) -> Result<Organization, anyhow::Error> {
-    let val = db::get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await?;
-    Ok(json::from_slice(&val).unwrap())
+pub async fn get(org_id: &str) -> Option<Organization> {
+    if ORGANIZATIONS.read().await.contains_key(org_id) {
+        return ORGANIZATIONS.read().await.get(org_id).cloned();
+    }
+
+    match db::get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await {
+        Ok(v) => {
+            let org: Organization = json::from_slice(&v).unwrap();
+            Some(org)
+        }
+        Err(_) => {
+            log::error!("Org Not found");
+            None
+        }
+    }
 }
 
 pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {

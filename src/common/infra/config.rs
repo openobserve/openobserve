@@ -33,8 +33,11 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        maxmind::MaxmindClient, organization::OrganizationSetting, prom::ClusterLeader,
-        syslog::SyslogRoute, user::User,
+        maxmind::MaxmindClient,
+        organization::{Organization, OrganizationSetting},
+        prom::ClusterLeader,
+        syslog::SyslogRoute,
+        user::User,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
@@ -55,6 +58,8 @@ pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
