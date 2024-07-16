@@ -121,8 +121,9 @@ pub async fn check_cache(
 
     if !order_by.is_empty() {
         for (field, order) in &order_by {
-            if field.eq(&result_ts_col) {
+            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
                 is_descending = *order;
+                break;
             }
         }
     }
