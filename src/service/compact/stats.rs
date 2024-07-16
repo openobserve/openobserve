@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE_UUID;
+use config::cluster::LOCAL_NODE;
 use infra::{dist_lock, file_list as infra_file_list};
 use tokio::time;
 
@@ -22,13 +22,13 @@ use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(None);
     }
 
     // before starting, set current node to lock the job
     if config::get_config().common.meta_store_external
-        && (node.is_empty() || LOCAL_NODE_UUID.ne(&node))
+        && (node.is_empty() || LOCAL_NODE.uuid.ne(&node))
     {
         offset = match update_stats_lock_node().await {
             Ok(Some(offset)) => offset,
@@ -56,7 +56,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     }
 
     // update offset
-    db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE_UUID.clone())).await?;
+    db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE.uuid.clone())).await?;
 
     Ok(pk_value)
 }
@@ -67,13 +67,13 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
     // check the working node for the organization again, maybe other node locked it
     // first
     let (offset, node) = db::compact::stats::get_offset().await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         dist_lock::unlock(&locker).await?;
         return Ok(None);
     }
 
     // bind the job to this node
-    let ret = db::compact::stats::set_offset(offset, Some(&LOCAL_NODE_UUID.clone())).await;
+    let ret = db::compact::stats::set_offset(offset, Some(&LOCAL_NODE.uuid.clone())).await;
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     if let Err(e) = ret {

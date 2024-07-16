@@ -17,10 +17,7 @@ use std::{cmp::max, collections::HashMap, net::SocketAddr, str::FromStr, time::D
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use config::{
-    cluster::{is_router, LOCAL_NODE_ROLE},
-    get_config,
-};
+use config::get_config;
 use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
@@ -64,7 +61,10 @@ use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 use tokio::sync::oneshot;
-use tonic::codec::CompressionEncoding;
+use tonic::{
+    codec::CompressionEncoding,
+    metadata::{MetadataKey, MetadataMap, MetadataValue},
+};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::Registry;
 
@@ -199,7 +199,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    if is_router(&LOCAL_NODE_ROLE) {
+    if config::cluster::LOCAL_NODE.is_router() {
         init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     } else {
         init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
@@ -405,7 +405,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!("starting HTTP server at: {}", haddr);
         let mut app = App::new().wrap(prometheus.clone());
-        if is_router(&LOCAL_NODE_ROLE) {
+        if config::cluster::LOCAL_NODE.is_router() {
             let client = awc::Client::builder()
                 .connector(awc::Connector::new().limit(cfg.route.max_connections))
                 .timeout(Duration::from_secs(cfg.route.timeout))
@@ -484,7 +484,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         let cfg = get_config();
         log::info!("starting HTTP server at: {}", haddr);
         let mut app = App::new().wrap(prometheus.clone());
-        if is_router(&LOCAL_NODE_ROLE) {
+        if config::cluster::LOCAL_NODE.is_router() {
             let client = awc::Client::builder()
                 .connector(awc::Connector::new().limit(cfg.route.max_connections))
                 .timeout(Duration::from_secs(cfg.route.timeout))
@@ -636,14 +636,14 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
 fn enable_tracing() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
-    let mut headers = HashMap::new();
-    headers.insert(
-        cfg.common.tracing_header_key.clone(),
-        cfg.common.tracing_header_value.clone(),
-    );
-    let tracer = opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_exporter(
+    let tracer = opentelemetry_otlp::new_pipeline().tracing();
+    let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
+        tracer.with_exporter({
+            let mut headers = HashMap::new();
+            headers.insert(
+                cfg.common.tracing_header_key.clone(),
+                cfg.common.tracing_header_value.clone(),
+            );
             opentelemetry_otlp::new_exporter()
                 .http()
                 .with_http_client(
@@ -652,8 +652,31 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                         .build()?,
                 )
                 .with_endpoint(&cfg.common.otel_otlp_url)
-                .with_headers(headers),
-        )
+                .with_headers(headers)
+        })
+    } else {
+        tracer.with_exporter({
+            let mut metadata = MetadataMap::new();
+            metadata.insert(
+                MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
+                MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
+            );
+            metadata.insert(
+                MetadataKey::from_str(&cfg.grpc.org_header_key).unwrap(),
+                MetadataValue::from_str(&cfg.common.tracing_grpc_header_org).unwrap(),
+            );
+            metadata.insert(
+                MetadataKey::from_str(&cfg.grpc.stream_header_key).unwrap(),
+                MetadataValue::from_str(&cfg.common.tracing_grpc_header_stream_name).unwrap(),
+            );
+            opentelemetry_otlp::new_exporter()
+                .tonic()
+                .with_endpoint(&cfg.common.otel_otlp_grpc_url)
+                .with_metadata(metadata)
+                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+        })
+    };
+    let tracer = tracer
         .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
             KeyValue::new("service.name", cfg.common.node_role.to_string()),
             KeyValue::new("service.instance", cfg.common.instance_name.to_string()),

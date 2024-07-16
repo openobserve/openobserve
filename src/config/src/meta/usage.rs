@@ -91,6 +91,8 @@ pub struct UsageData {
     pub search_type: Option<SearchEventType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_wait_in_queue: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_cache_ratio: Option<usize>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -245,6 +247,8 @@ pub struct RequestStats {
     pub trace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_wait_in_queue: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_cache_ratio: Option<usize>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -261,6 +265,7 @@ impl Default for RequestStats {
             search_type: None,
             trace_id: None,
             took_wait_in_queue: None,
+            result_cache_ratio: None,
         }
     }
 }
@@ -280,6 +285,7 @@ impl From<FileMeta> for RequestStats {
             search_type: None,
             trace_id: None,
             took_wait_in_queue: None,
+            result_cache_ratio: None,
         }
     }
 }

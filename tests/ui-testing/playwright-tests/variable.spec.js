@@ -118,7 +118,6 @@ test.describe("Variable testcases", () => {
     await page.waitForTimeout(2000);  
     await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.waitForTimeout(2000);  
-    await page.locator('[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-x-data"]').click();
     await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();

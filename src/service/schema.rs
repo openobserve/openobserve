@@ -60,7 +60,7 @@ pub async fn check_for_schema(
     stream_schema_map: &mut HashMap<String, SchemaCache>,
     record_vals: Vec<&Map<String, Value>>,
     record_ts: i64,
-) -> Result<SchemaEvolution> {
+) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
@@ -68,10 +68,13 @@ pub async fn check_for_schema(
     let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
     if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
-        return Ok(SchemaEvolution {
-            is_schema_changed: false,
-            types_delta: None,
-        });
+        return Ok((
+            SchemaEvolution {
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        ));
     }
 
     // get infer schema
@@ -80,10 +83,13 @@ pub async fn check_for_schema(
 
     // fast path
     if schema.schema().fields.eq(&inferred_schema.fields) {
-        return Ok(SchemaEvolution {
-            is_schema_changed: false,
-            types_delta: None,
-        });
+        return Ok((
+            SchemaEvolution {
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        ));
     }
 
     if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit {
@@ -109,10 +115,13 @@ pub async fn check_for_schema(
                     generate_schema_for_defined_schema_fields(schema, &defined_schema_fields);
                 stream_schema_map.insert(stream_name.to_string(), schema);
             }
-            return Ok(SchemaEvolution {
-                is_schema_changed: false,
-                types_delta: Some(field_datatype_delta),
-            });
+            return Ok((
+                SchemaEvolution {
+                    is_schema_changed: false,
+                    types_delta: Some(field_datatype_delta),
+                },
+                Some(inferred_schema),
+            ));
         }
         if !field_datatype_delta.is_empty() {
             // check if the min_ts < current_version_created_at
@@ -156,7 +165,7 @@ pub async fn check_for_schema(
         .await?;
     }
 
-    Ok(ret)
+    Ok((ret, Some(inferred_schema)))
 }
 
 pub async fn get_merged_schema(
@@ -491,7 +500,7 @@ mod tests {
         let mut map: HashMap<String, SchemaCache> = HashMap::new();
 
         map.insert(stream_name.to_string(), SchemaCache::new(schema));
-        let result = check_for_schema(
+        let (result, _) = check_for_schema(
             org_name,
             stream_name,
             StreamType::Logs,

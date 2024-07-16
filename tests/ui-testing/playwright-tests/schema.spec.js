@@ -163,7 +163,7 @@ test.describe("Schema testcases", () => {
     await page.getByText('e2e_automate').click();
     await page.waitForTimeout(4000);
     await page.waitForSelector('text=Loading...', { state: 'hidden' });
-    await page.getByTitle('_timestamp').click();
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click()
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill(streamName);

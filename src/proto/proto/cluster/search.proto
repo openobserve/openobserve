@@ -36,16 +36,17 @@ message SearchQuery {
 
 // Search request
 message SearchRequest {
-    Job                        job = 1;
-    string                  org_id = 2;
-    string             stream_type = 3;
-    SearchType               stype = 4;
-    SearchQuery              query = 5;
-    repeated FileKey     file_list = 6;
-    repeated SearchAggRequest aggs = 7;
-    int64                  timeout = 8;
-    string              work_group = 9;
-    optional string       user_id = 10;
+    Job                            job = 1;
+    string                      org_id = 2;
+    string                 stream_type = 3;
+    SearchType                   stype = 4;
+    SearchQuery                  query = 5;
+    repeated FileKey         file_list = 6;
+    repeated SearchAggRequest     aggs = 7;
+    int64                      timeout = 8;
+    string                  work_group = 9;
+    optional string           user_id = 10;
+    optional string search_event_type = 11;
 }
 
 message SearchResponse {
@@ -87,6 +88,12 @@ message QueryStatus {
     optional string   stream_type = 7;
     optional Query          query = 8;
     optional ScanStats scan_stats = 9;
+    optional WorkGroup work_group = 10;
+}
+
+enum WorkGroup{
+    SHORT = 0;
+    LONG = 1;
 }
 
 message Query {

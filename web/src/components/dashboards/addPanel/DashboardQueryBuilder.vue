@@ -1150,7 +1150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed } from "vue";
+import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -1188,6 +1188,10 @@ export default defineComponent({
       config: true,
       filter: false,
     });
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -1208,7 +1212,7 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
       { label: t("dashboard.countDistinct"), value: "count-distinct" },

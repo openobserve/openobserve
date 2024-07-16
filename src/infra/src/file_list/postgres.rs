@@ -895,7 +895,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS file_list
 (
-    id        BIGINT GENERATED ALWAYS AS IDENTITY,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
@@ -917,7 +917,7 @@ CREATE TABLE IF NOT EXISTS file_list
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
 (
-    id        BIGINT GENERATED ALWAYS AS IDENTITY,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
@@ -939,7 +939,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
-    id         BIGINT GENERATED ALWAYS AS IDENTITY,
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -956,7 +956,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
         r#"
 CREATE TABLE IF NOT EXISTS file_list_jobs
 (
-    id         BIGINT GENERATED ALWAYS AS IDENTITY,
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     offsets    BIGINT not null,
@@ -974,7 +974,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
 (
-    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org      VARCHAR(100) not null,
     stream   VARCHAR(256) not null,
     file_num BIGINT not null,

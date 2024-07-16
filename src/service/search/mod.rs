@@ -19,6 +19,7 @@ use chrono::Duration;
 use config::{
     get_config, ider,
     meta::{
+        cluster::RoleGroup,
         search,
         stream::{FileKey, StreamType},
         usage::{RequestStats, UsageType},
@@ -247,7 +248,7 @@ pub async fn search_partition(
     )
     .await;
 
-    let nodes = infra_cluster::get_cached_online_querier_nodes()
+    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -255,9 +256,6 @@ pub async fn search_partition(
         return Err(Error::Message("no querier node online".to_string()));
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
-    if nodes.is_empty() {
-        return Err(Error::Message("no querier node online".to_string()));
-    }
 
     let (records, original_size, compressed_size) =
         files
@@ -312,7 +310,7 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio
@@ -438,6 +436,13 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "processing"
         };
+        let work_group = if result.work_group.is_none() {
+            "Unknown"
+        } else if *result.work_group.as_ref().unwrap() == 0 {
+            "Short"
+        } else {
+            "Long"
+        };
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
@@ -448,6 +453,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             stream_type: result.stream_type,
             query,
             scan_stats,
+            work_group: work_group.to_string(),
         });
     }
 
@@ -460,7 +466,7 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio

@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::config::{get_config, meta::cluster::Role, utils::rand::get_rand_element};
+use ::config::{
+    get_config,
+    meta::cluster::{Role, RoleGroup},
+    utils::rand::get_rand_element,
+};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::infra::cluster;
@@ -193,7 +197,7 @@ async fn get_url(path: &str) -> URLDetails {
 
     let nodes = if is_querier_path {
         node_type = Role::Querier;
-        let nodes = cluster::get_cached_online_querier_nodes().await;
+        let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive)).await;
         if is_fixed_querier_route(path) && nodes.is_some() && !nodes.as_ref().unwrap().is_empty() {
             nodes.map(|v| v.into_iter().take(1).collect())
         } else {

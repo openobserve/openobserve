@@ -16,10 +16,10 @@
 use std::io::Write;
 
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        cluster::Node,
+        cluster::{Node, RoleGroup},
         search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
@@ -73,7 +73,7 @@ pub async fn query(
 
     // cluster mode
     let start: std::time::Instant = std::time::Instant::now();
-    let nodes = cluster::get_cached_online_querier_nodes()
+    let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -171,7 +171,7 @@ pub async fn query(
         return Ok(Vec::new());
     }
     let node = max_id_node.unwrap();
-    if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
+    if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
         // local node, no need grpc call
         let files = query_inner(
             org_id,
@@ -310,11 +310,6 @@ async fn query_inner(
 }
 
 #[inline]
-pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
-    Ok(file_list::get(file).await?)
-}
-
-#[inline]
 pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
     stats.files = files.len() as i64;
@@ -397,18 +392,4 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
         _ = storage::del(&[key]).await;
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_get_file_meta() {
-        let res = get_file_meta(
-            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-        )
-        .await;
-        assert!(res.is_err());
-    }
 }

@@ -21,6 +21,7 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
+import { DateTime as _DateTime } from "luxon";
 
 let moment: any;
 let momentInitialized = false;
@@ -793,4 +794,65 @@ export const durationFormatter = (durationInSeconds: number): string => {
   }
 
   return formattedDuration;
+};
+
+export const getTimezoneOffset = () => {
+  const now = new Date();
+
+  // Get the day, month, and year from the date object
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+  const year = now.getFullYear();
+
+  // Combine them in the DD-MM-YYYY format
+  const scheduleDate = `${day}-${month}-${year}`;
+
+  // Get the hours and minutes, ensuring they are formatted with two digits
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+
+  // Combine them in the HH:MM format
+  const scheduleTime = `${hours}:${minutes}`;
+
+  const ScheduleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const convertedDateTime = convertDateToTimestamp(
+    scheduleDate,
+    scheduleTime,
+    ScheduleTimezone
+  );
+
+  return convertedDateTime.offset;
+};
+
+export const convertDateToTimestamp = (
+  date: string,
+  time: string,
+  timezone: string
+) => {
+  const browserTime =
+    "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+  const [day, month, year] = date.split("-");
+  const [hour, minute] = time.split(":");
+
+  const _date = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour),
+    minute: Number(minute),
+  };
+
+  if (timezone.toLowerCase() == browserTime.toLowerCase()) {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+
+  // Create a DateTime instance from date and time, then set the timezone
+  const dateTime = _DateTime.fromObject(_date, { zone: timezone });
+
+  // Convert the DateTime to a Unix timestamp in milliseconds
+  const unixTimestampMillis = dateTime.toMillis();
+
+  return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
 };

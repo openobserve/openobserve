@@ -135,14 +135,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         ]"
         :rows="data.currentFieldsList"
+        v-model:pagination="pagination"
         row-key="column"
         :filter="dashboardPanelData.meta.stream.filterField"
         :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
         hide-header
-        hide-bottom
         virtual-scroll
         id="fieldList"
+        :rows-per-page-options="[]"
+        :hide-bottom="
+          (!store.state.zoConfig.user_defined_schemas_enabled ||
+            dashboardPanelData.meta.stream.userDefinedSchema.length == 0) &&
+          dashboardPanelData.meta.stream.selectedStreamFields != undefined &&
+          (dashboardPanelData.meta.stream.selectedStreamFields.length <=
+            pagination.rowsPerPage ||
+            dashboardPanelData.meta.stream.selectedStreamFields.length == 0)
+        "
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
@@ -158,9 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].customQuery &&
-                props.pageIndex ==
-                  dashboardPanelData.meta.stream.customQueryFields.length
+                ].customQuery && props.pageIndex == customQueryFieldsLength
                   ? 'border: 1px solid black'
                   : ''
               "
@@ -186,9 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length)
+                        props.pageIndex >= customQueryFieldsLength)
                     )
                   "
                   @dragstart="onDragStart($event, props.row)"
@@ -203,9 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
                         ].customQuery &&
-                          props.pageIndex >=
-                            dashboardPanelData.meta.stream.customQueryFields
-                              .length)
+                          props.pageIndex >= customQueryFieldsLength)
                       )
                         ? 'drag_indicator'
                         : 'drag_disabled',
@@ -235,9 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length) ||
+                        props.pageIndex >= customQueryFieldsLength) ||
                       dashboardPanelData.data.type == 'geomap'
                     )
                   "
@@ -298,6 +298,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+Z</div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery == false
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-data"
@@ -313,9 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length)
+                        props.pageIndex >= customQueryFieldsLength)
                     ) && dashboardPanelData.data.type == 'geomap'
                   "
                 >
@@ -358,6 +361,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+W</div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery == false
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-geomap-data"
@@ -373,9 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery &&
-                        props.pageIndex >=
-                          dashboardPanelData.meta.stream.customQueryFields
-                            .length)
+                        props.pageIndex >= customQueryFieldsLength)
                     ) && dashboardPanelData.data.type == 'sankey'
                   "
                 >
@@ -418,6 +424,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+V</div>
                   </q-btn>
                   <q-btn
+                    v-if="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery == false
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-sankey-data"
@@ -446,6 +457,127 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
         </template>
+        <template v-slot:pagination="scope">
+          <div
+            v-if="
+              store.state.zoConfig.user_defined_schemas_enabled &&
+              dashboardPanelData.meta.stream.userDefinedSchema.length > 0
+            "
+            class="fieldList-pagination"
+          >
+            <q-btn-toggle
+              no-caps
+              v-model="dashboardPanelData.meta.stream.useUserDefinedSchemas"
+              data-test="dashboard-page-field-list-user-defined-schema-toggle"
+              class="schema-field-toggle q-mr-xs"
+              toggle-color="primary"
+              bordered
+              size="8px"
+              color="white"
+              text-color="primary"
+              @update:model-value="toggleSchema"
+              :options="userDefinedSchemaBtnGroupOption"
+            >
+              <template v-slot:user_defined_slot>
+                <q-icon name="person"></q-icon>
+                <q-icon name="schema"></q-icon>
+                <q-tooltip
+                  data-test="dashboard-page-fields-list-user-defined-fields-warning-tooltip"
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  class="text-body2"
+                >
+                  <span class="text-bold" color="white">{{
+                    t("search.userDefinedSchemaLabel")
+                  }}</span>
+                </q-tooltip>
+              </template>
+              <template v-slot:all_fields_slot>
+                <q-icon name="schema"></q-icon>
+                <q-tooltip
+                  data-test="dashboard-page-fields-list-all-fields-warning-tooltip"
+                  anchor="center right"
+                  self="center left"
+                  max-width="300px"
+                  class="text-body2"
+                >
+                  <span class="text-bold" color="white">{{
+                    t("search.allFieldsLabel")
+                  }}</span>
+                  <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                  {{ t("search.allFieldsWarningMsg") }}
+                </q-tooltip>
+              </template>
+            </q-btn-toggle>
+          </div>
+          <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
+            <q-tooltip
+              data-test="dashboard-page-fields-list-pagination-tooltip"
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              class="text-body2"
+            >
+              Total Fields:
+              {{ dashboardPanelData.meta.stream.selectedStreamFields.length }}
+            </q-tooltip>
+            <q-btn
+              data-test="dashboard-page-fields-list-pagination-firstpage-button"
+              v-if="scope.pagesNumber > 2"
+              icon="skip_previous"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.firstPage"
+            />
+
+            <q-btn
+              data-test="dashboard-page-fields-list-pagination-previouspage-button"
+              icon="fast_rewind"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isFirstPage"
+              @click="scope.prevPage"
+            />
+
+            <q-btn
+              round
+              data-test="dashboard-page-fields-list-pagination-messsage-button"
+              dense
+              flat
+              class="text text-caption text-regular"
+              >{{ scope.pagination.page }}/{{ scope.pagesNumber }}</q-btn
+            >
+
+            <q-btn
+              data-test="dashboard-page-fields-list-pagination-nextpage-button"
+              icon="fast_forward"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.nextPage"
+            />
+
+            <q-btn
+              data-test="dashboard-page-fields-list-pagination-lastpage-button"
+              v-if="scope.pagesNumber > 2"
+              icon="skip_next"
+              color="grey-8"
+              round
+              dense
+              flat
+              :disable="scope.isLastPage"
+              @click="scope.lastPage"
+            />
+          </div>
+        </template>
       </q-table>
     </div>
   </div>
@@ -467,13 +599,41 @@ import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
+import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "FieldList",
-  props: ["selectedXAxisValue", "selectedYAxisValue", "editMode"],
-  emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
-  setup(props) {
+  props: ["editMode"],
+  emits: ["update:streamList"],
+  setup(props, { emit }) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+
+    const userDefinedSchemaBtnGroupOption = [
+      {
+        label: "",
+        value: "user_defined_schema",
+        slot: "user_defined_slot",
+      },
+      {
+        label: "",
+        value: "all_fields",
+        slot: "all_fields_slot",
+      },
+    ];
+
+    const pagination = ref({
+      page: 1,
+      rowsPerPage: 10000,
+    });
+
+    // custom query fields length
+    // will be updated when filter is applied
+    const customQueryFieldsLength = ref(0);
+
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -503,7 +663,7 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
     const onDragEnd = () => {
@@ -518,7 +678,7 @@ export default defineComponent({
     };
 
     const selectedMetricTypeIcon = computed(() => {
-      return dashboardPanelData.meta.stream.streamResults.find(
+      return data.schemaList.find(
         (it: any) =>
           it.name ==
           dashboardPanelData.data.queries[
@@ -590,22 +750,7 @@ export default defineComponent({
         // if fields found
         if (fields) {
           try {
-            // get schema of that field using getstream
-            const fieldWithSchema: any = await getStreamFields.execute(
-              fields.name,
-              fields.stream_type,
-              true
-            );
-
-            // below line required for pass by reference
-            // if we don't set blank, then same object from cache is being set
-            // and that doesn't call the watchers,
-            // so it will not be updated when we switch to different chart types
-            // which doesn't have field list and coming back to field list
-            dashboardPanelData.meta.stream.selectedStreamFields = [];
-            // assign the schema
-            dashboardPanelData.meta.stream.selectedStreamFields =
-              fieldWithSchema?.schema ?? [];
+            await extractFields();
           } catch (error: any) {
             showErrorNotification(
               error?.message ?? "Failed to get stream fields"
@@ -614,27 +759,13 @@ export default defineComponent({
         }
       }
     );
-    const selectedStreamForQueries: any = ref({});
-
-    // Watch for changes in the current query selected stream
-    watch(
-      () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-      (newStream) => {
-        selectedStreamForQueries.value[
-          dashboardPanelData.layout.currentQueryIndex
-        ] = newStream;
-      }
-    );
 
     watch(
       () => [
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
-        dashboardPanelData.meta.stream.streamResults,
+        data.schemaList,
       ],
       () => {
         if (!props.editMode) {
@@ -643,7 +774,7 @@ export default defineComponent({
           ].fields.stream = "";
         }
 
-        data.indexOptions = dashboardPanelData.meta.stream.streamResults.filter(
+        data.indexOptions = data.schemaList.filter(
           (data: any) =>
             data.stream_type ==
             dashboardPanelData.data.queries[
@@ -663,14 +794,18 @@ export default defineComponent({
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
           if (
-            selectedStreamForQueries.value[currentIndex] &&
             data.indexOptions.find(
               (it: any) =>
-                it.name == selectedStreamForQueries.value[currentIndex]
+                it.name ==
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
-              selectedStreamForQueries.value[currentIndex];
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream;
           } else {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
               data.indexOptions[0]?.name;
@@ -681,21 +816,53 @@ export default defineComponent({
     // update the current list fields if any of the lists changes
     watch(
       () => [
+        store.state.zoConfig.user_defined_schemas_enabled,
         dashboardPanelData.meta.stream.selectedStreamFields,
         dashboardPanelData.meta.stream.customQueryFields,
+        dashboardPanelData.meta.stream.userDefinedSchema,
+        dashboardPanelData.meta.stream.useUserDefinedSchemas,
       ],
       () => {
         data.currentFieldsList = [];
-        data.currentFieldsList = [
-          ...dashboardPanelData.meta.stream.customQueryFields,
-          ...dashboardPanelData.meta.stream.selectedStreamFields,
-        ];
+        // if user defined schema is enabled, use user defined schema
+        // else use selectedStreamFields
+
+        if (
+          store.state.zoConfig.user_defined_schemas_enabled &&
+          dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+          dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+            "user_defined_schema"
+        ) {
+          data.currentFieldsList = [
+            ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.userDefinedSchema,
+          ];
+        } else {
+          data.currentFieldsList = [
+            ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.selectedStreamFields,
+          ];
+        }
+
+        // set the custom query fields length
+        customQueryFieldsLength.value =
+          dashboardPanelData.meta.stream.customQueryFields.length;
+      }
+    );
+
+    watch(
+      () => dashboardPanelData.meta.stream.filterField,
+      () => {
+        // set the custom query fields length
+        customQueryFieldsLength.value =
+          dashboardPanelData.meta.stream.customQueryFields.length;
       }
     );
 
     // get the stream list by making an API call
     const getStreamList = async (stream_type: any) => {
       await getStreams(stream_type, false).then((res: any) => {
+        data.schemaList = [];
         data.schemaList = res.list;
         // below line required for pass by reference
         // if we don't set blank, then same object from cache is being set
@@ -708,12 +875,42 @@ export default defineComponent({
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
+      let filtered = [];
+
       if (terms != "") {
         terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
+
+        // loop on custom query fields
+        for (
+          let i = 0;
+          i < dashboardPanelData.meta.stream.customQueryFields.length;
+          i++
+        ) {
+          if (
+            dashboardPanelData.meta.stream.customQueryFields[i]["name"]
+              .toLowerCase()
+              .includes(terms)
+          ) {
+            filtered.push(dashboardPanelData.meta.stream.customQueryFields[i]);
+          }
+        }
+
+        // update custom query fields length
+        customQueryFieldsLength.value = filtered.length;
+
+        for (
+          let i = 0;
+          i < dashboardPanelData.meta.stream.selectedStreamFields.length;
+          i++
+        ) {
+          if (
+            dashboardPanelData.meta.stream.selectedStreamFields[i]["name"]
+              .toLowerCase()
+              .includes(terms)
+          ) {
+            filtered.push(
+              dashboardPanelData.meta.stream.selectedStreamFields[i]
+            );
           }
         }
       }
@@ -757,6 +954,97 @@ export default defineComponent({
       });
     };
 
+    async function loadStreamFileds(streamName: string) {
+      try {
+        if (streamName != "") {
+          return await getStream(
+            streamName,
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type ?? "logs",
+            true
+          ).then((res) => {
+            return res;
+          });
+        } else {
+        }
+        return;
+      } catch (e: any) {
+        console.log("Error while loading stream fields");
+      }
+    }
+
+    async function extractFields() {
+      try {
+        dashboardPanelData.meta.stream.selectedStreamFields = [];
+        const schemaFields: any = [];
+        let userDefineSchemaSettings: any = [];
+
+        if (data.schemaList.length > 0) {
+          for (const stream of data.schemaList) {
+            if (
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream == stream.name
+            ) {
+              // check for schema exist in the object or not
+              // if not pull the schema from server.
+              if (!stream.hasOwnProperty("schema")) {
+                const streamData: any = await loadStreamFileds(stream.name);
+                const streamSchema: any = streamData.schema;
+                if (streamSchema == undefined) {
+                  return;
+                }
+                stream.settings = streamData.settings;
+                stream.schema = streamSchema;
+              }
+
+              if (
+                stream.settings.hasOwnProperty("defined_schema_fields") &&
+                stream.settings.defined_schema_fields.length > 0
+              ) {
+                dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
+              } else {
+                dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
+              }
+
+              // create a schema field mapping based on field name to avoind iteration over object.
+              // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
+              for (const field of stream.schema) {
+                if (
+                  store.state.zoConfig.user_defined_schemas_enabled &&
+                  stream.settings.hasOwnProperty("defined_schema_fields") &&
+                  stream.settings.defined_schema_fields.length > 0
+                ) {
+                  if (
+                    stream.settings.defined_schema_fields.includes(field.name)
+                  ) {
+                    // push as a user defined schema
+                    userDefineSchemaSettings.push(field);
+                  }
+                  schemaFields.push(field);
+                } else {
+                  schemaFields.push(field);
+                }
+              }
+
+              dashboardPanelData.meta.stream.selectedStreamFields =
+                schemaFields ?? [];
+              dashboardPanelData.meta.stream.userDefinedSchema =
+                userDefineSchemaSettings ?? [];
+            }
+          }
+        }
+        emit("update:streamList");
+      } catch (e: any) {
+        console.log("Error while extracting fields");
+      }
+    }
+
+    const toggleSchema = async () => {
+      await extractFields();
+    };
+
     return {
       t,
       store,
@@ -794,6 +1082,16 @@ export default defineComponent({
       metricsIconMapping,
       selectedMetricTypeIcon,
       onDragEnd,
+      customQueryFieldsLength,
+      toggleSchema,
+      userDefinedSchemaBtnGroupOption,
+      pagination,
+      pagesNumber: computed(() => {
+        return Math.ceil(
+          dashboardPanelData.meta.stream.selectedStreamFields.length /
+            pagination.value.rowsPerPage
+        );
+      }),
     };
   },
 });
@@ -1042,5 +1340,35 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+
+.schema-field-toggle .q-btn {
+  padding: 5px !important;
+}
+
+.schema-field-toggle {
+  border: 1px solid light-grey;
+  border-radius: 5px;
+  line-height: 10px;
+}
+
+.q-table__bottom {
+  padding: 0px !important;
+}
+
+.pagination-field-count {
+  line-height: 32px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.q-table__bottom .q-table__control {
+  min-height: 80px !important;
+}
+
+.fieldList-pagination {
+  // min-height: 80px;
+  display: flex;
+  padding-bottom: 2rem;
 }
 </style>

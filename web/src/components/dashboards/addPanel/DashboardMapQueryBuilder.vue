@@ -699,6 +699,7 @@ import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
@@ -714,6 +715,10 @@ export default defineComponent({
       weight: true,
       filter: false,
     });
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
     const {
       dashboardPanelData,
       addLatitude,
@@ -727,7 +732,7 @@ export default defineComponent({
       loadFilterItem,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData();
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
       { label: t("dashboard.countDistinct"), value: "count-distinct" },

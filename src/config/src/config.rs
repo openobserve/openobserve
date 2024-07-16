@@ -492,6 +492,12 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
+    #[env_config(
+        name = "ZO_NODE_ROLE_GROUP",
+        default = "",
+        help = "Role group can be empty (default), interactive, or background"
+    )]
+    pub node_role_group: String,
     #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
@@ -568,6 +574,20 @@ pub struct Common {
     pub tracing_search_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
+    #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
+    pub otel_otlp_grpc_url: String,
+    #[env_config(
+        name = "ZO_TRACING_GRPC_ORGANIZATION",
+        default = "",
+        help = "Used in metadata when exporting traces to grpc endpoint."
+    )]
+    pub tracing_grpc_header_org: String,
+    #[env_config(
+        name = "ZO_TRACING_GRPC_STREAM_NAME",
+        default = "",
+        help = "Used in metadata when exporting traces to grpc endpoint."
+    )]
+    pub tracing_grpc_header_stream_name: String,
     #[env_config(name = "ZO_TRACING_HEADER_KEY", default = "Authorization")]
     pub tracing_header_key: String,
     #[env_config(
@@ -738,6 +758,8 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
+    pub swagger_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1157,6 +1179,13 @@ pub struct RUM {
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().unwrap();
+
+    // set local mode
+    if cfg.common.local_mode {
+        cfg.common.node_role = "all".to_string();
+        cfg.common.node_role_group = "".to_string();
+    }
+
     // set cpu num
     let cpu_num = cgroup::get_cpu_limit();
     cfg.limit.cpu_num = cpu_num;
@@ -1168,15 +1197,27 @@ pub fn init() -> Config {
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
-        cfg.limit.query_thread_num = cpu_num * 4;
+        if cfg.common.local_mode {
+            cfg.limit.query_thread_num = cpu_num * 2;
+        } else {
+            cfg.limit.query_thread_num = cpu_num * 4;
+        }
     }
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num;
+        if cfg.common.local_mode {
+            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.file_move_thread_num = cpu_num;
+        }
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
-        cfg.limit.file_merge_thread_num = cpu_num;
+        if cfg.common.local_mode {
+            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.file_merge_thread_num = cpu_num;
+        }
     }
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
@@ -1434,7 +1475,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let mem_total = cgroup::get_memory_limit();
     cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
-        cfg.memory_cache.max_size = mem_total / 2; // 50%
+        if cfg.common.local_mode {
+            cfg.memory_cache.max_size = mem_total / 4; // 25%
+        } else {
+            cfg.memory_cache.max_size = mem_total / 2; // 50%
+        }
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
@@ -1458,7 +1503,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
-        cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
+        if cfg.common.local_mode {
+            cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
+        } else {
+            cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
+        }
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
@@ -1472,7 +1521,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // for memtable limit check
     if cfg.limit.mem_table_max_size == 0 {
-        cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+        if cfg.common.local_mode {
+            cfg.limit.mem_table_max_size = mem_total / 4; // 25%
+        } else {
+            cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+        }
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }

@@ -399,21 +399,27 @@ export default defineComponent({
               range: range,
             });
             filteredSuggestions.push({
-              label: `match_all_ignore_case('${lastElement}')`,
+              label: `match_all_raw('${lastElement}')`,
               kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_ignore_case('${lastElement}')`,
+              insertText: `match_all_raw('${lastElement}')`,
               range: range,
             });
             filteredSuggestions.push({
-              label: `match_all_indexed('${lastElement}')`,
+              label: `match_all_raw_ignore_case('${lastElement}')`,
               kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_indexed('${lastElement}')`,
+              insertText: `match_all_raw_ignore_case('${lastElement}')`,
               range: range,
             });
             filteredSuggestions.push({
-              label: `match_all_indexed_ignore_case('${lastElement}')`,
+              label: `re_match(fieldname: string, regular_expression: string)`,
               kind: monaco.languages.CompletionItemKind.Text,
-              insertText: `match_all_indexed_ignore_case('${lastElement}')`,
+              insertText: `re_match(fieldname, '')`,
+              range: range,
+            });
+            filteredSuggestions.push({
+              label: `re_not_match(fieldname: string, regular_expression: string)`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `re_not_match(fieldname, '')`,
               range: range,
             });
             filteredSuggestions.push({

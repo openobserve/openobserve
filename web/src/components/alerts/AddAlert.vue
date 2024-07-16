@@ -32,10 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
+        <div v-if="beingUpdated"
+class="text-h6" data-test="add-alert-title">
           {{ t("alerts.updateTitle") }}
         </div>
-        <div v-else class="text-h6" data-test="add-alert-title">
+        <div v-else
+class="text-h6" data-test="add-alert-title">
           {{ t("alerts.addTitle") }}
         </div>
       </div>
@@ -53,7 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row justify-start items-start" style="width: 1024px">
         <div style="width: calc(100% - 401px)">
-          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+          <q-form class="add-alert-form"
+ref="addAlertForm" @submit="onSubmit">
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
@@ -440,7 +443,7 @@ import { useStore } from "vuex";
 import { useQuasar, debounce } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import { getUUID } from "@/utils/zincutils";
+import { getUUID, getTimezoneOffset } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -480,8 +483,10 @@ const defaultValue: any = () => {
       period: 10,
       operator: ">=",
       frequency: 1,
+      cron: "",
       threshold: 3,
       silence: 10,
+      frequency_type: "minutes",
     },
     destinations: [],
     context_attributes: {},
@@ -1091,6 +1096,7 @@ export default defineComponent({
       previewQuery,
       previewAlertRef,
       outlinedInfo,
+      getTimezoneOffset,
     };
   },
 
@@ -1155,6 +1161,13 @@ export default defineComponent({
           timeout: 1500,
         });
         return false;
+      }
+
+      if (
+        this.formData.is_real_time == "false" &&
+        this.formData.trigger_condition.frequency_type == "cron"
+      ) {
+        this.formData.tz_offset = this.getTimezoneOffset();
       }
 
       this.addAlertForm.validate().then((valid: any) => {

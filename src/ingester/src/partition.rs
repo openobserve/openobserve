@@ -25,6 +25,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use hashbrown::HashSet;
 use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
@@ -36,29 +37,70 @@ use crate::{
 
 pub(crate) struct Partition {
     schema: Arc<Schema>,
+    schema_fields: HashSet<String>, // use for quick check schema change
     files: BTreeMap<Arc<str>, PartitionFile>, // key: hour, val: files
 }
 
 impl Partition {
-    pub(crate) fn new(schema: Arc<Schema>) -> Self {
-        metrics::INGEST_MEMTABLE_ARROW_BYTES
-            .with_label_values(&[])
-            .add(schema.size() as i64);
+    pub(crate) fn new() -> Self {
         Self {
-            schema,
+            schema: Arc::new(Schema::empty()),
+            schema_fields: HashSet::new(),
             files: BTreeMap::default(),
         }
     }
 
-    pub(crate) fn write(
-        &mut self,
-        entry: Entry,
-        batch: Option<Arc<RecordBatchEntry>>,
-    ) -> Result<usize> {
+    pub(crate) fn write(&mut self, entry: Entry, batch: Arc<RecordBatchEntry>) -> Result<usize> {
         let partition = self
             .files
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
+
+        let schema = batch.data.schema();
+        let mut schema_change_size = 0;
+        if self.schema_fields.is_empty() {
+            self.schema = schema.clone();
+            self.schema_fields = self
+                .schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_string())
+                .collect();
+            schema_change_size = self.schema.size();
+        } else {
+            let new_fields = schema
+                .fields()
+                .iter()
+                .filter_map(|f| {
+                    if !self.schema_fields.contains(f.name()) {
+                        Some(f.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            if !new_fields.is_empty() {
+                self.schema_fields
+                    .extend(new_fields.iter().map(|f| f.name().to_string()));
+                let old_schema_size = self.schema.size();
+                let schema_fields = self
+                    .schema
+                    .fields()
+                    .iter()
+                    .cloned()
+                    .chain(new_fields)
+                    .collect::<Vec<_>>();
+                self.schema = Arc::new(Schema::new(schema_fields));
+                let new_schema_size = self.schema.size();
+                schema_change_size = new_schema_size - old_schema_size;
+            }
+        }
+        if schema_change_size > 0 {
+            metrics::INGEST_MEMTABLE_ARROW_BYTES
+                .with_label_values(&[])
+                .add(schema_change_size as i64);
+        }
+
         partition.write(batch)
     }
 
@@ -120,9 +162,16 @@ impl Partition {
                     (vec![], vec![])
                 };
 
-            let batches = data.data.iter().map(|r| &r.data).collect::<Vec<_>>();
+            let batches = data
+                .data
+                .iter()
+                .map(|r| {
+                    persist_stat.arrow_size += r.data_arrow_size;
+                    r.data.clone()
+                })
+                .collect::<Vec<_>>();
             let (schema, batches) =
-                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), &batches)
+                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();
@@ -134,16 +183,10 @@ impl Partition {
                 &file_meta,
             );
 
-            for entry in data.data.iter() {
-                persist_stat.arrow_size += entry.data_arrow_size;
-            }
-
-            for batch in batches.iter() {
-                writer
-                    .write(batch)
-                    .await
-                    .context(WriteParquetRecordBatchSnafu)?;
-            }
+            writer
+                .write(&batches)
+                .await
+                .context(WriteParquetRecordBatchSnafu)?;
             writer.close().await.context(WriteParquetRecordBatchSnafu)?;
             file_meta.compressed_size = buf_parquet.len() as i64;
 
@@ -204,10 +247,7 @@ impl PartitionFile {
         Self { data: Vec::new() }
     }
 
-    fn write(&mut self, batch: Option<Arc<RecordBatchEntry>>) -> Result<usize> {
-        let Some(batch) = batch else {
-            return Ok(0);
-        };
+    fn write(&mut self, batch: Arc<RecordBatchEntry>) -> Result<usize> {
         let json_size = batch.data_json_size;
         let arrow_size = batch.data_arrow_size;
         self.data.push(batch);

@@ -78,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <span>&nbsp;</span>
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="selectedFolder = $event" />
+        <select-folder-dropdown
+          v-if="showFolderSelection"
+          :active-folder-id="selectedFolder.value"
+          @folder-selected="selectedFolder = $event"
+        />
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -112,7 +116,7 @@ import { defineComponent, ref } from "vue";
 import dashboardService from "../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { isProxy, toRaw } from "vue";
+import { toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
@@ -135,8 +139,14 @@ export default defineComponent({
   name: "ComponentAddDashboard",
   props: {
     activeFolderId: {
-      type: String,
+      validator: (value: any) => {
+        return typeof value === "string" || value === null;
+      },
       default: "default",
+    },
+    showFolderSelection: {
+      type: Boolean,
+      default: true,
     },
   },
   emits: ["updated"],

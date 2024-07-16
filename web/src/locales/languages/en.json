@@ -578,6 +578,8 @@
     "addFieldMessage": "Please add a field from the list",
     "currentFolderLabel": "Current Folder",
     "selectFolderLabel": "Select Folder",
+    "selectDashboardLabel": "Select Dashboard",
+    "selectTabLabel": "Select Tab",
     "layerType": "Layer Type",
     "newDashboard": "Create new dashboard",
     "addDashboard": "Add to Dashboard",
@@ -775,7 +777,8 @@
     "pause": "Pause",
     "groupBy": "Group by",
     "row": "Row Template",
-    "preview": "Preview"
+    "preview": "Preview",
+    "crontitle": "Enable Cron"
   },
   "alert_templates": {
     "header": "Templates",

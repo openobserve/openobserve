@@ -94,6 +94,7 @@ const defaultObject = {
     ],
   },
   meta: {
+    logsVisualizeToggle: "logs",
     refreshInterval: <number>0,
     refreshIntervalLabel: "Off",
     showFields: true,
@@ -2185,6 +2186,7 @@ const useLogs = () => {
               searchObj.data.queryResults.aggs = res.data.hits;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
+              searchObj.data.queryResults.result_cache_ratio += res.data.result_cache_ratio;
               // if (hasAggregationFlag) {
               //   searchObj.data.queryResults.total = res.data.total;
               // }
@@ -2896,6 +2898,8 @@ const useLogs = () => {
       if(searchObj.data.queryResults.partitionDetail.partitions.length > 1 && searchObj.meta.showHistogram == false) {
         plusSign = "+";
       }
+      const scanSizeLabel = searchObj.data.queryResults.result_cache_ratio > 0 ? "Delta Scan Size" : "Scan Size";
+
       const title =
         "Showing " +
         startCount +
@@ -2906,7 +2910,7 @@ const useLogs = () => {
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +
-        " ms. (Scan Size: " +
+        " ms. (+ scanSizeLabel +: " +
         formatSizeFromMB(searchObj.data.queryResults.scan_size) +
         plusSign +
         ")";
@@ -3170,18 +3174,26 @@ const useLogs = () => {
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
-          if (searchObj.loading == false && searchObj.loadingHistogram == false) {
+          if (
+            searchObj.loading == false &&
+            searchObj.loadingHistogram == false &&
+            searchObj.meta.logsVisualizeToggle == "logs"
+          ) {
             searchObj.loading = true;
             await getQueryData(false);
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
-        $q.notify({
-          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-          color: "positive",
-          position: "top",
-          timeout: 1000,
-        });
+
+        // only notify if user is in logs page
+        if(searchObj.meta.logsVisualizeToggle == "logs"){
+          $q.notify({
+            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            color: "positive",
+            position: "top",
+            timeout: 1000,
+          });
+        }
       } else {
         clearInterval(store.state.refreshIntervalID);
       }

@@ -21,6 +21,7 @@ use std::{
 use config::{
     ider,
     meta::{
+        cluster::RoleGroup,
         search::ScanStats,
         stream::StreamType,
         usage::{RequestStats, UsageType},
@@ -73,7 +74,9 @@ async fn search_in_cluster(
     let started_at = chrono::Utc::now().timestamp_micros();
 
     // get querier nodes from cluster
-    let mut nodes = cluster::get_cached_online_querier_nodes().await.unwrap();
+    let mut nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+        .await
+        .unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);

@@ -20,7 +20,7 @@ use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config, ider,
     meta::stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
@@ -29,7 +29,7 @@ use config::{
         parquet::{
             parse_file_key_columns, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::{format_recordbatch_by_schema, merge_record_batches},
+        record_batch_ext::merge_record_batches,
         schema_ext::SchemaExt,
     },
     FILE_EXT_PARQUET,
@@ -88,16 +88,16 @@ pub async fn generate_job_by_stream(
 ) -> Result<(), anyhow::Error> {
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
 
-    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
@@ -108,7 +108,7 @@ pub async fn generate_job_by_stream(
             stream_type,
             stream_name,
             offset,
-            Some(&LOCAL_NODE_UUID.clone()),
+            Some(&LOCAL_NODE.uuid.clone()),
         )
         .await;
         dist_lock::unlock(&locker).await?;
@@ -191,7 +191,7 @@ pub async fn generate_job_by_stream(
         stream_type,
         stream_name,
         offset,
-        Some(&LOCAL_NODE_UUID.clone()),
+        Some(&LOCAL_NODE.uuid.clone()),
     )
     .await?;
 
@@ -1138,22 +1138,14 @@ pub async fn merge_parquet_files(
     // create new schema with the shared fields
     let schema = Arc::new(schema.retain(shared_fields));
 
-    // format recordbatch
-    let record_batches = record_batches
-        .into_iter()
-        .map(|b| format_recordbatch_by_schema(schema.clone(), b))
-        .collect::<Vec<_>>();
-
     // merge record batches, the record batch have same schema
-    let record_batches = record_batches.iter().collect::<Vec<_>>();
     let (schema, new_record_batches) =
-        merge_record_batches("MERGE", thread_id, schema, &record_batches)?;
-    drop(record_batches);
+        merge_record_batches("MERGE", thread_id, schema, record_batches)?;
 
     log::info!(
         "[MERGE:JOB:{thread_id}] merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, new_record_batches))
+    Ok((schema, vec![new_record_batches]))
 }

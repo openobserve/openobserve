@@ -17,6 +17,8 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
+use crate::meta::search::SearchEventType;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Node {
     pub id: i32,
@@ -25,6 +27,8 @@ pub struct Node {
     pub http_addr: String,
     pub grpc_addr: String,
     pub role: Vec<Role>,
+    #[serde(default)]
+    pub role_group: RoleGroup,
     pub cpu_num: u64,
     pub status: NodeStatus,
     #[serde(default)]
@@ -42,11 +46,41 @@ impl Node {
             http_addr: "".to_string(),
             grpc_addr: "".to_string(),
             role: vec![],
+            role_group: RoleGroup::None,
             cpu_num: 0,
             status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
         }
+    }
+    pub fn is_single_node(&self) -> bool {
+        self.role.len() == 1 && self.role.contains(&Role::All)
+    }
+    pub fn is_router(&self) -> bool {
+        self.role.contains(&Role::Router)
+    }
+    pub fn is_ingester(&self) -> bool {
+        self.role.contains(&Role::Ingester) || self.role.contains(&Role::All)
+    }
+    pub fn is_querier(&self) -> bool {
+        self.role.contains(&Role::Querier) || self.role.contains(&Role::All)
+    }
+    pub fn is_interactive_querier(&self) -> bool {
+        self.is_querier()
+            && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Interactive)
+    }
+    pub fn is_background_querier(&self) -> bool {
+        self.is_querier()
+            && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Background)
+    }
+    pub fn is_compactor(&self) -> bool {
+        self.role.contains(&Role::Compactor) || self.role.contains(&Role::All)
+    }
+    pub fn is_flatten_compactor(&self) -> bool {
+        self.role.contains(&Role::FlattenCompactor) || self.role.contains(&Role::All)
+    }
+    pub fn is_alert_manager(&self) -> bool {
+        self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
 }
 
@@ -101,6 +135,47 @@ impl std::fmt::Display for Role {
             Role::Router => write!(f, "router"),
             Role::AlertManager => write!(f, "alert_manager"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
+        }
+    }
+}
+
+/// Categorizes nodes into different groups.
+/// None        -> All tasks
+/// Background  -> Low-priority tasks
+/// Interactive -> High-priority tasks
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub enum RoleGroup {
+    #[default]
+    None,
+    Interactive,
+    Background,
+}
+
+impl From<&str> for RoleGroup {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "background" => RoleGroup::Background,
+            "interactive" => RoleGroup::Interactive,
+            _ => RoleGroup::None,
+        }
+    }
+}
+
+impl From<SearchEventType> for RoleGroup {
+    fn from(value: SearchEventType) -> Self {
+        match value {
+            SearchEventType::Reports | SearchEventType::Alerts => RoleGroup::Background,
+            _ => RoleGroup::Interactive,
+        }
+    }
+}
+
+impl std::fmt::Display for RoleGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RoleGroup::None => write!(f, ""),
+            RoleGroup::Interactive => write!(f, "interactive"),
+            RoleGroup::Background => write!(f, "background"),
         }
     }
 }

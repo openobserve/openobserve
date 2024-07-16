@@ -17,7 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div class="row">
-      <div class="float-right col q-mb-xs">
+      <div class="float-right col q-mb-xs flex">
+        <div class="button-group logs-visualize-toggle q-ml-xs">
+          <div class="row">
+            <div>
+              <button
+                data-test="logs-logs-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'logs'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-left"
+                @click="onLogsVisualizeToggleUpdate('logs')"
+              >
+                Search
+              </button>
+            </div>
+            <div>
+              <button
+                data-test="logs-visualize-toggle"
+                :class="
+                  searchObj.meta.logsVisualizeToggle === 'visualize'
+                    ? 'selected'
+                    : ''
+                "
+                class="button button-right"
+                @click="onLogsVisualizeToggleUpdate('visualize')"
+              >
+                Visualize
+              </button>
+            </div>
+          </div>
+        </div>
         <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-model="searchObj.meta.showHistogram"
@@ -393,7 +425,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <auto-refresh-interval
               class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
+              :trigger="true"
               @update:model-value="onRefreshIntervalUpdate"
+              @trigger="$emit('onAutoIntervalTrigger')"
             />
             <q-btn-group
               class="no-outline q-pa-none no-border q-mr-xs"
@@ -445,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="t('search.runQuery')"
               class="q-pa-none search-button"
-              @click="handleRunQuery"
+              @click="handleRunQueryFn"
               :disable="
                 searchObj.loading == true || searchObj.loadingHistogram == true
               "
@@ -474,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
-              @run-query="handleRunQuery"
+              @run-query="handleRunQueryFn"
               :class="
                 searchObj.data.editorValue == '' &&
                 searchObj.meta.queryEditorPlaceholderFlag
@@ -488,7 +522,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="logs-vrl-function-editor"
-              v-show="searchObj.meta.toggleFunction"
+              v-show="
+                searchObj.meta.toggleFunction &&
+                searchObj.meta.logsVisualizeToggle != 'visualize'
+              "
               style="width: 100%; height: 100%"
             >
               <query-editor
@@ -813,6 +850,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <ConfirmDialog
+      title="Reset Changes"
+      message="Navigating away from visualize will reset your changes. Are you sure you want to proceed?"
+      @update:ok="changeLogsVisualizeToggle"
+      @update:cancel="confirmLogsVisualizeModeChangeDialog = false"
+      v-model="confirmLogsVisualizeModeChangeDialog"
+    />
   </div>
 </template>
 
@@ -859,6 +903,8 @@ import {
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { inject } from "vue";
 
 const defaultValue: any = () => {
   return {
@@ -885,6 +931,8 @@ export default defineComponent({
     "onChangeInterval",
     "onChangeTimezone",
     "handleQuickModeChange",
+    "handleRunQueryFn",
+    "onAutoIntervalTrigger",
   ],
   methods: {
     searchData() {
@@ -1016,6 +1064,9 @@ export default defineComponent({
     const savedFunctionName: string = ref("");
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
+
+    // confirm dialog for logs visualization toggle
+    const confirmLogsVisualizeModeChangeDialog = ref(false);
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -2228,7 +2279,7 @@ export default defineComponent({
       searchObj.data.editorValue = "";
       queryEditorRef.value.setValue(searchObj.data.query);
       if (store.state.zoConfig.query_on_stream_selection == false) {
-        handleRunQuery();
+        handleRunQueryFn();
       }
     };
 
@@ -2327,6 +2378,14 @@ export default defineComponent({
       return filtered;
     };
 
+    const regionFilterMethod = (node, filter) => {
+      const filt = filter.toLowerCase();
+      return node.label && node.label.toLowerCase().indexOf(filt) > -1;
+    };
+    const resetRegionFilter = () => {
+      regionFilter.value = "";
+    };
+
     const handleRegionsSelection = (item, isSelected) => {
       if (isSelected) {
         const index = searchObj.meta.regions.indexOf(item);
@@ -2342,13 +2401,36 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
-    const regionFilterMethod = (node, filter) => {
-      const filt = filter.toLowerCase();
-      return node.label && node.label.toLowerCase().indexOf(filt) > -1;
+    const handleRunQueryFn = () => {
+      if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        emit("handleRunQueryFn");
+      } else {
+        handleRunQuery();
+      }
     };
 
-    const resetRegionFilter = () => {
-      regionFilter.value = "";
+    const onLogsVisualizeToggleUpdate = (value: any) => {
+      if (value == "logs") {
+        confirmLogsVisualizeModeChangeDialog.value = true;
+      } else {
+        searchObj.meta.logsVisualizeToggle = value;
+      }
+    };
+
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "logs"
+    );
+    const { resetDashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
+
+    const changeLogsVisualizeToggle = () => {
+      // change logs visualize toggle
+      searchObj.meta.logsVisualizeToggle = "logs";
+      confirmLogsVisualizeModeChangeDialog.value = false;
+      // reset old dashboardPanelData
+      resetDashboardPanelData();
     };
 
     return {
@@ -2379,6 +2461,7 @@ export default defineComponent({
       filterFn,
       refreshData,
       handleRunQuery,
+      handleRunQueryFn,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       onRefreshIntervalUpdate,
@@ -2424,6 +2507,9 @@ export default defineComponent({
       resetRegionFilter,
       validateFilterForMultiStream,
       cancelQuery,
+      confirmLogsVisualizeModeChangeDialog,
+      changeLogsVisualizeToggle,
+      onLogsVisualizeToggleUpdate,
     };
   },
   computed: {
@@ -2577,45 +2663,45 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-#logsQueryEditor,
-#fnEditor {
-  height: 100% !important;
-}
-#fnEditor {
-  width: 100%;
-  border-radius: 5px;
-  border: 0px solid #dbdbdb;
-  overflow: hidden;
-}
-
-.q-field--standard .q-field__control:before,
-.q-field--standard .q-field__control:focus:before,
-.q-field--standard .q-field__control:hover:before {
-  border: 0px !important;
-  border-color: none;
-  transition: none;
-}
-
-.logs-search-bar-component > .row:nth-child(2) {
-  height: 100%; /* or any other height you want to set */
-}
-
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
-
 .logs-search-bar-component {
   padding-bottom: 1px;
   height: 100%;
   overflow: visible;
+
+  #logsQueryEditor,
+  #fnEditor {
+    height: 100% !important;
+  }
+  #fnEditor {
+    width: 100%;
+    border-radius: 5px;
+    border: 0px solid #dbdbdb;
+    overflow: hidden;
+  }
+
+  .q-field--standard .q-field__control:before,
+  .q-field--standard .q-field__control:focus:before,
+  .q-field--standard .q-field__control:hover:before {
+    border: 0px !important;
+    border-color: none;
+    transition: none;
+  }
+
+  .row:nth-child(2) {
+    height: 100%; /* or any other height you want to set */
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
 
   .function-dropdown {
     width: 205px;
@@ -2772,65 +2858,109 @@ export default defineComponent({
   .download-logs-btn {
     height: 30px;
   }
-}
 
-.query-editor-container {
-  height: calc(100% - 30px) !important;
-}
-
-.logs-auto-refresh-interval {
-  .q-btn {
-    min-height: 30px;
-    max-height: 30px;
-    padding: 0 4px;
+  .query-editor-container {
+    height: calc(100% - 30px) !important;
   }
-}
 
-.saved-views-dropdown {
-  border-radius: 4px;
-  button {
-    padding: 4px 5px;
+  .logs-auto-refresh-interval {
+    .q-btn {
+      min-height: 30px;
+      max-height: 30px;
+      padding: 0 4px;
+    }
   }
-}
 
-.savedview-dropdown {
-  width: 215px;
-  display: inline-block;
-  border: 1px solid #dbdbdb;
+  .saved-views-dropdown {
+    border-radius: 4px;
+    button {
+      padding: 4px 5px;
+    }
+  }
 
-  .q-field__input {
-    cursor: pointer;
+  .savedview-dropdown {
+    width: 215px;
+    display: inline-block;
+    border: 1px solid #dbdbdb;
+
+    .q-field__input {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .q-field__native,
+    .q-field__control {
+      min-height: 29px !important;
+      height: 29px;
+      padding: 0px 0px 0px 4px;
+    }
+
+    .q-field__marginal {
+      height: 30px;
+    }
+  }
+
+  .saved-view-item {
+    padding: 4px 5px !important;
+  }
+
+  .body--dark {
+    .btn-function {
+      filter: brightness(100);
+    }
+  }
+
+  .q-pagination__middle > .q-btn {
+    min-width: 30px !important;
+    max-width: 30px !important;
+  }
+
+  .q-item {
+    padding: 0px !important;
+  }
+
+  .q-focus-helper:hover {
+    background: transparent !important;
+  }
+
+  .favorite-label {
+    line-height: 24px !important;
+    font-weight: bold !important;
+  }
+
+  .region-dropdown-btn {
+    text-transform: capitalize;
     font-weight: 600;
     font-size: 12px;
-  }
-  .q-field__native,
-  .q-field__control {
-    min-height: 29px !important;
-    height: 29px;
-    padding: 0px 0px 0px 4px;
-  }
-
-  .q-field__marginal {
+    padding-left: 8px;
     height: 30px;
+    padding-top: 3px;
+
+    .q-btn-dropdown__arrow {
+      margin-left: 0px !important;
+    }
+  }
+
+  .download-logs-btn {
+    .q-btn-dropdown__arrow {
+      margin-left: 0px !important;
+    }
+  }
+
+  .region-dropdown-list {
+    min-width: 150px;
+
+    .q-item__section {
+      display: inline-block;
+    }
+
+    .q-item__label {
+      margin-left: 20px;
+      text-transform: capitalize;
+      margin-top: 2px;
+    }
   }
 }
-
-.saved-view-item {
-  padding: 4px 5px !important;
-}
-
-.body--dark {
-  .btn-function {
-    filter: brightness(100);
-  }
-}
-
-.q-pagination__middle > .q-btn {
-  min-width: 30px !important;
-  max-width: 30px !important;
-}
-</style>
-<style lang="scss">
 .saved-view-table {
   td {
     padding: 0;
@@ -2880,51 +3010,35 @@ export default defineComponent({
     padding-left: 5px !important;
   }
 }
-.logs-search-bar-component {
-  .q-item {
-    padding: 0px !important;
+
+.logs-visualize-toggle {
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
   }
 
-  .q-focus-helper:hover {
-    background: transparent !important;
-  }
-}
-
-.favorite-label {
-  line-height: 24px !important;
-  font-weight: bold !important;
-}
-
-.region-dropdown-btn {
-  text-transform: capitalize;
-  font-weight: 600;
-  font-size: 12px;
-  padding-left: 8px;
-  height: 30px;
-  padding-top: 3px;
-
-  .q-btn-dropdown__arrow {
-    margin-left: 0px !important;
-  }
-}
-
-.download-logs-btn {
-  .q-btn-dropdown__arrow {
-    margin-left: 0px !important;
-  }
-}
-
-.region-dropdown-list {
-  min-width: 150px;
-
-  .q-item__section {
-    display: inline-block;
+  .button-group {
+    border: 1px solid gray !important;
+    border-radius: 9px;
   }
 
-  .q-item__label {
-    margin-left: 20px;
-    text-transform: capitalize;
-    margin-top: 2px;
+  .button {
+    display: block;
+    cursor: pointer;
+    background-color: #f0eaea;
+    border: none;
+    font-size: 12px;
+    padding: 6px 4px;
+  }
+
+  .button-left {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+  }
+
+  .button-right {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
   }
 }
 </style>

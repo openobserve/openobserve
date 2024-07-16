@@ -17,7 +17,7 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search::{self, SearchEventType},
+        search,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -56,7 +56,6 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
     use_cache: bool,
-    search_type: Option<SearchEventType>,
 ) -> Result<search::Response, Error> {
     let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
@@ -241,7 +240,7 @@ pub async fn search(
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
         cached_ratio: Some(res.cached_ratio),
-        search_type,
+        search_type: req.search_type,
         trace_id: Some(trace_id.to_string()),
         took_wait_in_queue: if res.took_detail.is_some() {
             let resp_took = res.took_detail.as_ref().unwrap();
@@ -250,6 +249,7 @@ pub async fn search(
         } else {
             None
         },
+        result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -315,16 +315,10 @@ fn merge_response(
     }
     let cache_hits_len = cache_response.hits.len();
 
+    cache_response.scan_size = 0;
+
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
-    let cache_ts = if cache_response.hits.is_empty() {
-        get_ts_value(
-            ts_column,
-            search_response.first().unwrap().hits.first().unwrap(),
-        )
-    } else {
-        get_ts_value(ts_column, cache_response.hits.first().unwrap())
-    };
 
     for res in search_response {
         cache_response.total += res.total;
@@ -337,17 +331,7 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
-        let search_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-        if search_ts < cache_ts && is_descending {
-            cache_response.hits.extend(res.hits.clone());
-        } else {
-            cache_response.hits = res
-                .hits
-                .iter()
-                .chain(cache_response.hits.iter())
-                .cloned()
-                .collect();
-        }
+        cache_response.hits.extend(res.hits.clone());
     }
     if is_descending {
         cache_response

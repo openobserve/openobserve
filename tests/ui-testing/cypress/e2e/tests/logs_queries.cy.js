@@ -176,7 +176,7 @@ describe("Logs testcases", () => {
     });
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type("match_all_indexed_ignore_case('provide_credentials')");
+      .type("match_all_raw_ignore_case('provide_credentials')");
     cy.wait(2000);
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content');
     cy.wait(3000);
@@ -303,7 +303,7 @@ describe("Logs testcases", () => {
       },
       body: {
         query: {
-          sql: "SELECT * FROM \"e2e_automate\" where match_all_indexed_ignore_case('logger')",
+          sql: "SELECT * FROM \"e2e_automate\" where match_all_raw_ignore_case('logger')",
           start_time: 1709726643160000,
           end_time: 1710072243160000,
           from: 0,
@@ -327,7 +327,7 @@ describe("Logs testcases", () => {
 
         body: {
           query: {
-            sql: "SELECT * FROM \"e2e_automate\" where match_all_ignore_case('logger')",
+            sql: "SELECT * FROM \"e2e_automate\" where match_all('logger')",
             start_time: 1709726508369000,
             end_time: 1710072108369000,
             from: 0,
@@ -386,7 +386,7 @@ describe("Logs testcases", () => {
 
         body: {
           query: {
-            sql: "SELECT * FROM \"e2e_automate\" where match_all_indexed('logger')",
+            sql: "SELECT * FROM \"e2e_automate\" where match_all_raw('logger')",
             start_time: 1709706092870000,
             end_time: 1710051692870000,
             from: 0,
@@ -448,7 +448,7 @@ describe("Logs testcases", () => {
 
         body: {
           query: {
-            sql: "select * from \"e2e_automate\"  WHERE match_all_indexed('logger')",
+            sql: "select * from \"e2e_automate\"  WHERE match_all_raw('logger')",
             start_time: 1709725511382000,
             end_time: 1710071111382000,
             from: 0,
@@ -486,7 +486,7 @@ describe("Logs testcases", () => {
       },
       body: {
         query: {
-          sql: "select * from \"e2e_automate\"  WHERE match_all_ignore_case('logger')",
+          sql: "select * from \"e2e_automate\"  WHERE match_all('logger')",
           start_time: 1709725454701000,
           end_time: 1710071054701000,
           from: 0,
@@ -513,7 +513,7 @@ describe("Logs testcases", () => {
 
         body: {
           query: {
-            sql: "select * from \"e2e_automate\"  WHERE match_all_indexed_ignore_case('logger')",
+            sql: "select * from \"e2e_automate\"  WHERE match_all_raw_ignore_case('logger')",
             start_time: 1709725511382000,
             end_time: 1710071111382000,
             from: 0,
