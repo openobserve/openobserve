@@ -42,7 +42,7 @@ use {
 use crate::{
     common::{
         infra::{cluster::get_cached_online_querier_nodes, config::ENRICHMENT_TABLES},
-        meta::stream::StreamSchema,
+        meta::{organization::Organization, stream::StreamSchema},
     },
     service::{db, enrichment::StreamTable},
 };
@@ -546,6 +546,18 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             let mut w = STREAM_SCHEMAS.write().await;
             w.insert(item_key.to_string(), schema_versions);
             drop(w);
+        }
+
+        let stream: Vec<&str> = item_key.split('/').collect::<Vec<&str>>();
+        let org_id = stream[0];
+
+        if super::organization::get(org_id).await.is_none() {
+            log::info!("Creating org: {}", org_id);
+            let _ = super::organization::set(&Organization {
+                identifier: org_id.to_owned(),
+                name: org_id.to_owned(),
+            })
+            .await;
         }
     }
     log::info!("Stream schemas Cached");
