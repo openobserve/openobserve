@@ -21,8 +21,8 @@ use config::{
     utils::{file::scan_files, json},
 };
 use infra::cache::{
+    file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
-    results::disk::{self, QUERY_RESULT_CACHE},
 };
 
 use crate::{

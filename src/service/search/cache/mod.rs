@@ -25,7 +25,7 @@ use config::{
     utils::{base64, hash::Sum64, json},
 };
 use infra::{
-    cache::{meta::ResultCacheMeta, results::disk::QUERY_RESULT_CACHE},
+    cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
 use result_utils::get_ts_value;

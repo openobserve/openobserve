@@ -517,8 +517,6 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_RESULT_CACHE_DIR", default = "")] // ./data/openobserve/result_cache/
-    pub result_cache_dir: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
@@ -981,6 +979,9 @@ pub struct DiskCache {
     // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
+    // MB, default is 10% of local volume available space and maximum 10GB
+    #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub result_max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 80% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1410,14 +1411,8 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.data_cache_dir.is_empty() {
         cfg.common.data_cache_dir = format!("{}cache/", cfg.common.data_dir);
     }
-    if cfg.common.result_cache_dir.is_empty() {
-        cfg.common.result_cache_dir = format!("{}result_cache/", cfg.common.data_dir);
-    }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
-    }
-    if !cfg.common.result_cache_dir.ends_with('/') {
-        cfg.common.result_cache_dir = format!("{}/", cfg.common.result_cache_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
@@ -1573,6 +1568,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.disk_cache.max_size *= 1024 * 1024;
+    }
+
+    if cfg.disk_cache.result_max_size == 0 {
+        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 100 {
+            cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 100; // 10GB
+        }
+    } else {
+        cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
