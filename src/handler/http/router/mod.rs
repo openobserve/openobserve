@@ -214,16 +214,18 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .service(status::stream_fields),
     );
 
-    cfg.service(
-        SwaggerUi::new("/swagger/{_:.*}")
-            .url(
-                format!("{}/api-doc/openapi.json", get_config().common.base_uri),
-                openapi::ApiDoc::openapi(),
-            )
-            .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
-    );
-    cfg.service(web::redirect("/swagger", "/swagger/"));
-    cfg.service(web::redirect("/docs", "/swagger/"));
+    if get_config().common.swagger_enabled {
+        cfg.service(
+            SwaggerUi::new("/swagger/{_:.*}")
+                .url(
+                    format!("{}/api-doc/openapi.json", get_config().common.base_uri),
+                    openapi::ApiDoc::openapi(),
+                )
+                .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
+        );
+        cfg.service(web::redirect("/swagger", "/swagger/"));
+        cfg.service(web::redirect("/docs", "/swagger/"));
+    }
 
     if get_config().common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
