@@ -30,7 +30,7 @@ pub enum CacheType {
     None,
 }
 
-pub enum CacheStrategy {
+enum CacheStrategy {
     Lru(LruCache<String, usize>),
     Fifo((VecDeque<(String, usize)>, HashSet<String>)),
 }
@@ -47,7 +47,7 @@ impl CacheStrategy {
         }
     }
 
-    pub fn insert(&mut self, key: String, value: usize) {
+    fn insert(&mut self, key: String, value: usize) {
         match self {
             CacheStrategy::Lru(cache) => {
                 cache.insert(key, value);
@@ -59,7 +59,7 @@ impl CacheStrategy {
         }
     }
 
-    pub fn remove(&mut self) -> Option<(String, usize)> {
+    fn remove(&mut self) -> Option<(String, usize)> {
         match self {
             CacheStrategy::Lru(cache) => cache.remove_lru(),
             CacheStrategy::Fifo((queue, set)) => {
@@ -73,7 +73,7 @@ impl CacheStrategy {
         }
     }
 
-    pub fn contains_key(&self, key: &str) -> bool {
+    fn contains_key(&self, key: &str) -> bool {
         match self {
             CacheStrategy::Lru(cache) => cache.contains_key(key),
             CacheStrategy::Fifo((_, set)) => set.contains(key),
@@ -87,14 +87,14 @@ impl CacheStrategy {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         match self {
             CacheStrategy::Lru(cache) => cache.is_empty(),
             CacheStrategy::Fifo((queue, _)) => queue.is_empty(),
         }
     }
 
-    pub fn remove_key(&mut self, key: &str) -> Option<(String, usize)> {
+    fn remove_key(&mut self, key: &str) -> Option<(String, usize)> {
         match self {
             CacheStrategy::Lru(cache) => cache.remove_entry(key),
             CacheStrategy::Fifo((queue, set)) => {
