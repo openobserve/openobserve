@@ -1230,13 +1230,15 @@ pub async fn prepare_datafusion_context(
 ) -> Result<SessionContext, DataFusionError> {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
-    let memory_size = cfg.memory_cache.datafusion_max_size;
-    #[cfg(not(feature = "enterprise"))]
-    let target_partition = cfg.limit.query_thread_num;
+    let (memory_size, target_partition) = (
+        cfg.memory_cache.datafusion_max_size,
+        cfg.limit.query_thread_num,
+    );
     #[cfg(feature = "enterprise")]
-    let mut memory_size = cfg.memory_cache.datafusion_max_size;
-    #[cfg(feature = "enterprise")]
-    let mut target_partition = cfg.limit.query_thread_num;
+    let (mut memory_size, mut target_partition) = (
+        cfg.memory_cache.datafusion_max_size,
+        cfg.limit.query_thread_num,
+    );
     #[cfg(feature = "enterprise")]
     if let Some(wg) = _work_group {
         if let Ok(wg) = WorkGroup::from_str(&wg) {
