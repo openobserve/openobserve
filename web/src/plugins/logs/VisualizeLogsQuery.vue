@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <div
+                        class="col"
                         style="position: relative; height: 100%; width: 100%"
                       >
                         <div style="flex: 1; height: 100%; width: 100%">
@@ -150,8 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </div>
                       </div>
-
-                      <DashboardErrorsComponent :errors="errorData" />
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
                     </div>
                   </template>
                   <template #separator>
@@ -236,6 +240,7 @@ import { inject } from "vue";
 import { computed } from "vue";
 import { isEqual } from "lodash-es";
 import { onActivated } from "vue";
+import useNotifications from "@/composables/useNotifications";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -285,12 +290,13 @@ export default defineComponent({
     );
     const { t } = useI18n();
     const store = useStore();
-    const { dashboardPanelData, resetAggregationFunction } =
+    const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
+    const { showErrorNotification } = useNotifications();
 
     const { visualizeChartData }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
@@ -385,7 +391,20 @@ export default defineComponent({
     };
 
     const addToDashboard = () => {
-      showAddToDashboardDialog.value = true;
+      const errors: any = [];
+      // will push errors in errors array
+      validatePanel(errors);
+
+      if (errors.length) {
+        // set errors into errorData
+        props.errorData.errors = errors;
+        showErrorNotification(
+          "There are some errors, please fix them and try again"
+        );
+        return;
+      } else {
+        showAddToDashboardDialog.value = true;
+      }
     };
 
     const addPanelToDashboard = () => {

@@ -669,6 +669,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.y.forEach((itemY: any) => {
           itemY.aggregationFunction = null;
         });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;
@@ -691,13 +694,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "bar":
       case "line":
       case "scatter":
-      case "pie":
-      case "donut":
       case "h-bar":
       case "stacked":
       case "h-stacked":
-      case "metric":
-      case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
@@ -727,6 +726,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.markdownContent = "";
         break;
       case "table":
+      case "pie":
+      case "donut":
+      case "metric":
+      case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
