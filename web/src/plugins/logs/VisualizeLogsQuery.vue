@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <div
+                        class="col"
                         style="position: relative; height: 100%; width: 100%"
                       >
                         <div style="flex: 1; height: 100%; width: 100%">
@@ -150,8 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </div>
                       </div>
-
-                      <DashboardErrorsComponent :errors="errorData" />
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
                     </div>
                   </template>
                   <template #separator>
