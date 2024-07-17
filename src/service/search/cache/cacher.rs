@@ -73,8 +73,10 @@ pub async fn check_cache(
     if (sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits)
         || (order_by.is_empty()
             || (order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
-                && result_ts_col.is_some()
-                && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0))
+                && (result_ts_col.is_none()
+                    || (result_ts_col.is_some()
+                        && result_ts_col.as_ref().unwrap()
+                            != &order_by.first().as_ref().unwrap().0))))
     {
         return CachedQueryResponse::default();
     }
