@@ -11,7 +11,7 @@
     "build": "run-p type-check build-only",
     "postbuild": "run-p copy && cp dist/manifest.json dist/src/assets/workers/ && cp dist/src/assets/sw.js dist/assets/",
     "preview": "vite preview",
-    "copy": "cd dist && mkdir src && cd src && mkdir assets && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
+    "copy": "cd dist && mkdir src && cd src && mkdir assets && cd assets && mkdir workers && cd .. && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
     "test:unit": "vitest --environment jsdom --root src/",
     "test:unit:coverage": "vitest --coverage",
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",
