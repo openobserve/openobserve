@@ -931,6 +931,9 @@ export default defineComponent({
       () => [searchObj.meta.logsVisualizeToggle],
       async () => {
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
+          // reset old rendered chart
+          visualizeChartData.value = {};
+
           // hide VRL function editor
           searchObj.config.fnSplitterModel = 99.5;
 
