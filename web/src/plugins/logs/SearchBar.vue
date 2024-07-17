@@ -1425,15 +1425,15 @@ export default defineComponent({
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
-        fnEditorRef.value.setValue(fnContent);
-        fnEditorRef.value.resetEditorLayout();
+        fnEditorRef?.value?.setValue(fnContent);
+        fnEditorRef?.value?.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
       }
     });
 
     onUnmounted(() => {
       window.removeEventListener("click", () => {
-        fnEditorRef.value.resetEditorLayout();
+        fnEditorRef?.value?.resetEditorLayout();
       });
     });
 
@@ -1448,19 +1448,19 @@ export default defineComponent({
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
-        fnEditorRef.value.setValue(fnContent);
-        fnEditorRef.value.resetEditorLayout();
+        fnEditorRef?.value?.setValue(fnContent);
+        fnEditorRef?.value?.resetEditorLayout();
         searchObj.config.fnSplitterModel = 60;
         window.removeEventListener("click", () => {
-          fnEditorRef.value.resetEditorLayout();
+          fnEditorRef?.value?.resetEditorLayout();
         });
       }
-      fnEditorRef.value.resetEditorLayout();
+      fnEditorRef?.value?.resetEditorLayout();
     });
 
     onDeactivated(() => {
       window.removeEventListener("click", () => {
-        fnEditorRef.value.resetEditorLayout();
+        fnEditorRef?.value?.resetEditorLayout();
       });
     });
 
@@ -1599,9 +1599,9 @@ export default defineComponent({
 
     const resetEditorLayout = () => {
       setTimeout(() => {
-        queryEditorRef.value.resetEditorLayout();
+        queryEditorRef?.value?.resetEditorLayout();
         console.log("resetEditorLayout", fnEditorRef.value);
-        fnEditorRef.value.resetEditorLayout();
+        fnEditorRef?.value?.resetEditorLayout();
       }, 100);
     };
 
