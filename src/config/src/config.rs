@@ -742,7 +742,7 @@ pub struct Common {
     pub traces_span_metrics_export_interval: u64,
     #[env_config(
         name = "ZO_TRACES_SPAN_METRICS_CHANNEL_BUFFER",
-        default = 2048,
+        default = 100000,
         help = "traces span metrics channel send buffer"
     )]
     pub traces_span_metrics_channel_buffer: usize,
