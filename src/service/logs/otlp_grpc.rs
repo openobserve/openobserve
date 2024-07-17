@@ -21,7 +21,10 @@ use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
-    meta::{stream::StreamType, usage::UsageType},
+    meta::{
+        stream::{Routing, StreamType},
+        usage::UsageType,
+    },
     metrics,
     utils::{flatten, json},
 };
@@ -44,7 +47,6 @@ use crate::{
             grpc::{get_val, get_val_with_type_retained},
         },
         schema::get_upto_discard_error,
-        usage::report_request_usage_stats,
     },
 };
 
@@ -59,11 +61,10 @@ pub async fn handle_grpc_request(
     let started_at = Utc::now().timestamp_micros();
 
     // check stream
-    let stream_name = match in_stream_name {
+    let mut stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
-    let stream_params = StreamParams::new(org_id, &stream_name, StreamType::Logs);
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
     let cfg = get_config();
@@ -79,17 +80,38 @@ pub async fn handle_grpc_request(
     );
     // End Register Transforms for stream
 
+    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+
+    // Start get routing keys
+    let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
+    crate::service::ingestion::get_stream_routing(
+        StreamParams::new(org_id, &stream_name, StreamType::Logs),
+        &mut stream_routing_map,
+    )
+    .await;
+
+    if let Some(routes) = stream_routing_map.get(&stream_name) {
+        for route in routes {
+            stream_params.push(StreamParams::new(
+                org_id,
+                &route.destination,
+                StreamType::Logs,
+            ));
+        }
+    }
+    // End get routing keys
+
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     crate::service::ingestion::get_user_defined_schema(
-        &[stream_params],
+        &stream_params,
         &mut user_defined_schema_map,
     )
     .await;
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
-    let mut json_data = Vec::new();
+    let mut json_data_by_stream = HashMap::new();
 
     for resource_log in &request.resource_logs {
         for instrumentation_logs in &resource_log.scope_logs {
@@ -177,6 +199,28 @@ pub async fn handle_grpc_request(
                 // flattening
                 rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
+                // Start re-routing if exists
+                if let Some(routings) = stream_routing_map.get(&stream_name) {
+                    if !routings.is_empty() {
+                        for route in routings {
+                            let mut is_routed = true;
+                            let val = &route.routing;
+                            for q_condition in val.iter() {
+                                if !q_condition.evaluate(rec.as_object().unwrap()).await {
+                                    is_routed = false;
+                                    break;
+                                }
+                            }
+                            if !val.is_empty() && is_routed {
+                                stream_name = route.destination.clone();
+                                break;
+                            }
+                        }
+                    }
+                }
+                // End re-routing
+
+                // Start row based transform
                 if !local_trans.is_empty() {
                     rec = crate::service::ingestion::apply_stream_functions(
                         &local_trans,
@@ -187,6 +231,7 @@ pub async fn handle_grpc_request(
                         &mut runtime,
                     )?;
                 }
+                // end row based transform
 
                 // get json object
                 let mut local_val = match rec.take() {
@@ -198,7 +243,11 @@ pub async fn handle_grpc_request(
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
-                json_data.push((timestamp, local_val));
+                let (ts_data, fn_num) = json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_insert((Vec::new(), None));
+                ts_data.push((timestamp, local_val));
+                *fn_num = Some(local_trans.len());
             }
         }
     }
@@ -208,7 +257,7 @@ pub async fn handle_grpc_request(
     };
 
     // if no data, fast return
-    if json_data.is_empty() {
+    if json_data_by_stream.is_empty() {
         let mut out = BytesMut::with_capacity(res.encoded_len());
         res.encode(&mut out).expect("Out of memory");
         return Ok(HttpResponse::Ok()
@@ -218,9 +267,21 @@ pub async fn handle_grpc_request(
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
-    let mut req_stats = match super::write_logs(org_id, &stream_name, &mut status, json_data).await
+    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        org_id,
+        user_email,
+        (started_at, &start),
+        UsageType::Logs,
+        &mut status,
+        json_data_by_stream,
+    )
+    .await
     {
-        Ok(rs) => rs,
+        Ok(()) => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            ("200", out)
+        }
         Err(e) => {
             log::error!("Error while writing logs: {}", e);
             stream_status.status = match status {
@@ -233,10 +294,7 @@ pub async fn handle_grpc_request(
             });
             let mut out = BytesMut::with_capacity(res.encoded_len());
             res.encode(&mut out).expect("Out of memory");
-            return Ok(HttpResponse::Ok()
-                .status(http::StatusCode::OK)
-                .content_type(CONTENT_TYPE_PROTO)
-                .body(out)); // just return
+            ("500", out)
         }
     };
 
@@ -245,57 +303,37 @@ pub async fn handle_grpc_request(
     } else {
         "/api/oltp/v1/logs"
     };
-
-    let time = start.elapsed().as_secs_f64();
+    // metric + data usage
+    let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             ep,
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
-        .observe(time);
+        .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             ep,
-            "200",
+            metric_rpt_status_code,
             org_id,
             &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
 
-    req_stats.response_time = start.elapsed().as_secs_f64();
-    req_stats.user_email = if user_email.is_empty() {
-        None
-    } else {
-        Some(user_email.to_string())
-    };
-    // metric + data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        &stream_name,
-        StreamType::Logs,
-        UsageType::Logs,
-        local_trans.len() as u16,
-        started_at,
-    )
-    .await;
-
     // drop variables
     drop(runtime);
     drop(stream_vrl_map);
+    drop(stream_routing_map);
     drop(user_defined_schema_map);
-
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
 
     return Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_PROTO)
-        .body(out));
+        .body(response_body));
 }
 
 #[cfg(test)]
