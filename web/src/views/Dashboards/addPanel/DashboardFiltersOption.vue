@@ -327,7 +327,7 @@ export default defineComponent({
           operator: null,
           value: null,
           condition: addLabel.value,
-          values: [],
+          values: ["1721204004048867"],
         };
         currentQuery.fields.filter.push(defaultCondition);
       } else if (filterType === "group") {
@@ -347,7 +347,7 @@ export default defineComponent({
         operator: null,
         value: null,
         condition: addLabel.value,
-        values: [],
+        values: ["1721204004048867"],
       });
     };
 
