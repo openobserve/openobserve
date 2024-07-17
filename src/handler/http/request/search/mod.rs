@@ -957,7 +957,9 @@ async fn values_v1(
         field_value.insert("values".to_string(), json::Value::Array(top_hits));
         hit_values.push(json::Value::Object(field_value));
         resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
-        resp.cached_ratio = std::cmp::min(resp.cached_ratio, ret.cached_ratio);
+        resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
+        resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
+        resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
     }
     resp.total = fields.len();
     resp.hits = hit_values;
