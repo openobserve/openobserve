@@ -39,8 +39,7 @@ use crate::service::{
     search::{
         datafusion::{exec, file_type::FileType},
         grpc::{generate_search_schema, generate_select_start_search_schema},
-        sql::Sql,
-        RE_SELECT_WILDCARD,
+        sql::{Sql, RE_SELECT_WILDCARD},
     },
 };
 
