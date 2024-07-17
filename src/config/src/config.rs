@@ -729,6 +729,24 @@ pub struct Common {
     )]
     pub mem_table_individual_streams: String,
     #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_ENABLED",
+        default = false,
+        help = "enable span metrics for traces"
+    )]
+    pub traces_span_metrics_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_EXPORT_INTERVAL",
+        default = 60,
+        help = "traces span metrics export interval, unit seconds"
+    )]
+    pub traces_span_metrics_export_interval: u64,
+    #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_CHANNEL_BUFFER",
+        default = 100000,
+        help = "traces span metrics channel send buffer"
+    )]
+    pub traces_span_metrics_channel_buffer: usize,
+    #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
         default = "false",
         help = "Enable result cache for query results"
