@@ -39,8 +39,7 @@ use crate::{
         stream::StreamParams,
     },
     service::{
-        db, format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
-        usage::report_request_usage_stats,
+        format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
     },
 };
 
@@ -167,14 +166,17 @@ pub async fn ingest(
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
 
+            // Start re-routing if exists
             if let Some(routing) = stream_routing_map.get(&stream_name) {
                 if !routing.is_empty() {
                     for route in routing {
                         let mut is_routed = true;
                         let val = &route.routing;
                         for q_condition in val.iter() {
-                            is_routed =
-                                is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
+                            if !q_condition.evaluate(value.as_object().unwrap()).await {
+                                is_routed = false;
+                                break;
+                            }
                         }
                         if is_routed && !val.is_empty() {
                             stream_name = route.destination.clone();
@@ -183,6 +185,7 @@ pub async fn ingest(
                     }
                 }
             }
+            // End re-routing
 
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             // Start row based transform
@@ -273,55 +276,50 @@ pub async fn ingest(
                 json::Value::Number(timestamp.into()),
             );
 
-            json_data_by_stream
+            let fns_length = stream_functions_map
+                .get(&key)
+                .map(|v| v.len())
+                .unwrap_or_default();
+
+            let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
-                .or_insert(Vec::new())
-                .push((timestamp, local_val));
+                .or_insert((Vec::new(), None));
+            ts_data.push((timestamp, local_val));
+            *fn_num = Some(fns_length);
         }
     }
+
+    let (metric_rpt_status_code, response_body) = {
+        let mut status = IngestionStatus::Bulk(bulk_res);
+        let write_result = super::write_logs_by_stream(
+            org_id,
+            user_email,
+            (started_at, &start),
+            UsageType::Bulk,
+            &mut status,
+            json_data_by_stream,
+        )
+        .await;
+        let IngestionStatus::Bulk(mut bulk_res) = status else {
+            unreachable!();
+        };
+        bulk_res.took = start.elapsed().as_millis();
+        match write_result {
+            Ok(()) => ("200", bulk_res),
+            Err(e) => {
+                log::error!("Error while writing logs: {}", e);
+                bulk_res.errors = true;
+                ("500", bulk_res)
+            }
+        }
+    };
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
-    let mut status = IngestionStatus::Bulk(bulk_res);
-    for (stream_name, json_data) in json_data_by_stream {
-        // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
-        {
-            log::warn!("stream [{stream_name}] is being deleted");
-            continue; // skip
-        }
-
-        // write json data by stream
-        let mut req_stats = super::write_logs(org_id, &stream_name, &mut status, json_data).await?;
-
-        req_stats.response_time += took_time;
-        req_stats.user_email = if user_email.is_empty() {
-            None
-        } else {
-            Some(user_email.to_string())
-        };
-
-        let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-        let fns_length = stream_functions_map
-            .get(&key)
-            .map(|v| v.len())
-            .unwrap_or_default();
-        report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Logs,
-            UsageType::Bulk,
-            fns_length as u16,
-            started_at,
-        )
-        .await;
-    }
-
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",
-            "200",
+            metric_rpt_status_code,
             org_id,
             "",
             StreamType::Logs.to_string().as_str(),
@@ -330,19 +328,14 @@ pub async fn ingest(
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",
-            "200",
+            metric_rpt_status_code,
             org_id,
             "",
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-    let mut bulk_res = match status {
-        IngestionStatus::Bulk(bulk_res) => bulk_res,
-        IngestionStatus::Record(_) => unreachable!(),
-    };
-    bulk_res.took = start.elapsed().as_millis();
 
-    Ok(bulk_res)
+    Ok(response_body)
 }
 
 pub fn add_record_status(

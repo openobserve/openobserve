@@ -57,9 +57,9 @@ impl Searcher {
     pub async fn remove(
         &self,
         trace_id: &str,
-        to_cancel: bool,
+        query_cancelled: bool,
     ) -> Option<Vec<(String, TaskStatus)>> {
-        self.query_manager.remove(trace_id, to_cancel).await
+        self.query_manager.remove(trace_id, query_cancelled).await
     }
 
     // check is the trace_id in the query_manager and is_leader
