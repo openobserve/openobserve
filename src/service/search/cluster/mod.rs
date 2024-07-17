@@ -929,12 +929,6 @@ async fn get_file_list_by_inverted_index(
         .map(|f| (&f.key, &f.meta))
         .collect::<HashMap<_, _>>();
 
-    // fast_mode is for 1st page optimization
-    //  1. single WHERE clause of `match_all()`
-    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
-    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
-        && idx_req.query.as_ref().unwrap().size > 0);
-
     // Get all the unique terms which the user has searched.
     let terms = meta
         .fts_terms
@@ -1026,72 +1020,17 @@ async fn get_file_list_by_inverted_index(
             }
         })
         .collect::<HashSet<_>>();
-    let unique_files = if fast_mode {
-        let limit_count = (meta.meta.limit + meta.meta.offset) as u64;
-        let sorted_data = idx_resp.hits.iter().filter_map(|hit| {
-            let term = hit.get("term").unwrap().as_str().unwrap().to_string();
-            let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-            let count = hit.get("_count").unwrap().as_u64().unwrap();
-            let segment_ids = match hit.get("segment_ids") {
-                None => "".to_string(),
-                Some(v) => v.as_str().unwrap().to_string(),
-            };
-            if deleted_files.contains(&file_name) {
-                None
-            } else {
-                Some((term, file_name, count, segment_ids))
-            }
-        });
-        let mut term_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
-        let mut term_counts: HashMap<String, u64> = HashMap::new();
-        for (term, filename, count, segment_ids) in sorted_data {
-            let prefixed_filename = format!(
-                "files/{}/{}/{}/{}",
-                meta.org_id, stream_type, meta.stream_name, filename
-            );
-            if !file_list.contains_key(&prefixed_filename) {
-                continue;
-            };
-            let term = term.as_str();
-            for search_term in terms.iter() {
-                if term.contains(search_term) {
-                    let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
-                    if *current_count < limit_count {
-                        *current_count += count;
-                        term_map
-                            .entry(search_term.to_string())
-                            .or_insert_with(Vec::new)
-                            .push((filename.to_string(), segment_ids.to_string()));
-                    }
-                }
-            }
-        }
-        term_map
-            .into_iter()
-            .flat_map(|(_, filenames)| filenames)
-            .collect::<Vec<_>>()
-    } else {
-        idx_resp
-            .hits
-            .iter()
-            .filter_map(|hit| {
-                hit.get("file_name")
-                    .and_then(|value| value.as_str())
-                    .filter(|&name| !deleted_files.contains(name))
-                    .map(|v| {
-                        let segment_ids = match hit.get("segment_ids") {
-                            None => "".to_string(),
-                            Some(v) => v.as_str().unwrap().to_string(),
-                        };
-                        (v.to_string(), segment_ids)
-                    })
-            })
-            .collect::<Vec<_>>()
-    };
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
-    for (filename, segment_ids) in unique_files {
+    for item in idx_resp.hits.iter() {
+        let filename = match item.get("file_name") {
+            None => continue,
+            Some(v) => v.as_str().unwrap(),
+        };
+        if deleted_files.contains(filename) {
+            continue;
+        }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
@@ -1099,10 +1038,9 @@ async fn get_file_list_by_inverted_index(
         let Some(file_meta) = file_list.get(&prefixed_filename) else {
             continue;
         };
-        let segment_ids = if segment_ids.is_empty() {
-            None
-        } else {
-            hex::decode(segment_ids).ok()
+        let segment_ids = match item.get("segment_ids") {
+            None => None,
+            Some(v) => hex::decode(v.as_str().unwrap()).ok(),
         };
         let entry = idx_file_list
             .entry(prefixed_filename.clone())
