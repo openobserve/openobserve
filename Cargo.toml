@@ -208,7 +208,6 @@ argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"
 async-walkdir = "1.0.0"
-aws-config = "0.56.1"
 base64 = "0.21"
 bitvec = "1.0"
 bytes = "1.4"
