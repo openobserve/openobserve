@@ -496,7 +496,7 @@ export default defineComponent({
 
         if (
           searchObj.organizationIdetifier !=
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier && searchObj.loading == false
         ) {
           loadLogsData();
         } else if (!searchObj.loading) updateStreams();
@@ -525,7 +525,9 @@ export default defineComponent({
         searchObj.organizationIdetifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
-        loadLogsData();
+        if(searchObj.loading==false){
+          loadLogsData();
+        }
         if (config.isCloud == "true") {
           MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
         }
