@@ -84,7 +84,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
-    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if config::cluster::LOCAL_NODE.is_ingester() {
         tokio::spawn(async {
             if let Err(e) = traces_metrics_collect().await {
                 log::error!("Error traces_metrics_collect metrics: {}", e);
