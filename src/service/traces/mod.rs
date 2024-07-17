@@ -124,6 +124,7 @@ pub async fn handle_trace_request(
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     let mut json_data = Vec::with_capacity(res_spans.len());
+    let mut span_metrics = Vec::with_capacity(res_spans.len());
     let mut partial_success = ExportTracePartialSuccess::default();
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
@@ -220,6 +221,7 @@ pub async fn handle_trace_request(
                     //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
                 };
+                let span_status_for_spanmetric = local_val.span_status.clone();
 
                 let value: json::Value = json::to_value(local_val).unwrap();
 
@@ -246,7 +248,25 @@ pub async fn handle_trace_request(
 
                 // get json object
                 let mut record_val = match value.take() {
-                    json::Value::Object(v) => v,
+                    json::Value::Object(mut v) => {
+                        // build span metrics item
+                        let sm = crate::job::metrics::TraceMetricsItem {
+                            organization: org_id.to_string(),
+                            traces_stream_name: traces_stream_name.clone(),
+                            service_name: service_name.clone(),
+                            span_name: v
+                                .remove("o2_span_metrics_name")
+                                .map_or(span.name.clone(), |name| {
+                                    name.as_str().unwrap().to_string()
+                                }),
+                            span_status: span_status_for_spanmetric,
+                            span_kind: span.kind.to_string(),
+                            duration: ((end_time - start_time) / 1_000_000) as f64, // milliseconds
+                            span_id: v["span_id"].to_string(),
+                        };
+                        span_metrics.push(sm);
+                        v
+                    }
                     _ => unreachable!(""),
                 };
 
@@ -280,6 +300,28 @@ pub async fn handle_trace_request(
     } else {
         "/api/otlp/v1/traces"
     };
+
+    // record span metrics
+    for m in span_metrics {
+        if cfg.common.traces_span_metrics_enabled {
+            metrics::SPAN_DURATION_MILLISECONDS
+                .with_label_values(&[
+                    org_id,
+                    &m.traces_stream_name,
+                    &m.service_name,
+                    &m.span_name,
+                    &m.span_status,
+                    &m.span_kind,
+                ])
+                .observe(m.duration);
+        }
+
+        // send to metrics job
+        if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
+            log::error!("traces metrics item send to job fail : {e}")
+        }
+    }
+
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             ep,

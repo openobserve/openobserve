@@ -32,7 +32,7 @@ mod compactor;
 pub(crate) mod file_list;
 pub(crate) mod files;
 mod flatten_compactor;
-mod metrics;
+pub mod metrics;
 mod mmdb_downloader;
 mod prom;
 mod stats;

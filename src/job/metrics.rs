@@ -13,27 +13,84 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use config::{
     get_config,
     meta::{cluster::Role, stream::StreamType},
     metrics,
+    metrics::{NAMESPACE, SPAN_METRICS_BUCKET},
     utils::file::scan_files,
 };
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
-use tokio::time;
+use once_cell::sync::Lazy;
+use opentelemetry::{
+    global,
+    metrics::{Histogram, Unit},
+    KeyValue,
+};
+use opentelemetry_sdk::{
+    metrics::{
+        new_view,
+        reader::{DefaultAggregationSelector, DefaultTemporalitySelector},
+        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream,
+    },
+    runtime, Resource,
+};
+use tokio::{sync::RwLock, time};
 
 use crate::{
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
-    service::db,
+    service::{
+        db,
+        exporter::otlp_o2_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
+    },
 };
+
+#[derive(Debug)]
+pub struct TraceMetricsItem {
+    pub organization: String,
+    pub traces_stream_name: String,
+    pub service_name: String,
+    pub span_name: String,
+    pub span_status: String,
+    pub span_kind: String,
+    pub duration: f64,
+    pub span_id: String,
+}
+
+pub type TraceMetricsChan = (
+    tokio::sync::mpsc::Sender<TraceMetricsItem>,
+    RwLock<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
+);
+
+pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
+    let (tx, rx) =
+        tokio::sync::mpsc::channel(get_config().common.traces_span_metrics_channel_buffer);
+    (tx, RwLock::new(rx))
+});
+
+pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
+    let meter = opentelemetry::global::meter("o2");
+    meter
+        .f64_histogram(format!("{}_span_duration_milliseconds", NAMESPACE))
+        .with_unit(Unit::new("ms"))
+        .with_description("span duration milliseconds")
+        .init()
+});
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
     load_query_cache_limit_bytes().await?;
     load_ingest_wal_used_bytes().await?;
+    if config::cluster::LOCAL_NODE.is_ingester() {
+        tokio::spawn(async {
+            if let Err(e) = traces_metrics_collect().await {
+                log::error!("Error traces_metrics_collect metrics: {}", e);
+            }
+        });
+    }
 
     // update metrics every 60 seconds
     let mut interval = time::interval(time::Duration::from_secs(60));
@@ -231,5 +288,56 @@ async fn update_memory_usage() -> Result<(), anyhow::Error> {
             .with_label_values(&[])
             .set(cur_memory.physical_mem as i64);
     }
+    Ok(())
+}
+
+pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
+    let exporter = O2MetricsExporter::new(
+        O2MetricsClient::new(),
+        Box::new(DefaultTemporalitySelector::new()),
+        Box::new(DefaultAggregationSelector::new()),
+    );
+    let reader = PeriodicReader::builder(exporter, runtime::Tokio)
+        .with_interval(Duration::from_secs(
+            get_config().common.traces_span_metrics_export_interval,
+        ))
+        .build();
+    let provider = SdkMeterProvider::builder()
+        .with_reader(reader)
+        .with_resource(Resource::new(vec![KeyValue::new(
+            "service.name",
+            "openobserve",
+        )]))
+        .with_view(new_view(
+            Instrument::new().name(format!("{}_span_duration_milliseconds", NAMESPACE)),
+            Stream::new().aggregation(Aggregation::ExplicitBucketHistogram {
+                boundaries: SPAN_METRICS_BUCKET.to_vec(),
+                record_min_max: false,
+            }),
+        )?)
+        .build();
+    global::set_meter_provider(provider.clone());
+    Ok(provider)
+}
+
+async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
+    let mut receiver = TRACE_METRICS_CHAN.1.write().await;
+
+    while let Some(item) = receiver.recv().await {
+        // Record measurements using the histogram instrument.
+        log::info!("receive span metrics: {}", item.span_id);
+        TRACE_METRICS_SPAN_HISTOGRAM.record(
+            item.duration,
+            &[
+                KeyValue::new("organization", item.organization),
+                KeyValue::new("traces_stream_name", item.traces_stream_name),
+                KeyValue::new("service_name", item.service_name),
+                KeyValue::new("operation_name", item.span_name),
+                KeyValue::new("status_code", item.span_status),
+                KeyValue::new("span_kind", item.span_kind),
+            ],
+        );
+    }
+
     Ok(())
 }

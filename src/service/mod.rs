@@ -22,6 +22,7 @@ pub mod dashboards;
 pub mod db;
 pub mod enrichment;
 pub mod enrichment_table;
+pub mod exporter;
 pub mod file_list;
 pub mod functions;
 pub mod ingestion;
