@@ -748,7 +748,7 @@ pub struct Common {
     pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = false,
+        default = true,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
