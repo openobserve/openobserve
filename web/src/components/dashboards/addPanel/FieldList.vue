@@ -768,11 +768,11 @@ export default defineComponent({
         data.schemaList,
       ],
       () => {
-        if (!props.editMode) {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream = "";
-        }
+        // if (!props.editMode) {
+        //   dashboardPanelData.data.queries[
+        //     dashboardPanelData.layout.currentQueryIndex
+        //   ].fields.stream = "";
+        // }
 
         data.indexOptions = data.schemaList.filter(
           (data: any) =>

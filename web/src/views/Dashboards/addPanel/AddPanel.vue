@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
 
-                      <div style="flex: 1">
+                      <div class="col" style="flex: 1">
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
@@ -230,7 +230,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ></QueryInspector>
                         </q-dialog>
                       </div>
-                      <DashboardErrorsComponent :errors="errorData" />
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
                     </div>
                   </template>
                   <template #separator>
