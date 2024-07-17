@@ -23,6 +23,16 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 export default {
+  mounted() {
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data === 'reloadApp') {
+        if (confirm('A new version of the application is available. Reload now?')) {
+          window.location.reload(); // Reload the page
+        }
+      }
+      
+    });
+  },
   setup() {
     const store = useStore();
     // if (
