@@ -315,7 +315,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
         }
-        log::info!("Loading disk cache done, total files: {} ", len().await);
+        log::info!(
+            "Loading disk cache done, total files: {} ",
+            len(FileType::DATA).await
+        );
     });
 
     tokio::task::spawn(async move {
@@ -544,10 +547,15 @@ async fn gc() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn stats() -> (usize, usize) {
+pub async fn stats(file_type: FileType) -> (usize, usize) {
     let mut total_size = 0;
     let mut used_size = 0;
-    for file in FILES.iter() {
+    let files = match file_type {
+        FileType::DATA => &FILES,
+        FileType::RESULT => &RESULT_FILES,
+    };
+
+    for file in files.iter() {
         let r = file.read().await;
         let (max_size, cur_size) = r.size();
         total_size += max_size;
@@ -557,9 +565,13 @@ pub async fn stats() -> (usize, usize) {
 }
 
 #[inline]
-pub async fn len() -> usize {
+pub async fn len(file_type: FileType) -> usize {
     let mut total = 0;
-    for file in FILES.iter() {
+    let files = match file_type {
+        FileType::DATA => &FILES,
+        FileType::RESULT => &RESULT_FILES,
+    };
+    for file in files.iter() {
         let r = file.read().await;
         total += r.len();
     }
@@ -567,8 +579,13 @@ pub async fn len() -> usize {
 }
 
 #[inline]
-pub async fn is_empty() -> bool {
-    for file in FILES.iter() {
+pub async fn is_empty(file_type: FileType) -> bool {
+    let files = match file_type {
+        FileType::DATA => &FILES,
+        FileType::RESULT => &RESULT_FILES,
+    };
+
+    for file in files.iter() {
         let r = file.read().await;
         if !r.is_empty() {
             return false;

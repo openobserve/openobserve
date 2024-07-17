@@ -32,7 +32,8 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
-    cache, file_list,
+    cache::{self, file_data::disk::FileType},
+    file_list,
     schema::{
         STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
     },
@@ -293,13 +294,17 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len().await;
-    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats().await;
+    let disk_file_num = cache::file_data::disk::len(FileType::DATA).await;
+    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats(FileType::DATA).await;
+    let disk_result_file_num = cache::file_data::disk::len(FileType::RESULT).await;
+    let (disk_result_max_size, disk_result_cur_size) =
+        cache::file_data::disk::stats(FileType::RESULT).await;
     stats.insert(
         "FILE_DATA",
         json::json!({
             "memory":{"cache_files":mem_file_num, "cache_limit":mem_max_size,"cache_bytes": mem_cur_size},
-            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"cache_bytes": disk_cur_size}
+            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"cache_bytes": disk_cur_size},
+            "results":{"cache_files":disk_result_file_num, "cache_limit":disk_result_max_size,"cache_bytes": disk_result_cur_size}
         }),
     );
 
