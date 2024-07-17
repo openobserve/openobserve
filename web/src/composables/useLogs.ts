@@ -1625,7 +1625,9 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          await getHistogramQueryData(searchObj.data.histogramQuery);
+          if(searchObj.data.queryResults.hits.length > 0) {
+            await getHistogramQueryData(searchObj.data.histogramQuery);
+          }
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
@@ -1641,7 +1643,7 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
-          if (queryReq.query.from == 0) {
+          if (queryReq.query.from == 0 && searchObj.data.queryResults.hits.length > 0) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
