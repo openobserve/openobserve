@@ -2910,7 +2910,7 @@ const useLogs = () => {
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +
-        " ms. (+ scanSizeLabel +: " +
+        " ms. ( " + scanSizeLabel  + ": " +
         formatSizeFromMB(searchObj.data.queryResults.scan_size) +
         plusSign +
         ")";
