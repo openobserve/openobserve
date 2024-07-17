@@ -63,7 +63,9 @@ impl TraceService for TraceServer {
                 partial_success: None,
             }));
         } else {
-            Err(Status::internal(resp.err().unwrap().to_string()))
+            let err = resp.err().unwrap().to_string();
+            log::error!("handle_trace_request err {}", err);
+            Err(Status::internal(err))
         }
     }
 }
