@@ -80,11 +80,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Logs,
-        &stream_name,
-    );
+    let (before_local_trans, after_local_trans, stream_vrl_map) =
+        crate::service::ingestion::register_stream_functions(
+            org_id,
+            &StreamType::Logs,
+            &stream_name,
+        );
     // End Register Transforms for stream
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -123,6 +124,18 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
 
+    // Start row based transform. Apply vrl functions with apply_before_flattening flag
+    if !before_local_trans.is_empty() {
+        value = crate::service::ingestion::apply_stream_functions(
+            &before_local_trans,
+            value,
+            &stream_vrl_map,
+            org_id,
+            &stream_name,
+            &mut runtime,
+        )?;
+    }
+
     // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
@@ -148,9 +161,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // End re-routing
 
     // Start row based transform
-    if !local_trans.is_empty() {
+    if !after_local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
-            &local_trans,
+            &after_local_trans,
             value,
             &stream_vrl_map,
             org_id,

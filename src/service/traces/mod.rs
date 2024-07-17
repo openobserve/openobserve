@@ -114,11 +114,12 @@ pub async fn handle_trace_request(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Traces,
-        &traces_stream_name,
-    );
+    let (before_local_trans, after_local_trans, stream_vrl_map) =
+        crate::service::ingestion::register_stream_functions(
+            org_id,
+            &StreamType::Traces,
+            &traces_stream_name,
+        );
     // End Register Transforms for stream
 
     let mut service_name: String = traces_stream_name.to_string();
@@ -223,17 +224,32 @@ pub async fn handle_trace_request(
                 };
                 let span_status_for_spanmetric = local_val.span_status.clone();
 
-                let value: json::Value = json::to_value(local_val).unwrap();
+                let mut value: json::Value = json::to_value(local_val).unwrap();
+                // Start row based transform
+                if !before_local_trans.is_empty() {
+                    value = crate::service::ingestion::apply_stream_functions(
+                        &before_local_trans,
+                        value,
+                        &stream_vrl_map,
+                        org_id,
+                        &traces_stream_name,
+                        &mut runtime,
+                    )
+                    .map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                    })?;
+                }
+                // End row based transform
 
                 // JSON Flattening
-                let mut value = flatten::flatten(value).map_err(|e| {
+                value = flatten::flatten(value).map_err(|e| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                 })?;
 
                 // Start row based transform
-                if !local_trans.is_empty() {
+                if !after_local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_functions(
-                        &local_trans,
+                        &after_local_trans,
                         value,
                         &stream_vrl_map,
                         org_id,

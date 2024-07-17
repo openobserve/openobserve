@@ -382,6 +382,7 @@ mod tests {
                 stream_type: StreamType::Logs,
                 order: 0,
                 is_removed: false,
+                apply_before_flattening: false,
             }]),
         };
 

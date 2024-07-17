@@ -49,6 +49,8 @@ pub struct StreamOrder {
     pub stream_type: StreamType,
     #[serde(default)]
     pub is_removed: bool,
+    #[serde(default)]
+    pub apply_before_flattening: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -63,6 +65,8 @@ pub struct StreamTransform {
     pub stream_type: StreamType,
     #[serde(default)]
     pub is_removed: bool,
+    #[serde(default)]
+    pub apply_before_flattening: bool,
 }
 
 impl PartialEq for StreamTransform {
@@ -86,6 +90,7 @@ impl Transform {
                     order: stream.order,
                     stream_type: stream.stream_type,
                     is_removed: stream.is_removed,
+                    apply_before_flattening: stream.apply_before_flattening,
                 })
             }
         }
@@ -159,6 +164,7 @@ mod tests {
                 order: 1,
                 stream_type: StreamType::Logs,
                 is_removed: false,
+                apply_before_flattening: false,
             }]),
         };
 

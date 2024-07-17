@@ -145,7 +145,7 @@ pub async fn handle_grpc_request(
                 // End get stream alert
 
                 // Start Register Transforms for stream
-                let (mut local_trans, mut stream_vrl_map) =
+                let (_, mut local_trans, mut stream_vrl_map) =
                     crate::service::ingestion::register_stream_functions(
                         org_id,
                         &StreamType::Metrics,
@@ -218,6 +218,7 @@ pub async fn handle_grpc_request(
                     }
                 }
                 for mut rec in records {
+                    // TODO: What to do here?
                     // flattening
                     rec = flatten::flatten(rec)?;
 
@@ -266,7 +267,7 @@ pub async fn handle_grpc_request(
                         // End get stream alert
 
                         // Start Register Transforms for stream
-                        (local_trans, stream_vrl_map) =
+                        (_, local_trans, stream_vrl_map) =
                             crate::service::ingestion::register_stream_functions(
                                 org_id,
                                 &StreamType::Metrics,

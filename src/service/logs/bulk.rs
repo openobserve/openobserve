@@ -72,7 +72,8 @@ pub async fn ingest(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
-    let mut stream_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_before_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_after_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
@@ -91,7 +92,7 @@ pub async fn ingest(
             continue;
         }
 
-        let value: json::Value = json::from_slice(line.as_bytes())?;
+        let mut value: json::Value = json::from_slice(line.as_bytes())?;
 
         if !next_line_is_data {
             // check bulk operate
@@ -155,13 +156,47 @@ pub async fn ingest(
             // Start Register functions for stream
             crate::service::ingestion::get_stream_functions(
                 &streams,
-                &mut stream_functions_map,
+                &mut stream_before_functions_map,
+                &mut stream_after_functions_map,
                 &mut stream_vrl_map,
             )
             .await;
             // End Register functions for index
         } else {
             next_line_is_data = false;
+
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+            // Start row based transform before flattening the value
+            if let Some(transforms) = stream_before_functions_map.get(&key) {
+                if !transforms.is_empty() {
+                    let mut ret_value = value.clone();
+                    ret_value = crate::service::ingestion::apply_stream_functions(
+                        transforms,
+                        ret_value,
+                        &stream_vrl_map,
+                        org_id,
+                        &stream_name,
+                        &mut runtime,
+                    )?;
+
+                    if ret_value.is_null() || !ret_value.is_object() {
+                        bulk_res.errors = true;
+                        add_record_status(
+                            stream_name.clone(),
+                            &doc_id,
+                            action.clone(),
+                            Some(value),
+                            &mut bulk_res,
+                            Some(TRANSFORM_FAILED.to_owned()),
+                            Some(TRANSFORM_FAILED.to_owned()),
+                        );
+                        continue;
+                    } else {
+                        value = ret_value;
+                    }
+                }
+            }
+            // end row based transformation
 
             // JSON Flattening
             let mut value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
@@ -187,9 +222,8 @@ pub async fn ingest(
             }
             // End re-routing
 
-            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             // Start row based transform
-            if let Some(transforms) = stream_functions_map.get(&key) {
+            if let Some(transforms) = stream_after_functions_map.get(&key) {
                 if !transforms.is_empty() {
                     let mut ret_value = value.clone();
                     ret_value = crate::service::ingestion::apply_stream_functions(
@@ -276,10 +310,14 @@ pub async fn ingest(
                 json::Value::Number(timestamp.into()),
             );
 
-            let fns_length = stream_functions_map
+            let fns_length = stream_after_functions_map
                 .get(&key)
                 .map(|v| v.len())
-                .unwrap_or_default();
+                .unwrap_or_default()
+                + stream_after_functions_map
+                    .get(&key)
+                    .map(|v| v.len())
+                    .unwrap_or_default();
 
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
