@@ -240,7 +240,7 @@ import { inject } from "vue";
 import { computed } from "vue";
 import { isEqual } from "lodash-es";
 import { onActivated } from "vue";
-import { useQuasar } from "quasar";
+import useNotifications from "@/composables/useNotifications";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -296,7 +296,7 @@ export default defineComponent({
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
-    const $q = useQuasar();
+    const { showErrorNotification } = useNotifications();
 
     const { visualizeChartData }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
@@ -398,11 +398,9 @@ export default defineComponent({
       if (errors.length) {
         // set errors into errorData
         props.errorData.errors = errors;
-        $q.notify({
-          type: "negative",
-          message: "There are some errors, please fix them and try again",
-          timeout: 5000,
-        });
+        showErrorNotification(
+          "There are some errors, please fix them and try again"
+        );
         return;
       } else {
         showAddToDashboardDialog.value = true;

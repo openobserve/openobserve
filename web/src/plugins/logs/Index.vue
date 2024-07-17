@@ -261,6 +261,7 @@ import {
   getFieldsFromQuery,
   getValidConditionObj,
 } from "@/utils/query/sqlUtils";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "PageSearch",
@@ -420,6 +421,8 @@ export default defineComponent({
 
     // flag to know if it is the first time visualize
     let firstTimeVisualizeFlag = false;
+
+    const { showErrorNotification } = useNotifications();
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -845,18 +848,12 @@ export default defineComponent({
       validatePanel(errors);
 
       if (errors.length) {
-        $q.notify({
-          type: "negative",
-          message: "There are some errors, please fix them and try again",
-          timeout: 5000,
-        });
-      }
-
-      if (errors.length) {
+        showErrorNotification(
+          "There are some errors, please fix them and try again"
+        );
         return false;
-      } else {
-        return true;
       }
+      return true;
     };
 
     const setFieldsAndConditions = async () => {
