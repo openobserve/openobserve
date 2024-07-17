@@ -131,7 +131,9 @@ if ('serviceWorker' in navigator) {
   //   //   console.error('Service Worker registration failed:', error);
   //   // });
   // }
-  navigator.serviceWorker.register('./src/assets/sw.js').then(registration => {
+  navigator.serviceWorker.register('./assets/sw.js', {
+    scope: '/web/assets/'
+  }).then(registration => {
       console.log('Service Worker registered:', registration);
 
       registration.addEventListener('updatefound', () => {
