@@ -249,6 +249,7 @@ pub async fn search(
         } else {
             None
         },
+        result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -314,16 +315,10 @@ fn merge_response(
     }
     let cache_hits_len = cache_response.hits.len();
 
+    cache_response.scan_size = 0;
+
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
-    let cache_ts = if cache_response.hits.is_empty() {
-        get_ts_value(
-            ts_column,
-            search_response.first().unwrap().hits.first().unwrap(),
-        )
-    } else {
-        get_ts_value(ts_column, cache_response.hits.first().unwrap())
-    };
 
     for res in search_response {
         cache_response.total += res.total;
@@ -336,17 +331,7 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
-        let search_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-        if search_ts < cache_ts && is_descending {
-            cache_response.hits.extend(res.hits.clone());
-        } else {
-            cache_response.hits = res
-                .hits
-                .iter()
-                .chain(cache_response.hits.iter())
-                .cloned()
-                .collect();
-        }
+        cache_response.hits.extend(res.hits.clone());
     }
     if is_descending {
         cache_response

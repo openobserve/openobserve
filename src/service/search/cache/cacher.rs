@@ -117,12 +117,13 @@ pub async fn check_cache(
     }
     let query_key = file_path.replace('/', "_");
 
-    let mut is_descending = true;
+    let mut is_descending = false;
 
     if !order_by.is_empty() {
         for (field, order) in &order_by {
-            if field.eq(&result_ts_col) {
+            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
                 is_descending = *order;
+                break;
             }
         }
     }
@@ -149,7 +150,7 @@ pub async fn check_cache(
                     start_time: cached_resp.response_start_time,
                     end_time: cached_resp.response_end_time,
                     is_aggregate,
-                    is_descending: true,
+                    is_descending,
                 },
                 req.query.start_time,
                 req.query.end_time,

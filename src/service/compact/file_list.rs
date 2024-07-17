@@ -20,7 +20,7 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use config::{cluster::LOCAL_NODE_UUID, ider, meta::stream::FileKey, utils::json};
+use config::{cluster::LOCAL_NODE, ider, meta::stream::FileKey, utils::json};
 use hashbrown::HashMap;
 use infra::{dist_lock, schema::STREAM_SCHEMAS_LATEST, storage};
 use tokio::sync::{RwLock, Semaphore};
@@ -193,13 +193,13 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let lock_key = format!("/compact/file_list/{offset}");
     let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::file_list::get_process(offset).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
 
     // before start merging, set current node to lock the offset
-    let ret = db::compact::file_list::set_process(offset, &LOCAL_NODE_UUID.clone()).await;
+    let ret = db::compact::file_list::set_process(offset, &LOCAL_NODE.uuid.clone()).await;
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     drop(locker);

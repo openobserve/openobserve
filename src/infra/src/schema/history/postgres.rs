@@ -90,7 +90,7 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
 (
-    id           BIGINT GENERATED ALWAYS AS IDENTITY,
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     org          VARCHAR(100) not null,
     stream_type  VARCHAR(32)  not null,
     stream_name  VARCHAR(256) not null,

@@ -15,11 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{
-    cluster::{is_flatten_compactor, LOCAL_NODE_ROLE},
-    get_config,
-    meta::stream::FileKey,
-};
+use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey};
 use tokio::{
     sync::{mpsc, Mutex},
     time,
@@ -28,7 +24,7 @@ use tokio::{
 use crate::service::compact;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !is_flatten_compactor(&LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_flatten_compactor() {
         return Ok(());
     }
 

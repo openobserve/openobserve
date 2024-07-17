@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use config::{cluster::LOCAL_NODE_UUID, utils::json};
+use config::{cluster::LOCAL_NODE, utils::json};
 
 use crate::{
     common::{infra::config::METRIC_CLUSTER_LEADER, meta::prom::ClusterLeader},
@@ -90,7 +90,7 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
-                if item_value.updated_by != LOCAL_NODE_UUID.to_string() {
+                if item_value.updated_by != LOCAL_NODE.uuid {
                     METRIC_CLUSTER_LEADER
                         .write()
                         .await

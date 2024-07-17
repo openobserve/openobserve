@@ -15,7 +15,7 @@
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
-    cluster::LOCAL_NODE_UUID,
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         cluster::Role,
@@ -58,11 +58,11 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node) =
-                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE_UUID.ne(&node) {
+                if LOCAL_NODE.uuid.ne(&node) {
                     continue; // not this node
                 }
 
@@ -103,10 +103,11 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let stream_name = columns[2];
         let retention = columns[3];
 
-        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor).await else {
+        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor, None).await
+        else {
             continue; // no compactor node
         };
-        if LOCAL_NODE_UUID.ne(&node) {
+        if LOCAL_NODE.uuid.ne(&node) {
             continue; // not this node
         }
 
@@ -150,11 +151,11 @@ pub async fn run_generate_job() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node) =
-                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE_UUID.ne(&node) {
+                if LOCAL_NODE.uuid.ne(&node) {
                     // Check if this node holds the stream
                     if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
                         &org_id,
@@ -216,7 +217,7 @@ pub async fn run_merge(
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let mut jobs =
-        infra_file_list::get_pending_jobs(&LOCAL_NODE_UUID, cfg.compact.batch_size).await?;
+        infra_file_list::get_pending_jobs(&LOCAL_NODE.uuid, cfg.compact.batch_size).await?;
     if jobs.is_empty() {
         return Ok(());
     }
@@ -237,11 +238,12 @@ pub async fn run_merge(
             unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
         if partition_time_level == PartitionTimeLevel::Daily || cfg.compact.step_secs < 3600 {
             // check if this stream need process by this node
-            let Some(node) = get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+            let Some(node) =
+                get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
             else {
                 continue; // no compactor node
             };
-            if LOCAL_NODE_UUID.ne(&node) {
+            if LOCAL_NODE.uuid.ne(&node) {
                 need_release_ids.push(job.id); // not this node
             }
         }
@@ -373,7 +375,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     for org_id in orgs {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             continue;
         }
@@ -385,17 +387,17 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         // first
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
             continue;
         }
-        let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+        let ret = if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
             db::compact::organization::set_offset(
                 &org_id,
                 "file_list_deleted",
                 offset,
-                Some(&LOCAL_NODE_UUID.clone()),
+                Some(&LOCAL_NODE.uuid.clone()),
             )
             .await
         } else {
@@ -428,7 +430,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
             &org_id,
             "file_list_deleted",
             time_max,
-            Some(&LOCAL_NODE_UUID.clone()),
+            Some(&LOCAL_NODE.uuid.clone()),
         )
         .await?;
     }

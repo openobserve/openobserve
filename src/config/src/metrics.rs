@@ -24,7 +24,10 @@ use prometheus::{
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
-
+pub const SPAN_METRICS_BUCKET: [f64; 15] = [
+    0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
+    60000.0,
+];
 // http latency
 pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -290,6 +293,33 @@ pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new(
             "query_disk_cache_files",
             "Querier disk cached files. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+// querier disk result cache stats
+
+pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_result_cache_used_bytes",
+            "Querier disk result cache used bytes. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_RESULT_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_disk_result_cache_files",
+            "Querier disk result cached files. ".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -564,6 +594,24 @@ pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static SPAN_DURATION_MILLISECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("span_duration_milliseconds", "span duration milliseconds")
+            .namespace(NAMESPACE)
+            .buckets(SPAN_METRICS_BUCKET.to_vec())
+            .const_labels(create_const_labels()),
+        &[
+            "organization",
+            "stream",
+            "service_name",
+            "operation_name",
+            "status_code",
+            "span_kind",
+        ],
+    )
+    .expect("Metric created")
+});
+
 // metrics for query manager
 pub static QUERY_RUNNING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -760,6 +808,15 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SPAN_DURATION_MILLISECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_RESULT_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_RESULT_CACHE_FILES.clone()))
         .expect("Metric registered");
 }
 

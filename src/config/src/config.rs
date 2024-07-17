@@ -729,6 +729,24 @@ pub struct Common {
     )]
     pub mem_table_individual_streams: String,
     #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_ENABLED",
+        default = false,
+        help = "enable span metrics for traces"
+    )]
+    pub traces_span_metrics_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_EXPORT_INTERVAL",
+        default = 60,
+        help = "traces span metrics export interval, unit seconds"
+    )]
+    pub traces_span_metrics_export_interval: u64,
+    #[env_config(
+        name = "ZO_TRACES_SPAN_METRICS_CHANNEL_BUFFER",
+        default = 100000,
+        help = "traces span metrics channel send buffer"
+    )]
+    pub traces_span_metrics_channel_buffer: usize,
+    #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
         default = "false",
         help = "Enable result cache for query results"
@@ -740,6 +758,8 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
+    pub swagger_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -977,6 +997,9 @@ pub struct DiskCache {
     // MB, default is 50% of local volume available space and maximum 100GB
     #[env_config(name = "ZO_DISK_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
+    // MB, default is 10% of local volume available space and maximum 20GB
+    #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub result_max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 80% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1159,6 +1182,13 @@ pub struct RUM {
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().unwrap();
+
+    // set local mode
+    if cfg.common.local_mode {
+        cfg.common.node_role = "all".to_string();
+        cfg.common.node_role_group = "".to_string();
+    }
+
     // set cpu num
     let cpu_num = cgroup::get_cpu_limit();
     cfg.limit.cpu_num = cpu_num;
@@ -1170,15 +1200,27 @@ pub fn init() -> Config {
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
-        cfg.limit.query_thread_num = cpu_num * 4;
+        if cfg.common.local_mode {
+            cfg.limit.query_thread_num = cpu_num * 2;
+        } else {
+            cfg.limit.query_thread_num = cpu_num * 4;
+        }
     }
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num;
+        if cfg.common.local_mode {
+            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.file_move_thread_num = cpu_num;
+        }
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
-        cfg.limit.file_merge_thread_num = cpu_num;
+        if cfg.common.local_mode {
+            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
+        } else {
+            cfg.limit.file_merge_thread_num = cpu_num;
+        }
     }
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
@@ -1436,7 +1478,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let mem_total = cgroup::get_memory_limit();
     cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
-        cfg.memory_cache.max_size = mem_total / 2; // 50%
+        if cfg.common.local_mode {
+            cfg.memory_cache.max_size = mem_total / 4; // 25%
+        } else {
+            cfg.memory_cache.max_size = mem_total / 2; // 50%
+        }
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
@@ -1460,7 +1506,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
-        cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
+        if cfg.common.local_mode {
+            cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
+        } else {
+            cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
+        }
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
@@ -1474,7 +1524,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // for memtable limit check
     if cfg.limit.mem_table_max_size == 0 {
-        cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+        if cfg.common.local_mode {
+            cfg.limit.mem_table_max_size = mem_total / 4; // 25%
+        } else {
+            cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+        }
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
@@ -1532,6 +1586,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.disk_cache.max_size *= 1024 * 1024;
+    }
+
+    if cfg.disk_cache.result_max_size == 0 {
+        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
+    } else {
+        cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is

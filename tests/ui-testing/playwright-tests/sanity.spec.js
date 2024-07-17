@@ -357,11 +357,6 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(3000);
     await page
       .locator(
-        '[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-x-data"]'
-      )
-      .click();
-    await page
-      .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
       )
       .click();
@@ -873,11 +868,6 @@ test.describe("Sanity testcases", () => {
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_tabledashboard-job"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_tabledashboard-_timestamp"] [data-test="dashboard-add-x-data"]'
       )
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();

@@ -18,7 +18,7 @@ use core::cmp::min;
 use config::{
     cluster::*,
     get_config,
-    meta::cluster::{load_role_group, Node, NodeStatus, Role},
+    meta::cluster::{Node, NodeStatus, Role, RoleGroup},
     utils::json,
 };
 use infra::{
@@ -92,14 +92,19 @@ async fn register() -> Result<()> {
     let mut node_ids = Vec::new();
     let mut w = super::NODES.write().await;
     for node in node_list {
-        if is_querier(&node.role) {
-            super::add_node_to_consistent_hash(&node, &Role::Querier).await;
+        if node.is_interactive_querier() {
+            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
         }
-        if is_compactor(&node.role) {
-            super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
+        if node.is_background_querier() {
+            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
+                .await;
         }
-        if is_flatten_compactor(&node.role) {
-            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
+        if node.is_compactor() {
+            super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        }
+        if node.is_flatten_compactor() {
+            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         }
         node_ids.push(node.id);
         w.insert(node.uuid.clone(), node);
@@ -125,35 +130,40 @@ async fn register() -> Result<()> {
     }
 
     // 5. join the cluster
-    let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
+    let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let node = Node {
         id: new_node_id,
-        uuid: LOCAL_NODE_UUID.clone(),
+        uuid: LOCAL_NODE.uuid.clone(),
         name: cfg.common.instance_name.clone(),
         http_addr: format!("http://{}:{}", get_local_http_ip(), cfg.http.port),
         grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), cfg.grpc.port),
-        role: LOCAL_NODE_ROLE.clone(),
+        role: LOCAL_NODE.role.clone(),
+        role_group: LOCAL_NODE.role_group,
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
-        role_group: load_role_group(),
     };
     let val = json::to_vec(&node).unwrap();
 
     // cache local node
-    if is_querier(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::Querier).await;
+    if node.is_interactive_querier() {
+        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+            .await;
     }
-    if is_compactor(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
+    if node.is_background_querier() {
+        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
+            .await;
     }
-    if is_flatten_compactor(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor).await;
+    if node.is_compactor() {
+        super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+    }
+    if node.is_flatten_compactor() {
+        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
     }
 
     let mut w = super::NODES.write().await;
-    w.insert(LOCAL_NODE_UUID.clone(), node);
+    w.insert(LOCAL_NODE.uuid.clone(), node);
     drop(w);
 
     // 6. register node to cluster
@@ -182,7 +192,7 @@ pub(crate) async fn set_offline() -> Result<()> {
 pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let cfg = get_config();
     // set node status to online
-    let node = match super::NODES.read().await.get(LOCAL_NODE_UUID.as_str()) {
+    let node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
         Some(node) => {
             let mut val = node.clone();
             val.status = status.clone();
@@ -190,16 +200,16 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
         }
         None => Node {
             id: unsafe { LOCAL_NODE_ID },
-            uuid: LOCAL_NODE_UUID.clone(),
+            uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
             http_addr: format!("http://{}:{}", get_local_node_ip(), cfg.http.port),
             grpc_addr: format!("http://{}:{}", get_local_node_ip(), cfg.grpc.port),
-            role: LOCAL_NODE_ROLE.clone(),
+            role: LOCAL_NODE.role.clone(),
+            role_group: LOCAL_NODE.role_group,
             cpu_num: cfg.limit.cpu_num as u64,
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
-            role_group: load_role_group(),
         },
     };
     let val = json::to_string(&node).unwrap();
@@ -208,7 +218,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
         LOCAL_NODE_STATUS = status;
     }
 
-    let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
+    let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
         return Err(Error::Message(format!("online node error: {}", e)));
@@ -219,7 +229,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
 
 /// Leave cluster
 pub(crate) async fn leave() -> Result<()> {
-    let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
+    let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.delete(&key, false, NEED_WATCH, None).await {
         return Err(Error::Message(format!("leave node error: {}", e)));
@@ -229,7 +239,7 @@ pub(crate) async fn leave() -> Result<()> {
 }
 
 pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
-    let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
+    let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let val = json::to_vec(&node).unwrap();
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {

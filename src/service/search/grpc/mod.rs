@@ -18,7 +18,8 @@ use std::{collections::HashSet, sync::Arc};
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    cluster, get_config,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         search::ScanStats,
         stream::{FileKey, StreamType},
@@ -79,7 +80,7 @@ pub async fn search(
     let sql1 = sql.clone();
     let wal_parquet_span = tracing::span::Span::current();
     let task1 = tokio::task::spawn(async move {
-        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
+        if LOCAL_NODE.is_ingester() && !skip_wal {
             wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout)
                 .instrument(wal_parquet_span)
                 .await
@@ -94,7 +95,7 @@ pub async fn search(
     let sql2 = sql.clone();
     let wal_mem_span = tracing::span::Span::current();
     let task2 = tokio::task::spawn(async move {
-        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) && !skip_wal {
+        if LOCAL_NODE.is_ingester() && !skip_wal {
             wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout)
                 .instrument(wal_mem_span)
                 .await

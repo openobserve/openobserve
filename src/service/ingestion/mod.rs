@@ -21,7 +21,8 @@ use std::{
 use anyhow::{anyhow, Result};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
-    cluster, get_config,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
@@ -411,7 +412,7 @@ pub async fn write_file(
 }
 
 pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Err(anyhow!("not an ingester"));
     }
 

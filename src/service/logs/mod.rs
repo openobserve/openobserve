@@ -17,6 +17,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::Result;
@@ -25,7 +26,7 @@ use config::{
     get_config,
     meta::{
         stream::{PartitionTimeLevel, StreamPartition, StreamType},
-        usage::RequestStats,
+        usage::{RequestStats, UsageType},
     },
     utils::{
         json::{estimate_json_bytes, get_string_value, pickup_string_value, Map, Value},
@@ -46,7 +47,10 @@ use crate::{
         ingestion::IngestionStatus,
         stream::{SchemaRecords, StreamParams},
     },
-    service::{ingestion::get_wal_time_key, schema::check_for_schema},
+    service::{
+        db, ingestion::get_wal_time_key, schema::check_for_schema,
+        usage::report_request_usage_stats,
+    },
 };
 
 pub mod bulk;
@@ -56,6 +60,8 @@ pub mod otlp_http;
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
+
+type LogJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     let local_val = v.as_object().unwrap();
@@ -179,6 +185,49 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
         field.name(),
         field.data_type()
     ));
+}
+
+async fn write_logs_by_stream(
+    org_id: &str,
+    user_email: &str,
+    time_stats: (i64, &Instant), // started_at
+    usage_type: UsageType,
+    status: &mut IngestionStatus,
+    json_data_by_stream: HashMap<String, LogJsonData>,
+) -> Result<()> {
+    for (stream_name, (json_data, fn_num)) in json_data_by_stream {
+        // check if we are allowed to ingest
+        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
+        {
+            log::warn!("stream [{stream_name}] is being deleted");
+            continue; // skip
+        }
+
+        // write json data by stream
+        let mut req_stats = write_logs(org_id, &stream_name, status, json_data).await?;
+
+        let time_took = time_stats.1.elapsed().as_secs_f64();
+        req_stats.response_time = time_took;
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
+
+        if let Some(fns_length) = fn_num {
+            report_request_usage_stats(
+                req_stats,
+                org_id,
+                &stream_name,
+                StreamType::Logs,
+                usage_type,
+                fns_length as u16,
+                time_stats.0,
+            )
+            .await;
+        }
+    }
+    Ok(())
 }
 
 async fn write_logs(

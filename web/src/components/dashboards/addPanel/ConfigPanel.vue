@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div style="padding-bottom: 30px;">
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}
@@ -779,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
@@ -788,7 +788,13 @@ export default defineComponent({
   components: { Drilldown, CommonAutoComplete },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard"
+    );
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
     const { t } = useI18n();
 
     const basemapTypeOptions = [

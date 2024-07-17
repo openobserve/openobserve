@@ -24,7 +24,7 @@ use actix_web::{
 };
 use arrow_schema::Schema;
 use config::{
-    cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::cluster::NodeStatus,
     utils::{json, schema_ext::SchemaExt},
@@ -32,7 +32,8 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::{
-    cache, file_list,
+    cache::{self, file_data::disk::FileType},
+    file_list,
     schema::{
         STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
     },
@@ -153,7 +154,7 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
 )]
 #[get("/schedulez")]
 pub async fn schedulez() -> Result<HttpResponse, Error> {
-    let node_id = LOCAL_NODE_UUID.clone();
+    let node_id = LOCAL_NODE.uuid.clone();
     let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(HttpResponse::NotFound().json(HealthzResponse {
             status: "not ok".to_string(),
@@ -275,7 +276,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
 pub async fn cache_status() -> Result<HttpResponse, Error> {
     let cfg = get_config();
     let mut stats: HashMap<&str, json::Value> = HashMap::default();
-    stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
+    stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
     let nodes = cluster::get_cached_online_nodes().await;
@@ -293,13 +294,17 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len().await;
-    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats().await;
+    let disk_file_num = cache::file_data::disk::len(FileType::DATA).await;
+    let (disk_max_size, disk_cur_size) = cache::file_data::disk::stats(FileType::DATA).await;
+    let disk_result_file_num = cache::file_data::disk::len(FileType::RESULT).await;
+    let (disk_result_max_size, disk_result_cur_size) =
+        cache::file_data::disk::stats(FileType::RESULT).await;
     stats.insert(
         "FILE_DATA",
         json::json!({
             "memory":{"cache_files":mem_file_num, "cache_limit":mem_max_size,"cache_bytes": mem_cur_size},
-            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"cache_bytes": disk_cur_size}
+            "disk":{"cache_files":disk_file_num, "cache_limit":disk_max_size,"cache_bytes": disk_cur_size},
+            "results":{"cache_files":disk_result_file_num, "cache_limit":disk_result_max_size,"cache_bytes": disk_result_cur_size}
         }),
     );
 
@@ -668,7 +673,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
 
 #[put("/enable")]
 async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
-    let node_id = LOCAL_NODE_UUID.clone();
+    let node_id = LOCAL_NODE.uuid.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
@@ -687,7 +692,7 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
 
 #[put("/flush")]
 async fn flush_node() -> Result<HttpResponse, Error> {
-    if !is_ingester(&LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_ingester() {
         return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
     };
 

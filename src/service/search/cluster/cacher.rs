@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::{is_querier, LOCAL_NODE_UUID};
+use config::cluster::LOCAL_NODE;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -33,7 +33,7 @@ pub async fn get_cached_results(
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
@@ -41,8 +41,8 @@ pub async fn get_cached_results(
 
     nodes.sort_by_key(|x| x.id);
 
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE_UUID.as_str()).await;
-    nodes.retain(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()));
+    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
 
     let querier_num = nodes.len();
     if querier_num == 0 && local_node.is_none() {
@@ -254,7 +254,7 @@ pub async fn delete_cached_results(path: String) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes()
+    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
         .await
         .unwrap();
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
@@ -262,8 +262,8 @@ pub async fn delete_cached_results(path: String) -> bool {
 
     nodes.sort_by_key(|x| x.id);
 
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE_UUID.as_str()).await;
-    nodes.retain(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()));
+    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
 
     let querier_num = nodes.len();
     if querier_num == 0 && local_node.is_none() {

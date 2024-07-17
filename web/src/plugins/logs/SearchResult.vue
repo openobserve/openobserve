@@ -138,10 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :style="{
           wordBreak: 'break-word',
-          height:
-            !searchObj.meta.showHistogram
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
+          height: !searchObj.meta.showHistogram
+            ? 'calc(100% - 40px)'
+            : 'calc(100% - 140px)',
         }"
       >
         <template v-slot:before>

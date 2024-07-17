@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
 
-                      <div style="flex: 1">
+                      <div class="col" style="flex: 1">
                         <PanelSchemaRenderer
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
@@ -230,7 +230,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ></QueryInspector>
                         </q-dialog>
                       </div>
-                      <DashboardErrorsComponent :errors="errorData" />
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
                     </div>
                   </template>
                   <template #separator>
@@ -369,6 +373,8 @@ export default defineComponent({
     CustomMarkdownEditor,
   },
   setup(props) {
+    provide("dashboardPanelDataPageKey", "dashboard");
+
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref({});
@@ -379,10 +385,11 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const {
       dashboardPanelData,
-      promqlMode,
       resetDashboardPanelData,
+      resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
-    } = useDashboardPanelData();
+      validatePanel,
+    } = useDashboardPanelData("dashboard");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
@@ -454,7 +461,7 @@ export default defineComponent({
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
-        resetDashboardPanelData();
+        resetDashboardPanelDataAndAddTimeField();
         chartData.value = {};
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
@@ -530,6 +537,7 @@ export default defineComponent({
         !dashboardPanelData.data.config.unit &&
         !dashboardPanelData.data.config.unit_custom &&
         dashboardPanelData.data.queries[0].fields.x.length == 0 &&
+        dashboardPanelData.data.queries[0].fields.breakdown.length == 0 &&
         dashboardPanelData.data.queries[0].fields.y.length == 0 &&
         dashboardPanelData.data.queries[0].fields.z.length == 0 &&
         dashboardPanelData.data.queries[0].fields.filter.length == 0 &&
@@ -546,22 +554,6 @@ export default defineComponent({
 
     watch(isOutDated, () => {
       window.dispatchEvent(new Event("resize"));
-    });
-
-    const currentXLabel = computed(() => {
-      return dashboardPanelData.data.type == "table"
-        ? "First Column"
-        : dashboardPanelData.data.type == "h-bar"
-        ? "Y-Axis"
-        : "X-Axis";
-    });
-
-    const currentYLabel = computed(() => {
-      return dashboardPanelData.data.type == "table"
-        ? "Other Columns"
-        : dashboardPanelData.data.type == "h-bar"
-        ? "X-Axis"
-        : "Y-Axis";
     });
 
     watch(
@@ -699,453 +691,8 @@ export default defineComponent({
         }
       }
 
-      //check each query is empty or not for promql
-      if (dashboardData.data.queryType == "promql") {
-        dashboardData.data.queries.map((q: any, index: number) => {
-          if (q && q.query == "") {
-            errors.push(`Query-${index + 1} is empty`);
-          }
-        });
-      }
-
-      //check each query is empty or not for geomap
-      if (dashboardData.data.type == "geomap") {
-        dashboardData.data.queries.map((q: any, index: number) => {
-          if (q && q.query == "") {
-            errors.push(`Query-${index + 1} is empty`);
-          }
-        });
-      }
-
-      //check content should be empty for html
-      if (dashboardData.data.type == "html") {
-        if (dashboardData.data.htmlContent.trim() == "") {
-          errors.push("Please enter your HTML code");
-        }
-      }
-
-      //check content should be empty for html
-      if (dashboardData.data.type == "markdown") {
-        if (dashboardData.data.markdownContent.trim() == "") {
-          errors.push("Please enter your markdown code");
-        }
-      }
-
-      if (promqlMode.value) {
-        // 1. chart type: only line chart is supported
-        const allowedChartTypes = [
-          "area",
-          "line",
-          "bar",
-          "scatter",
-          "area-stacked",
-          "metric",
-          "gauge",
-          "html",
-          "markdown",
-        ];
-        if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
-          errors.push(
-            "Selected chart type is not supported for PromQL. Only line chart is supported."
-          );
-        }
-
-        // 2. x axis, y axis, filters should be blank
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .fields.x.length > 0
-        ) {
-          errors.push(
-            "X-Axis is not supported for PromQL. Remove anything added to the X-Axis."
-          );
-        }
-
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .fields.y.length > 0
-        ) {
-          errors.push(
-            "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis."
-          );
-        }
-
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .fields.filter.length > 0
-        ) {
-          errors.push(
-            "Filters are not supported for PromQL. Remove anything added to the Filters."
-          );
-        }
-
-        // if(!dashboardPanelData.data.query) {
-        //   errors.push("Query should not be empty")
-        // }
-      } else {
-        switch (dashboardPanelData.data.type) {
-          case "donut":
-          case "pie": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length > 1 ||
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length == 0
-            ) {
-              errors.push("Add one value field for donut and pie charts");
-            }
-
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length > 1 ||
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length == 0
-            ) {
-              errors.push("Add one label field for donut and pie charts");
-            }
-
-            break;
-          }
-          case "metric": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length > 1 ||
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length == 0
-            ) {
-              errors.push("Add one value field for metric charts");
-            }
-
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length
-            ) {
-              errors.push(
-                `${currentXLabel.value} field is not allowed for Metric chart`
-              );
-            }
-
-            break;
-          }
-          case "gauge": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length != 1
-            ) {
-              errors.push("Add one value field for gauge chart");
-            }
-            // gauge can have zero or one label
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length != 1 &&
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length != 0
-            ) {
-              errors.push(`Add one label field for gauge chart`);
-            }
-
-            break;
-          }
-          case "h-bar":
-          case "area":
-          case "line":
-          case "scatter":
-          case "bar": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length < 1
-            ) {
-              errors.push("Add at least one field for the Y-Axis");
-            }
-
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length > 1 ||
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length == 0
-            ) {
-              errors.push(`Add one fields for the X-Axis`);
-            }
-
-            break;
-          }
-          case "table": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length == 0 &&
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length == 0
-            ) {
-              errors.push("Add at least one field on X-Axis or Y-Axis");
-            }
-
-            break;
-          }
-          case "heatmap": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length == 0
-            ) {
-              errors.push("Add at least one field for the Y-Axis");
-            }
-
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length == 0
-            ) {
-              errors.push(`Add one field for the X-Axis`);
-            }
-
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.z.length == 0
-            ) {
-              errors.push(`Add one field for the Z-Axis`);
-            }
-
-            break;
-          }
-          case "area-stacked":
-          case "stacked":
-          case "h-stacked": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length > 1 ||
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.y.length == 0
-            ) {
-              errors.push(
-                "Add exactly one field on Y-Axis for stacked and h-stacked charts"
-              );
-            }
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.x.length != 1 ||
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.breakdown.length != 1
-            ) {
-              errors.push(
-                `Add exactly one fields on the X-Axis and breakdown for stacked, area-stacked and h-stacked charts`
-              );
-            }
-
-            break;
-          }
-          case "geomap": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.latitude == null
-            ) {
-              errors.push("Add one field for the latitude");
-            }
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.longitude == null
-            ) {
-              errors.push("Add one field for the longitude");
-            }
-            break;
-          }
-
-          case "sankey": {
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.source == null
-            ) {
-              errors.push("Add one field for the source");
-            }
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.target == null
-            ) {
-              errors.push("Add one field for the target");
-            }
-            if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.value == null
-            ) {
-              errors.push("Add one field for the value");
-            }
-            break;
-          }
-          default:
-            break;
-        }
-
-        // check if aggregation function is selected or not
-        if (!(dashboardData.data.type == "heatmap")) {
-          const aggregationFunctionError = dashboardData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.y.filter(
-            (it: any) =>
-              it.aggregationFunction == null || it.aggregationFunction == ""
-          );
-          if (
-            dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-              .fields.y.length &&
-            aggregationFunctionError.length
-          ) {
-            errors.push(
-              ...aggregationFunctionError.map(
-                (it: any) =>
-                  `${currentYLabel.value}: ${it.column}: Aggregation function required`
-              )
-            );
-          }
-        }
-
-        // check if labels are there for y axis items
-        const labelError = dashboardData.data.queries[
-          dashboardData.layout.currentQueryIndex
-        ].fields.y.filter((it: any) => it.label == null || it.label == "");
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .fields.y.length &&
-          labelError.length
-        ) {
-          errors.push(
-            ...labelError.map(
-              (it: any) =>
-                `${currentYLabel.value}: ${it.column}: Label required`
-            )
-          );
-        }
-
-        // if there are filters
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .fields.filter.length
-        ) {
-          // check if at least 1 item from the list is selected
-          const listFilterError = dashboardData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.filter.filter(
-            (it: any) => it.type == "list" && !it.values?.length
-          );
-          if (listFilterError.length) {
-            errors.push(
-              ...listFilterError.map(
-                (it: any) =>
-                  `Filter: ${it.column}: Select at least 1 item from the list`
-              )
-            );
-          }
-
-          // check if condition operator is selected
-          const conditionFilterError = dashboardData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.filter.filter(
-            (it: any) => it.type == "condition" && it.operator == null
-          );
-          if (conditionFilterError.length) {
-            errors.push(
-              ...conditionFilterError.map(
-                (it: any) => `Filter: ${it.column}: Operator selection required`
-              )
-            );
-          }
-
-          // check if condition value is selected
-          const conditionValueFilterError = dashboardData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.filter.filter(
-            (it: any) =>
-              it.type == "condition" &&
-              !["Is Null", "Is Not Null"].includes(it.operator) &&
-              (it.value == null || it.value == "")
-          );
-          if (conditionValueFilterError.length) {
-            errors.push(
-              ...conditionValueFilterError.map(
-                (it: any) => `Filter: ${it.column}: Condition value required`
-              )
-            );
-          }
-        }
-
-        // check if query syntax is valid
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .customQuery &&
-          dashboardData.meta.errors.queryErrors.length
-        ) {
-          errors.push("Please add valid query syntax");
-        }
-
-        // check if field selection is from the custom query fields when the custom query mode is ON
-        if (
-          dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-            .customQuery
-        ) {
-          const customQueryXFieldError = dashboardPanelData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.x.filter(
-            (it: any) =>
-              !dashboardPanelData.meta.stream.customQueryFields.find(
-                (i: any) => i.name == it.column
-              )
-          );
-          if (customQueryXFieldError.length) {
-            errors.push(
-              ...customQueryXFieldError.map(
-                (it: any) =>
-                  `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`
-              )
-            );
-          }
-
-          const customQueryYFieldError = dashboardPanelData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.y.filter(
-            (it: any) =>
-              !dashboardPanelData.meta.stream.customQueryFields.find(
-                (i: any) => i.name == it.column
-              )
-          );
-          if (customQueryYFieldError.length) {
-            errors.push(
-              ...customQueryYFieldError.map(
-                (it: any) =>
-                  `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`
-              )
-            );
-          }
-        } else {
-          // check if field selection is from the selected stream fields when the custom query mode is OFF
-          const customQueryXFieldError = dashboardPanelData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.x.filter(
-            (it: any) =>
-              !dashboardPanelData.meta.stream.selectedStreamFields.find(
-                (i: any) => i.name == it.column
-              )
-          );
-          if (customQueryXFieldError.length) {
-            errors.push(
-              ...customQueryXFieldError.map(
-                (it: any) =>
-                  `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`
-              )
-            );
-          }
-
-          const customQueryYFieldError = dashboardPanelData.data.queries[
-            dashboardData.layout.currentQueryIndex
-          ].fields.y.filter(
-            (it: any) =>
-              !dashboardPanelData.meta.stream.selectedStreamFields.find(
-                (i: any) => i.name == it.column
-              )
-          );
-          if (customQueryYFieldError.length) {
-            errors.push(
-              ...customQueryYFieldError.map(
-                (it: any) =>
-                  `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`
-              )
-            );
-          }
-        }
-      }
+      // will push errors in errors array
+      validatePanel(errors);
 
       // show all the errors
       // for (let index = 0; index < errors.length; index++) {

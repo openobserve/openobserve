@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster;
+use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
@@ -32,7 +32,7 @@ mod compactor;
 pub(crate) mod file_list;
 pub(crate) mod files;
 mod flatten_compactor;
-mod metrics;
+pub mod metrics;
 mod mmdb_downloader;
 mod prom;
 mod stats;
@@ -90,12 +90,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { usage::run_audit_publish().await });
 
     // Router doesn't need to initialize job
-    if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+    if LOCAL_NODE.is_router() {
         return Ok(());
     }
 
     // telemetry run
-    if cfg.common.telemetry_enabled && cluster::is_querier(&cluster::LOCAL_NODE_ROLE) {
+    if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
@@ -114,14 +114,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
-    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if LOCAL_NODE.is_ingester() {
         tokio::task::spawn(async move { db::pipelines::watch().await });
     }
 
     #[cfg(feature = "enterprise")]
-    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
-        || cluster::is_single_node(&cluster::LOCAL_NODE_ROLE)
-    {
+    if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
         tokio::task::spawn(async move { db::session::watch().await });
     }
 
@@ -157,21 +155,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
-    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if LOCAL_NODE.is_ingester() {
         db::pipelines::cache().await.expect("syslog cache failed");
     }
 
     // cache file list
     if !cfg.common.meta_store_external {
-        if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        if LOCAL_NODE.is_ingester() {
             // load the wal file_list into memory
             db::file_list::local::load_wal_in_cache()
                 .await
                 .expect("load wal file list failed");
         }
-        if cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-            || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
-        {
+        if LOCAL_NODE.is_querier() || LOCAL_NODE.is_compactor() {
             db::file_list::remote::cache("", false)
                 .await
                 .expect("file list remote cache failed");
@@ -191,14 +187,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::ofga::cache().await.expect("ofga model cache failed");
 
     #[cfg(feature = "enterprise")]
-    if !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE) {
+    if !LOCAL_NODE.is_compactor() {
         db::session::cache()
             .await
             .expect("user session cache failed");
     }
 
     // check wal directory
-    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if LOCAL_NODE.is_ingester() {
         // create wal dir
         if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
             log::error!("Failed to create wal dir: {}", e);
