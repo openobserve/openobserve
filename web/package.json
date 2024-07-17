@@ -9,7 +9,7 @@
     "build-alpha1": "run-p type-check build-only-alpha1",
     "build-cloud-prod": "run-p type-check build-only-cloud-prod",
     "build": "run-p type-check build-only",
-    "postbuild": "run-p copy",
+    "postbuild": "run-p copy && cp dist/manifest.json dist/src/assets/workers/",
     "preview": "vite preview",
     "copy": "cd dist && mkdir src && cd src && mkdir assets && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
     "test:unit": "vitest --environment jsdom --root src/",

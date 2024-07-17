@@ -26,6 +26,8 @@ import dotenv from "dotenv";
 import fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
 import visualizer from "rollup-plugin-visualizer";
+import manifest from "vite-plugin-manifest";
+
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -132,6 +134,7 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: "es2020",
+    manifest: true,
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
       plugins: [
