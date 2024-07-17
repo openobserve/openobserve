@@ -1749,16 +1749,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].fields?.stream
     }" `;
 
-    const filterData = filter?.map((field, i) => {
-      let selectFilter = "";
-      if (field.type == "list" && field.values?.length > 0) {
-        selectFilter += `${field.column} IN (${field.values
-          .map((it: any) => `'${it}'`)
+    // Add the AND/OR condition logic
+    const buildCondition = (condition: any) => {
+      if (condition.filterType === "group") {
+        const groupConditions = condition.conditions
+          .map(buildCondition)
+          .filter(Boolean);
+        return groupConditions.length
+          ? `(${groupConditions.join(` ${condition.condition || "AND"} `)})`
+          : "";
+      } else if (condition.type === "list" && condition.values?.length > 0) {
+        return `${condition.column} IN (${condition.values
+          .map((value: any) => `'${value}'`)
           .join(", ")})`;
-      } else if (field.type == "condition" && field.operator != null) {
-        selectFilter += `${field?.column} `;
-        if (["Is Null", "Is Not Null"].includes(field.operator)) {
-          switch (field?.operator) {
+      } else if (condition.type === "condition" && condition.operator != null) {
+        let selectFilter = `${condition.column} `;
+        if (["Is Null", "Is Not Null"].includes(condition.operator)) {
+          switch (condition.operator) {
             case "Is Null":
               selectFilter += `IS NULL`;
               break;
@@ -1766,33 +1773,35 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               selectFilter += `IS NOT NULL`;
               break;
           }
-        } else if (field.value != null && field.value != "") {
-          switch (field.operator) {
+        } else if (condition.value != null && condition.value != "") {
+          switch (condition.operator) {
             case "=":
             case "<>":
             case "<":
             case ">":
             case "<=":
             case ">=":
-              selectFilter += `${field?.operator} ${field?.value}`;
+              selectFilter += `${condition.operator} ${condition.value}`;
               break;
             case "Contains":
-              selectFilter += `LIKE '%${field.value}%'`;
+              selectFilter += `LIKE '%${condition.value}%'`;
               break;
             case "Not Contains":
-              selectFilter += `NOT LIKE '%${field.value}%'`;
+              selectFilter += `NOT LIKE '%${condition.value}%'`;
               break;
             default:
-              selectFilter += `${field.operator} ${field.value}`;
+              selectFilter += `${condition.operator} ${condition.value}`;
               break;
           }
         }
+        return selectFilter;
       }
-      return selectFilter;
-    });
-    const filterItems = filterData.filter((it: any) => it);
-    if (filterItems.length > 0) {
-      query += "WHERE " + filterItems.join(" AND ");
+      return "";
+    };
+
+    const whereConditions = filter.map(buildCondition).filter(Boolean);
+    if (whereConditions.length > 0) {
+      query += ` WHERE ${whereConditions.join(" AND ")}`;
     }
 
     // add group by statement
@@ -1848,6 +1857,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].config.limit ?? 0;
     query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+    console.log("query", query);
 
     return query;
   };
