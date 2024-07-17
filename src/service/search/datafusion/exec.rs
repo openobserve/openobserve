@@ -56,7 +56,6 @@ use hashbrown::HashMap;
 use infra::cache::tmpfs::Directory;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
-use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 

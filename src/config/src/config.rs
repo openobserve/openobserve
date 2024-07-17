@@ -637,7 +637,7 @@ pub struct Common {
     pub usage_publish_interval: i64,
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = "false")]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION", default = "86400")] // Everyday to test
     pub mmdb_update_duration: u64,
@@ -748,7 +748,7 @@ pub struct Common {
     pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = "false",
+        default = false,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,

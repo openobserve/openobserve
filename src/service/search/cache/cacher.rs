@@ -62,14 +62,20 @@ pub async fn check_cache(
     };
     let sql_mode: SqlMode = meta.sql_mode;
 
-    let order_by = meta.meta.order_by;
-
-    // skip the count queries & queries with multiple order by fields
-    if (sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits) || order_by.len() > 1 {
-        return CachedQueryResponse::default();
-    }
+    // skip the queries with no timestamp column
     let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
     if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
+        return CachedQueryResponse::default();
+    }
+
+    // skip the count queries & queries first order by is not _timestamp field
+    let order_by = meta.meta.order_by;
+    if (sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits)
+        || (order_by.is_empty()
+            || (order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
+                && result_ts_col.is_some()
+                && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0))
+    {
         return CachedQueryResponse::default();
     }
 

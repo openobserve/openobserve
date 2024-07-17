@@ -27,8 +27,8 @@ use sqlparser::{
 
 use crate::get_config;
 
-const MAX_LIMIT: i64 = 100000;
-const MAX_OFFSET: i64 = 100000;
+pub const MAX_LIMIT: i64 = 100000;
+pub const MAX_OFFSET: i64 = 100000;
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]

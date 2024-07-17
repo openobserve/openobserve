@@ -325,7 +325,7 @@ async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
 
     while let Some(item) = receiver.recv().await {
         // Record measurements using the histogram instrument.
-        log::info!("receive span metrics: {}", item.span_id);
+        // log::info!("receive span metrics: {}", item.span_id);
         TRACE_METRICS_SPAN_HISTOGRAM.record(
             item.duration,
             &[

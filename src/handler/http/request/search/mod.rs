@@ -27,7 +27,7 @@ use config::{
     },
     metrics,
     utils::{base64, json},
-    DISTINCT_FIELDS, QUERY_WITH_NO_LIMIT,
+    DISTINCT_FIELDS,
 };
 use infra::errors;
 use tracing::{Instrument, Span};
@@ -44,7 +44,7 @@ use crate::{
         },
     },
     service::{
-        search::{self as SearchService},
+        search as SearchService,
         usage::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -851,7 +851,7 @@ async fn values_v1(
             sql: query_sql,
             sql_mode: "full".to_string(),
             from: 0,
-            size: QUERY_WITH_NO_LIMIT as i64,
+            size: config::meta::sql::MAX_LIMIT,
             start_time,
             end_time,
             uses_zo_fn: uses_fn,
