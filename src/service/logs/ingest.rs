@@ -314,7 +314,6 @@ pub fn apply_functions<'a>(
     runtime: &mut Runtime,
 ) -> Result<json::Value> {
     let cfg = get_config();
-    log::info!("item printing: {:#?}", item);
     let mut value = item;
     if !before_local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
@@ -327,7 +326,6 @@ pub fn apply_functions<'a>(
         )?;
     }
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
-    log::info!("item printing after flattening: {:#?}", value);
 
     if !after_local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
