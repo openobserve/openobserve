@@ -972,7 +972,7 @@ async fn get_file_list_by_inverted_index(
 
     let fts_condition = terms
         .iter()
-        .map(|x| format!("term LIKE '%{x}%'"))
+        .map(|x| format!("term LIKE '{x}%'"))
         .collect::<Vec<_>>()
         .join(" OR ");
     let fts_condition = if fts_condition.is_empty() {
@@ -1020,8 +1020,8 @@ async fn get_file_list_by_inverted_index(
             format!("{}_{}", meta.stream_name, stream_type)
         };
     let query = format!(
-        "SELECT term, file_name, _count, deleted, segment_ids FROM \"{}\" WHERE {} ORDER BY {} DESC",
-        index_stream_name, search_condition, cfg.common.column_timestamp
+        "SELECT file_name, deleted, segment_ids FROM \"{}\" WHERE {}",
+        index_stream_name, search_condition,
     );
 
     idx_req.stream_type = StreamType::Index.to_string();
