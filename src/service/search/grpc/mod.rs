@@ -279,6 +279,7 @@ pub async fn search(
     let result = cluster_rpc::SearchResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
+        idx_took: 0,
         from: sql.meta.offset as i32,
         size: sql.meta.limit as i32,
         total: hits_total as i64,

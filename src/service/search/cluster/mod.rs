@@ -65,7 +65,13 @@ pub async fn search(
     trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut req: cluster_rpc::SearchRequest,
-) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, usize, bool)> {
+) -> Result<(
+    HashMap<String, Vec<RecordBatch>>,
+    ScanStats,
+    usize,
+    bool,
+    usize,
+)> {
     let start = std::time::Instant::now();
 
     let cfg = get_config();
@@ -137,13 +143,6 @@ pub async fn search(
         &stream_settings.partition_keys,
     )
     .await;
-
-    // If the query is of type inverted index and this is not an aggregations request,
-    // then filter the file list based on the inverted index.
-    if is_inverted_index && req.aggs.is_empty() {
-        file_list = get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
-    }
-
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {} ms",
@@ -151,6 +150,22 @@ pub async fn search(
         file_list.len(),
         file_list_took,
     );
+
+    // If the query is of type inverted index and this is not an aggregations request,
+    // then filter the file list based on the inverted index.
+    let mut idx_scan_size = 0;
+    let mut idx_took = 0;
+    if is_inverted_index && req.aggs.is_empty() {
+        (file_list, idx_scan_size, idx_took) =
+            get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
+        log::info!(
+            "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+            meta.meta.time_range,
+            file_list.len(),
+            idx_scan_size,
+            idx_took,
+        );
+    }
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -532,7 +547,7 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, scan_stats, is_partial) =
+    let (merge_batches, mut scan_stats, is_partial) =
         match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
             Ok(v) => v,
             Err(e) => {
@@ -566,7 +581,8 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    Ok((merge_batches, scan_stats, took_wait, is_partial))
+    scan_stats.idx_scan_size = idx_scan_size as i64;
+    Ok((merge_batches, scan_stats, took_wait, is_partial, idx_took))
 }
 
 #[cfg(feature = "enterprise")]
@@ -931,8 +947,10 @@ async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
     file_list: &[FileKey],
-) -> Result<Vec<FileKey>> {
+) -> Result<(Vec<FileKey>, usize, usize)> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
     let file_list = file_list
         .iter()
@@ -1078,7 +1096,11 @@ async fn get_file_list_by_inverted_index(
         .collect::<Vec<_>>();
     // sorted by _timestamp
     idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-    Ok(idx_file_list)
+    Ok((
+        idx_file_list,
+        idx_resp.scan_size,
+        start.elapsed().as_millis() as usize,
+    ))
 }
 
 #[cfg(test)]
