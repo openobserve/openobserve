@@ -1,9 +1,5 @@
 <template>
   <div class="group">
-    <div class="group-header">
-      <!-- <span>GROUP {{ groupIndex }}</span> -->
-      <q-btn size="xs" dense @click="$emit('remove-group')" icon="close" />
-    </div>
     <div class="group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
@@ -21,7 +17,7 @@
             :load-filter-item="loadFilterItem"
             @add-condition="addConditionToGroup"
             @add-group="addGroupToGroup"
-            @remove-group="removeGroupFromNested"
+            @remove-group="removeGroupFromNested(index)"
           />
         </div>
         <div v-else>
@@ -36,7 +32,7 @@
           />
         </div>
       </div>
-      <q-btn icon="add" color="primary" size="xs" round>
+      <q-btn icon="add" color="primary" size="xs" round class="add-btn">
         <q-menu v-model="showAddMenu">
           <q-list>
             <q-item clickable @click="emitAddCondition">
@@ -49,6 +45,10 @@
         </q-menu>
       </q-btn>
     </div>
+  </div>
+  <div class="group-header">
+    <!-- <span>GROUP {{ groupIndex }}</span> -->
+    <q-btn size="xs" dense @click="$emit('remove-group')" icon="close" />
   </div>
 </template>
 
@@ -109,6 +109,15 @@ export default defineComponent({
     };
 
     const removeGroupFromNested = (groupIndex: number) => {
+      // Recursively remove all conditions in the nested group
+      const nestedGroup = props.group.conditions[groupIndex];
+      if (nestedGroup && nestedGroup.filterType === "group") {
+        nestedGroup.conditions.forEach((condition: any, idx: number) => {
+          if (condition.filterType === "group") {
+            removeGroupFromNested(idx);
+          }
+        });
+      }
       props.group.conditions.splice(groupIndex, 1);
     };
 
@@ -148,9 +157,16 @@ export default defineComponent({
 }
 .group-conditions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 .condition-group {
-  margin-bottom: 10px;
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.add-btn {
+  height: 20px;
+  width: 20px;
 }
 </style>
