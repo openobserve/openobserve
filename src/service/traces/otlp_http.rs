@@ -102,12 +102,11 @@ pub async fn traces_json(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (before_local_trans, after_local_trans, stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(
-            org_id,
-            &StreamType::Traces,
-            &traces_stream_name,
-        );
+    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+        org_id,
+        &StreamType::Traces,
+        &traces_stream_name,
+    );
     // End Register Transforms for stream
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
@@ -265,31 +264,15 @@ pub async fn traces_json(
 
                     let mut value: json::Value = json::to_value(local_val).unwrap();
 
-                    // Start row based transform
-                    if !before_local_trans.is_empty() {
-                        value = crate::service::ingestion::apply_stream_functions(
-                            &before_local_trans,
-                            value,
-                            &stream_vrl_map,
-                            org_id,
-                            &traces_stream_name,
-                            &mut runtime,
-                        )
-                        .map_err(|e| {
-                            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                        })?;
-                    }
-                    // End row based transform
-
                     // JSON Flattening
                     value = flatten::flatten(value).map_err(|e| {
                         std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
                     })?;
 
                     // Start row based transform
-                    if !after_local_trans.is_empty() {
+                    if !local_trans.is_empty() {
                         value = crate::service::ingestion::apply_stream_functions(
-                            &after_local_trans,
+                            &local_trans,
                             value,
                             &stream_vrl_map,
                             org_id,

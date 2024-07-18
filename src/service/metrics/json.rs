@@ -348,16 +348,14 @@ fn apply_func(
     metric_name: &str,
     value: json::Value,
 ) -> Result<json::Value> {
-    let (mut before_local_trans, mut after_local_trans, stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(
-            org_id,
-            &StreamType::Metrics,
-            metric_name,
-        );
+    let (_, local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
+        org_id,
+        &StreamType::Metrics,
+        metric_name,
+    );
 
-    before_local_trans.append(&mut after_local_trans);
     crate::service::ingestion::apply_stream_functions(
-        &before_local_trans,
+        &local_trans,
         value,
         &stream_vrl_map,
         org_id,

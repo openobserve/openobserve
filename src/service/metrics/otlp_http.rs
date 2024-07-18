@@ -299,7 +299,6 @@ pub async fn metrics_json_handler(
                     }
 
                     for mut rec in records {
-                        // TODO: What to do here?
                         // flattening
                         rec = flatten::flatten(rec).expect("failed to flatten");
                         // get json object

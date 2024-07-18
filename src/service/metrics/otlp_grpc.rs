@@ -218,7 +218,6 @@ pub async fn handle_grpc_request(
                     }
                 }
                 for mut rec in records {
-                    // TODO: What to do here?
                     // flattening
                     rec = flatten::flatten(rec)?;
 
