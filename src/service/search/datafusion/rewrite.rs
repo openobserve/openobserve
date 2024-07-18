@@ -22,7 +22,8 @@ use datafusion::error::Result;
 use itertools::Itertools;
 use sqlparser::{
     ast::{
-        Expr, Function, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, TableFactor,
+        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
+        FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, TableFactor,
         TableWithJoins, VisitMut, VisitorMut,
     },
     dialect::GenericDialect,
@@ -38,6 +39,8 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
     "array_agg",
     "approx_percentile_cont",
 ];
+
+const COUNT_NAME: &str = "_count";
 
 pub fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String> {
     let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
@@ -398,9 +401,194 @@ impl VisitorMut for ReplaceDataSource {
     }
 }
 
+pub fn rewrite_count_operate(sql: &str, phase: i64) -> Result<String> {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
+    statements.visit(&mut RewriteCountOps { phase });
+    Ok(statements[0].to_string())
+}
+
+// A visitor that count operator query
+struct RewriteCountOps {
+    phase: i64,
+}
+
+// Visit each expression after its children have been visited
+impl VisitorMut for RewriteCountOps {
+    type Break = ();
+
+    /// Invoked for any queries that appear in the AST before visiting children
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            let mut final_select_item = vec![];
+            for select_item in &mut select.projection {
+                let mut flag = true;
+                match &select_item {
+                    sqlparser::ast::SelectItem::ExprWithAlias { expr, alias, .. } => {
+                        if let Expr::Nested(expr) = expr {
+                            if let Expr::BinaryOp {
+                                left: out_left,
+                                op: out_op,
+                                right: out_right,
+                            } = expr.as_ref()
+                            {
+                                if let Expr::BinaryOp { left, op, right } = out_left.as_ref() {
+                                    if self.phase == 1 {
+                                        if is_count_function(left)
+                                            && is_count_function(right)
+                                            && matches!(op, sqlparser::ast::BinaryOperator::Divide)
+                                        {
+                                            final_select_item.push(
+                                                sqlparser::ast::SelectItem::ExprWithAlias {
+                                                    expr: left.as_ref().clone(),
+                                                    alias: Ident::new("_count_left"),
+                                                },
+                                            );
+                                            final_select_item.push(
+                                                sqlparser::ast::SelectItem::ExprWithAlias {
+                                                    expr: right.as_ref().clone(),
+                                                    alias: Ident::new("_count_right"),
+                                                },
+                                            );
+                                            flag = false;
+                                        }
+                                    } else if self.phase == 2 {
+                                        if is_count_function(left)
+                                            && is_count_function(right)
+                                            && matches!(op, sqlparser::ast::BinaryOperator::Divide)
+                                        {
+                                            final_select_item.push(
+                                                sqlparser::ast::SelectItem::ExprWithAlias {
+                                                    expr: generate_function_args("sum", true),
+                                                    alias: Ident::new("_count_left"),
+                                                },
+                                            );
+                                            final_select_item.push(
+                                                sqlparser::ast::SelectItem::ExprWithAlias {
+                                                    expr: generate_function_args("sum", false),
+                                                    alias: Ident::new("_count_right"),
+                                                },
+                                            );
+                                        }
+                                        flag = false;
+                                    } else {
+                                        if is_count_function(left)
+                                            && is_count_function(right)
+                                            && matches!(op, BinaryOperator::Divide)
+                                        {
+                                            final_select_item.push(SelectItem::ExprWithAlias {
+                                                expr: Expr::BinaryOp {
+                                                    left: Box::new(Expr::BinaryOp {
+                                                        left: Box::new(generate_function_args(
+                                                            "sum", true,
+                                                        )),
+                                                        op: BinaryOperator::Divide,
+                                                        right: Box::new(generate_function_args(
+                                                            "sum", false,
+                                                        )),
+                                                    }),
+                                                    op: out_op.clone(),
+                                                    right: out_right.clone(),
+                                                },
+                                                alias: alias.clone(),
+                                            });
+                                            flag = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                if flag {
+                    final_select_item.push(select_item.clone());
+                }
+            }
+            select.projection = final_select_item;
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn is_count_function(expr: &Expr) -> bool {
+    if let Expr::Function(Function { name, .. }) = expr {
+        if name.to_string().to_lowercase() == "count" {
+            return true;
+        }
+    }
+    false
+}
+
+fn generate_function_args(fun_name: &str, is_left: bool) -> Expr {
+    let name = if is_left {
+        "_count_left"
+    } else {
+        "_count_right"
+    };
+    Expr::Function(Function {
+        name: ObjectName(vec![Ident::new(fun_name)]),
+        args: FunctionArguments::List(FunctionArgumentList {
+            duplicate_treatment: None,
+            args: vec![FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                Expr::Identifier(Ident::new(name)),
+            ))],
+            clauses: vec![],
+        }),
+        filter: None,
+        null_treatment: None,
+        over: None,
+        within_group: vec![],
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rewrite_count_operate_phase_1() {
+        let sql = [
+            "SELECT histogram(_timestamp, '5 minute') as a_axia_1, COUNT(*) as totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) as errorlogcount,  (COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) / COUNT(*) * 100) as errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+        ];
+
+        let excepts = [
+            "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS _count_left, COUNT(*) AS _count_right FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+        ];
+        for (sql, except) in sql.iter().zip(excepts.iter()) {
+            let new_sql = rewrite_count_operate(sql, 1).unwrap();
+            assert_eq!(new_sql, **except);
+        }
+    }
+
+    #[test]
+    fn test_rewrite_count_operate_phase_2() {
+        let sql = [
+            "SELECT histogram(_timestamp, '5 minute') as a_axia_1, COUNT(*) as totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) as errorlogcount,  (COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) / COUNT(*) * 100) as errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+        ];
+
+        let excepts = [
+            "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, sum(_count_left) AS _count_left, sum(_count_right) AS _count_right FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+        ];
+        for (sql, except) in sql.iter().zip(excepts.iter()) {
+            let new_sql = rewrite_count_operate(sql, 2).unwrap();
+            assert_eq!(new_sql, **except);
+        }
+    }
+
+    #[test]
+    fn test_rewrite_count_operate_phase_3() {
+        let sql = [
+            "SELECT histogram(_timestamp, '5 minute') as a_axia_1, COUNT(*) as totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) as errorlogcount,  (COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) / COUNT(*) * 100) as errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+        ];
+
+        let excepts = [
+            "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, sum(_count_left) / sum(_count_right) * 100 AS errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+        ];
+        for (sql, except) in sql.iter().zip(excepts.iter()) {
+            let new_sql = rewrite_count_operate(sql, 3).unwrap();
+            assert_eq!(new_sql, **except);
+        }
+    }
 
     #[test]
     fn test_count_distinct_rewrite_phase1() {
