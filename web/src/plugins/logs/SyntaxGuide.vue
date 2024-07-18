@@ -36,14 +36,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight">match_all('error')</span> in query
-                  editor
+                  For inverted index search of value 'error' use 
+                  <span class="bg-highlight">match_all('error')</span> 
+                  in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
-                  For case-insensitive full text search of value 'error' use
+                  For full text search of value 'error' use 
                   <span class="bg-highlight"
-                    >match_all_ignore_case('error')</span
+                    >match_all_raw('error')</span
+                  >
+                </li>
+                <li>
+                  For case-insensitive full text search of value 'error' use 
+                  <span class="bg-highlight"
+                    >match_all_raw_ignore_case('error')</span
                   >
                 </li>
                 <li>
@@ -65,11 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   To search value 'stderr' for stream column use
                   <span class="bg-highlight">stream='stderr'</span>
-                </li>
-                <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
-                  log use
-                  <span class="bg-highlight">extract_ip(log) | code=200</span>
                 </li>
                 <li>
                   For additional examples,
@@ -94,17 +95,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For full text search of value 'error' use
+                  For inverted index search of value 'error' use 
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
-                  in query editor
+                  in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
-                  For case-insensitive full text search of value 'error' use
+                  For full text search of value 'error' use 
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
-                    match_all_ignore_case('error')</span
+                    match_all_raw('error')</span
+                  >
+                </li>
+                <li>
+                  For case-insensitive full text search of value 'error' use 
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all_raw_ignore_case('error')</span
                   >
                 </li>
                 <li>
@@ -124,14 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   To search value 'stderr' for stream column use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
-                  >
-                </li>
-                <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
-                  log use
-                  <span class="bg-highlight"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
                   >
                 </li>
                 <li>
