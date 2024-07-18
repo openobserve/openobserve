@@ -145,7 +145,7 @@ pub async fn process_token(
                     // this is to allow user call organization api with org
                     tuples.push(get_user_org_tuple(&user_email, &user_email));
                 }
-                let _ = organization::create_org(&Organization {
+                let _ = organization::create_org(&mut Organization {
                     identifier: org.name.to_owned(),
                     name: org.name.to_owned(),
                 })
@@ -227,7 +227,7 @@ pub async fn process_token(
 
         // Add the user to the newly added organizations
         for org in orgs_added {
-            let _ = organization::create_org(&Organization {
+            let _ = organization::create_org(&mut Organization {
                 identifier: org.name.to_owned(),
                 name: org.name.to_owned(),
             })
