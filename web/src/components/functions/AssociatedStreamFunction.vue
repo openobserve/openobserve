@@ -710,7 +710,10 @@ export default defineComponent({
           _function
         )
         .then((res) => {
-          console.log(res);
+          getStreamFunctions(
+            expandedRow.value.name,
+            expandedRow.value.stream_type
+          );
         });
     };
 
