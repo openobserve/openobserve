@@ -90,6 +90,7 @@ export default defineComponent({
       required: true,
     },
   },
+  emits: ['add-condition', 'add-group', 'remove-group'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);
