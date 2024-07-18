@@ -934,7 +934,11 @@ async fn values_v1(
     for (key, ret) in query_results {
         let mut top_hits: HashMap<String, i64> = HashMap::default();
         for row in ret.hits {
-            let key = row.get("zo_sql_key").unwrap().as_str().unwrap().to_string();
+            let key = row
+                .get("zo_sql_key")
+                .map(|v| v.as_str().unwrap_or(""))
+                .unwrap_or("")
+                .to_string();
             let num = row.get("zo_sql_num").unwrap().as_i64().unwrap();
             let key_num = top_hits.entry(key).or_insert(0);
             *key_num += num;
