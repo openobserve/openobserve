@@ -132,7 +132,7 @@ if ('serviceWorker' in navigator) {
   //   // });
   // }
   navigator.serviceWorker.register('./assets/sw.js', {
-    scope: '/web/'
+    scope: '/web/assets/'
   }).then(registration => {
       console.log('Service Worker registered:', registration);
 
