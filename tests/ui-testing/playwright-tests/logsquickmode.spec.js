@@ -313,7 +313,12 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-      await page.locator('[data-test="log-table-column-0-\\@timestamp"]').click();
+      await expect(
+        page
+          .locator('[data-test="log-table-column-0-source"]')
+          .getByText(/_timestamp/)
+          .first()
+      ).toBeVisible();
 
  });
 });
