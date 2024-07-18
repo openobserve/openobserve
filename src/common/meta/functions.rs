@@ -66,6 +66,7 @@ pub struct StreamTransform {
     #[serde(default)]
     pub is_removed: bool,
     #[serde(default)]
+    #[serde(rename = "applyBeforeFlattening")]
     pub apply_before_flattening: bool,
 }
 
