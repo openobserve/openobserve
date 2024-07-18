@@ -114,6 +114,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-td key="order" :props="props">
                       {{ props.row.order }}
                     </q-td>
+                    <q-td key="applyBeforeFlattening" :props="props">
+                      <q-toggle
+                        data-test="stream-association-applyBeforeFlattening-toggle"
+                        class="q-mt-sm"
+                        v-model="props.row.applyBeforeFlattening"
+                        @update:model-value="
+                          updateAssociatedFunctions(props.row)
+                        "
+                      />
+                    </q-td>
                     <q-td key="actions" :props="props">
                       <q-btn
                         data-test="stream-association-delete-function-btn"
@@ -152,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></q-select>
                     </q-td>
                     <q-td></q-td>
+                    <q-td> </q-td>
                     <q-td></q-td>
                   </q-tr>
                 </template>
@@ -373,6 +384,14 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "applyBeforeFlattening",
+        field: "applyBeforeFlattening",
+        label: "Apply Before Flattening",
+        align: "left",
+        sortable: true,
+        style: "width: 180px",
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("user.actions"),
@@ -483,6 +502,10 @@ export default defineComponent({
           store.state.selectedOrganization.identifier
         )
         .then((res: any) => {
+          res.data.list.forEach((element: any) => {
+            element.applyBeforeFlattening =
+              element.applyBeforeFlattening || false;
+          });
           allFunctionsList.value = res.data?.list || [];
           filterFunctions.value = res.data?.list || [];
         })
@@ -557,6 +580,10 @@ export default defineComponent({
         )
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
+          functionsList.value.forEach((element: any) => {
+            element.applyBeforeFlattening =
+              element.applyBeforeFlattening || false;
+          });
         })
         .catch((err) => {
           $q.notify({
@@ -673,6 +700,20 @@ export default defineComponent({
       }
     });
 
+    const updateAssociatedFunctions = (_function: any) => {
+      jsTransformService
+        .apply_stream_function(
+          store.state.selectedOrganization.identifier,
+          expandedRow.value.name,
+          expandedRow.value.stream_type,
+          _function.name,
+          _function
+        )
+        .then((res) => {
+          console.log(res);
+        });
+    };
+
     return {
       t,
       qTable,
@@ -724,6 +765,7 @@ export default defineComponent({
       getImageURL,
       loadingFunctions,
       verifyOrganizationStatus,
+      updateAssociatedFunctions,
     };
   },
   computed: {
