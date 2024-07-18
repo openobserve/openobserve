@@ -2410,7 +2410,11 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
-      if (value == "logs") {
+      // confirm with user on toggle from visualize to logs
+      if (
+        value == "logs" &&
+        searchObj.meta.logsVisualizeToggle == "visualize"
+      ) {
         confirmLogsVisualizeModeChangeDialog.value = true;
       } else {
         searchObj.meta.logsVisualizeToggle = value;
