@@ -239,23 +239,9 @@ pub async fn validate_credentials_ext(
         }
     }
 
-    // this is only applicable for super admin user
-    if is_root_user(user_id) {
-        user = users::get_user(None, user_id).await;
-        if user.is_none() {
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
-    } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
-        user = match db_user {
+        match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
                 if all_users.is_empty() {
@@ -267,10 +253,20 @@ pub async fn validate_credentials_ext(
             Err(_) => None,
         }
     } else {
-        user = match path.find('/') {
+        match path.find('/') {
             Some(index) => {
                 let org_id = &path[0..index];
-                users::get_user(Some(org_id), user_id).await
+                if crate::service::organization::get_org(org_id)
+                    .await
+                    .is_none()
+                {
+                    return Err(ErrorNotFound("Organization not found"));
+                }
+                if is_root_user(user_id) {
+                    users::get_user(Some(DEFAULT_ORG), user_id).await
+                } else {
+                    users::get_user(Some(org_id), user_id).await
+                }
             }
             None => users::get_user(None, user_id).await,
         }
