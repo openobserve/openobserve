@@ -59,6 +59,7 @@ message SearchResponse {
     repeated SearchAggResponse aggs = 7;
     ScanStats            scan_stats = 8;
     bool                 is_partial = 9;
+    int32                 idx_took = 10;
 }
 
 message SearchAggRequest {
