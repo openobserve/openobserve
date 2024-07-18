@@ -340,8 +340,8 @@ pub fn register_stream_functions(
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         (before_local_trans, after_local_trans) = (*transforms.list)
-            .to_vec()
-            .into_iter()
+            .iter()
+            .cloned()
             .partition(|elem| elem.apply_before_flattening);
         before_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
         after_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
