@@ -44,7 +44,7 @@
             :label="t('dashboard.panelTitle') + '*'"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-md q-pl-md showLabelOnTop"
+            class="q-mb-xs showLabelOnTop"
             stack-label
             outlined
             filled
@@ -86,11 +86,7 @@ import { defineComponent, onBeforeMount, ref, toRaw, type Ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
-import {
-  getAllDashboardsByFolderId,
-  getFoldersList,
-  getPanelId,
-} from "@/utils/commons";
+import { getFoldersList, getPanelId } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
