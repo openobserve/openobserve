@@ -292,6 +292,7 @@ pub async fn add_function_to_stream(
         if let Some(existing) = val.iter_mut().find(|x| x.stream == stream_order.stream) {
             existing.is_removed = false;
             existing.order = stream_order.order;
+            existing.apply_before_flattening = stream_order.apply_before_flattening;
         } else {
             val.push(stream_order);
         }
