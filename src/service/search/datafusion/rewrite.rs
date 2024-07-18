@@ -541,14 +541,29 @@ mod tests {
     fn test_rewrite_count_operate_phase_1() {
         let sql = [
             "SELECT histogram(_timestamp, '5 minute') as a_axia_1, COUNT(*) as totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) as errorlogcount,  (COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) / COUNT(*) * 100) as errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT COUNT(DISTINCT a) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT COUNT(DISTINCT (a)) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(DISTINCT c) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, MAX(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
         let excepts = [
             "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS _count_left, COUNT(*) AS _count_right FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT COUNT(DISTINCT a) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT COUNT(DISTINCT (a)) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(DISTINCT c) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, MAX(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
-            let new_sql = rewrite_count_operate(sql, 1).unwrap();
-            assert_eq!(new_sql, **except);
+            let new_sql = rewrite_count_operate(sql, 1);
+            println!("{:?}", new_sql);
+            assert_eq!(new_sql.unwrap(), **except);
         }
     }
 
@@ -556,10 +571,24 @@ mod tests {
     fn test_rewrite_count_operate_phase_2() {
         let sql = [
             "SELECT histogram(_timestamp, '5 minute') as a_axia_1, COUNT(*) as totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) as errorlogcount,  (COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) / COUNT(*) * 100) as errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
+            "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
         let excepts = [
             "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, sum(_count_left) AS _count_left, sum(_count_right) AS _count_right FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT COUNT(DISTINCT a) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT COUNT(DISTINCT (a)) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(DISTINCT c) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, MAX(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_operate(sql, 2).unwrap();
@@ -571,10 +600,24 @@ mod tests {
     fn test_rewrite_count_operate_phase_3() {
         let sql = [
             "SELECT histogram(_timestamp, '5 minute') as a_axia_1, COUNT(*) as totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) as errorlogcount,  (COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) / COUNT(*) * 100) as errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT COUNT(DISTINCT a) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT COUNT(DISTINCT (a)) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(DISTINCT c) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, MAX(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
         let excepts = [
             "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, sum(_count_left) / sum(_count_right) * 100 AS errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT COUNT(DISTINCT a) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT COUNT(DISTINCT (a)) FROM tbl WHERE a > 3 LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(DISTINCT c) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT a, COUNT(DISTINCT b) AS cnt, MAX(b) FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
+            "SELECT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let new_sql = rewrite_count_operate(sql, 3).unwrap();
