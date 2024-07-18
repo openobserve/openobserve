@@ -479,11 +479,11 @@ impl VisitorMut for RewriteCountOps {
                                     expr: Expr::BinaryOp {
                                         left: Box::new(Expr::BinaryOp {
                                             left: Box::new(generate_function_expr("sum", true)),
-                                            op: BinaryOperator::Divide,
-                                            right: Box::new(generate_function_expr("sum", false)),
+                                            op: out_op.clone(),
+                                            right: out_right.clone(),
                                         }),
-                                        op: out_op.clone(),
-                                        right: out_right.clone(),
+                                        op: BinaryOperator::Divide,
+                                        right: Box::new(generate_function_expr("sum", false)),
                                     },
                                     alias: alias.clone(),
                                 });
@@ -610,7 +610,7 @@ mod tests {
         ];
 
         let excepts = [
-            "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, sum(_count_left) / sum(_count_right) * 100 AS errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
+            "SELECT histogram(_timestamp, '5 minute') AS a_axia_1, COUNT(*) AS totallogcount, COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' THEN 1 END) AS errorlogcount, sum(_count_left) * 100 / sum(_count_right) AS errorrate FROM default GROUP BY a_axia_1 ORDER BY a_axia_1 DESC",
             "SELECT COUNT(DISTINCT a) FROM tbl WHERE a > 3 LIMIT 10",
             "SELECT COUNT(DISTINCT (a)) FROM tbl WHERE a > 3 LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl WHERE a > 3 GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
