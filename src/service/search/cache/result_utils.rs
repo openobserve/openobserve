@@ -94,12 +94,15 @@ pub fn decode_foldername_to_sql(folder_name: &str) -> io::Result<String> {
 }
 
 pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
-    match record.get(ts_column).unwrap() {
-        serde_json::Value::String(ts) => {
-            parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
-        }
-        serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-        _ => 0_i64,
+    match record.get(ts_column) {
+        None => 0_i64,
+        Some(ts) => match ts {
+            serde_json::Value::String(ts) => {
+                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
+            }
+            serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
+            _ => 0_i64,
+        },
     }
 }
 
