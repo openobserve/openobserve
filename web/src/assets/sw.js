@@ -19,6 +19,7 @@ self.addEventListener('install', function(event) {
 
       // Add hashed filenames from the manifest
       Object.keys(manifest).forEach(key => {
+        filesToCache.push("/web/");
         if(key == "index.html") {
           filesToCache.push(`/web/${manifest[key]["file"]}`);
           filesToCache.push("/web/assets/sw.js");
