@@ -305,6 +305,11 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
+    if let Some((field, sort)) = meta.meta.order_by.first() {
+        if field == &cfg.common.column_timestamp && !sort {
+            partitions.reverse();
+        }
+    }
     resp.partitions = partitions;
     Ok(resp)
 }
