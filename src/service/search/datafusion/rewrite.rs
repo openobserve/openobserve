@@ -23,7 +23,7 @@ use itertools::Itertools;
 use sqlparser::{
     ast::{
         BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
-        FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, TableFactor,
+        FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, SetExpr, TableFactor,
         TableWithJoins, VisitMut, VisitorMut,
     },
     dialect::GenericDialect,
@@ -39,8 +39,6 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
     "array_agg",
     "approx_percentile_cont",
 ];
-
-const COUNT_NAME: &str = "_count";
 
 pub fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String> {
     let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
@@ -418,87 +416,81 @@ impl VisitorMut for RewriteCountOps {
 
     /// Invoked for any queries that appear in the AST before visiting children
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+        if let SetExpr::Select(ref mut select) = *query.body {
             let mut final_select_item = vec![];
             for select_item in &mut select.projection {
                 let mut flag = true;
-                match &select_item {
-                    sqlparser::ast::SelectItem::ExprWithAlias { expr, alias, .. } => {
-                        if let Expr::Nested(expr) = expr {
-                            if let Expr::BinaryOp {
-                                left: out_left,
-                                op: out_op,
-                                right: out_right,
-                            } = expr.as_ref()
-                            {
-                                if let Expr::BinaryOp { left, op, right } = out_left.as_ref() {
-                                    if self.phase == 1 {
-                                        if is_count_function(left)
-                                            && is_count_function(right)
-                                            && matches!(op, sqlparser::ast::BinaryOperator::Divide)
-                                        {
-                                            final_select_item.push(
-                                                sqlparser::ast::SelectItem::ExprWithAlias {
-                                                    expr: left.as_ref().clone(),
-                                                    alias: Ident::new("_count_left"),
-                                                },
-                                            );
-                                            final_select_item.push(
-                                                sqlparser::ast::SelectItem::ExprWithAlias {
-                                                    expr: right.as_ref().clone(),
-                                                    alias: Ident::new("_count_right"),
-                                                },
-                                            );
-                                            flag = false;
-                                        }
-                                    } else if self.phase == 2 {
-                                        if is_count_function(left)
-                                            && is_count_function(right)
-                                            && matches!(op, sqlparser::ast::BinaryOperator::Divide)
-                                        {
-                                            final_select_item.push(
-                                                sqlparser::ast::SelectItem::ExprWithAlias {
-                                                    expr: generate_function_args("sum", true),
-                                                    alias: Ident::new("_count_left"),
-                                                },
-                                            );
-                                            final_select_item.push(
-                                                sqlparser::ast::SelectItem::ExprWithAlias {
-                                                    expr: generate_function_args("sum", false),
-                                                    alias: Ident::new("_count_right"),
-                                                },
-                                            );
-                                        }
-                                        flag = false;
-                                    } else {
-                                        if is_count_function(left)
-                                            && is_count_function(right)
-                                            && matches!(op, BinaryOperator::Divide)
-                                        {
-                                            final_select_item.push(SelectItem::ExprWithAlias {
-                                                expr: Expr::BinaryOp {
-                                                    left: Box::new(Expr::BinaryOp {
-                                                        left: Box::new(generate_function_args(
-                                                            "sum", true,
-                                                        )),
-                                                        op: BinaryOperator::Divide,
-                                                        right: Box::new(generate_function_args(
-                                                            "sum", false,
-                                                        )),
-                                                    }),
-                                                    op: out_op.clone(),
-                                                    right: out_right.clone(),
-                                                },
-                                                alias: alias.clone(),
-                                            });
-                                            flag = false;
-                                        }
-                                    }
+                if let SelectItem::ExprWithAlias {
+                    expr: Expr::Nested(expr),
+                    alias,
+                    ..
+                } = &select_item
+                {
+                    if let Expr::BinaryOp {
+                        left: out_left,
+                        op: out_op,
+                        right: out_right,
+                    } = expr.as_ref()
+                    {
+                        if let Expr::BinaryOp { left, op, right } = out_left.as_ref() {
+                            if self.phase == 1 {
+                                if is_count_function(left)
+                                    && is_count_function(right)
+                                    && matches!(op, sqlparser::ast::BinaryOperator::Divide)
+                                {
+                                    final_select_item.push(
+                                        sqlparser::ast::SelectItem::ExprWithAlias {
+                                            expr: left.as_ref().clone(),
+                                            alias: Ident::new("_count_left"),
+                                        },
+                                    );
+                                    final_select_item.push(
+                                        sqlparser::ast::SelectItem::ExprWithAlias {
+                                            expr: right.as_ref().clone(),
+                                            alias: Ident::new("_count_right"),
+                                        },
+                                    );
+                                    flag = false;
                                 }
+                            } else if self.phase == 2 {
+                                if is_count_function(left)
+                                    && is_count_function(right)
+                                    && matches!(op, sqlparser::ast::BinaryOperator::Divide)
+                                {
+                                    final_select_item.push(
+                                        sqlparser::ast::SelectItem::ExprWithAlias {
+                                            expr: generate_function_expr("sum", true),
+                                            alias: Ident::new("_count_left"),
+                                        },
+                                    );
+                                    final_select_item.push(
+                                        sqlparser::ast::SelectItem::ExprWithAlias {
+                                            expr: generate_function_expr("sum", false),
+                                            alias: Ident::new("_count_right"),
+                                        },
+                                    );
+                                }
+                                flag = false;
+                            } else if is_count_function(left)
+                                && is_count_function(right)
+                                && matches!(op, BinaryOperator::Divide)
+                            {
+                                final_select_item.push(SelectItem::ExprWithAlias {
+                                    expr: Expr::BinaryOp {
+                                        left: Box::new(Expr::BinaryOp {
+                                            left: Box::new(generate_function_expr("sum", true)),
+                                            op: BinaryOperator::Divide,
+                                            right: Box::new(generate_function_expr("sum", false)),
+                                        }),
+                                        op: out_op.clone(),
+                                        right: out_right.clone(),
+                                    },
+                                    alias: alias.clone(),
+                                });
+                                flag = false;
                             }
                         }
                     }
-                    _ => {}
                 }
                 if flag {
                     final_select_item.push(select_item.clone());
@@ -519,7 +511,7 @@ fn is_count_function(expr: &Expr) -> bool {
     false
 }
 
-fn generate_function_args(fun_name: &str, is_left: bool) -> Expr {
+fn generate_function_expr(fun_name: &str, is_left: bool) -> Expr {
     let name = if is_left {
         "_count_left"
     } else {
