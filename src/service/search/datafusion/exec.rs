@@ -303,6 +303,8 @@ async fn exec_query(
         query = rewrite::rewrite_count_distinct_sql(&query, true)?;
     } else {
         query = rewrite::add_group_by_order_by_field_to_select(&query)?;
+        query = rewrite::rewrite_count_operate(&query, 1)?;
+        query = rewrite::remove_having_clause(&query)?;
     }
 
     // Debug SQL
@@ -722,6 +724,8 @@ fn merge_rewrite_sql(
     let mut sql = sql.to_string();
     if !is_final_phase {
         sql = rewrite::add_group_by_order_by_field_to_select(&sql)?;
+        sql = rewrite::rewrite_count_operate(&sql, 2)?;
+        sql = rewrite::remove_having_clause(&sql)?;
     }
 
     let mut fields = Vec::new();
@@ -912,7 +916,8 @@ fn merge_rewrite_sql(
         if fn_name == "count" {
             // the special case for count / count
             if field.contains("/") {
-                fn_name = "avg".to_string();
+                fields[i] = format!("({}", field);
+                continue;
             } else {
                 fn_name = "sum".to_string();
             }
@@ -945,6 +950,10 @@ fn merge_rewrite_sql(
             sql = sql.replace(r#""_PLACEHOLDER_", "#, "");
             sql = sql.replace(r#", "_PLACEHOLDER_""#, "");
         }
+    }
+
+    if is_final_phase {
+        sql = rewrite::rewrite_count_operate(&sql, 3)?;
     }
 
     sql = rewrite::remove_where_clause(&sql)?;
