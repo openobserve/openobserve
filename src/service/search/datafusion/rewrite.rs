@@ -300,6 +300,29 @@ impl VisitorMut for RemoveWhere {
     }
 }
 
+pub fn remove_having_clause(sql: &str) -> Result<String> {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
+    statements.visit(&mut RemoveHaving);
+    Ok(statements[0].to_string())
+}
+
+// A visitor that remove where clause
+struct RemoveHaving;
+
+// Visit each expression after its children have been visited
+impl VisitorMut for RemoveHaving {
+    type Break = ();
+
+    /// Invoked for any queries that appear in the AST before visiting children
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            // remove the having clause
+            select.having = None;
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 pub fn add_group_by_order_by_field_to_select(sql: &str) -> Result<String> {
     let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
     statements.visit(&mut AddGroupByOrderBy);
