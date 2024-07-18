@@ -93,6 +93,9 @@
                       multiple
                       emit-value
                       map-options
+                      :rules="[
+                        (val) => val.length > 0 || 'At least 1 item required',
+                      ]"
                     >
                       <template v-slot:selected>
                         {{
@@ -158,6 +161,9 @@ export default defineComponent({
     "schemaOptions",
     "dashboardVariablesFilterItems",
     "label",
+    "filterValueOptions",
+    "filterOptions",
+    "loadFilterItem",
   ],
   setup(props) {
     const { dashboardPanelData, loadFilterItem } = useDashboardPanelData();
@@ -193,8 +199,7 @@ export default defineComponent({
       "Is Not Null",
     ];
 
-    const filterOptions = ["AND", "OR"];
-
+    const showMenu = ref(false);
     const showSelect = ref(false);
     const addLabel = ref("AND");
     const selectedSchemas = ref<any[]>([]);
@@ -207,8 +212,9 @@ export default defineComponent({
 
     return {
       operators,
-      filterOptions,
+      filterOptions: props.filterOptions,
       showSelect,
+      showMenu,
       addLabel,
       selectedSchemas,
       computedLabel,
@@ -221,7 +227,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .condition {
   display: flex;
   align-items: center;

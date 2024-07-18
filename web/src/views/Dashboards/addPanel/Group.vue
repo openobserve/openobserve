@@ -143,7 +143,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .group {
   border: 1px solid #ccc;
   padding: 10px;
