@@ -114,7 +114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-td key="order" :props="props">
                       {{ props.row.order }}
                     </q-td>
-                    <q-td key="applyBeforeFlattening" :props="props">
+                    <q-td
+                      v-if="expandedRow.stream_type === 'logs'"
+                      key="applyBeforeFlattening"
+                      :props="props"
+                    >
                       <q-toggle
                         data-test="stream-association-applyBeforeFlattening-toggle"
                         class="q-mt-sm"
@@ -275,7 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onMounted, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onActivated,
+  onMounted,
+  watch,
+  computed,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -362,43 +373,6 @@ export default defineComponent({
     const addFunctionInProgressLoading = ref(false);
     const { getStreams } = useStreams();
 
-    const functionsColumns = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("logStream.name"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "order",
-        field: "order",
-        label: "Order",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "applyBeforeFlattening",
-        field: "applyBeforeFlattening",
-        label: "Apply Before Flattening",
-        align: "left",
-        sortable: true,
-        style: "width: 180px",
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "left",
-      },
-    ]);
-
     let deleteStreamName = "";
     let deleteStreamType = "";
     const loadingFunctions = ref(false);
@@ -406,6 +380,49 @@ export default defineComponent({
     const allFunctionsList = ref([]);
     const selectedFunction = ref<any | null>(null);
     const filterFunctions = ref([]);
+
+    const functionsColumns = computed(() => {
+      return [
+        {
+          name: "#",
+          label: "#",
+          field: "#",
+          align: "left",
+        },
+        {
+          name: "name",
+          field: "name",
+          label: t("logStream.name"),
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "order",
+          field: "order",
+          label: "Order",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "applyBeforeFlattening",
+          field: "applyBeforeFlattening",
+          label: "Apply Before Flattening",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        },
+      ].filter((column) => {
+        if (expandedRow.value.stream_type !== "logs") {
+          return column.name !== "applyBeforeFlattening";
+        }
+        return true;
+      });
+    });
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
