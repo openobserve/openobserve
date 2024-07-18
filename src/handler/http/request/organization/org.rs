@@ -351,7 +351,7 @@ async fn create_org(
 ) -> Result<HttpResponse, Error> {
     let org = org.into_inner();
 
-    let result = organization::create_org(&org).await;
+    let result = organization::create_org(&mut org).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(org)),
         Err(err) => Err(err),

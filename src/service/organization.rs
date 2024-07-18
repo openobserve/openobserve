@@ -15,7 +15,7 @@
 
 use std::io::{Error, ErrorKind};
 
-use config::{meta::stream::StreamType, utils::rand::generate_random_string};
+use config::{ider, meta::stream::StreamType, utils::rand::generate_random_string};
 
 use crate::{
     common::{
@@ -192,7 +192,14 @@ async fn update_passcode_inner(
     Ok(ret)
 }
 
-pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
+pub async fn create_org(org: &mut Organization) -> Result<Organization, Error> {
+    if db::organization::get(&org.identifier).await.is_some() {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Organization already exists".to_string(),
+        )));
+    }
+    org.identifier = ider::generate();
     match db::organization::set(org).await {
         Ok(_) => Ok(org.clone()),
         Err(e) => {
@@ -206,6 +213,12 @@ pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
 }
 
 pub async fn remove_org(org_id: &str) -> Result<(), Error> {
+    if db::organization::get(&org.identifier).await.is_none() {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Organization does not exist".to_string(),
+        )));
+    }
     match db::organization::delete(org_id).await {
         Ok(_) => Ok(()),
         Err(e) => {
