@@ -289,4 +289,36 @@ test.describe("Logs Quickmode testcases", () => {
         )
     ).toBeVisible();
   });
+
+  test("should display results without adding timestamp in quick mode", async ({
+    page,
+  }) => {
+  
+    await page.locator('[data-cy="index-field-search-input"]').clear();
+    await page
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("kubernetes_pod_id");
+    await page.waitForTimeout(2000);
+    await page
+      .locator(
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+      )
+      .last()
+      .click({
+        force: true,
+      });
+    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page
+      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+      await expect(
+        page
+          .locator('[data-test="log-table-column-0-source"]')
+          .getByText(/_timestamp/)
+          .first()
+      ).toBeVisible();
+
+ });
 });
