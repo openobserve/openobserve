@@ -57,7 +57,10 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+pub static RE_SELECT_WILDCARD: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
+
+pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
@@ -72,6 +75,12 @@ static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^
 
 pub static _TS_WITH_ALIAS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
+
+pub static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
+});
+pub static RE_FIELD_FN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -344,30 +353,8 @@ impl Sql {
                 && meta_time_range_is_empty
                 && req_query.size > QUERY_WITH_NO_LIMIT
             {
-                match RE_WHERE.captures(rewrite_time_range_sql.as_str()) {
-                    Some(caps) => {
-                        let mut where_str = caps.get(1).unwrap().as_str().to_string();
-                        if !meta.group_by.is_empty() {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" group ").unwrap()]
-                                .to_string();
-                        } else if meta.having {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" having ").unwrap()]
-                                .to_string();
-                        } else if !meta.order_by.is_empty() {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
-                                .to_string();
-                        } else if meta.limit > 0 {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" limit ").unwrap()]
-                                .to_string();
-                        } else if meta.offset > 0 {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" offset ").unwrap()]
-                                .to_string();
-                        }
+                match pickup_where(&rewrite_time_range_sql, Some(meta.clone()))? {
+                    Some(where_str) => {
                         let pos_start = rewrite_time_range_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
                         rewrite_time_range_sql = format!(
@@ -488,7 +475,7 @@ impl Sql {
         let where_pos = where_tokens
             .iter()
             .position(|x| x.to_lowercase() == "where");
-        let mut where_tokens = if let Some(v) = where_pos {
+        let where_tokens = if let Some(v) = where_pos {
             where_tokens[v + 1..].to_vec()
         } else {
             Vec::new()
@@ -620,27 +607,10 @@ impl Sql {
         }
 
         // pickup where
-        let mut where_str = match RE_WHERE.captures(&origin_sql) {
-            Some(caps) => caps[1].to_string(),
+        let where_str = match pickup_where(&origin_sql, Some(meta.clone()))? {
+            Some(where_str) => where_str,
             None => "".to_string(),
         };
-        if !where_str.is_empty() {
-            let mut where_str_lower = where_str.to_lowercase();
-            for key in ["group", "order", "offset", "limit"].iter() {
-                if !where_tokens.iter().any(|x| x.to_lowercase().eq(key)) {
-                    continue;
-                }
-                let where_pos = where_tokens
-                    .iter()
-                    .position(|x| x.to_lowercase().eq(key))
-                    .unwrap();
-                where_tokens = where_tokens[..where_pos].to_vec();
-                if let Some(pos) = where_str_lower.rfind(key) {
-                    where_str = where_str[..pos].to_string();
-                    where_str_lower = where_str.to_lowercase();
-                }
-            }
-        }
 
         // Hack for aggregation
         if track_total_hits {
@@ -950,6 +920,36 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
         }
     };
     seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
+}
+
+pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
+    let meta = match meta {
+        Some(v) => v,
+        None => match MetaSql::new(sql) {
+            Ok(meta) => meta,
+            Err(_) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    sql.to_string(),
+                )));
+            }
+        },
+    };
+    let Some(caps) = RE_WHERE.captures(sql) else {
+        return Ok(None);
+    };
+    let mut where_str = caps.get(1).unwrap().as_str().to_string();
+    if !meta.group_by.is_empty() {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" group ").unwrap()].to_string();
+    } else if meta.having {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
+    } else if !meta.order_by.is_empty() {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
+    } else if meta.limit > 0 {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
+    } else if meta.offset > 0 {
+        where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
+    }
+    Ok(Some(where_str))
 }
 
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {

@@ -9,7 +9,6 @@ ahash.workspace = true
 anyhow.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
-aws-config.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 config.workspace = true

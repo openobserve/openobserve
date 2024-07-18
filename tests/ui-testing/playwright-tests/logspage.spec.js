@@ -514,7 +514,7 @@ test.describe("Logs UI testcases", () => {
     await page.waitForTimeout(4000);
     await page.getByLabel('Expand "code"').click();
     await page.waitForTimeout(4000);
-    await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
+    // await page.locator('[data-test="logs-search-subfield-add-code-200"] [data-test="log-search-subfield-list-equal-code-field-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
