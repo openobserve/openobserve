@@ -56,7 +56,6 @@ use hashbrown::HashMap;
 use infra::cache::tmpfs::Directory;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
-use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
@@ -70,8 +69,7 @@ use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{
         datafusion::{rewrite, ExtLimit},
-        sql::Sql,
-        RE_SELECT_WILDCARD,
+        sql::{Sql, RE_COUNT_DISTINCT, RE_FIELD_FN, RE_SELECT_WILDCARD, RE_WHERE},
     },
 };
 
@@ -87,13 +85,6 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
     "array_agg",
     "approx_percentile_cont",
 ];
-
-static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
-static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
-});
-static RE_FIELD_FN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
 pub async fn sql(
     session: &SearchSession,
