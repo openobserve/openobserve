@@ -275,7 +275,7 @@ pub async fn search(
             original_size += file_meta.original_size;
             compressed_size += file_meta.compressed_size;
         }
-        original_size += idx_scan_size;
+        original_size += idx_scan_size as i64;
         super::SEARCH_SERVER
             .add_file_stats(
                 trace_id,
