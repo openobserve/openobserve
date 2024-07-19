@@ -3322,7 +3322,7 @@ const useLogs = () => {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
     if (queryParams.refresh) {
-      searchObj.meta.refreshInterval = queryParams.refresh;
+      searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
     useLocalTimezone(queryParams.timezone);
 

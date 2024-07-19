@@ -490,7 +490,7 @@ export default defineComponent({
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
-          // loadLogsData();
+          loadLogsData();
           return;
         }
 
@@ -526,6 +526,7 @@ export default defineComponent({
         if(searchObj.loading==false){
           resetSearchObj();
           resetStreamData();
+          restoreUrlQueryParams();
           loadLogsData();
         }
         if (config.isCloud == "true") {
