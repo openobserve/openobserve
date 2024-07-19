@@ -354,6 +354,9 @@ test.describe("Sanity testcases", () => {
       .locator("div")
       .nth(2)
       .click();
+    
+    await page.waitForTimeout(3000);
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-x-data"]').click()
     await page.waitForTimeout(3000);
     await page
       .locator(
@@ -857,9 +860,8 @@ test.describe("Sanity testcases", () => {
       .locator('[data-test="index-dropdown-stream"]')
       .fill("e2e_tabledashboard");
       await page.waitForTimeout(4000);
-    await page.getByRole("option", { name: "e2e_tabledashboard" }).click({force: true});
+    await page.getByRole("option", { name: "e2e_tabledashboard" }).click({force: true}); 
     await page.waitForTimeout(6000);
-
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_tabledashboard-e2e"] [data-test="dashboard-add-y-data"]'
