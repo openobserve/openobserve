@@ -619,6 +619,7 @@ pub async fn around(
         ("end_time" = i64, Query, description = "end time"),
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
@@ -781,6 +782,15 @@ async fn values_v1(
         }
     };
 
+    let keyword = match query.get("keyword") {
+        None => "".to_string(),
+        Some(v) => v.trim().to_string(),
+    };
+    let no_count = match query.get("no_count") {
+        None => false,
+        Some(v) => v.parse::<bool>().unwrap_or(false),
+    };
+
     let mut query_context = match query.get("sql") {
         None => None,
         Some(v) => match base64::decode_url(v) {
@@ -884,9 +894,22 @@ async fn values_v1(
         if schema.field_with_name(field).is_err() {
             continue;
         }
-        let sql = format!(
-            "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
-        );
+        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
+            format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
+        } else if !keyword.is_empty() {
+            format!("WHERE {field} ILIKE '%{keyword}%'")
+        } else {
+            sql_where.clone()
+        };
+        let sql = if no_count {
+            format!(
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, {field} ASC"
+            )
+        } else {
+            format!(
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+            )
+        };
         let mut req = req.clone();
         req.query.sql = sql;
 
@@ -939,12 +962,19 @@ async fn values_v1(
                 .map(|v| v.as_str().unwrap_or(""))
                 .unwrap_or("")
                 .to_string();
-            let num = row.get("zo_sql_num").unwrap().as_i64().unwrap();
+            let num = row
+                .get("zo_sql_num")
+                .map(|v| v.as_i64().unwrap_or(0))
+                .unwrap_or(0);
             let key_num = top_hits.entry(key).or_insert(0);
             *key_num += num;
         }
         let mut top_hits = top_hits.into_iter().collect::<Vec<_>>();
-        top_hits.sort_by(|a, b| b.1.cmp(&a.1));
+        if no_count {
+            top_hits.sort_by(|a, b| a.0.cmp(&b.0));
+        } else {
+            top_hits.sort_by(|a, b| b.1.cmp(&a.1));
+        }
         let top_hits = top_hits
             .into_iter()
             .take(size as usize)
@@ -1024,10 +1054,21 @@ async fn values_v2(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    let mut query_sql = format!(
-        "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-        stream_type, stream_name, field
-    );
+    let no_count = match query.get("no_count") {
+        None => false,
+        Some(v) => v.parse::<bool>().unwrap_or(false),
+    };
+    let mut query_sql = if no_count {
+        format!(
+            "SELECT field_value AS zo_sql_key FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
+            stream_type, stream_name, field
+        )
+    } else {
+        format!(
+            "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
+            stream_type, stream_name, field
+        )
+    };
     if let Some((key, val)) = filter {
         let val = val.split(',').collect::<Vec<_>>().join("','");
         query_sql = format!(
@@ -1056,6 +1097,11 @@ async fn values_v2(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
+    }
+    if no_count {
+        query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {size}")
+    } else {
+        query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}")
     }
 
     let regions = query.get("regions").map_or(vec![], |regions| {
@@ -1105,7 +1151,7 @@ async fn values_v2(
     // search
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}"),
+            sql: query_sql,
             from: 0,
             size: 0,
             start_time,
