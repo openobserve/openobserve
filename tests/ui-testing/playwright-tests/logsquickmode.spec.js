@@ -179,6 +179,7 @@ test.describe("Logs Quickmode testcases", () => {
     // Click on the refresh button
     await page.click('[data-cy="search-bar-refresh-button"] > .q-btn__content',{ force: true });
   
+    await page.waitForTimeout(2000)
     // Wait for the error message to appear and ensure it is visible
     await expect(page.locator('[data-test="logs-search-error-message"]').first()).toBeVisible({ timeout: 10000 });
   });
