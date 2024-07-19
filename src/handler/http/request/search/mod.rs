@@ -790,7 +790,7 @@ async fn values_v1(
         None => false,
         Some(v) => {
             let v = v.to_lowercase();
-            if v == "true" || v == "1" { true } else { false }
+            v == "true" || v == "1"
         }
     };
 
@@ -1061,7 +1061,7 @@ async fn values_v2(
         None => false,
         Some(v) => {
             let v = v.to_lowercase();
-            if v == "true" || v == "1" { true } else { false }
+            v == "true" || v == "1"
         }
     };
     let mut query_sql = if no_count {
