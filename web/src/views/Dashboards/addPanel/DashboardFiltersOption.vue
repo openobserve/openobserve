@@ -90,19 +90,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import Group from "./Group.vue";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "DashboardFiltersOption",
   components: {
-    CommonAutoComplete,
-    SanitizedHtmlRenderer,
     Group,
     AddCondition,
   },
@@ -113,13 +109,10 @@ export default defineComponent({
       useDashboardPanelData();
     const { t } = useI18n();
     const showAddMenu = ref(false);
-    const showSelect = ref(false);
     const addLabel = ref("AND");
-    const selectedSchemas = ref<any[]>([]);
 
     const addFilter = (filterType: string) => {
       showAddMenu.value = false;
-      showSelect.value = true;
       const currentQuery =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -138,7 +131,17 @@ export default defineComponent({
         currentQuery.fields?.filter.push(defaultCondition);
       } else if (filterType === "group") {
         const defaultGroup = {
-          conditions: [],
+          conditions: [
+            {
+              type: "list",
+              column: "",
+              filterType: "condition",
+              operator: null,
+              value: null,
+              logicalOperator: addLabel.value,
+              values: [],
+            },
+          ],
           filterType: "group",
         };
         currentQuery.fields?.filter.push(defaultGroup);
@@ -159,7 +162,17 @@ export default defineComponent({
 
     const addGroupToGroup = (group: any) => {
       group.conditions.push({
-        conditions: [],
+        conditions: [
+          {
+            type: "list",
+            column: "",
+            filterType: "condition",
+            operator: null,
+            value: null,
+            logicalOperator: addLabel.value,
+            values: [],
+          },
+        ],
         filterType: "group",
       });
     };
@@ -203,22 +216,10 @@ export default defineComponent({
       }))
     );
 
-    const filterStreamFn = (search: any, update: any) => {
-      const needle = search.toLowerCase().trim();
-
-      update(() => {
-        return schemaOptions.value.filter((option: any) =>
-          option.label.toLowerCase().includes(needle)
-        );
-      });
-    };
-
     return {
       t,
       showAddMenu,
-      showSelect,
       addLabel,
-      selectedSchemas,
       dashboardPanelData,
       removeFilterItem,
       loadFilterItem,
