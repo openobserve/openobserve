@@ -421,7 +421,7 @@ export default defineComponent({
           return column.name !== "applyBeforeFlattening";
         }
         return true;
-      });
+      }) as QTableProps["columns"];
     });
 
     const getLogStream = () => {
