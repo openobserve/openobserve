@@ -905,6 +905,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
+import useStreams from "@/composables/useStreams";
 
 const defaultValue: any = () => {
   return {
@@ -1053,6 +1054,8 @@ export default defineComponent({
       cancelQuery,
     } = useLogs();
     const queryEditorRef = ref(null);
+    const {  getStream } = useStreams();
+
 
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
@@ -1164,7 +1167,7 @@ export default defineComponent({
       return columnNames;
     }
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue =  async (value: string) => {
       if (searchObj.meta.quickMode == true) {
         const parsedSQL = fnParsedSQL();
 
@@ -1254,21 +1257,30 @@ export default defineComponent({
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
               let streamFound = false;
+              searchObj.data.stream.selectedStream = [];
+           
               streamName = searchObj.data.parsedQuery.from[0].table;
-              searchObj.data.streamResults.list.forEach((stream) => {
+              searchObj.data.streamResults.list.forEach(async (stream) => {
                 if (stream.name == searchObj.data.parsedQuery.from[0].table) {
                   streamFound = true;
                   let itemObj = {
                     label: stream.name,
                     value: stream.name,
                   };
+
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  stream.schema.forEach((field) => {
-                    searchObj.data.stream.selectedStreamFields.push({
-                      name: field.name,
-                    });
-                  });
+                  searchObj.data.stream.selectedStreamFields = [];
+                  if (searchObj.data.stream.selectedStreamFields.length == 0)
+                   {
+                      const data = await getStream (
+                        searchObj.data.stream.selectedStream[0],
+                        searchObj.data.stream.streamType || "logs",
+                        true
+                   )
+                   searchObj.data.stream.selectedStreamFields = data.schema
+
+                  }
                 }
               });
               if (streamFound == false) {
@@ -1286,7 +1298,7 @@ export default defineComponent({
           }
         }
       } catch (e) {
-        console.log("Logs: Error while updating query value");
+        console.log(e,"Logs: Error while updating query value");
       }
     };
 
