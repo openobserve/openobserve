@@ -124,7 +124,7 @@ test.describe("Logs UI testcases", () => {
     await page.keyboard.press("Backspace");
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByText("An error occurred while constructing the search query.").click();
+    await page.getByText("No column found in selected stream.").click();
   });
 
   test("should be able to enter valid text in VRL and run query", async ({
