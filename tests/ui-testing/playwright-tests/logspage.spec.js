@@ -165,13 +165,13 @@ test.describe("Logs UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
       .click({ force: true });
-    await page
-      .locator(".bg-primary > .q-btn__content > .q-icon")
-      .click({ force: true });
-    await page.waitForTimeout(2000);
-    await page
-      .locator(".bg-primary > .q-btn__content > .q-icon")
-      .click({ force: true });
+    // await page
+    //   .locator(".bg-primary > .q-btn__content > .q-icon")
+    //   .click({ force: true });
+    // await page.waitForTimeout(2000);
+    // await page
+    //   .locator(".bg-primary > .q-btn__content > .q-icon")
+    //   .click({ force: true });
     await expect(
       page.locator('[data-cy="index-field-search-input"]')
     ).toBeVisible();
