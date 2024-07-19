@@ -1625,7 +1625,9 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          await getHistogramQueryData(searchObj.data.histogramQuery);
+          if(searchObj.data.queryResults.hits.length > 0) {
+            await getHistogramQueryData(searchObj.data.histogramQuery);
+          }
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
@@ -1641,7 +1643,11 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
-          if (queryReq.query.from == 0) {
+          let aggFlag = false;
+          if (parsedSQL) {
+            aggFlag = hasAggregation(parsedSQL?.columns);
+          }
+          if (queryReq.query.from == 0 && searchObj.data.queryResults.hits.length > 0 && !aggFlag) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
@@ -3316,7 +3322,7 @@ const useLogs = () => {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
     if (queryParams.refresh) {
-      searchObj.meta.refreshInterval = queryParams.refresh;
+      searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
     useLocalTimezone(queryParams.timezone);
 
