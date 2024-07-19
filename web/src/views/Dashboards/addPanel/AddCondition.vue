@@ -159,8 +159,6 @@ export default defineComponent({
     "schemaOptions",
     "dashboardVariablesFilterItems",
     "label",
-    "filterValueOptions",
-    "filterOptions",
     "loadFilterItem",
   ],
   setup(props) {
@@ -198,6 +196,7 @@ export default defineComponent({
       "Is Not Null",
     ];
 
+    const filterOptions = ["AND", "OR"];
     const showMenu = ref(false);
     const showSelect = ref(false);
     const addLabel = ref("AND");
@@ -220,7 +219,6 @@ export default defineComponent({
 
     return {
       operators,
-      filterOptions: props.filterOptions,
       showSelect,
       showMenu,
       addLabel,
@@ -230,6 +228,7 @@ export default defineComponent({
       loadFilterItem,
       filterStreamFn,
       dashboardPanelData,
+      filterOptions,
     };
   },
 });

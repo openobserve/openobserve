@@ -36,8 +36,6 @@
                 :dashboard-variables-filter-items="
                   dashboardVariablesFilterItems(index)
                 "
-                :filter-value-options="filterValueOptions"
-                :filter-options="filterOptions"
                 :load-filter-item="loadFilterItem"
               />
             </div>
@@ -48,8 +46,6 @@
                 :dashboard-variables-filter-items="
                   dashboardVariablesFilterItems(index)
                 "
-                :filter-value-options="filterValueOptions"
-                :filter-options="filterOptions"
                 :load-filter-item="loadFilterItem"
                 label="Condition"
                 @remove-condition="removeFilterItem(filteredItem.column)"
@@ -217,9 +213,6 @@ export default defineComponent({
       });
     };
 
-    const filterOptions: any = []; // Define your filter options array here
-    const filterValueOptions: any = []; // Define your filter value options array here
-
     return {
       t,
       showAddMenu,
@@ -235,8 +228,6 @@ export default defineComponent({
       removeGroup,
       dashboardVariablesFilterItems,
       schemaOptions,
-      filterOptions,
-      filterValueOptions,
     };
   },
 });

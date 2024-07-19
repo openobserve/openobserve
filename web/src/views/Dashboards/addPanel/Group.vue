@@ -11,9 +11,7 @@
             :group="condition"
             :group-index="index"
             :dashboard-variables-filter-items="dashboardVariablesFilterItems"
-            :filter-value-options="filterValueOptions"
             :schema-options="schemaOptions"
-            :filter-options="filterOptions"
             :load-filter-item="loadFilterItem"
             @add-condition="addConditionToGroup"
             @add-group="addGroupToGroup"
@@ -24,9 +22,7 @@
           <AddCondition
             :condition="condition"
             :dashboard-variables-filter-items="dashboardVariablesFilterItems"
-            :filter-value-options="filterValueOptions"
             :schema-options="schemaOptions"
-            :filter-options="filterOptions"
             :load-filter-item="loadFilterItem"
             @remove-condition="removeConditionFromGroup(index)"
           />
@@ -73,15 +69,7 @@ export default defineComponent({
       type: Array,
       required: true,
     },
-    filterValueOptions: {
-      type: Array,
-      required: true,
-    },
     schemaOptions: {
-      type: Array,
-      required: true,
-    },
-    filterOptions: {
       type: Array,
       required: true,
     },
@@ -90,7 +78,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['add-condition', 'add-group', 'remove-group'],
+  emits: ["add-condition", "add-group", "remove-group"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);
