@@ -561,7 +561,7 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
-    scan_stats.original_size = idx_scan_size as i64;
+    scan_stats.original_size += idx_scan_size as i64;
     Ok((merge_batches, scan_stats, took_wait, is_partial))
 }
 
