@@ -788,7 +788,10 @@ async fn values_v1(
     };
     let no_count = match query.get("no_count") {
         None => false,
-        Some(v) => v.parse::<bool>().unwrap_or(false),
+        Some(v) => {
+            let v = v.to_lowercase();
+            if v == "true" || v == "1" { true } else { false }
+        }
     };
 
     let mut query_context = match query.get("sql") {
@@ -903,7 +906,7 @@ async fn values_v1(
         };
         let sql = if no_count {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, {field} ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
             )
         } else {
             format!(
@@ -1056,7 +1059,10 @@ async fn values_v2(
 
     let no_count = match query.get("no_count") {
         None => false,
-        Some(v) => v.parse::<bool>().unwrap_or(false),
+        Some(v) => {
+            let v = v.to_lowercase();
+            if v == "true" || v == "1" { true } else { false }
+        }
     };
     let mut query_sql = if no_count {
         format!(
