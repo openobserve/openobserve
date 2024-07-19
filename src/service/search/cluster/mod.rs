@@ -136,8 +136,10 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request,
     // then filter the file list based on the inverted index.
+    let mut idx_scan_size = 0;
     if is_inverted_index && req.aggs.is_empty() {
-        file_list = get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
+        (file_list, idx_scan_size) =
+            get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
     }
 
     let file_list_took = start.elapsed().as_millis() as usize;
@@ -273,6 +275,7 @@ pub async fn search(
             original_size += file_meta.original_size;
             compressed_size += file_meta.compressed_size;
         }
+        original_size += idx_scan_size;
         super::SEARCH_SERVER
             .add_file_stats(
                 trace_id,
@@ -524,7 +527,7 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, scan_stats, is_partial) =
+    let (merge_batches, mut scan_stats, is_partial) =
         match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
             Ok(v) => v,
             Err(e) => {
@@ -558,6 +561,7 @@ pub async fn search(
             .map_err(|e| Error::Message(e.to_string()))?;
     }
 
+    scan_stats.original_size = idx_scan_size as i64;
     Ok((merge_batches, scan_stats, took_wait, is_partial))
 }
 
@@ -921,7 +925,7 @@ async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
     file_list: &[FileKey],
-) -> Result<Vec<FileKey>> {
+) -> Result<(Vec<FileKey>, usize)> {
     let cfg = get_config();
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
     let file_list = file_list
@@ -1068,7 +1072,7 @@ async fn get_file_list_by_inverted_index(
         .collect::<Vec<_>>();
     // sorted by _timestamp
     idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-    Ok(idx_file_list)
+    Ok((idx_file_list, idx_resp.scan_size))
 }
 
 #[cfg(test)]
