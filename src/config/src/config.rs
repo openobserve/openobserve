@@ -503,7 +503,7 @@ pub struct Common {
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
     pub instance_name_short: String,
-    #[env_config(name = "ZO_WEB_URL", default = "")] // http://localhost:5080
+    #[env_config(name = "ZO_WEB_URL", default = "http://localhost:5080")]
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
@@ -710,7 +710,7 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
-    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "localhost:5082")]
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "http://localhost:5082")]
     pub report_server_url: String,
     #[env_config(name = "ZO_REPORT_SERVER_SKIP_TLS_VERIFY", default = false)]
     pub report_server_skip_tls_verify: bool,

@@ -260,7 +260,7 @@ impl Report {
             };
 
             let url = url::Url::parse(&format!(
-                "{}/{}/reports/{}/send",
+                "{}/api/{}/reports/{}/send",
                 &cfg.common.report_server_url, &self.org_id, &self.name
             ))
             .unwrap();
