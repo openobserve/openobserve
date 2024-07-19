@@ -132,12 +132,12 @@ export default defineComponent({
       if (filterType === "condition") {
         const defaultCondition = {
           type: "list",
-          column: "_timestamp",
+          column: "",
           filterType: "condition",
           operator: null,
           value: null,
           logicalOperator: addLabel.value,
-          values: ["1721204004048867"],
+          values: [],
         };
         currentQuery.fields?.filter.push(defaultCondition);
       } else if (filterType === "group") {
@@ -152,12 +152,12 @@ export default defineComponent({
     const addConditionToGroup = (group: any) => {
       group.conditions.push({
         type: "list",
-        column: "_timestamp",
+        column: "",
         filterType: "condition",
         operator: null,
         value: null,
         logicalOperator: addLabel.value,
-        values: ["1721204004048867"],
+        values: [],
       });
     };
 

@@ -1,8 +1,6 @@
 <template>
   <div class="condition">
-    <!-- <span>{{ label }}</span> -->
     <div>
-      <!-- {{ condition }} -->
       <div>
         <q-select v-model="addLabel" dense filled :options="filterOptions" />
       </div>
@@ -144,7 +142,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -185,6 +183,7 @@ export default defineComponent({
         );
       });
     };
+
     const operators = [
       "=",
       "<>",
@@ -205,10 +204,19 @@ export default defineComponent({
     const selectedSchemas = ref<any[]>([]);
 
     const computedLabel = (condition: any) => {
-      return condition.operator && condition.value
-        ? `${condition.column} ${condition.operator} ${condition.value}`
-        : condition.column;
+      console.log("selectedSchemas", selectedSchemas.value);
+      return selectedSchemas.value.length === 0
+        ? condition.column
+        : selectedSchemas.value;
     };
+
+    watch(selectedSchemas, (newVal) => {
+      console.log("newVal------", newVal);
+      if (newVal.length > 0) {
+        console.log("newVal", newVal);
+        props.condition.column = newVal;
+      }
+    });
 
     return {
       operators,
@@ -232,5 +240,14 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.q-menu {
+  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(0.5rem);
+  border-radius: 0px;
+  .q-virtual-scroll__content {
+    padding: 0.5rem;
+  }
 }
 </style>
