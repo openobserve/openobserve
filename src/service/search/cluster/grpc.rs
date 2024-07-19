@@ -49,7 +49,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     );
 
     // handle query function
-    let (merge_results, scan_stats, _, is_partial) =
+    let (merge_results, scan_stats, _, is_partial, idx_took) =
         super::search(&trace_id, sql.clone(), req).await?;
 
     // final result
@@ -102,6 +102,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     let result = cluster_rpc::SearchResponse {
         job,
         took: start.elapsed().as_millis() as i32,
+        idx_took: idx_took as i32,
         from: sql.meta.offset as i32,
         size: sql.meta.limit as i32,
         total: hits_total as i64,

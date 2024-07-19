@@ -199,6 +199,7 @@ pub struct Response {
     pub file_count: usize,
     pub cached_ratio: usize,
     pub scan_size: usize,
+    pub idx_scan_size: usize,
     pub scan_records: usize,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -225,6 +226,7 @@ pub struct Response {
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseTook {
     pub total: usize,
+    pub idx_took: usize,
     pub wait_queue: usize,
     pub cluster_total: usize,
     pub cluster_wait_queue: usize,
@@ -251,6 +253,7 @@ impl Response {
             file_count: 0,
             cached_ratio: 0,
             scan_size: 0,
+            idx_scan_size: 0,
             scan_records: 0,
             columns: Vec::new(),
             hits: Vec::new(),
@@ -280,6 +283,7 @@ impl Response {
         self.took = val - wait;
         self.took_detail = Some(ResponseTook {
             total: 0,
+            idx_took: 0,
             wait_queue: 0,
             cluster_total: val,
             cluster_wait_queue: wait,
@@ -293,6 +297,12 @@ impl Response {
             if wait > 0 {
                 self.took_detail.as_mut().unwrap().wait_queue = wait;
             }
+        }
+    }
+
+    pub fn set_idx_took(&mut self, val: usize) {
+        if self.took_detail.is_some() {
+            self.took_detail.as_mut().unwrap().idx_took = val;
         }
     }
 
@@ -310,6 +320,10 @@ impl Response {
 
     pub fn set_scan_size(&mut self, val: usize) {
         self.scan_size = val;
+    }
+
+    pub fn set_idx_scan_size(&mut self, val: usize) {
+        self.idx_scan_size = val;
     }
 
     pub fn set_scan_records(&mut self, val: usize) {
@@ -414,6 +428,7 @@ pub struct ScanStats {
     pub querier_files: i64,
     pub querier_memory_cached_files: i64,
     pub querier_disk_cached_files: i64,
+    pub idx_scan_size: i64,
 }
 
 impl ScanStats {
@@ -429,11 +444,13 @@ impl ScanStats {
         self.querier_files += other.querier_files;
         self.querier_memory_cached_files += other.querier_memory_cached_files;
         self.querier_disk_cached_files += other.querier_disk_cached_files;
+        self.idx_scan_size += other.idx_scan_size;
     }
 
     pub fn format_to_mb(&mut self) {
         self.original_size = self.original_size / 1024 / 1024;
         self.compressed_size = self.compressed_size / 1024 / 1024;
+        self.idx_scan_size = self.idx_scan_size / 1024 / 1024;
     }
 }
 
@@ -494,6 +511,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             querier_files: req.querier_files,
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
+            idx_scan_size: req.idx_scan_size,
         }
     }
 }
@@ -508,6 +526,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             querier_files: req.querier_files,
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
+            idx_scan_size: req.idx_scan_size,
         }
     }
 }
