@@ -179,6 +179,7 @@ test.describe("Logs Quickmode testcases", () => {
     // Click on the refresh button
     await page.click('[data-cy="search-bar-refresh-button"] > .q-btn__content',{ force: true });
   
+    await page.waitForTimeout(2000)
     // Wait for the error message to appear and ensure it is visible
     await expect(page.locator('[data-test="logs-search-error-message"]').first()).toBeVisible({ timeout: 10000 });
   });
@@ -279,6 +280,11 @@ test.describe("Logs Quickmode testcases", () => {
         force: true,
       });
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page
+      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .click({
+        force: true,
+      });
     await page.reload();
     await page.waitForTimeout(2000);
     await expect(

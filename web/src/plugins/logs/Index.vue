@@ -490,13 +490,13 @@ export default defineComponent({
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
-          // loadLogsData();
+          loadLogsData();
           return;
         }
 
         if (
           searchObj.organizationIdetifier !=
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier && searchObj.loading == false
         ) {
           loadLogsData();
         } else if (!searchObj.loading) updateStreams();
@@ -511,7 +511,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       await importSqlParser();
       if (searchObj.meta.logsVisualizeToggle == "logs") {
-        searchObj.loading = true;
+        // searchObj.loading = true;
         searchObj.meta.pageType = "logs";
         if (
           config.isEnterprise == "true" &&
@@ -520,12 +520,15 @@ export default defineComponent({
           await getRegionInfo();
         }
 
-        resetSearchObj();
-        resetStreamData();
         searchObj.organizationIdetifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
-        loadLogsData();
+        if(searchObj.loading==false){
+          resetSearchObj();
+          resetStreamData();
+          restoreUrlQueryParams();
+          loadLogsData();
+        }
         if (config.isCloud == "true") {
           MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
         }
