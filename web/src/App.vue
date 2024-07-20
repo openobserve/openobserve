@@ -21,7 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
+import { Notify } from 'quasar'
+import { mdiCached } from '@quasar/extras/mdi-v6'
 export default {
   mounted() {
     navigator.serviceWorker.addEventListener('message', event => {
@@ -29,6 +30,30 @@ export default {
         if (confirm('A new version of the application is available. Reload now?')) {
           window.location.reload(); // Reload the page
         }
+      } else {
+        console.log("change done********************")
+        Notify.create({
+      color: 'negative',
+      icon: mdiCached,
+      message: 'Updated content is available. Please refresh the page.',
+      timeout: 0,
+      multiLine: true,
+      position: 'top',
+      actions: [
+        {
+          label: 'Refresh',
+          color: 'yellow',
+          handler: () => {
+            window.location.reload()
+          }
+        },
+        {
+          label: 'Dismiss',
+          color: 'white',
+          handler: () => {}
+        }
+      ]
+    })
       }
       
     });
