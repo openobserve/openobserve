@@ -1178,7 +1178,6 @@ export default defineComponent({
           parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
         ) {
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
-          searchObj.data.stream.selectedStreamFields = [];
           onStreamChange(value);
         }
         // if (
@@ -1270,17 +1269,19 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  searchObj.data.stream.selectedStreamFields = [];
-                  if (searchObj.data.stream.selectedStreamFields.length == 0)
-                   {
-                      const data = await getStream (
-                        searchObj.data.stream.selectedStream[0],
-                        searchObj.data.stream.streamType || "logs",
-                        true
-                   )
-                   searchObj.data.stream.selectedStreamFields = data.schema
+                  onStreamChange(itemObj.value);
+                  // searchObj.data.stream.selectedStreamFields = [];
 
-                  }
+                  // if (searchObj.data.stream.selectedStreamFields.length == 0)
+                  //  {
+                  //     const data = await getStream (
+                  //       searchObj.data.stream.selectedStream[0],
+                  //       searchObj.data.stream.streamType || "logs",
+                  //       true
+                  //  )
+                  //  searchObj.data.stream.selectedStreamFields = data.schema
+                   
+                  // }
                 }
               });
               if (streamFound == false) {
