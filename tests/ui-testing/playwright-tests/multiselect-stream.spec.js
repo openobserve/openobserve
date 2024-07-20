@@ -174,6 +174,7 @@ await page.waitForTimeout(1000);
     await expect(page.locator(".q-notification__message")).toContainText(
       "Live mode is enabled"
     );
+    await page.waitForTimeout(5000);
     await page
       .locator(".q-pl-sm > .q-btn > .q-btn__content")
       .click({ force: true });
