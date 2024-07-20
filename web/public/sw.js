@@ -1,7 +1,7 @@
 // sw.js
 
 // Version identifier for cache and update management
-const cacheVersion = 'v'+new Date().getTime().toString();
+const cacheVersion = 'O2-cache';
 // Function to fetch the asset manifest
 async function fetchManifest() {
   const response = await fetch('/web/src/assets/workers/manifest.json');
@@ -17,26 +17,30 @@ self.addEventListener('install', function(event) {
       const filesToCache = [
       ];
 
+      filesToCache.push("/web/");
       // Add hashed filenames from the manifest
       Object.keys(manifest).forEach(key => {
-        if(key == "index.html") {
-          filesToCache.push("/web/");
-          filesToCache.push("/web/index.html");
-          filesToCache.push("/web/favicon.ico");
+        // filesToCache.push(`/web/${manifest[key]}`);
+        // if(key == "index.html") {
+        //   filesToCache.push("/web/");
+        //   filesToCache.push("/web/favicon.ico");
+        //   filesToCache.push(`/web/${manifest[key]["file"]}`);
+        //   filesToCache.push("/web/sw.js");
+        // }
+        if(typeof manifest[key] == "object" && manifest[key]?.file && manifest[key]?.file.indexOf(".js") > -1) {
           filesToCache.push(`/web/${manifest[key]["file"]}`);
-          filesToCache.push("/web/assets/sw.js");
         }
       });
 
       console.log(filesToCache);
-      const cache = await caches.open(cacheVersion)
-      .then((cache) => {
-        try {
-          cache.addAll(filesToCache);
-        } catch (error) {
-          console.error(`Failed to cache ${file}:`, error);
-        }
-      });
+      // const cache = await caches.open(cacheVersion)
+      // .then((cache) => {
+      //   try {
+      //     cache.addAll(filesToCache);
+      //   } catch (error) {
+      //     console.error(`Failed to cache ${file}:`, error);
+      //   }
+      // });
       // await cache.addAll(filesToCache);
       // Cache files with error handling
       self.skipWaiting();
@@ -59,6 +63,7 @@ self.addEventListener('install', function(event) {
 
 self.addEventListener('activate', function(event) {
   // Clean up old caches if any
+  console.log("activate")
   event.waitUntil(
     caches.keys().then(function(cacheNames) {
       return Promise.all(
@@ -90,6 +95,13 @@ self.addEventListener('fetch', function(event) {
       var fetchRequest = event.request;
       return fetch(fetchRequest).then(function(response) {
         if (!response || response.status !== 200 || response.type !== 'basic') {
+          self.skipWaiting();
+          caches.delete("cache-name");
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage('staledata');
+            });
+          });
           return response;
         }
         var responseToCache = response.clone();
@@ -115,6 +127,7 @@ self.addEventListener('fetch', function(event) {
 self.addEventListener('message', function(event) {
   console.log(event.data)
   if (event.data === 'skipWaiting') {
+    caches.delete("cache-name");
     self.skipWaiting();
   }
 });

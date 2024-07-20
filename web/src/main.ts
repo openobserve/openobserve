@@ -131,10 +131,15 @@ if ('serviceWorker' in navigator) {
   //   //   console.error('Service Worker registration failed:', error);
   //   // });
   // }
-  navigator.serviceWorker.register('./assets/sw.js', {
-    scope: '/web/assets/'
+  navigator.serviceWorker.register('/web/sw.js', {
+    scope: '/web/'
   }).then(registration => {
       console.log('Service Worker registered:', registration);
+      // setInterval(() => {
+      //   console.log("inside setinertval", registration)
+      //   registration.update();
+      //   registration?.waiting?.postMessage('skipWaiting');
+      // }, 6000);
 
       registration.addEventListener('updatefound', () => {
         const installingWorker = registration.installing;
