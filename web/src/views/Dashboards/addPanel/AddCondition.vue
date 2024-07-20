@@ -82,11 +82,7 @@
                       dense
                       filled
                       v-model="condition.values"
-                      :options="
-                        dashboardPanelData.meta.filterValue.find(
-                          (it: any) => it.column == condition.column
-                        )?.value
-                      "
+                      :options="filterValueOptions"
                       :label="t('common.selectFilter')"
                       multiple
                       emit-value
@@ -145,7 +141,6 @@
 import { defineComponent, ref, computed, watch } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -158,25 +153,17 @@ export default defineComponent({
     "condition",
     "schemaOptions",
     "dashboardVariablesFilterItems",
+    "filterValueOptions",
     "label",
     "loadFilterItem",
   ],
   setup(props) {
-    const { dashboardPanelData, loadFilterItem } = useDashboardPanelData();
     const { t } = useI18n();
-
-    const schemaOptions = computed(() =>
-      dashboardPanelData.meta.stream.selectedStreamFields.map((field: any) => ({
-        label: field.name,
-        value: field.name,
-      }))
-    );
 
     const filterStreamFn = (search: any, update: any) => {
       const needle = search.toLowerCase().trim();
-
       update(() => {
-        return schemaOptions.value.filter((option: any) =>
+        return props.schemaOptions.filter((option: any) =>
           option.label.toLowerCase().includes(needle)
         );
       });
@@ -198,36 +185,29 @@ export default defineComponent({
 
     const filterOptions = ["AND", "OR"];
     const showMenu = ref(false);
-    const showSelect = ref(false);
     const addLabel = ref("AND");
     const selectedSchemas = ref<any[]>([]);
 
     const computedLabel = (condition: any) => {
-      console.log("selectedSchemas", selectedSchemas.value);
       return selectedSchemas.value.length === 0
         ? condition.column
         : selectedSchemas.value;
     };
 
     watch(selectedSchemas, (newVal) => {
-      console.log("newVal------", newVal);
       if (newVal.length > 0) {
-        console.log("newVal", newVal);
         props.condition.column = newVal;
       }
     });
 
     return {
       operators,
-      showSelect,
       showMenu,
       addLabel,
       selectedSchemas,
       computedLabel,
       t,
-      loadFilterItem,
       filterStreamFn,
-      dashboardPanelData,
       filterOptions,
     };
   },
