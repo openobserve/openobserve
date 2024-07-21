@@ -348,7 +348,7 @@ fn merge_response(
     }
     cache_response.cached_ratio = files_cache_ratio / search_response.len();
     log::info!(
-        "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
+        "cache_response.hits.len: {}, Result cache len: {}",
         cache_hits_len,
         result_cache_len,
     );
@@ -379,7 +379,7 @@ async fn write_results(
     let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
 
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
-        last_rec_ts
+        largest_ts
     } else {
         req_query_end_time
     };
