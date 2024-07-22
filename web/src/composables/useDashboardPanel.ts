@@ -1001,6 +1001,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         fields: [name],
         size: 100,
         type: currentQuery.fields.stream_type,
+        no_count: true,
       });
 
       dashboardPanelData.meta.filterValue.push({
@@ -1041,6 +1042,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,
+      no_count: true,
     })
       .then((res: any) => {
         const find = dashboardPanelData.meta.filterValue.findIndex(
