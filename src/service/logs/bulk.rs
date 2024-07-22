@@ -310,7 +310,7 @@ pub async fn ingest(
                 json::Value::Number(timestamp.into()),
             );
 
-            let fns_length = stream_after_functions_map
+            let fns_length = stream_before_functions_map
                 .get(&key)
                 .map(|v| v.len())
                 .unwrap_or_default()
