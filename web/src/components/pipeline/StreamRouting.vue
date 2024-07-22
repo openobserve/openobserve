@@ -29,7 +29,7 @@
             v-bind:readonly="isUpdating"
             v-bind:disable="isUpdating"
             :rules="[
-              (val, rules) =>
+              (val: any, rules: any) =>
                 !!val
                   ? isValidStreamName ||
                     `Use alphanumeric and '+=,.@-_' characters only, without spaces.`

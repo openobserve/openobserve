@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].label
                           "
-                          :rules="[(val) => val.length > 0 || 'Required']"
+                          :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
                           v-if="
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].label
                           "
-                          :rules="[(val) => val.length > 0 || 'Required']"
+                          :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
                           v-if="
@@ -673,7 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].label
                       "
-                      :rules="[(val) => val.length > 0 || 'Required']"
+                      :rules="[(val: any) => val.length > 0 || 'Required']"
                     />
                     <div
                       v-if="
@@ -862,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].label
                         "
-                        :rules="[(val) => val.length > 0 || 'Required']"
+                        :rules="[(val: any) => val.length > 0 || 'Required']"
                       />
                       <div
                         v-if="
@@ -953,7 +953,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-menu
               class="q-pa-md"
-              @show="(e) => loadFilterItem(filteredItem.column)"
+              @show="(e: any) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
               <div style="height: 100%">
@@ -1012,7 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :label="t('common.operator')"
                             data-test="dashboard-filter-condition-dropdown"
                             style="width: 100%"
-                            :rules="[(val) => !!val || 'Required']"
+                            :rules="[(val: any) => !!val || 'Required']"
                           />
                           <CommonAutoComplete
                             v-if="
@@ -1055,7 +1055,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           emit-value
                           map-options
                           :rules="[
-                            (val) =>
+                            (val:any) =>
                               val.length > 0 || 'At least 1 item required',
                           ]"
                         >
@@ -1178,8 +1178,7 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
-    const {  showErrorNotification } =
-      useNotifications();
+    const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
       x: true,
       y: true,

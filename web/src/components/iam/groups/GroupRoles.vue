@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             method: filterRoles,
           }"
         >
-          <template v-slot:select="slotProps">
+          <template v-slot:select="slotProps: any">
             <q-checkbox
               :data-test="`iam-roles-selection-table-body-row-${slotProps.column.row.role_name}-checkbox`"
               size="xs"
@@ -284,6 +284,7 @@ const filterRoles = (rows: any[], term: string) => {
   }
   return filtered;
 };
+
 </script>
 
 <style scoped></style>

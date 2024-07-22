@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     row-key="id"
     ref="tableRef"
     data-test="dashboard-panel-table"
-    @row-click="(...args) => $emit('row-click', ...args)"
+    @row-click="(...args: any) => $emit('row-click', ...args)"
   >
   </q-table>
 </template>

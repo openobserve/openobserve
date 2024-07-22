@@ -21,7 +21,7 @@
  * @param {any} store - the store object
  * @return {Object} - the options object for rendering the chart
  */
-import { utcToZonedTime } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
@@ -165,7 +165,7 @@ export const convertSQLData = async (
 
     while (currentTime <= endTime) {
       const currentFormattedTime = format(
-        utcToZonedTime(currentTime, "UTC"),
+        toZonedTime(currentTime, "UTC"),
         "yyyy-MM-dd'T'HH:mm:ss"
       );
 
@@ -1095,7 +1095,7 @@ export const convertSQLData = async (
           // convert time string to selected timezone
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
-              return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
+              return formatDate(toZonedTime(it + "Z", store.state.timezone));
             }
           );
         }
@@ -1111,7 +1111,7 @@ export const convertSQLData = async (
           // convert time string to selected timezone
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
-              return formatDate(utcToZonedTime(it + "Z", store.state.timezone));
+              return formatDate(toZonedTime(it + "Z", store.state.timezone));
             }
           );
         }
@@ -1403,7 +1403,7 @@ export const convertSQLData = async (
         // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            utcToZonedTime(
+            toZonedTime(
               new Date(options.xAxis[0].data[index] + "Z").getTime(),
               store.state.timezone
             ),
@@ -1411,7 +1411,7 @@ export const convertSQLData = async (
           ]);
         } else if (timestampField) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            utcToZonedTime(
+            toZonedTime(
               new Date(options.xAxis[0].data[index]).getTime() / 1000,
               store.state.timezone
             ),
@@ -1538,7 +1538,7 @@ export const convertSQLData = async (
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            utcToZonedTime(
+            toZonedTime(
               new Date(options.xAxis[0].data[index] + "Z").getTime(),
               store.state.timezone
             ),
@@ -1546,7 +1546,7 @@ export const convertSQLData = async (
           ]);
         } else if (isTimeStampData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            utcToZonedTime(
+            toZonedTime(
               new Date(options.xAxis[0].data[index]).getTime() / 1000,
               store.state.timezone
             ),

@@ -25,114 +25,256 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="text-h6">{{ t("user.add") }}</div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" @click="
-            router.push({
-              name: 'users',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            })
-            " />
+          <q-btn
+            v-close-popup="true"
+            round
+            flat
+            icon="cancel"
+            @click="
+              router.push({
+                name: 'users',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              })
+            "
+          />
         </div>
       </div>
 
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <q-toggle v-if="!beingUpdated && userRole == 'root'" v-model="existingUser"
-            :label="t('user.isExistingUser')" />
+          <q-toggle
+            v-if="!beingUpdated && userRole == 'root'"
+            v-model="existingUser"
+            :label="t('user.isExistingUser')"
+          />
 
-          <q-input v-if="!beingUpdated" v-model="formData.email" :label="t('user.email') + ' *'" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
-            (val, rules) =>
-              rules.email(val) || 'Please enter a valid email address',
-          ]" />
+          <q-input
+            v-if="!beingUpdated"
+            v-model="formData.email"
+            :label="t('user.email') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[
+              (val: any, rules: any) =>
+                rules.email(val) || 'Please enter a valid email address',
+            ]"
+          />
 
           <div v-if="!beingUpdated && !existingUser">
-            <q-input :type="isPwd ? 'password' : 'text'" v-model="formData.password" :label="t('user.password') + ' *'"
-              color="input-border" bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense
+            <q-input
+              :type="isPwd ? 'password' : 'text'"
+              v-model="formData.password"
+              :label="t('user.password') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
               :rules="[
-            (val) => !!val || 'Field is required',
-            (val) =>
-              (val && val.length >= 8) ||
-              'Password must be at least 8 characters long',
-          ]">
+                (val: any) => !!val || 'Field is required',
+                (val: any) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
+            >
               <template v-slot:append>
-                <q-icon :name="isPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer"
-                  @click="isPwd = !isPwd" />
+                <q-icon
+                  :name="isPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isPwd = !isPwd"
+                />
               </template>
             </q-input>
           </div>
 
-          <q-input v-if="!existingUser" v-model="formData.first_name" :label="t('user.firstName')" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop q-mt-sm" stack-label outlined filled dense />
+          <q-input
+            v-if="!existingUser"
+            v-model="formData.first_name"
+            :label="t('user.firstName')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop q-mt-sm"
+            stack-label
+            outlined
+            filled
+            dense
+          />
 
-          <q-input v-if="!existingUser" v-model="formData.last_name" :label="t('user.lastName')" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense />
+          <q-input
+            v-if="!existingUser"
+            v-model="formData.last_name"
+            :label="t('user.lastName')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+          />
 
-          <q-select v-if="(userRole !== 'member' &&
-            store.state.userInfo.email !== formData.email) ||
-            !beingUpdated
-            " v-model="formData.role" :label="t('user.role') + ' *'" :options="roles" color="input-border"
-            bg-color="input-bg" class="q-pt-md q-pb-md showLabelOnTop" emit-value map-options stack-label outlined
-            filled dense :rules="[(val) => !!val || 'Field is required']" />
+          <q-select
+            v-if="
+              (userRole !== 'member' &&
+                store.state.userInfo.email !== formData.email) ||
+              !beingUpdated
+            "
+            v-model="formData.role"
+            :label="t('user.role') + ' *'"
+            :options="roles"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pt-md q-pb-md showLabelOnTop"
+            emit-value
+            map-options
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[(val: any) => !!val || 'Field is required']"
+          />
 
           <div v-if="beingUpdated">
-            <q-toggle v-model="formData.change_password" :label="t('user.changePassword')" color="input-border"
-              bg-color="input-bg" class="q-pt-md q-pb-sm showLabelOnTop" stack-label outlined filled dense />
+            <q-toggle
+              v-model="formData.change_password"
+              :label="t('user.changePassword')"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-pt-md q-pb-sm showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+            />
 
-            <q-input v-if="formData.change_password &&
-            (userRole == 'member' ||
-              store.state.userInfo.email == formData.email)
-            " :type="isOldPwd ? 'password' : 'text'" v-model="formData.old_password"
-              :label="t('user.oldPassword') + ' *'" color="input-border" bg-color="input-bg"
-              class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
-            (val) => !!val || 'Field is required',
-            (val) =>
-              (val && val.length >= 8) ||
-              'Password must be at least 8 characters long',
-          ]">
+            <q-input
+              v-if="
+                formData.change_password &&
+                (userRole == 'member' ||
+                  store.state.userInfo.email == formData.email)
+              "
+              :type="isOldPwd ? 'password' : 'text'"
+              v-model="formData.old_password"
+              :label="t('user.oldPassword') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
+                (val: any) => !!val || 'Field is required',
+                (val: any) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
+            >
               <template v-slot:append>
-                <q-icon :name="isOldPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer"
-                  @click="isOldPwd = !isOldPwd" />
+                <q-icon
+                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isOldPwd = !isOldPwd"
+                />
               </template>
             </q-input>
 
-            <q-input v-if="formData.change_password" :type="isNewPwd ? 'password' : 'text'"
-              v-model="formData.new_password" :label="t('user.newPassword') + ' *'" color="input-border"
-              bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
-            (val) => !!val || 'Field is required',
-            (val) =>
-              (val && val.length >= 8) ||
-              'Password must be at least 8 characters long',
-          ]">
+            <q-input
+              v-if="formData.change_password"
+              :type="isNewPwd ? 'password' : 'text'"
+              v-model="formData.new_password"
+              :label="t('user.newPassword') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
+                (val: any) => !!val || 'Field is required',
+                (val: any) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
+            >
               <template v-slot:append>
-                <q-icon :name="isNewPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer"
-                  @click="isNewPwd = !isNewPwd" />
+                <q-icon
+                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isNewPwd = !isNewPwd"
+                />
               </template>
             </q-input>
           </div>
 
-          <q-select v-if="!beingUpdated && userRole != 'member'" v-model="formData.organization"
-            :label="t('user.organization') + ' *'" emit-value :options="organizationOptions" color="input-border"
-            bg-color="input-bg" class="q-pt-md q-pb-md showLabelOnTop q-mt-sm" stack-label outlined
-            :loading="loadingOrganizations" filled dense :rules="[(val) => !!val || 'Field is required']" />
+          <q-select
+            v-if="!beingUpdated && userRole != 'member'"
+            v-model="formData.organization"
+            :label="t('user.organization') + ' *'"
+            emit-value
+            :options="organizationOptions"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pt-md q-pb-md showLabelOnTop q-mt-sm"
+            stack-label
+            outlined
+            :loading="loadingOrganizations"
+            filled
+            dense
+            :rules="[(val: any) => !!val || 'Field is required']"
+          />
 
-          <q-input v-if="!beingUpdated &&
-            userRole != 'member' &&
-            formData.organization == 'other'
-            " v-model="formData.other_organization" :label="t('user.otherOrganization')" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop q-mt-sm" stack-label outlined filled dense :rules="[
-            (val) =>
-              /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
-              'Input must start with a letter and be alphanumeric _ or -',
-          ]" />
+          <q-input
+            v-if="
+              !beingUpdated &&
+              userRole != 'member' &&
+              formData.organization == 'other'
+            "
+            v-model="formData.other_organization"
+            :label="t('user.otherOrganization')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop q-mt-sm"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[
+              (val: any) =>
+                /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
+                'Input must start with a letter and be alphanumeric _ or -',
+            ]"
+          />
 
           <div class="flex justify-center q-mt-lg">
-            <q-btn v-close-popup="true" class="q-mb-md text-bold" :label="t('user.cancel')" text-color="light-text"
-              padding="sm md" no-caps @click="$emit('cancel:hideform')" />
-            <q-btn :label="t('user.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-              type="submit" no-caps />
+            <q-btn
+              v-close-popup="true"
+              class="q-mb-md text-bold"
+              :label="t('user.cancel')"
+              text-color="light-text"
+              padding="sm md"
+              no-caps
+              @click="$emit('cancel:hideform')"
+            />
+            <q-btn
+              :label="t('user.save')"
+              class="q-mb-md text-bold no-border q-ml-md"
+              color="secondary"
+              padding="sm xl"
+              type="submit"
+              no-caps
+            />
           </div>
         </q-form>
       </div>
@@ -141,13 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="logout_confirm" persistent>
     <q-card>
       <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
-        <span class="q-ml-sm">As you've chosen to change your password, you'll be automatically
-          logged out.</span>
+        <q-avatar icon="info"
+color="primary" text-color="white" />
+        <span class="q-ml-sm"
+          >As you've chosen to change your password, you'll be automatically
+          logged out.</span
+        >
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Ok" color="primary" @click="signout" />
+        <q-btn flat label="Ok"
+color="primary" @click="signout" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -168,7 +314,6 @@ import {
   invlidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
-
 
 const defaultValue: any = () => {
   return {

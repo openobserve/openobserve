@@ -734,7 +734,7 @@ export default defineComponent({
     };
 
     function removeFieldByName(data, fieldName) {
-      return data.filter((item) => {
+      return data.filter((item: any) => {
         if (item.expr) {
           if (item.expr.column === fieldName) {
             return false;

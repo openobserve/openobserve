@@ -4,7 +4,7 @@ import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 
 test.describe.configure({ mode: 'parallel' });
-const streamName = `stream${Date.now()}`
+const streamName = `stream${Date.now()}`;
 
 async function login(page) {
       await page.goto(process.env["ZO_BASE_URL"]);

@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-bind:readonly="isEditingReport"
               v-bind:disable="isEditingReport"
               :rules="[
-                (val, rules) =>
+                (val: any, rules: any) =>
                   !!val
                     ? isValidName ||
                       `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       input-style="text-transform: none;"
                       @update:model-value="onFolderSelection(dashboard.folder)"
                       @filter="
-                        (...args) =>
+                        (...args: any) =>
                           onFilterOptions('folders', args[0], args[1])
                       "
                       behavior="menu"
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         onDashboardSelection(dashboard.dashboard)
                       "
                       @filter="
-                        (...args) =>
+                        (...args: any) =>
                           onFilterOptions('dashboards', args[0], args[1])
                       "
                       behavior="menu"
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :input-debounce="400"
                       :rules="[(val: any) => !!val.length || 'Field is required!']"
                       @filter="
-                        (...args) => onFilterOptions('tabs', args[0], args[1])
+                        (...args: any) => onFilterOptions('tabs', args[0], args[1])
                       "
                       style="
                         min-width: 250px !important;
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         outlined
                         dense
-                        :rules="[(val) => !!val || 'Field is required!']"
+                        :rules="[(val: any) => !!val || 'Field is required!']"
                         style="width: 100%"
                       />
                     </div>
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         bg-color="input-bg"
                         class="showLabelOnTop"
                         :rules="[
-                          (val) =>
+                          (val: any) =>
                             /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
                               val
                             ) || 'Date format is incorrect!',

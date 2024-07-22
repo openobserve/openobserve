@@ -4,6 +4,7 @@ import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import LogStream from "@/components/logstream/schema.vue";
 import i18n from "@/locales";
+// @ts-ignore
 import { rest } from "msw";
 import store from "@/test/unit/helpers/store";
 import StreamService from "@/services/stream";
@@ -190,7 +191,7 @@ describe("Streams", async () => {
       global.server.use(
         rest.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/settings`,
-          (req, res, ctx) => {
+          (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
           }
         )
