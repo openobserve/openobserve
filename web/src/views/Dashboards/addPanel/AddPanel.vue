@@ -221,6 +221,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
+                          @updated:vrlFunctionFieldList="
+                            updateVrlFunctionFieldList
+                          "
                           searchType="Dashboards"
                         />
                         <q-dialog v-model="showViewPanel">
@@ -827,6 +830,10 @@ export default defineComponent({
       // console.timeEnd("onDataZoom");
     };
 
+    const updateVrlFunctionFieldList = (fieldList: any) => {
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
+    };
+
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
       panelId: -1,
@@ -884,6 +891,7 @@ export default defineComponent({
       panelTitle,
       onDataZoom,
       showTutorial,
+      updateVrlFunctionFieldList,
     };
   },
   methods: {

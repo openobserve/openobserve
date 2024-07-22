@@ -84,6 +84,7 @@ pub struct Panel {
 #[serde(rename_all = "camelCase")]
 pub struct Query {
     pub query: Option<String>,
+    pub vrl_function_query: Option<String>,
     pub custom_query: bool,
     pub fields: PanelFields,
     pub config: QueryConfig,

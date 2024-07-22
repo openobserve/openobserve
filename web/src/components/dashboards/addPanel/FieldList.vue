@@ -638,8 +638,8 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const data = reactive<any>({
-      schemaList: [],
-      indexOptions: [],
+      // schemaList: [],
+      // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
       currentFieldsList: [],
     });
@@ -678,7 +678,7 @@ export default defineComponent({
     };
 
     const selectedMetricTypeIcon = computed(() => {
-      return data.schemaList.find(
+      return dashboardPanelData.meta.stream.streamResults.find(
         (it: any) =>
           it.name ==
           dashboardPanelData.data.queries[
@@ -725,7 +725,7 @@ export default defineComponent({
     // update the selected stream fields list
     watch(
       () => [
-        data.schemaList,
+        dashboardPanelData.meta.stream.streamResults,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
@@ -735,7 +735,7 @@ export default defineComponent({
       ],
       async () => {
         // get the selected stream fields based on the selected stream type
-        const fields: any = data.schemaList.find(
+        const fields: any = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
             it.name ==
               dashboardPanelData.data.queries[
@@ -765,7 +765,7 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
-        data.schemaList,
+        dashboardPanelData.meta.stream.streamResults,
       ],
       () => {
         // if (!props.editMode) {
@@ -774,13 +774,13 @@ export default defineComponent({
         //   ].fields.stream = "";
         // }
 
-        data.indexOptions = data.schemaList.filter(
-          (data: any) =>
-            data.stream_type ==
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type
-        );
+        // data.indexOptions = data.schemaList.filter(
+        //   (data: any) =>
+        //     data.stream_type ==
+        //     dashboardPanelData.data.queries[
+        //       dashboardPanelData.layout.currentQueryIndex
+        //     ].fields.stream_type
+        // );
 
         // set the first stream as the selected stream when the api loads the data
         if (
@@ -788,13 +788,13 @@ export default defineComponent({
           // !dashboardPanelData.data.queries[
           //   dashboardPanelData.layout.currentQueryIndex
           // ].fields.stream &&
-          data.indexOptions.length > 0
+          dashboardPanelData.meta.stream.streamResults.length > 0
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
           if (
-            data.indexOptions.find(
+            dashboardPanelData.meta.stream.streamResults.find(
               (it: any) =>
                 it.name ==
                 dashboardPanelData.data.queries[
@@ -808,7 +808,7 @@ export default defineComponent({
               ].fields.stream;
           } else {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
-              data.indexOptions[0]?.name;
+              dashboardPanelData.meta.stream.streamResults[0]?.name;
           }
         }
       }
@@ -821,6 +821,7 @@ export default defineComponent({
         dashboardPanelData.meta.stream.customQueryFields,
         dashboardPanelData.meta.stream.userDefinedSchema,
         dashboardPanelData.meta.stream.useUserDefinedSchemas,
+        dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ],
       () => {
         data.currentFieldsList = [];
@@ -835,11 +836,13 @@ export default defineComponent({
         ) {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ...dashboardPanelData.meta.stream.userDefinedSchema,
           ];
         } else {
           data.currentFieldsList = [
             ...dashboardPanelData.meta.stream.customQueryFields,
+            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ...dashboardPanelData.meta.stream.selectedStreamFields,
           ];
         }
@@ -862,8 +865,6 @@ export default defineComponent({
     // get the stream list by making an API call
     const getStreamList = async (stream_type: any) => {
       await getStreams(stream_type, false).then((res: any) => {
-        data.schemaList = [];
-        data.schemaList = res.list;
         // below line required for pass by reference
         // if we don't set blank, then same object from cache is being set
         // and that doesn't call the watchers,
@@ -948,9 +949,10 @@ export default defineComponent({
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        filteredStreams.value = data.indexOptions.filter((stream: any) => {
-          return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        });
+        filteredStreams.value =
+          dashboardPanelData.meta.stream.streamResults.filter((stream: any) => {
+            return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+          });
       });
     };
 
@@ -980,8 +982,8 @@ export default defineComponent({
         const schemaFields: any = [];
         let userDefineSchemaSettings: any = [];
 
-        if (data.schemaList.length > 0) {
-          for (const stream of data.schemaList) {
+        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
+          for (const stream of dashboardPanelData.meta.stream.streamResults) {
             if (
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex

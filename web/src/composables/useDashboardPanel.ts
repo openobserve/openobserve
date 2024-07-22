@@ -80,6 +80,7 @@ const getDefaultDashboardPanelData: any = () => ({
     queries: [
       {
         query: "",
+        vrlFunctionQuery: "",
         customQuery: false,
         fields: {
           stream: "",
@@ -135,6 +136,7 @@ const getDefaultDashboardPanelData: any = () => ({
       hasUserDefinedSchemas: false,
       interestingFieldList: [],
       userDefinedSchema: [],
+      vrlFunctionFieldList: [],
       selectedStreamFields: [],
       useUserDefinedSchemas: "user_defined_schema",
       customQueryFields: [],
@@ -2424,9 +2426,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.x.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.customQueryFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...dashboardPanelData.meta.stream.customQueryFields,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column)
         );
         if (customQueryXFieldError.length) {
           errors.push(
@@ -2441,9 +2444,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.customQueryFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...dashboardPanelData.meta.stream.customQueryFields,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column)
         );
         if (customQueryYFieldError.length) {
           errors.push(
@@ -2459,9 +2463,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.x.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.selectedStreamFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...dashboardPanelData.meta.stream.selectedStreamFields,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column)
         );
         if (customQueryXFieldError.length) {
           errors.push(
@@ -2476,9 +2481,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.filter(
           (it: any) =>
-            !dashboardPanelData.meta.stream.selectedStreamFields.find(
-              (i: any) => i.name == it.column
-            )
+            ![
+              ...dashboardPanelData.meta.stream.selectedStreamFields,
+              ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+            ].find((i: any) => i.name == it.column)
         );
         if (customQueryYFieldError.length) {
           errors.push(

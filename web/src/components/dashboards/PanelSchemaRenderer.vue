@@ -222,6 +222,7 @@ export default defineComponent({
     "metadata-update",
     "result-metadata-update",
     "update:initialVariableValues",
+    "updated:vrlFunctionFieldList",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -285,6 +286,56 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
+        // emit vrl function field list
+        if (data.value.length && data.value[0] && data.value[0].length) {
+          // Find the index of the record with max attributes
+          const maxAttributesIndex = data.value[0].reduce(
+            (
+              maxIndex: string | number,
+              obj: {},
+              currentIndex: any,
+              array: { [x: string]: {} }
+            ) => {
+              const numAttributes = Object.keys(obj).length;
+              const maxNumAttributes = Object.keys(array[maxIndex]).length;
+              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
+            },
+            0
+          );
+
+          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
+
+          // extract all panelSchema alias
+          const aliasList = [
+            ...panelSchema.value?.queries[0]?.fields?.x.map(
+              (it: any) => it.alias
+            ),
+            ...panelSchema.value?.queries[0]?.fields?.y.map(
+              (it: any) => it.alias
+            ),
+            ...panelSchema.value?.queries[0]?.fields?.z.map(
+              (it: any) => it.alias
+            ),
+            ...panelSchema.value?.queries[0]?.fields?.breakdown.map(
+              (it: any) => it.alias
+            ),
+          ];
+
+          // vrl function field list = all fields except aliasList
+          const vrlFunctionFieldList = Object.keys(recordwithMaxAttribute)
+            .filter((alias: any) => {
+              return !aliasList.includes(alias);
+            })
+            .map((alias: any) => {
+              return {
+                name: alias,
+                type: "Utf8",
+              };
+            });
+
+          emit("updated:vrlFunctionFieldList", vrlFunctionFieldList);
+        }
+
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
           try {
