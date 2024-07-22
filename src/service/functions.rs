@@ -221,7 +221,7 @@ pub async fn list_stream_functions(
 
 pub async fn delete_stream_function(
     org_id: &str,
-    _stream_type: StreamType,
+    stream_type: StreamType,
     stream_name: &str,
     fn_name: &str,
 ) -> Result<HttpResponse, Error> {
@@ -237,7 +237,7 @@ pub async fn delete_stream_function(
 
     if let Some(ref mut val) = existing_fn.streams {
         for stream in val.iter_mut() {
-            if stream.stream == stream_name {
+            if stream.stream == stream_name && stream.stream_type == stream_type {
                 stream.is_removed = true;
                 stream.order = 0;
                 break;
