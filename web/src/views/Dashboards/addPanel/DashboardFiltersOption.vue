@@ -51,6 +51,7 @@
                 label="Condition"
                 @remove-condition="removeFilterItem(filteredItem.column)"
                 @logical-operator-change="handleLogicalOperatorChange"
+                :isFirst="index === 0"
               />
             </div>
           </q-btn-group>

@@ -1,7 +1,7 @@
 <template>
   <div class="condition">
     <div>
-      <div>
+      <div v-if="!isFirst">
         <q-select
           v-model="condition.logicalOperator"
           dense
@@ -162,6 +162,7 @@ export default defineComponent({
     "filterValueOptions",
     "label",
     "loadFilterItem",
+    "isFirst",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();

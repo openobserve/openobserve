@@ -27,6 +27,7 @@
             :load-filter-item="loadFilterItem"
             @remove-condition="removeConditionFromGroup(index)"
             @logical-operator-change="emitLogicalOperatorChange"
+            :isFirst="index === 0"
           />
         </div>
       </div>
@@ -45,7 +46,6 @@
     </div>
   </div>
   <div class="group-header">
-    <!-- <span>GROUP {{ groupIndex }}</span> -->
     <q-btn size="xs" dense @click="$emit('remove-group')" icon="close" />
   </div>
 </template>
@@ -94,7 +94,7 @@ export default defineComponent({
       emit("add-condition", props.group);
       showAddMenu.value = false;
     };
-    const filterOptions = ["AND", "OR"];
+
     const emitAddGroup = () => {
       emit("add-group", props.group);
       showAddMenu.value = false;
@@ -137,7 +137,6 @@ export default defineComponent({
       addConditionToGroup,
       addGroupToGroup,
       emitLogicalOperatorChange,
-      filterOptions,
     };
   },
 });
