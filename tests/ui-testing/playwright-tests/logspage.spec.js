@@ -165,6 +165,9 @@ test.describe("Logs UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
       .click({ force: true });
+       await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+       await page.waitForTimeout(1000)
+       await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
     // await page
     //   .locator(".bg-primary > .q-btn__content > .q-icon")
     //   .click({ force: true });
