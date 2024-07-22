@@ -1054,6 +1054,7 @@ export default defineComponent({
     } = useLogs();
     const queryEditorRef = ref(null);
 
+
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
@@ -1175,7 +1176,6 @@ export default defineComponent({
           parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
         ) {
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
-          searchObj.data.stream.selectedStreamFields = [];
           onStreamChange(value);
         }
         // if (
@@ -1254,6 +1254,8 @@ export default defineComponent({
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
               let streamFound = false;
+              searchObj.data.stream.selectedStream = [];
+           
               streamName = searchObj.data.parsedQuery.from[0].table;
               searchObj.data.streamResults.list.forEach((stream) => {
                 if (stream.name == searchObj.data.parsedQuery.from[0].table) {
@@ -1262,13 +1264,22 @@ export default defineComponent({
                     label: stream.name,
                     value: stream.name,
                   };
+
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  stream.schema.forEach((field) => {
-                    searchObj.data.stream.selectedStreamFields.push({
-                      name: field.name,
-                    });
-                  });
+                  onStreamChange(itemObj.value);
+                  // searchObj.data.stream.selectedStreamFields = [];
+
+                  // if (searchObj.data.stream.selectedStreamFields.length == 0)
+                  //  {
+                  //     const data = await getStream (
+                  //       searchObj.data.stream.selectedStream[0],
+                  //       searchObj.data.stream.streamType || "logs",
+                  //       true
+                  //  )
+                  //  searchObj.data.stream.selectedStreamFields = data.schema
+                   
+                  // }
                 }
               });
               if (streamFound == false) {
@@ -1286,7 +1297,7 @@ export default defineComponent({
           }
         }
       } catch (e) {
-        console.log("Logs: Error while updating query value");
+        console.log(e,"Logs: Error while updating query value");
       }
     };
 
