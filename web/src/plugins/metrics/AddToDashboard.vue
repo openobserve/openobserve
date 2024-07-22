@@ -49,7 +49,7 @@
             outlined
             filled
             dense
-            :rules="[(val) => !!val.trim() || 'Panel Title required']"
+            :rules="[(val: any) => !!val.trim() || 'Panel Title required']"
             :lazy-rules="true"
             data-test="metrics-new-dashboard-panel-title"
           />

@@ -124,7 +124,7 @@ test.describe("Logs UI testcases", () => {
     await page.keyboard.press("Backspace");
     await page.waitForTimeout(3000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByText("An error occurred while constructing the search query.").click();
+    await page.getByText("No column found in selected stream.").click();
   });
 
   test("should be able to enter valid text in VRL and run query", async ({
@@ -165,13 +165,16 @@ test.describe("Logs UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
       .click({ force: true });
-    await page
-      .locator(".bg-primary > .q-btn__content > .q-icon")
-      .click({ force: true });
-    await page.waitForTimeout(2000);
-    await page
-      .locator(".bg-primary > .q-btn__content > .q-icon")
-      .click({ force: true });
+       await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+       await page.waitForTimeout(1000)
+       await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+    // await page
+    //   .locator(".bg-primary > .q-btn__content > .q-icon")
+    //   .click({ force: true });
+    // await page.waitForTimeout(2000);
+    // await page
+    //   .locator(".bg-primary > .q-btn__content > .q-icon")
+    //   .click({ force: true });
     await expect(
       page.locator('[data-cy="index-field-search-input"]')
     ).toBeVisible();

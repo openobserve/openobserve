@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="sortedStreamFields"
         :visible-columns="['name']"
         :rows="streamFieldsRows"
-        :row-key="(row) => searchObj.data.stream.selectedStream[0] + row.name"
+        :row-key="(row: any) => searchObj.data.stream.selectedStream[0] + row.name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
         v-model:pagination="pagination"

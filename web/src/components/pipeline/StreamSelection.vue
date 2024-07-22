@@ -38,7 +38,7 @@
             v-bind:readonly="isUpdating"
             v-bind:disable="isUpdating"
             :rules="[
-              (val, rules) =>
+              (val: any, rules: any) =>
                 !!val
                   ? isValidName ||
                     `Use alphanumeric and '+=,.@-_' characters only, without spaces.`

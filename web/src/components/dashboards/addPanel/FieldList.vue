@@ -917,7 +917,7 @@ export default defineComponent({
       return filtered;
     };
 
-    const mutationHandler = (mutationRecords: any) => {};
+    const mutationHandler: any = (mutationRecords: any) => {};
 
     const onDragEnter = (e: any) => {
       e.preventDefault();

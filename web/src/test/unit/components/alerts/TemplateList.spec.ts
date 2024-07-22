@@ -20,6 +20,7 @@ import { Dialog, Notify } from "quasar";
 import TemplateList from "@/components/alerts/TemplateList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
+// @ts-ignore
 import { rest } from "msw";
 import templateService from "@/services/alert_templates";
 import router from "../../helpers/router";
@@ -114,7 +115,7 @@ describe("Alert List", async () => {
       global.server.use(
         rest.delete(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
-          (req, res, ctx) => {
+          (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
           }
         )
@@ -122,7 +123,7 @@ describe("Alert List", async () => {
       global.server.use(
         rest.get(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/templates`,
-          (req, res, ctx) => {
+          (req: any, res: any, ctx: any) => {
             return res(
               ctx.status(200),
               ctx.json({

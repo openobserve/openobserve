@@ -209,7 +209,7 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
       .fill("sanity");
-    await page.getByText("sanitytest").click();
+    await page.getByText("sanitytest").first().click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
       .getByLabel("Expand")
@@ -220,9 +220,9 @@ test.describe("Sanity testcases", () => {
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
       .fill("sanity");
-    await page.getByText("favorite_border").click();
+    await page.getByText("favorite_border").first().click();
     await page.getByText("Favorite Views").click();
-    await page.getByRole("button", { name: "cancel" }).click();
+    await page.getByLabel('Clear').first().click();
     await page.getByLabel("Collapse").click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')

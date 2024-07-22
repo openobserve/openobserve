@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       method: filterEntities,
     }"
   >
-    <template v-slot:permission="slotProps">
+    <template v-slot:permission="slotProps: any">
       <q-checkbox
         v-show="slotProps.column.row.permission[slotProps.columnName].show"
         size="xs"

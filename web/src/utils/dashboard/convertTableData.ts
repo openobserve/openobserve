@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { utcToZonedTime } from "date-fns-tz";
+import { toZonedTime } from "date-fns-tz";
 import {
   formatDate,
   formatUnitValue,
@@ -120,7 +120,7 @@ export const convertTableData = (
       // if current field is histogram field then return formatted date
       obj["format"] = (val: any) => {
         return formatDate(
-          utcToZonedTime(
+          toZonedTime(
             typeof val === "string"
               ? `${val}Z`
               : new Date(val)?.getTime() / 1000,
