@@ -370,8 +370,11 @@ async fn write_results(
     let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
     let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
 
-    if (last_rec_ts - first_rec_ts).abs()
-        < get_config().common.result_cache_discard_duration * 1000 * 1000
+    let smallest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
+    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+
+    if (last_rec_ts - first_rec_ts).abs() < discard_duration
+        && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
