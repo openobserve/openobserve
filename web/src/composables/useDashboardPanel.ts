@@ -1755,8 +1755,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const groupConditions = condition.conditions
           .map(buildCondition)
           .filter(Boolean);
+
+        const logicalOperator = condition.conditions
+          .map((c: any) => c.logicalOperator)
+          .filter(Boolean);
+
         return groupConditions.length
-          ? `(${groupConditions.join(` ${condition.condition || "AND"} `)})`
+          ? `(${groupConditions.join(` ${logicalOperator[0] || "AND"} `)})`
           : "";
       } else if (condition.type === "list" && condition.values?.length > 0) {
         return `${condition.column} IN (${condition.values
@@ -1800,7 +1805,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     };
 
     const whereConditions = filter.map(buildCondition).filter(Boolean);
-    if (whereConditions.length > 0) {
+
+    const filtermap = filter.map((it: any) => it.filterType);
+    const logicalOperator = filter.map((c: any) => c.logicalOperator);
+    if (filtermap.includes("condition")) {
+      query += ` WHERE ${whereConditions.join(` ${logicalOperator[0]} `)}`;
+    } else if (whereConditions.length > 0) {
       query += ` WHERE ${whereConditions.join(" AND ")}`;
     }
 

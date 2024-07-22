@@ -2,7 +2,13 @@
   <div class="condition">
     <div>
       <div>
-        <q-select v-model="addLabel" dense filled :options="filterOptions" />
+        <q-select
+          v-model="condition.logicalOperator"
+          dense
+          filled
+          :options="filterOptions"
+          @update:model-value="emitLogicalOperatorChange"
+        />
       </div>
       <q-btn
         square
@@ -157,7 +163,7 @@ export default defineComponent({
     "label",
     "loadFilterItem",
   ],
-  setup(props) {
+  setup(props, { emit }) {
     const { t } = useI18n();
 
     const filterStreamFn = (search: any, update: any) => {
@@ -200,6 +206,10 @@ export default defineComponent({
       }
     });
 
+    const emitLogicalOperatorChange = (newOperator: string) => {
+      emit("logical-operator-change", newOperator);
+    };
+
     return {
       operators,
       showMenu,
@@ -209,6 +219,7 @@ export default defineComponent({
       t,
       filterStreamFn,
       filterOptions,
+      emitLogicalOperatorChange,
     };
   },
 });

@@ -16,6 +16,7 @@
             @add-condition="addConditionToGroup"
             @add-group="addGroupToGroup"
             @remove-group="removeGroupFromNested(index)"
+            @logical-operator-change="emitLogicalOperatorChange"
           />
         </div>
         <div v-else>
@@ -25,6 +26,7 @@
             :schema-options="schemaOptions"
             :load-filter-item="loadFilterItem"
             @remove-condition="removeConditionFromGroup(index)"
+            @logical-operator-change="emitLogicalOperatorChange"
           />
         </div>
       </div>
@@ -78,7 +80,12 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ["add-condition", "add-group", "remove-group"],
+  emits: [
+    "add-condition",
+    "add-group",
+    "remove-group",
+    "logical-operator-change",
+  ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);
@@ -87,7 +94,7 @@ export default defineComponent({
       emit("add-condition", props.group);
       showAddMenu.value = false;
     };
-
+    const filterOptions = ["AND", "OR"];
     const emitAddGroup = () => {
       emit("add-group", props.group);
       showAddMenu.value = false;
@@ -117,7 +124,9 @@ export default defineComponent({
     const addGroupToGroup = (group: any) => {
       emit("add-group", group);
     };
-
+    const emitLogicalOperatorChange = (newOperator: string) => {
+      emit("logical-operator-change", newOperator);
+    };
     return {
       t,
       showAddMenu,
@@ -127,6 +136,8 @@ export default defineComponent({
       removeGroupFromNested,
       addConditionToGroup,
       addGroupToGroup,
+      emitLogicalOperatorChange,
+      filterOptions,
     };
   },
 });

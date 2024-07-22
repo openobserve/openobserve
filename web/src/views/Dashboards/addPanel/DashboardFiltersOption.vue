@@ -37,6 +37,7 @@
                   dashboardVariablesFilterItems(index)
                 "
                 :load-filter-item="loadFilterItem"
+                @logical-operator-change="handleLogicalOperatorChange"
               />
             </div>
             <div v-else>
@@ -49,6 +50,7 @@
                 :load-filter-item="loadFilterItem"
                 label="Condition"
                 @remove-condition="removeFilterItem(filteredItem.column)"
+                @logical-operator-change="handleLogicalOperatorChange"
               />
             </div>
           </q-btn-group>
@@ -109,7 +111,6 @@ export default defineComponent({
       useDashboardPanelData();
     const { t } = useI18n();
     const showAddMenu = ref(false);
-    const addLabel = ref("AND");
 
     const addFilter = (filterType: string) => {
       showAddMenu.value = false;
@@ -125,7 +126,7 @@ export default defineComponent({
           filterType: "condition",
           operator: null,
           value: null,
-          logicalOperator: addLabel.value,
+          logicalOperator: "AND",
           values: [],
         };
         currentQuery.fields?.filter.push(defaultCondition);
@@ -138,11 +139,12 @@ export default defineComponent({
               filterType: "condition",
               operator: null,
               value: null,
-              logicalOperator: addLabel.value,
+              logicalOperator: "AND",
               values: [],
             },
           ],
           filterType: "group",
+          logicalOperator: "AND",
         };
         currentQuery.fields?.filter.push(defaultGroup);
       }
@@ -155,7 +157,7 @@ export default defineComponent({
         filterType: "condition",
         operator: null,
         value: null,
-        logicalOperator: addLabel.value,
+        logicalOperator: "AND",
         values: [],
       });
     };
@@ -169,11 +171,12 @@ export default defineComponent({
             filterType: "condition",
             operator: null,
             value: null,
-            logicalOperator: addLabel.value,
+            logicalOperator: "AND",
             values: [],
           },
         ],
         filterType: "group",
+        logicalOperator: "AND",
       });
     };
 
@@ -183,6 +186,36 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ];
       currentQuery.fields?.filter.splice(index, 1);
+    };
+
+    const handleLogicalOperatorChange = (
+      index: number,
+      newOperator: string
+    ) => {
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      const item = currentQuery.fields?.filter[index];
+
+      if (item) {
+        if (item.filterType === "condition") {
+          item.logicalOperator = newOperator;
+        } else if (item.filterType === "group") {
+          updateGroupLogicalOperators(item, newOperator);
+        }
+      }
+    };
+
+    const updateGroupLogicalOperators = (group: any, newOperator: string) => {
+      group.logicalOperator = newOperator;
+      group.conditions.forEach((condition: any) => {
+        if (condition.filterType === "group") {
+          updateGroupLogicalOperators(condition, newOperator);
+        } else {
+          condition.logicalOperator = newOperator;
+        }
+      });
     };
 
     const dashboardVariablesFilterItems = (index: number) =>
@@ -219,7 +252,6 @@ export default defineComponent({
     return {
       t,
       showAddMenu,
-      addLabel,
       dashboardPanelData,
       removeFilterItem,
       loadFilterItem,
@@ -227,6 +259,7 @@ export default defineComponent({
       addConditionToGroup,
       addGroupToGroup,
       removeGroup,
+      handleLogicalOperatorChange,
       dashboardVariablesFilterItems,
       schemaOptions,
     };
