@@ -1755,14 +1755,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const groupConditions = condition.conditions
           .map(buildCondition)
           .filter(Boolean);
-
-        const logicalOperator = condition.conditions
+        const logicalOperators = condition.conditions
           .map((c: any) => c.logicalOperator)
           .filter(Boolean);
+        console.log("groupConditions", groupConditions, logicalOperators);
 
-        return groupConditions.length
-          ? `(${groupConditions.join(` ${logicalOperator[0] || "AND"} `)})`
-          : "";
+        let groupQuery = "";
+        groupConditions.forEach((cond: any, index: any) => {
+          console.log("groupConditions cond", cond, index);
+
+          if (index > 0) {
+            groupQuery += ` ${logicalOperators[index]} `;
+          }
+          groupQuery += cond;
+        });
+
+        return groupConditions.length ? `(${groupQuery})` : "";
       } else if (condition.type === "list" && condition.values?.length > 0) {
         return `${condition.column} IN (${condition.values
           .map((value: any) => `'${value}'`)
@@ -1806,12 +1814,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const whereConditions = filter.map(buildCondition).filter(Boolean);
 
-    const filtermap = filter.map((it: any) => it.filterType);
-    const logicalOperator = filter.map((c: any) => c.logicalOperator);
-    if (filtermap.includes("condition")) {
-      query += ` WHERE ${whereConditions.join(` ${logicalOperator[0]} `)}`;
-    } else if (whereConditions.length > 0) {
-      query += ` WHERE ${whereConditions.join(" AND ")}`;
+    const logicalOperators = filter.map((it: any) => it.logicalOperator);
+    console.log("whereConditions", whereConditions, logicalOperators);
+
+    if (whereConditions.length > 0) {
+      query += ` WHERE ${whereConditions
+        .map((cond, index) => {
+          console.log("cond", cond, index);
+
+          const logicalOperator =
+            index < logicalOperators.length && logicalOperators[index + 1]
+              ? logicalOperators[index + 1]
+              : "";
+
+          return index < logicalOperators.length
+            ? `${cond} ${logicalOperator}`
+            : cond;
+        })
+        .join(" ")}`;
     }
 
     // add group by statement

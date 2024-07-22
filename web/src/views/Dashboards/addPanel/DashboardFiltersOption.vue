@@ -145,6 +145,7 @@ export default defineComponent({
             },
           ],
           filterType: "group",
+          logicalOperator: "AND",
         };
         currentQuery.fields?.filter.push(defaultGroup);
       }
@@ -176,6 +177,7 @@ export default defineComponent({
           },
         ],
         filterType: "group",
+        logicalOperator: "AND",
       });
     };
 

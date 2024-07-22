@@ -1,4 +1,11 @@
 <template>
+  <q-select
+    v-model="group.logicalOperator"
+    dense
+    filled
+    :options="filterOptions"
+    @update:model-value="emitLogicalOperatorChange"
+  />
   <div class="group">
     <div class="group-conditions">
       <div
@@ -89,6 +96,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);
+    const filterOptions = ["AND", "OR"];
 
     const emitAddCondition = () => {
       emit("add-condition", props.group);
@@ -137,6 +145,7 @@ export default defineComponent({
       addConditionToGroup,
       addGroupToGroup,
       emitLogicalOperatorChange,
+      filterOptions,
     };
   },
 });
