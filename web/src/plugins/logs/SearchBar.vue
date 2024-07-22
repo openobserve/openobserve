@@ -905,7 +905,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
-import useStreams from "@/composables/useStreams";
 
 const defaultValue: any = () => {
   return {
@@ -1054,7 +1053,6 @@ export default defineComponent({
       cancelQuery,
     } = useLogs();
     const queryEditorRef = ref(null);
-    const {  getStream } = useStreams();
 
 
     const formData: any = ref(defaultValue());
@@ -1167,7 +1165,7 @@ export default defineComponent({
       return columnNames;
     }
 
-    const updateQueryValue =  async (value: string) => {
+    const updateQueryValue = (value: string) => {
       if (searchObj.meta.quickMode == true) {
         const parsedSQL = fnParsedSQL();
 
@@ -1259,7 +1257,7 @@ export default defineComponent({
               searchObj.data.stream.selectedStream = [];
            
               streamName = searchObj.data.parsedQuery.from[0].table;
-              searchObj.data.streamResults.list.forEach(async (stream) => {
+              searchObj.data.streamResults.list.forEach((stream) => {
                 if (stream.name == searchObj.data.parsedQuery.from[0].table) {
                   streamFound = true;
                   let itemObj = {
