@@ -1,42 +1,43 @@
 <template>
   <q-select
+    v-if="groupIndex !== 0"
     v-model="group.logicalOperator"
     dense
+    options-dense
     filled
     :options="filterOptions"
     @update:model-value="emitLogicalOperatorChange"
+    class="condition-logical-operator"
   />
-  <div class="group">
+  <div class="group" :style="`--group-index: ${groupIndex}`">
     <div class="group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
         class="condition-group"
       >
-        <div v-if="condition.filterType === 'group'">
-          <Group
-            :group="condition"
-            :group-index="index"
-            :dashboard-variables-filter-items="dashboardVariablesFilterItems"
-            :schema-options="schemaOptions"
-            :load-filter-item="loadFilterItem"
-            @add-condition="addConditionToGroup"
-            @add-group="addGroupToGroup"
-            @remove-group="removeGroupFromNested(index)"
-            @logical-operator-change="emitLogicalOperatorChange"
-          />
-        </div>
-        <div v-else>
-          <AddCondition
-            :condition="condition"
-            :dashboard-variables-filter-items="dashboardVariablesFilterItems"
-            :schema-options="schemaOptions"
-            :load-filter-item="loadFilterItem"
-            @remove-condition="removeConditionFromGroup(index)"
-            @logical-operator-change="emitLogicalOperatorChange"
-            :isFirst="index === 0"
-          />
-        </div>
+        <Group
+          v-if="condition.filterType === 'group'"
+          :group="condition"
+          :group-index="groupIndex + 1"
+          :dashboard-variables-filter-items="dashboardVariablesFilterItems"
+          :schema-options="schemaOptions"
+          :load-filter-item="loadFilterItem"
+          @add-condition="addConditionToGroup"
+          @add-group="addGroupToGroup"
+          @remove-group="removeGroupFromNested(index)"
+          @logical-operator-change="emitLogicalOperatorChange"
+        />
+        <AddCondition
+          v-else-if="condition.filterType === 'condition'"
+          :condition="condition"
+          :dashboard-variables-filter-items="dashboardVariablesFilterItems"
+          :schema-options="schemaOptions"
+          :load-filter-item="loadFilterItem"
+          @remove-condition="removeConditionFromGroup(index)"
+          @logical-operator-change="emitLogicalOperatorChange"
+          :condition-index="index"
+        />
       </div>
       <q-btn icon="add" color="primary" size="xs" round class="add-btn">
         <q-menu v-model="showAddMenu">
@@ -51,9 +52,12 @@
         </q-menu>
       </q-btn>
     </div>
-  </div>
-  <div class="group-header">
-    <q-btn size="xs" dense @click="$emit('remove-group')" icon="close" />
+    <div
+      v-if="groupIndex !== 0"
+      class="group-remove"
+    >
+      <q-btn flat size="xs" dense @click="$emit('remove-group')" icon="close" />
+    </div>
   </div>
 </template>
 
@@ -152,29 +156,62 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
 .group {
-  border: 1px solid #ccc;
-  padding: 10px;
-  margin-bottom: 10px;
+  display: flex;
+  padding: 0px 0px 0px 5px;
+  background-color: rgba(89, 96, 178, calc(0.2 * var(--group-index)));
+  border-radius: 5px;
 }
-.group-header {
+
+.group-remove {
+  border-left: 1px solid $grey-2;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
 }
+
 .group-conditions {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
+  align-items: center;
 }
+
 .condition-group {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   margin-right: 10px;
+  padding: 0px 0px 0px 0px;
+  min-height: 35px;
+  gap: 8px;
 }
 
 .add-btn {
   height: 20px;
   width: 20px;
+  margin-right: 5px;
+}
+
+.condition-logical-operator {
+  width: 55px;
+}
+
+:deep(.condition-logical-operator .q-field__control) {
+    min-height: 23px !important;
+    height: 23px !important;
+    padding: 0px 0px 0px 5px !important;
+}
+
+:deep(.condition-logical-operator .q-field__native) {
+  min-height: 23px !important;
+    height: 23px !important;
+    padding: 0px 0px 0px 0px !important;
+}
+
+:deep(.condition-logical-operator .q-field__append) {
+  min-height: 23px !important;
+    height: 23px !important;
+    padding: 0px 0px 0px 0px !important;
 }
 </style>

@@ -1,145 +1,146 @@
 <template>
   <div class="condition">
-    <div>
-      <div v-if="!isFirst">
+    <q-select
+      v-if="conditionIndex !== 0"
+      v-model="condition.logicalOperator"
+      dense
+      options-dense
+      filled
+      :options="filterOptions"
+      @update:model-value="emitLogicalOperatorChange"
+      class="condition-logical-operator"
+    />
+    <q-btn-group>
+    <q-btn
+      square
+      icon-right="arrow_drop_down"
+      no-caps
+      dense
+      :no-wrap="true"
+      color="primary"
+      size="sm"
+      :label="computedLabel(condition)"
+      class="q-pl-sm"
+    >
+      <q-menu class="q-pa-md" @show="(e) => loadFilterItem(condition.column)">
         <q-select
-          v-model="condition.logicalOperator"
+          v-model="selectedSchemas"
+          :options="schemaOptions"
+          label="FieldList"
           dense
           filled
-          :options="filterOptions"
-          @update:model-value="emitLogicalOperatorChange"
+          style="width: 100%"
+          use-input
+          borderless
+          hide-selected
+          fill-input
+          emit-value
+          @filter="filterStreamFn"
         />
-      </div>
-      <q-btn
-        square
-        icon-right="arrow_drop_down"
-        no-caps
-        dense
-        :no-wrap="true"
-        color="primary"
-        size="sm"
-        :label="computedLabel(condition)"
-        class="q-pl-sm"
-      >
-        <q-menu class="q-pa-md" @show="(e) => loadFilterItem(condition.column)">
-          <q-select
-            v-model="selectedSchemas"
-            :options="schemaOptions"
-            label="FieldList"
-            dense
-            filled
-            style="width: 100%"
-            use-input
-            borderless
-            hide-selected
-            fill-input
-            emit-value
-            @filter="filterStreamFn"
-          />
-          <div style="height: 100%">
-            <div class="q-pa-xs" style="height: 100%">
-              <div class="q-gutter-xs" style="height: 100%">
-                <q-tabs v-model="condition.type" dense>
-                  <q-tab
-                    dense
-                    name="list"
-                    :label="t('common.list')"
-                    style="width: auto"
-                  ></q-tab>
-                  <q-tab
-                    dense
-                    name="condition"
-                    :label="t('common.condition')"
-                    style="width: auto"
-                  ></q-tab>
-                </q-tabs>
-                <q-separator></q-separator>
-                <q-tab-panels
-                  v-model="condition.type"
+        <div style="height: 100%">
+          <div class="q-pa-xs" style="height: 100%">
+            <div class="q-gutter-xs" style="height: 100%">
+              <q-tabs v-model="condition.type" dense>
+                <q-tab
                   dense
-                  animated
-                  style="height: 100%"
-                >
-                  <q-tab-panel dense name="condition" class="q-pa-none">
-                    <div class="flex column" style="height: 220px">
-                      <q-select
-                        dense
-                        filled
-                        v-model="condition.operator"
-                        :options="operators"
-                        :label="t('common.operator')"
-                        style="width: 100%"
-                      />
-                      <CommonAutoComplete
-                        v-if="
-                          !['Is Null', 'Is Not Null'].includes(
-                            condition.operator
-                          )
-                        "
-                        :label="t('common.value')"
-                        v-model="condition.value"
-                        :items="dashboardVariablesFilterItems"
-                        searchRegex="(?:^|[^$])\$?(\w+)"
-                      ></CommonAutoComplete>
-                    </div>
-                  </q-tab-panel>
-                  <q-tab-panel dense name="list" class="q-pa-none">
+                  name="list"
+                  :label="t('common.list')"
+                  style="width: auto"
+                ></q-tab>
+                <q-tab
+                  dense
+                  name="condition"
+                  :label="t('common.condition')"
+                  style="width: auto"
+                ></q-tab>
+              </q-tabs>
+              <q-separator></q-separator>
+              <q-tab-panels
+                v-model="condition.type"
+                dense
+                animated
+                style="height: 100%"
+              >
+                <q-tab-panel dense name="condition" class="q-pa-none">
+                  <div class="flex column" style="height: 220px">
                     <q-select
                       dense
                       filled
-                      v-model="condition.values"
-                      :options="filterValueOptions"
-                      :label="t('common.selectFilter')"
-                      multiple
-                      emit-value
-                      map-options
-                      :rules="[
-                        (val) => val.length > 0 || 'At least 1 item required',
-                      ]"
+                      v-model="condition.operator"
+                      :options="operators"
+                      :label="t('common.operator')"
+                      style="width: 100%"
+                    />
+                    <CommonAutoComplete
+                      v-if="
+                        !['Is Null', 'Is Not Null'].includes(
+                          condition.operator
+                        )
+                      "
+                      :label="t('common.value')"
+                      v-model="condition.value"
+                      :items="dashboardVariablesFilterItems"
+                      searchRegex="(?:^|[^$])\$?(\w+)"
+                    ></CommonAutoComplete>
+                  </div>
+                </q-tab-panel>
+                <q-tab-panel dense name="list" class="q-pa-none">
+                  <q-select
+                    dense
+                    filled
+                    v-model="condition.values"
+                    :options="filterValueOptions"
+                    :label="t('common.selectFilter')"
+                    multiple
+                    emit-value
+                    map-options
+                    :rules="[
+                      (val) => val.length > 0 || 'At least 1 item required',
+                    ]"
+                  >
+                    <template v-slot:selected>
+                      {{
+                        condition.values[0]?.length > 15
+                          ? condition.values[0]?.substring(0, 15) + "..."
+                          : condition.values[0]
+                      }}
+                      {{
+                        condition.values?.length > 1
+                          ? " +" + (condition.values?.length - 1)
+                          : ""
+                      }}
+                    </template>
+                    <template
+                      v-slot:option="{
+                        itemProps,
+                        opt,
+                        selected,
+                        toggleOption,
+                      }"
                     >
-                      <template v-slot:selected>
-                        {{
-                          condition.values[0]?.length > 15
-                            ? condition.values[0]?.substring(0, 15) + "..."
-                            : condition.values[0]
-                        }}
-                        {{
-                          condition.values?.length > 1
-                            ? " +" + (condition.values?.length - 1)
-                            : ""
-                        }}
-                      </template>
-                      <template
-                        v-slot:option="{
-                          itemProps,
-                          opt,
-                          selected,
-                          toggleOption,
-                        }"
-                      >
-                        <q-item v-bind="itemProps">
-                          <q-item-section side>
-                            <q-checkbox
-                              dense
-                              :model-value="selected"
-                              @update:model-value="toggleOption(opt)"
-                            ></q-checkbox>
-                          </q-item-section>
-                          <q-item-section>
-                            <SanitizedHtmlRenderer :html-content="opt" />
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
-                  </q-tab-panel>
-                </q-tab-panels>
-              </div>
+                      <q-item v-bind="itemProps">
+                        <q-item-section side>
+                          <q-checkbox
+                            dense
+                            :model-value="selected"
+                            @update:model-value="toggleOption(opt)"
+                          ></q-checkbox>
+                        </q-item-section>
+                        <q-item-section>
+                          <SanitizedHtmlRenderer :html-content="opt" />
+                        </q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
+                </q-tab-panel>
+              </q-tab-panels>
             </div>
           </div>
-        </q-menu>
+        </div>
+      </q-menu>
       </q-btn>
       <q-btn size="xs" dense @click="$emit('remove-condition')" icon="close" />
-    </div>
+    </q-btn-group>
   </div>
 </template>
 
@@ -162,7 +163,7 @@ export default defineComponent({
     "filterValueOptions",
     "label",
     "loadFilterItem",
-    "isFirst",
+    "conditionIndex",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -240,5 +241,27 @@ export default defineComponent({
   .q-virtual-scroll__content {
     padding: 0.5rem;
   }
+}
+
+.condition-logical-operator {
+  width: 55px;
+}
+
+:deep(.condition-logical-operator .q-field__control) {
+    min-height: 23px !important;
+    height: 23px !important;
+    padding: 0px 0px 0px 5px !important;
+}
+
+:deep(.condition-logical-operator .q-field__native) {
+  min-height: 23px !important;
+    height: 23px !important;
+    padding: 0px 0px 0px 0px !important;
+}
+
+:deep(.condition-logical-operator .q-field__append) {
+  min-height: 23px !important;
+    height: 23px !important;
+    padding: 0px 0px 0px 0px !important;
 }
 </style>
