@@ -114,52 +114,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="column" style="width: 100%; height: 100%">
       <div class="col" style="width: 100%; height: 100%">
         <div class="row" style="height: 100%">
-          <SqlQueryEditor
-            ref="queryEditorRef"
-            class="monaco-editor"
-            style="width: 70%"
-            v-model:query="currentQuery"
-            data-test="dashboard-panel-query-editor"
-            v-model:functions="dashboardPanelData.meta.stream.functions"
-            v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-            :keywords="
-              dashboardPanelData.data.queryType === 'promql'
-                ? autoCompletePromqlKeywords
-                : []
-            "
-            @update-query="updateQuery"
-            @run-query="searchData"
-            :readOnly="
-              !dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].customQuery
-            "
-            :language="dashboardPanelData.data.queryType"
-          ></SqlQueryEditor>
-          <div style="height: 100%; width: 30%">
-            <query-editor
-              data-test="dashboard-vrl-function-editor"
-              style="width: 100%; height: 100%"
-              ref="vrlFnEditorRef"
-              editor-id="fnEditor"
-              class="monaco-editor"
-              v-model:query="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].vrlFunctionQuery
-              "
-              :class="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].vrlFunctionQuery == '' && functionEditorPlaceholderFlag
-                  ? 'empty-function'
-                  : ''
-              "
-              language="ruby"
-              @focus="functionEditorPlaceholderFlag = false"
-              @blur="functionEditorPlaceholderFlag = true"
-            />
-          </div>
+          <q-splitter
+            no-scroll
+            style="width: 100%; height: 100%"
+            v-model="splitterModel"
+            @update:model-value="layoutSplitterUpdated"
+          >
+            <template #before>
+              <SqlQueryEditor
+                ref="queryEditorRef"
+                class="monaco-editor"
+                style="width: 100%"
+                v-model:query="currentQuery"
+                data-test="dashboard-panel-query-editor"
+                v-model:functions="dashboardPanelData.meta.stream.functions"
+                v-model:fields="
+                  dashboardPanelData.meta.stream.selectedStreamFields
+                "
+                :keywords="
+                  dashboardPanelData.data.queryType === 'promql'
+                    ? autoCompletePromqlKeywords
+                    : []
+                "
+                @update-query="updateQuery"
+                @run-query="searchData"
+                :readOnly="
+                  !dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].customQuery
+                "
+                :language="dashboardPanelData.data.queryType"
+              ></SqlQueryEditor>
+            </template>
+            <template #after>
+              <div style="height: 100%; width: 100%">
+                <query-editor
+                  data-test="dashboard-vrl-function-editor"
+                  style="width: 100%; height: 100%"
+                  ref="vrlFnEditorRef"
+                  editor-id="fnEditor"
+                  class="monaco-editor"
+                  v-model:query="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].vrlFunctionQuery
+                  "
+                  :class="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].vrlFunctionQuery == '' && functionEditorPlaceholderFlag
+                      ? 'empty-function'
+                      : ''
+                  "
+                  language="ruby"
+                  @focus="functionEditorPlaceholderFlag = false"
+                  @blur="functionEditorPlaceholderFlag = true"
+                />
+              </div>
+            </template>
+          </q-splitter>
         </div>
       </div>
       <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
@@ -196,7 +209,7 @@ export default defineComponent({
     ConfirmDialog,
     QueryTypeSelector,
     queryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+      () => import("@/components/QueryEditor.vue"),
     ),
   },
   emits: ["searchdata"],
@@ -211,8 +224,14 @@ export default defineComponent({
     const $q = useQuasar();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
+    const splitterModel = ref(70);
+
+    const layoutSplitterUpdated = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
@@ -278,7 +297,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.showQueryBar,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     onMounted(() => {
@@ -303,7 +322,7 @@ export default defineComponent({
       () => dashboardPanelData.meta.errors.queryErrors,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     const updatePromQLQuery = async (event, value) => {
@@ -353,6 +372,8 @@ export default defineComponent({
       updateQuery,
       functionEditorPlaceholderFlag,
       vrlFnEditorRef,
+      splitterModel,
+      layoutSplitterUpdated,
     };
   },
 });
