@@ -17,75 +17,18 @@
         class="axis-container droppable scroll row"
         data-test="dashboard-filter-layout"
       >
-        <div>
-          <q-btn-group
-            class="axis-field q-mr-sm q-my-xs"
-            v-for="(filteredItem, index) in dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.filter"
-            :key="index"
-          >
-            <div v-if="filteredItem.filterType === 'group'">
-              <Group
-                :group="filteredItem"
-                :group-index="index + 1"
-                @add-condition="addConditionToGroup"
-                @add-group="addGroupToGroup"
-                @remove-group="() => removeGroup(index)"
-                :schema-options="schemaOptions"
-                :dashboard-variables-filter-items="
-                  dashboardVariablesFilterItems(index)
-                "
-                :load-filter-item="loadFilterItem"
-                @logical-operator-change="handleLogicalOperatorChange"
-              />
-            </div>
-            <div v-else>
-              <AddCondition
-                :condition="filteredItem"
-                :schema-options="schemaOptions"
-                :dashboard-variables-filter-items="
-                  dashboardVariablesFilterItems(index)
-                "
-                :load-filter-item="loadFilterItem"
-                label="Condition"
-                @remove-condition="removeFilterItem(filteredItem.column)"
-                @logical-operator-change="handleLogicalOperatorChange"
-                :isFirst="index === 0"
-              />
-            </div>
-          </q-btn-group>
-          <q-btn icon="add" color="primary" size="xs" round>
-            <q-menu v-model="showAddMenu">
-              <q-list>
-                <q-item clickable @click="() => addFilter('condition')">
-                  <q-item-section>{{
-                    t("common.addCondition")
-                  }}</q-item-section>
-                </q-item>
-                <q-item clickable @click="() => addFilter('group')">
-                  <q-item-section>{{ t("common.addGroup") }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </q-btn>
-        </div>
-        <div
-          class="text-caption text-weight-bold text-center q-py-xs q-mt-xs"
-          v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.filter < 1
-          "
-          style="
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-          "
-        >
-          {{ t("dashboard.addFieldMessage") }}
-        </div>
+        <Group
+          v-if="topLevelGroup"
+          :group="topLevelGroup"
+          :group-index="0"
+          :schema-options="schemaOptions"
+          :dashboard-variables-filter-items="dashboardVariablesFilterItems(0)"
+          :load-filter-item="loadFilterItem"
+          @add-condition="addConditionToGroup"
+          @add-group="addGroupToGroup"
+          @remove-group="() => removeGroup(0)"
+          @logical-operator-change="handleLogicalOperatorChange"
+        />
       </div>
       <div></div>
     </div>
@@ -113,6 +56,17 @@ export default defineComponent({
     const { t } = useI18n();
     const showAddMenu = ref(false);
 
+    const topLevelGroup = computed(() => {
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions:
+          dashboardPanelData?.data?.queries?.[
+            dashboardPanelData?.layout?.currentQueryIndex || 0
+          ]?.fields?.filter || [],
+      };
+    });
+
     const addFilter = (filterType: string) => {
       showAddMenu.value = false;
       const currentQuery =
@@ -123,7 +77,7 @@ export default defineComponent({
       if (filterType === "condition") {
         const defaultCondition = {
           type: "list",
-          column: "",
+          column: `${schemaOptions.value[0]?.value}`,
           filterType: "condition",
           operator: null,
           value: null,
@@ -136,7 +90,7 @@ export default defineComponent({
           conditions: [
             {
               type: "list",
-              column: "",
+              column: `${schemaOptions.value[0]?.value}`,
               filterType: "condition",
               operator: null,
               value: null,
@@ -154,7 +108,7 @@ export default defineComponent({
     const addConditionToGroup = (group: any) => {
       group.conditions.push({
         type: "list",
-        column: "",
+        column: `${schemaOptions.value[0]?.value}`,
         filterType: "condition",
         operator: null,
         value: null,
@@ -168,7 +122,7 @@ export default defineComponent({
         conditions: [
           {
             type: "list",
-            column: "",
+            column: `${schemaOptions.value[0]?.value}`,
             filterType: "condition",
             operator: null,
             value: null,
@@ -186,12 +140,12 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ];
-      currentQuery.fields?.filter.splice(index, 1);
+      currentQuery.fields?.filter?.splice(index, 1);
     };
 
     const handleLogicalOperatorChange = (
       index: number,
-      newOperator: string
+      newOperator: string,
     ) => {
       const currentQuery =
         dashboardPanelData.data.queries[
@@ -225,7 +179,7 @@ export default defineComponent({
         const operator =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.filter[index].operator;
+          ].fields?.filter?.[index]?.operator || null;
 
         if (operator === "Contains" || operator === "Not Contains") {
           value = it.multiSelect
@@ -244,10 +198,12 @@ export default defineComponent({
       });
 
     const schemaOptions = computed(() =>
-      dashboardPanelData.meta.stream.selectedStreamFields.map((field: any) => ({
-        label: field.name,
-        value: field.name,
-      }))
+      dashboardPanelData?.meta?.stream?.selectedStreamFields?.map(
+        (field: any) => ({
+          label: field.name,
+          value: field.name,
+        }),
+      ),
     );
 
     return {
@@ -263,6 +219,7 @@ export default defineComponent({
       handleLogicalOperatorChange,
       dashboardVariablesFilterItems,
       schemaOptions,
+      topLevelGroup,
     };
   },
 });
