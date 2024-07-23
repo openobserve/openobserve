@@ -1758,11 +1758,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const logicalOperators = condition.conditions
           .map((c: any) => c.logicalOperator)
           .filter(Boolean);
-        console.log("groupConditions", groupConditions, logicalOperators);
+        // console.log("groupConditions", groupConditions, logicalOperators);
 
         let groupQuery = "";
         groupConditions.forEach((cond: any, index: any) => {
-          console.log("groupConditions cond", cond, index);
+          // console.log("groupConditions cond", cond, index);
 
           if (index > 0) {
             groupQuery += ` ${logicalOperators[index]} `;
@@ -1815,12 +1815,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const whereConditions = filter.map(buildCondition).filter(Boolean);
 
     const logicalOperators = filter.map((it: any) => it.logicalOperator);
-    console.log("whereConditions", whereConditions, logicalOperators);
+    // console.log("whereConditions", whereConditions, logicalOperators);
 
     if (whereConditions.length > 0) {
       query += ` WHERE ${whereConditions
         .map((cond, index) => {
-          console.log("cond", cond, index);
+          // console.log("cond", cond, index);
 
           const logicalOperator =
             index < logicalOperators.length && logicalOperators[index + 1]
@@ -1887,7 +1887,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].config.limit ?? 0;
     query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
-    console.log("query", query);
+    // console.log("query", query);
 
     return query;
   };
