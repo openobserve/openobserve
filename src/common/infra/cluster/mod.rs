@@ -15,6 +15,7 @@
 
 use std::{cmp::min, ops::Bound, sync::Arc, time::Duration};
 
+use ahash::HashSet;
 use config::{
     cluster::*,
     get_config, get_instance_id,
@@ -473,6 +474,16 @@ pub fn load_local_mode_node() -> Node {
 #[inline(always)]
 pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.read().await.get(uuid).cloned()
+}
+
+#[inline(always)]
+pub async fn get_online_node_ids() -> Option<HashSet<String>> {
+    let r = NODES.read().await;
+    if r.is_empty() {
+        None
+    } else {
+        Some(r.iter().map(|(id, _)| id.to_string()).collect())
+    }
 }
 
 #[inline]

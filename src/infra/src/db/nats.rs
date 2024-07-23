@@ -21,10 +21,15 @@ use std::{
     time::Duration,
 };
 
+use ahash::HashSet;
 use async_nats::{jetstream, Client, ServerAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, get_config, ider, utils::base64};
+use config::{
+    cluster::{self, LOCAL_NODE},
+    get_config, ider,
+    utils::base64,
+};
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -714,7 +719,10 @@ impl Locker {
         };
         let expiration =
             chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
-        let value = Bytes::from(format!("{}:{}", self.lock_id, expiration));
+        let value = Bytes::from(format!(
+            "{}:{}:{}",
+            self.lock_id, LOCAL_NODE.uuid, expiration
+        ));
         let key = key_encode(new_key);
 
         // check local global locker
@@ -795,6 +803,28 @@ impl Locker {
             return Err(Error::Message("nats unlock error".to_string()));
         };
         self.state.store(2, Ordering::SeqCst);
+        Ok(())
+    }
+
+    /// Finds and releases acquired by non-alive nods
+    pub(crate) async fn clean(&self, node_ids: HashSet<String>) -> Result<()> {
+        let cfg = get_config();
+        let (bucket, _) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
+        let mut existing_keys = bucket.keys().await?.boxed();
+        while let Some(key) = existing_keys.try_next().await? {
+            // check if the locker belongs to node_ids, clean it if not
+            if let Ok(Some(ret)) = bucket.get(&key).await {
+                let ret = String::from_utf8_lossy(&ret).to_string();
+                let ret_parts = ret.split(':').collect::<Vec<_>>();
+                // Backward compatibility: previous values only have 2 parts
+                if ret_parts.len() == 3 && !node_ids.contains(ret_parts[1]) {
+                    if let Err(err) = bucket.purge(&key).await {
+                        log::error!("nats purge lock for key: {}, error: {}", self.key, err);
+                        return Err(Error::Message("nats lock error".to_string()));
+                    };
+                }
+            }
+        }
         Ok(())
     }
 }
