@@ -801,6 +801,11 @@ pub struct Limit {
     pub http_worker_num: usize,
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)] // equals to 1024 if 0
     pub http_worker_max_blocking: usize,
+    #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)] // equals to cpu_num if 0
+    pub grpc_runtime_worker_num: usize,
+    #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
+    // equals to cpu_num if 0
+    pub grpc_runtime_blocking_worker_num: usize,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
@@ -1147,6 +1152,12 @@ pub fn init() -> Config {
     }
     if cfg.limit.http_worker_max_blocking == 0 {
         cfg.limit.http_worker_max_blocking = 1024;
+    }
+    if cfg.limit.grpc_runtime_worker_num == 0 {
+        cfg.limit.grpc_runtime_worker_num = 256;
+    }
+    if cfg.limit.grpc_runtime_blocking_worker_num == 0 {
+        cfg.limit.grpc_runtime_blocking_worker_num = 128;
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {

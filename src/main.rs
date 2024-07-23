@@ -197,12 +197,19 @@ async fn main() -> Result<(), anyhow::Error> {
     job::init().await.expect("job init failed");
 
     // gRPC server
+    let mut grpc_runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(cfg.limit.grpc_runtime_worker_num)
+        .enable_all()
+        .thread_name("grpc_server_runtime")
+        .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
+        .build()?;
+
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     if is_router(&LOCAL_NODE_ROLE) {
         init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     } else {
-        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
+        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx, &mut grpc_runtime)?;
     }
 
     // let node online
@@ -246,6 +253,7 @@ async fn main() -> Result<(), anyhow::Error> {
     grpc_shutudown_tx.send(()).ok();
     grpc_stopped_rx.await.ok();
     log::info!("gRPC server stopped");
+    grpc_runtime.shutdown_timeout(std::time::Duration::from_secs(10));
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
@@ -278,6 +286,7 @@ async fn main() -> Result<(), anyhow::Error> {
 fn init_common_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
+    rt: &mut tokio::runtime::Runtime,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let ip = if !cfg.grpc.addr.is_empty() {
@@ -315,7 +324,7 @@ fn init_common_grpc_server(
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
-    tokio::task::spawn(async move {
+    rt.spawn(async move {
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
             .layer(tonic::service::interceptor(check_auth))
