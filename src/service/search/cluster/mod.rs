@@ -195,13 +195,7 @@ pub async fn search(
         None
     } else {
         let node_ids = infra_cluster::get_online_node_ids().await;
-        dist_lock::clean(&locker_key, node_ids).await.map_err(|e| {
-            metrics::QUERY_PENDING_NUMS
-                .with_label_values(&[&req.org_id])
-                .dec();
-            Error::Message(e.to_string())
-        })?;
-        dist_lock::lock(&locker_key, req.timeout as u64)
+        dist_lock::lock(&locker_key, req.timeout as u64, node_ids)
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
