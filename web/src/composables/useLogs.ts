@@ -114,7 +114,7 @@ const defaultObject = {
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 250,
+      rowsPerPage: 100,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
