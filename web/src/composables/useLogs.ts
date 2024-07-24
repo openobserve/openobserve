@@ -134,6 +134,7 @@ const defaultObject = {
     query: <any>"",
     histogramQuery: <any>"",
     parsedQuery: {},
+    countErrorMsg: "",
     errorMsg: "",
     errorCode: 0,
     filterErrMsg: "",
@@ -368,6 +369,7 @@ const useLogs = () => {
     searchObj.data.resultGrid.currentPage = 1;
     searchObj.runQuery = false;
     searchObj.data.errorMsg = "";
+    searchObj.data.countErrorMsg = "";
   }
 
   function resetSearchAroundData() {
@@ -1809,6 +1811,7 @@ const useLogs = () => {
 
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
+      searchObj.data.countErrorMsg = "";
       queryReq.query.size = 0;
       delete queryReq.query.from;
       delete queryReq.query.quick_mode;
@@ -1868,17 +1871,12 @@ const useLogs = () => {
         .catch((err) => {
           searchObj.loading = false;
           let trace_id = "";
-          searchObj.data.errorMsg = "Error while processing search request.";
+          searchObj.data.countErrorMsg = "Error while retrieving total events: ";
           if (err.response != undefined) {
-            searchObj.data.errorMsg =
-              err.response.data.error +
-              " TraceID:" +
-              err.response.data?.trace_id;
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
-            searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
             if (err.hasOwnProperty("trace_id")) {
               trace_id = err?.trace_id;
             }
@@ -1887,23 +1885,17 @@ const useLogs = () => {
           const customMessage = logsErrorMessage(err?.response?.data.code);
           searchObj.data.errorCode = err?.response?.data.code;
 
-          if (customMessage != "") {
-            searchObj.data.errorMsg = t(customMessage);
-          }
-
-          notificationMsg.value = searchObj.data.errorMsg;
+          notificationMsg.value = searchObj.data.countErrorMsg;
 
           if (err?.request?.status >= 429) {
             notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg =
+            searchObj.data.countErrorMsg +=
               err?.response?.data?.message;
           }
 
           if (trace_id) {
-            searchObj.data.errorMsg +=
-              " <br><span class='text-subtitle1'>TraceID:" +
-              trace_id +
-              "</span>";
+            searchObj.data.countErrorMsg +=
+              " TraceID:" + trace_id;
             notificationMsg.value += " TraceID:" + trace_id;
             trace_id = "";
           }
@@ -2426,6 +2418,7 @@ const useLogs = () => {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
+      searchObj.data.countErrorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
       const schemaFields: any = [];
