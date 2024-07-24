@@ -92,11 +92,21 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
-const traceIdFieldName = ref("traceId");
-const spanIdFieldName = ref("spanId");
+
 const store = useStore();
+
+const traceIdFieldName = ref(
+  store.state?.organizationData?.organizationSettings?.trace_id_field_name,
+);
+
+const spanIdFieldName = ref(
+  store.state?.organizationData?.organizationSettings?.span_id_field_name,
+);
+
+const q = useQuasar();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);
@@ -128,7 +138,7 @@ const saveOrgSettings = async () => {
       {
         trace_id_field_name: traceIdFieldName.value,
         span_id_field_name: spanIdFieldName.value,
-      }
+      },
     );
 
     store.dispatch("setOrganizationSettings", {
@@ -136,8 +146,21 @@ const saveOrgSettings = async () => {
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
     });
+
+    q.notify({
+      message: "Organization settings updated successfully",
+      color: "positive",
+      position: "bottom",
+      timeout: 2000,
+    });
   } catch (e) {
     console.log("Error saving organization settings");
+    q.notify({
+      message: e?.message || "Error saving organization settings",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
   }
 };
 </script>

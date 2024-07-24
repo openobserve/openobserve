@@ -84,7 +84,7 @@ import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 export default defineComponent({
-  name: "PageIngestion",
+  name: "AppSettings",
   setup() {
     const { t } = useI18n();
     const store = useStore();
