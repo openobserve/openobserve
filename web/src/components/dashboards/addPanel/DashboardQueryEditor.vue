@@ -112,28 +112,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-query"
   >
     <div class="column" style="width: 100%; height: 100%">
-      <div class="col" style="width: 100%">
-        <query-editor
-          ref="queryEditorRef"
-          class="monaco-editor"
-          v-model:query="currentQuery"
-          data-test="dashboard-panel-query-editor"
-          v-model:functions="dashboardPanelData.meta.stream.functions"
-          v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-          :keywords="
-            dashboardPanelData.data.queryType === 'promql'
-              ? autoCompletePromqlKeywords
-              : []
-          "
-          @update-query="updateQuery"
-          @run-query="searchData"
-          :readOnly="
-            !dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].customQuery
-          "
-          :language="dashboardPanelData.data.queryType"
-        ></query-editor>
+      <div class="col" style="width: 100%; height: 100%">
+        <div class="row" style="height: 100%">
+          <q-splitter
+            no-scroll
+            style="width: 100%; height: 100%"
+            v-model="splitterModel"
+            :limits="[30, promqlMode ? 100 : 70]"
+            :disable="promqlMode"
+          >
+            <template #before>
+              <SqlQueryEditor
+                ref="queryEditorRef"
+                class="monaco-editor"
+                style="width: 100%"
+                v-model:query="currentQuery"
+                data-test="dashboard-panel-query-editor"
+                v-model:functions="dashboardPanelData.meta.stream.functions"
+                v-model:fields="
+                  dashboardPanelData.meta.stream.selectedStreamFields
+                "
+                :keywords="
+                  dashboardPanelData.data.queryType === 'promql'
+                    ? autoCompletePromqlKeywords
+                    : []
+                "
+                @update-query="updateQuery"
+                @run-query="searchData"
+                :readOnly="
+                  !dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].customQuery
+                "
+                :language="dashboardPanelData.data.queryType"
+              ></SqlQueryEditor>
+            </template>
+            <template #after>
+              <div style="height: 100%; width: 100%">
+                <query-editor
+                  v-if="!promqlMode"
+                  data-test="dashboard-vrl-function-editor"
+                  style="width: 100%; height: 100%"
+                  ref="vrlFnEditorRef"
+                  editor-id="fnEditor"
+                  class="monaco-editor"
+                  v-model:query="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].vrlFunctionQuery
+                  "
+                  :class="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ]?.vrlFunctionQuery == '' && functionEditorPlaceholderFlag
+                      ? 'empty-function'
+                      : ''
+                  "
+                  language="ruby"
+                  @focus="functionEditorPlaceholderFlag = false"
+                  @blur="functionEditorPlaceholderFlag = true"
+                />
+              </div>
+            </template>
+          </q-splitter>
+        </div>
       </div>
       <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
@@ -151,6 +193,8 @@ import {
   computed,
   onMounted,
   defineAsyncComponent,
+  nextTick,
+  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -160,13 +204,17 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import { inject } from "vue";
+import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
-    QueryEditor: defineAsyncComponent(() => import("../QueryEditor.vue")),
+    SqlQueryEditor: defineAsyncComponent(() => import("../QueryEditor.vue")),
     ConfirmDialog,
     QueryTypeSelector,
+    queryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue"),
+    ),
   },
   emits: ["searchdata"],
   methods: {
@@ -180,8 +228,17 @@ export default defineComponent({
     const $q = useQuasar();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
+    const splitterModel = ref(70);
+
+    watch(
+      () => splitterModel.value,
+      () => {
+        window.dispatchEvent(new Event("resize"));
+      },
+    );
+
     const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
@@ -190,6 +247,9 @@ export default defineComponent({
       usePromqlSuggestions();
 
     const queryEditorRef = ref(null);
+
+    const functionEditorPlaceholderFlag = ref(true);
+    const vrlFnEditorRef = ref(null);
 
     const addTab = () => {
       addQuery();
@@ -201,6 +261,17 @@ export default defineComponent({
         updatePromQLQuery(query, fields);
       }
     };
+
+    watch(
+      () => [promqlMode.value],
+      () => {
+        if (promqlMode.value) {
+          splitterModel.value = 100;
+        } else {
+          splitterModel.value = 70;
+        }
+      },
+    );
 
     const removeTab = async (index) => {
       if (
@@ -244,11 +315,41 @@ export default defineComponent({
       () => dashboardPanelData.layout.showQueryBar,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
+
+
+    // this is only for VRLs
+    const resizeEventListener = async () => {
+      await nextTick();
+      vrlFnEditorRef?.value?.resetEditorLayout();
+    };
+
+    onMounted(async () => {
+      window.removeEventListener("resize", resizeEventListener);
+      window.addEventListener("resize", resizeEventListener)
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("resize", resizeEventListener);
+    });
+    // End for VRL resize
 
     onMounted(() => {
       dashboardPanelData.meta.errors.queryErrors = [];
+      vrlFnEditorRef?.value?.resetEditorLayout();
+    });
+
+    onBeforeMount(() => {
+      if (
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery = "";
+      }
     });
 
     // on queryerror change dispatch resize event to resize monaco editor
@@ -256,7 +357,7 @@ export default defineComponent({
       () => dashboardPanelData.meta.errors.queryErrors,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     const updatePromQLQuery = async (event, value) => {
@@ -304,6 +405,9 @@ export default defineComponent({
       getSuggestions,
       queryEditorRef,
       updateQuery,
+      functionEditorPlaceholderFlag,
+      vrlFnEditorRef,
+      splitterModel,
     };
   },
 });
@@ -319,6 +423,12 @@ export default defineComponent({
 .q-ml-sm:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;
+}
+
+:deep(.empty-function .monaco-editor-background) {
+  background-image: url("../../../assets/images/common/vrl-function.png");
+  background-repeat: no-repeat;
+  background-size: 170px;
 }
 
 // .query-tabs-container {

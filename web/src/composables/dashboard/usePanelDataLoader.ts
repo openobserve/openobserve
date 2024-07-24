@@ -32,6 +32,7 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -309,6 +310,9 @@ export const usePanelDataLoader = (
                   query: {
                     query: {
                       sql: query,
+                      query_fn: it.vrlFunctionQuery
+                        ? b64EncodeUnicode(it.vrlFunctionQuery)
+                        : null,
                       sql_mode: "full",
                       start_time: startISOTimestamp,
                       end_time: endISOTimestamp,
