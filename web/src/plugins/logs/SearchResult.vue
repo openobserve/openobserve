@@ -24,7 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <div class="row">
-        <div class="col-6 text-left q-pl-lg q-mt-xs">
+        <div class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders	" v-if="searchObj.data.countErrorMsg != ''">
+          <SanitizedHtmlRenderer
+            data-test="logs-search-total-count-error-message"
+            :htmlContent="searchObj.data.countErrorMsg"
+          />
+        </div>
+        <div v-else  class="col-6 text-left q-pl-lg q-mt-xs warning">
           {{ noOfRecordsTitle }}
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
