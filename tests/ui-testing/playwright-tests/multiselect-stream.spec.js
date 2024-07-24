@@ -218,7 +218,7 @@ await page.waitForTimeout(1000);
     await page
       .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-add-kubernetes_host-field-btn"]'
       )
       .last()
       .click({
