@@ -1193,6 +1193,118 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery == true
     ) {
+      // first, remove all derived fields from x,y,z,latitude,longitude,weight,source,target,value
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x.filter((it: any) => !it.isDerived);
+
+      // remove from y axis
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y.filter((it: any) => !it.isDerived);
+
+      // remove from z axis
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.z.filter((it: any) => !it.isDerived);
+
+      // remove from breakdown
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown.filter((it: any) => !it.isDerived);
+
+      // remove from latitude
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude = null;
+      }
+
+      // remove from longitude
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude = null;
+      }
+
+      // remove from weight
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight = null;
+      }
+
+      // remove from source
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source = null;
+      }
+
+      // remove from target
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target = null;
+      }
+
+      // remove from value
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.isDerived
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value = null;
+      }
+
       // Loop through each custom query field in the dashboard panel data's stream meta
       dashboardPanelData.meta.stream.customQueryFields.forEach(
         (it: any, index: number) => {
