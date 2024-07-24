@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{ider, meta::stream::StreamType, utils::rand::generate_random_string};
-use o2_enterprise::enterprise::openfga::authorizer::authz::save_org_tuples;
 
 use super::users::{add_admin_to_org, get_user};
 use crate::{
@@ -27,7 +26,7 @@ use crate::{
             },
             user::{UserOrg, UserRole},
         },
-        utils::auth::{delete_org_tuples, is_root_user},
+        utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     service::{db, stream::get_streams},
 };
