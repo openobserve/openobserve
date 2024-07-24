@@ -73,11 +73,12 @@ pub async fn handle_grpc_request(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Logs,
-        &stream_name,
-    );
+    let (before_local_trans, after_local_trans, stream_vrl_map) =
+        crate::service::ingestion::register_stream_functions(
+            org_id,
+            &StreamType::Logs,
+            &stream_name,
+        );
     // End Register Transforms for stream
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -196,6 +197,19 @@ pub async fn handle_grpc_request(
                     }
                 };
 
+                // Start row based transform
+                if !before_local_trans.is_empty() {
+                    rec = crate::service::ingestion::apply_stream_functions(
+                        &before_local_trans,
+                        rec,
+                        &stream_vrl_map,
+                        org_id,
+                        &stream_name,
+                        &mut runtime,
+                    )?;
+                }
+                // end row based transform
+
                 // flattening
                 rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
@@ -221,9 +235,9 @@ pub async fn handle_grpc_request(
                 // End re-routing
 
                 // Start row based transform
-                if !local_trans.is_empty() {
+                if !after_local_trans.is_empty() {
                     rec = crate::service::ingestion::apply_stream_functions(
-                        &local_trans,
+                        &after_local_trans,
                         rec,
                         &stream_vrl_map,
                         org_id,
@@ -247,7 +261,7 @@ pub async fn handle_grpc_request(
                     .entry(stream_name.clone())
                     .or_insert((Vec::new(), None));
                 ts_data.push((timestamp, local_val));
-                *fn_num = Some(local_trans.len());
+                *fn_num = Some(after_local_trans.len() + before_local_trans.len());
             }
         }
     }

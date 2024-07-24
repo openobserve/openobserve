@@ -114,6 +114,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-td key="order" :props="props">
                       {{ props.row.order }}
                     </q-td>
+                    <q-td
+                      v-if="expandedRow.stream_type === 'logs'"
+                      key="applyBeforeFlattening"
+                      :props="props"
+                    >
+                      <q-toggle
+                        data-test="stream-association-applyBeforeFlattening-toggle"
+                        class="q-mt-sm"
+                        v-model="props.row.applyBeforeFlattening"
+                        @update:model-value="
+                          updateAssociatedFunctions(props.row)
+                        "
+                      />
+                    </q-td>
                     <q-td key="actions" :props="props">
                       <q-btn
                         data-test="stream-association-delete-function-btn"
@@ -152,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></q-select>
                     </q-td>
                     <q-td></q-td>
+                    <q-td> </q-td>
                     <q-td></q-td>
                   </q-tr>
                 </template>
@@ -264,7 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onMounted, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onActivated,
+  onMounted,
+  watch,
+  computed,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -351,35 +373,6 @@ export default defineComponent({
     const addFunctionInProgressLoading = ref(false);
     const { getStreams } = useStreams();
 
-    const functionsColumns = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("logStream.name"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "order",
-        field: "order",
-        label: "Order",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "left",
-      },
-    ]);
-
     let deleteStreamName = "";
     let deleteStreamType = "";
     const loadingFunctions = ref(false);
@@ -387,6 +380,49 @@ export default defineComponent({
     const allFunctionsList = ref([]);
     const selectedFunction = ref<any | null>(null);
     const filterFunctions = ref([]);
+
+    const functionsColumns = computed(() => {
+      return [
+        {
+          name: "#",
+          label: "#",
+          field: "#",
+          align: "left",
+        },
+        {
+          name: "name",
+          field: "name",
+          label: t("logStream.name"),
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "order",
+          field: "order",
+          label: "Order",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "applyBeforeFlattening",
+          field: "applyBeforeFlattening",
+          label: "Apply Before Flattening",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        },
+      ].filter((column) => {
+        if (expandedRow.value.stream_type !== "logs") {
+          return column.name !== "applyBeforeFlattening";
+        }
+        return true;
+      }) as QTableProps["columns"];
+    });
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
@@ -483,6 +519,10 @@ export default defineComponent({
           store.state.selectedOrganization.identifier
         )
         .then((res: any) => {
+          res.data.list.forEach((element: any) => {
+            element.applyBeforeFlattening =
+              element.applyBeforeFlattening || false;
+          });
           allFunctionsList.value = res.data?.list || [];
           filterFunctions.value = res.data?.list || [];
         })
@@ -557,6 +597,10 @@ export default defineComponent({
         )
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
+          functionsList.value.forEach((element: any) => {
+            element.applyBeforeFlattening =
+              element.applyBeforeFlattening || false;
+          });
         })
         .catch((err) => {
           $q.notify({
@@ -673,6 +717,23 @@ export default defineComponent({
       }
     });
 
+    const updateAssociatedFunctions = (_function: any) => {
+      jsTransformService
+        .apply_stream_function(
+          store.state.selectedOrganization.identifier,
+          expandedRow.value.name,
+          expandedRow.value.stream_type,
+          _function.name,
+          _function
+        )
+        .then((res) => {
+          getStreamFunctions(
+            expandedRow.value.name,
+            expandedRow.value.stream_type
+          );
+        });
+    };
+
     return {
       t,
       qTable,
@@ -724,6 +785,7 @@ export default defineComponent({
       getImageURL,
       loadingFunctions,
       verifyOrganizationStatus,
+      updateAssociatedFunctions,
     };
   },
   computed: {

@@ -298,7 +298,7 @@ pub async fn remote_write(
             let mut runtime = crate::service::ingestion::init_functions_runtime();
 
             // Start Register Transforms for stream
-            let (local_trans, stream_vrl_map) =
+            let (_, local_trans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_functions(
                     org_id,
                     &StreamType::Metrics,
