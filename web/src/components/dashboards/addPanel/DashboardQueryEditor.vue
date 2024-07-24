@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-splitter
             no-scroll
             style="width: 100%; height: 100%"
-            v-model="splitterModel"
+            v-model="splitterModelRef"
             @update:model-value="layoutSplitterUpdated"
           >
             <template #before>
@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #after>
               <div style="height: 100%; width: 100%">
                 <query-editor
+                  v-if="!promqlMode"
                   data-test="dashboard-vrl-function-editor"
                   style="width: 100%; height: 100%"
                   ref="vrlFnEditorRef"
@@ -227,6 +228,14 @@ export default defineComponent({
       "dashboard",
     );
     const splitterModel = ref(70);
+
+    const splitterModelRef = computed(() => {
+      if (dashboardPanelData.data.queryType === "promql") {
+        return 100;
+      } else {
+        return splitterModel.value;
+      }
+    });
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));
@@ -372,7 +381,7 @@ export default defineComponent({
       updateQuery,
       functionEditorPlaceholderFlag,
       vrlFnEditorRef,
-      splitterModel,
+      splitterModelRef,
       layoutSplitterUpdated,
     };
   },
