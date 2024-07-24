@@ -52,10 +52,7 @@
         </q-menu>
       </q-btn>
     </div>
-    <div
-      v-if="groupIndex !== 0"
-      class="group-remove"
-    >
+    <div v-if="groupIndex !== 0" class="group-remove">
       <q-btn flat size="xs" dense @click="$emit('remove-group')" icon="close" />
     </div>
   </div>
@@ -156,7 +153,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .group {
   display: flex;
   padding: 0px 0px 0px 5px;
@@ -174,7 +170,8 @@ export default defineComponent({
 .group-conditions {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
+  // flex-wrap: wrap;
+  overflow-x: auto;
   align-items: center;
 }
 
@@ -198,20 +195,20 @@ export default defineComponent({
 }
 
 :deep(.condition-logical-operator .q-field__control) {
-    min-height: 23px !important;
-    height: 23px !important;
-    padding: 0px 0px 0px 5px !important;
+  min-height: 23px !important;
+  height: 23px !important;
+  padding: 0px 0px 0px 5px !important;
 }
 
 :deep(.condition-logical-operator .q-field__native) {
   min-height: 23px !important;
-    height: 23px !important;
-    padding: 0px 0px 0px 0px !important;
+  height: 23px !important;
+  padding: 0px 0px 0px 0px !important;
 }
 
 :deep(.condition-logical-operator .q-field__append) {
   min-height: 23px !important;
-    height: 23px !important;
-    padding: 0px 0px 0px 0px !important;
+  height: 23px !important;
+  padding: 0px 0px 0px 0px !important;
 }
 </style>
