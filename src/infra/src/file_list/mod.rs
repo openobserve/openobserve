@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
@@ -128,6 +130,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
+    async fn get_pending_jobs_count(&self) -> Result<HashMap<String, HashMap<String, i64>>>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -355,6 +358,11 @@ pub async fn check_running_jobs(before_date: i64) -> Result<()> {
 #[inline]
 pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
     CLIENT.clean_done_jobs(before_date).await
+}
+
+#[inline]
+pub async fn get_pending_jobs_count() -> Result<HashMap<String, HashMap<String, i64>>> {
+    CLIENT.get_pending_jobs_count().await
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
