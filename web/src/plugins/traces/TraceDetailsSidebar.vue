@@ -332,6 +332,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
+import useTraces from "@/composables/useTraces";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -357,6 +358,7 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 0,
     });
+    const { buildQueryDetails, navigateToLogs } = useTraces();
 
     watch(
       () => props.span,
@@ -367,11 +369,11 @@ export default defineComponent({
       },
       {
         deep: true,
-      }
+      },
     );
 
     const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration)
+      formatTimeWithSuffix(props.span.duration),
     );
 
     onBeforeMount(() => {
@@ -386,12 +388,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -413,12 +415,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -436,7 +438,7 @@ export default defineComponent({
 
     const getExceptionEvents = computed(() => {
       return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception"
+        (event: any) => event.name === "exception",
       );
     });
 
@@ -471,14 +473,14 @@ export default defineComponent({
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000
+            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
           ),
-          "MMM DD, YYYY HH:mm:ss.SSS Z"
+          "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       spanDetails.events = JSON.parse(props.span.events || "[]").map(
-        (event: any) => event
+        (event: any) => event,
       );
 
       return spanDetails;
@@ -517,7 +519,7 @@ export default defineComponent({
       {
         deep: true,
         immediate: true,
-      }
+      },
     );
     function formatStackTrace(trace: any) {
       // Split the trace into lines
@@ -538,7 +540,8 @@ export default defineComponent({
     }
 
     const viewSpanLogs = () => {
-      emit("view-logs");
+      const queryDetails = buildQueryDetails(props.span);
+      navigateToLogs(queryDetails);
     };
 
     return {

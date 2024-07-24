@@ -36,13 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name">
+          <div
+            class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
+            :title="traceTree[0]['operationName']"
+          >
             {{ traceTree[0]["operationName"] }}
           </div>
           <div class="q-mr-lg flex items-center text-body2">
             <div class="flex items-center">
               Trace ID:
-              <div class="toolbar-trace-id ellipsis q-pl-xs">
+              <div
+                class="toolbar-trace-id ellipsis q-pl-xs"
+                :title="spanList[0]['trace_id']"
+              >
                 {{ spanList[0]["trace_id"] }}
               </div>
             </div>
@@ -56,14 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="q-pb-xs q-mr-lg">Spans: {{ spanList.length }}</div>
-
-          <div
-            class="q-pb-xs q-mr-lg cursor-pointer flex items-center"
-            @click="openTraceDetails"
-          >
-            <q-icon :name="outlinedInfo" class="q-mr-xs" size="16px" />
-            Trace Details
-          </div>
 
           <!-- TODO OK: Create component for this usecase multi select with button -->
           <div class="o2-input flex items-center trace-logs-selector">
@@ -276,9 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="isTimelineExpanded ? '' : 'full'"
       >
         <trace-details-sidebar
-          :span="
-            showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]
-          "
+          :span="spanMap[selectedSpanId as string]"
           @view-logs="redirectToLogs"
           @close="closeSidebar"
         />
@@ -1208,11 +1204,11 @@ $traceChartCollapseHeight: 42px;
 }
 
 .toolbar-trace-id {
-  width: 150px;
+  max-width: 150px;
 }
 
 .toolbar-operation-name {
-  width: 225px;
+  max-width: 225px;
 }
 </style>
 <style lang="scss">

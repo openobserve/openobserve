@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
-import { b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
+import {
+  b64EncodeStandard,
+  b64EncodeUnicode,
+  useLocalTraceFilterField,
+} from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
@@ -210,7 +214,7 @@ const useTraces = () => {
   }
 
   const copyTracesUrl = (
-    customTimeRange: { from: string; to: string } | null = null
+    customTimeRange: { from: string; to: string } | null = null,
   ) => {
     const queryParams = getUrlQueryParams(true);
 
@@ -222,7 +226,7 @@ const useTraces = () => {
     const queryString = Object.entries(queryParams)
       .map(
         ([key, value]: any) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
       )
       .join("&");
 
@@ -249,12 +253,60 @@ const useTraces = () => {
       });
   };
 
+  // Function to build query details for navigation
+  const buildQueryDetails = (span: any, isSpan: boolean = true) => {
+    const spanIdField =
+      store.state.organizationData?.organizationSettings?.span_id_field_name;
+    const traceIdField =
+      store.state.organizationData?.organizationSettings?.trace_id_field_name;
+    const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
+
+    let query: string = isSpan
+      ? `${spanIdField}='${span.spanId || span.span_id}' ${
+          traceId ? `AND ${traceIdField}='${traceId}'` : ""
+        }`
+      : `${traceIdField}='${traceId}'`;
+
+    if (query) query = b64EncodeStandard(query) as string;
+
+    return {
+      stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
+      from: span.startTimeMs * 1000 - 60000000,
+      to: span.endTimeMs * 1000 + 60000000,
+      refresh: 0,
+      query,
+      orgIdentifier: store.state.selectedOrganization.identifier,
+    };
+  };
+
+  // Function to navigate to logs with the provided query details
+  const navigateToLogs = (queryDetails: any) => {
+    router.push({
+      path: "/logs",
+      query: {
+        stream_type: "logs",
+        stream: queryDetails.stream,
+        from: queryDetails.from,
+        to: queryDetails.to,
+        refresh: queryDetails.refresh,
+        sql_mode: "false",
+        query: queryDetails.query,
+        org_identifier: queryDetails.orgIdentifier,
+        show_histogram: "true",
+        type: "trace_explorer",
+        quick_mode: "false",
+      },
+    });
+  };
+
   return {
     searchObj,
     resetSearchObj,
     updatedLocalLogFilterField,
     getUrlQueryParams,
     copyTracesUrl,
+    buildQueryDetails,
+    navigateToLogs,
   };
 };
 
