@@ -99,7 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
+                    <q-icon name="warning"
+color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -118,10 +119,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       Result not found.
                     </div>
-                    <SanitizedHtmlRenderer
-                      data-test="logs-search-error-message"
-                      :htmlContent="searchObj.data.errorMsg"
-                    />
+                    <div data-test="logs-search-result-not-found-text" v-else>
+                      Error while fetching data.
+                      <q-btn
+                        @click="toggleErrorDetails"
+                        size="sm"
+                        data-test="logs-page-result-error-details-btn"
+                        >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                      ><br />
+                    </div>
+
+                    <span v-if="disableMoreErrorDetails">
+                      <SanitizedHtmlRenderer
+                        data-test="logs-search-error-message"
+                        :htmlContent="searchObj.data.errorMsg"
+                      />
+                    </span>
                     <div
                       data-test="logs-search-error-20003"
                       v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -157,7 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -176,7 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -193,7 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -388,12 +404,16 @@ export default defineComponent({
         }
       }
     },
+    toggleErrorDetails() {
+      this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
+    },
   },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+    const disableMoreErrorDetails: boolean = ref(false);
     let {
       searchObj,
       getQueryData,
@@ -496,7 +516,8 @@ export default defineComponent({
 
         if (
           searchObj.organizationIdetifier !=
-          store.state.selectedOrganization.identifier && searchObj.loading == false
+            store.state.selectedOrganization.identifier &&
+          searchObj.loading == false
         ) {
           loadLogsData();
         } else if (!searchObj.loading) updateStreams();
@@ -523,7 +544,7 @@ export default defineComponent({
         searchObj.organizationIdetifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
-        if(searchObj.loading==false){
+        if (searchObj.loading == false) {
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
@@ -1066,6 +1087,7 @@ export default defineComponent({
       handleChartApiError,
       visualizeErrorData,
       streamListUpdated,
+      disableMoreErrorDetails,
     };
   },
   computed: {
