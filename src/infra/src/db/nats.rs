@@ -21,20 +21,12 @@ use std::{
     time::Duration,
 };
 
-use hashbrown::HashSet;
-use async_nats::{
-    jetstream::{self, kv::Store},
-    Client, ServerAddr,
-};
+use async_nats::{jetstream, Client, ServerAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{
-    cluster::{self, LOCAL_NODE},
-    get_config, ider,
-    utils::base64,
-};
+use config::{cluster, get_config, ider, utils::base64};
 use futures::{StreamExt, TryStreamExt};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use tokio::{
     sync::{mpsc, Mutex, OnceCell},
@@ -728,7 +720,9 @@ impl Locker {
             chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
         let value = Bytes::from(format!(
             "{}:{}:{}",
-            self.lock_id, LOCAL_NODE.uuid, expiration
+            self.lock_id,
+            cluster::LOCAL_NODE.uuid,
+            expiration
         ));
         let key = key_encode(new_key);
 
@@ -745,8 +739,22 @@ impl Locker {
         drop(local_mutex);
         let _lock_guard = locker.lock().await;
 
-        // clean up this bucket
-        self.clean(&bucket, &key, node_ids).await?;
+        // removes locks that are expired or acquired by nodes that are no longer alive
+        if let Ok(Some(ret)) = bucket.get(&key).await {
+            let ret = String::from_utf8_lossy(&ret).to_string();
+            let ret_parts = ret.split(':').collect::<Vec<_>>();
+            let expiration = ret_parts.last().unwrap();
+            let expiration = expiration.parse::<i64>().unwrap();
+            if (expiration < chrono::Utc::now().timestamp_micros())
+                || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
+                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[2])))
+            {
+                if let Err(err) = bucket.purge(&key).await {
+                    log::error!("nats purge lock for key: {}, error: {}", self.key, err);
+                    return Err(Error::Message("nats lock error".to_string()));
+                };
+            }
+        }
 
         let mut last_err = None;
         while expiration > chrono::Utc::now().timestamp_micros() {
@@ -801,31 +809,6 @@ impl Locker {
             return Err(Error::Message("nats unlock error".to_string()));
         };
         self.state.store(2, Ordering::SeqCst);
-        Ok(())
-    }
-
-    /// Removes locks that are expired or acquired by nodes that are no longer alive
-    pub(crate) async fn clean(
-        &self,
-        bucket: &Store,
-        key: &str,
-        node_ids: Option<HashSet<String>>,
-    ) -> Result<()> {
-        if let Ok(Some(ret)) = bucket.get(key).await {
-            let ret = String::from_utf8_lossy(&ret).to_string();
-            let ret_parts = ret.split(':').collect::<Vec<_>>();
-            let expiration = ret_parts.last().unwrap();
-            let expiration = expiration.parse::<i64>().unwrap();
-            if (expiration < chrono::Utc::now().timestamp_micros())
-                || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
-                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[2])))
-            {
-                if let Err(err) = bucket.purge(&key).await {
-                    log::error!("nats purge lock for key: {}, error: {}", self.key, err);
-                    return Err(Error::Message("nats lock error".to_string()));
-                };
-            }
-        }
         Ok(())
     }
 }
