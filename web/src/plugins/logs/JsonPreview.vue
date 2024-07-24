@@ -10,7 +10,10 @@
       @click="copyLogToClipboard"
     />
 
-    <div class="o2-input flex items-center logs-trace-selector">
+    <div
+      v-if="filteredStreamOptions.length"
+      class="o2-input flex items-center logs-trace-selector"
+    >
       <q-select
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.meta.selectedTraceStream"
@@ -79,7 +82,6 @@
         v-close-popup="true"
         class="text-bold traces-view-logs-btn q-px-sm view-trace-btn"
         :label="t('search.viewTrace')"
-        text-color="light-text"
         padding="sm sm"
         size="xs"
         no-caps
@@ -110,14 +112,11 @@
           <q-item
             clickable
             v-close-popup
-            v-if="searchObj.data.stream.selectedStreamFields.some(
-                                (item: any) =>
-                                  item.name === key
-                                    ? item.isSchemaField
-                                    : ''
-                              )
-                              && multiStreamFields.includes(key)
-                            "
+            v-if="
+              searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                item.name === key ? item.isSchemaField : '',
+              ) && multiStreamFields.includes(key)
+            "
           >
             <q-item-section>
               <q-item-label
@@ -141,14 +140,11 @@
           <q-item
             clickable
             v-close-popup
-            v-if="searchObj.data.stream.selectedStreamFields.some(
-                                (item: any) =>
-                                  item.name === key
-                                    ? item.isSchemaField
-                                    : ''
-                              )
-                              && multiStreamFields.includes(key)
-                            "
+            v-if="
+              searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                item.name === key ? item.isSchemaField : '',
+              ) && multiStreamFields.includes(key)
+            "
           >
             <q-item-section>
               <q-item-label
@@ -273,7 +269,7 @@ export default {
         .then((res: any) => {
           tracesStreams.value = res.list.map((option: any) => option.name);
           filteredStreamOptions.value = JSON.parse(
-            JSON.stringify(tracesStreams.value)
+            JSON.stringify(tracesStreams.value),
           );
 
           console.log("tracesStreams", tracesStreams.value);
@@ -289,7 +285,7 @@ export default {
       filteredStreamOptions.value = tracesStreams.value.filter(
         (stream: any) => {
           return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        }
+        },
       );
     };
 
@@ -359,7 +355,6 @@ export default {
     .q-btn__content {
       span {
         font-size: 11px;
-        color: #343434;
       }
     }
   }

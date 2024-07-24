@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center">
           <div
             data-test="add-alert-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="flex justify-center items-center q-mr-sm cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -36,13 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-h6 q-mr-lg">
+          <div class="text-subtitle1 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
-          <div class="q-pb-xs q-mr-lg flex items-center">
-            <div>Trace ID: {{ spanList[0]["trace_id"] }}</div>
+          <div class="q-mr-lg flex items-center text-body2">
+            <div class="flex items-center">
+              Trace ID:
+              <div class="toolbar-trace-id ellipsis q-pl-xs">
+                {{ spanList[0]["trace_id"] }}
+              </div>
+            </div>
             <q-icon
-              class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
+              class="q-ml-xs cursor-pointer trace-copy-icon"
               size="12px"
               name="content_copy"
               title="Copy"
@@ -271,7 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="isTimelineExpanded ? '' : 'full'"
       >
         <trace-details-sidebar
-          :span="showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]"
+          :span="
+            showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]
+          "
           @view-logs="redirectToLogs"
           @close="closeSidebar"
         />
@@ -341,7 +348,7 @@ export default defineComponent({
     TraceTimelineIcon,
     ServiceMapIcon,
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
   },
   emits: ["shareLink"],
@@ -418,7 +425,7 @@ export default defineComponent({
     const isTimelineExpanded = ref(false);
 
     const selectedStreamsString = computed(() =>
-      searchObj.data.traceDetails.selectedLogStreams.join(", ")
+      searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
 
     const showTraceDetails = ref(false);
@@ -447,7 +454,7 @@ export default defineComponent({
         } else {
           searchObj.meta.redirectedFromLogs = false;
         }
-      }
+      },
     );
 
     watch(
@@ -466,7 +473,7 @@ export default defineComponent({
             updateSelectedSpan(params.span_id as string);
           }
         }
-      }
+      },
     );
 
     const backgroundStyle = computed(() => {
@@ -497,12 +504,12 @@ export default defineComponent({
         .then((res: any) => {
           logStreams.value = res.list.map((option: any) => option.name);
           filteredStreamOptions.value = JSON.parse(
-            JSON.stringify(logStreams.value)
+            JSON.stringify(logStreams.value),
           );
 
           if (!searchObj.data.traceDetails.selectedLogStreams.length)
             searchObj.data.traceDetails.selectedLogStreams.push(
-              logStreams.value[0]
+              logStreams.value[0],
             );
         })
         .catch(() => Promise.reject())
@@ -523,7 +530,7 @@ export default defineComponent({
           buildTracesTree();
         } else traceTree.value = [];
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const isSidebarOpen = computed(() => {
@@ -590,15 +597,15 @@ export default defineComponent({
       req.query.size = 1000;
       req.query.start_time =
         Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace?.trace_start_time)
+          Number(searchObj.data.traceDetails.selectedTrace?.trace_start_time),
         ) - 30000000;
       req.query.end_time =
         Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace?.trace_end_time)
+          Number(searchObj.data.traceDetails.selectedTrace?.trace_end_time),
         ) + 30000000;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
+        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
       ) as string;
 
       return req;
@@ -617,7 +624,7 @@ export default defineComponent({
             query: req,
             page_type: "traces",
           },
-          "UI"
+          "UI",
         )
         .then((res: any) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
@@ -662,7 +669,7 @@ export default defineComponent({
 
     const showTraceDetailsError = () => {
       showErrorNotification(
-        `Trace ${router.currentRoute.value.query.trace_id} not found`
+        `Trace ${router.currentRoute.value.query.trace_id} not found`,
       );
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
@@ -786,7 +793,7 @@ export default defineComponent({
           },
           hasChildSpans: !!span.spans.length,
           currentIndex: index,
-        })
+        }),
       );
       if (collapseMapping.value[span.spanId]) {
         if (span.spans.length) {
@@ -797,7 +804,7 @@ export default defineComponent({
           span.totalSpans = span.spans.reduce(
             (acc: number, span: any) =>
               acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
-            0
+            0,
           );
         }
         return (span?.spans?.length || 0) + (span?.totalSpans || 0);
@@ -828,7 +835,7 @@ export default defineComponent({
         currentColumn: any[],
         serviceName: string,
         depth: number,
-        height: number
+        height: number,
       ) => {
         maxHeight[depth] =
           maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
@@ -848,7 +855,7 @@ export default defineComponent({
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
-              getService(_span, children, span.serviceName, depth + 1, height)
+              getService(_span, children, span.serviceName, depth + 1, height),
             );
           } else {
             if (maxDepth < depth) maxDepth = depth;
@@ -857,7 +864,7 @@ export default defineComponent({
         }
         if (span.spans && span.spans.length) {
           span.spans.forEach((span: any) =>
-            getService(span, currentColumn, serviceName, depth + 1, height)
+            getService(span, currentColumn, serviceName, depth + 1, height),
           );
         } else {
           if (maxDepth < depth) maxDepth = depth;
@@ -868,7 +875,7 @@ export default defineComponent({
       });
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
-        maxDepth
+        maxDepth,
       );
     };
 
@@ -944,8 +951,8 @@ export default defineComponent({
           x0: absoluteStartTime,
           x1: Number(
             (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
-              4
-            )
+              4,
+            ),
           ),
           fillcolor: spanPositionList.value[i].style.color,
         });
@@ -1016,7 +1023,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`
+        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
       );
 
       router.push({
@@ -1199,6 +1206,11 @@ $traceChartCollapseHeight: 42px;
     padding: 0px 8px;
   }
 }
+
+.toolbar-trace-id {
+  width: 150px;
+  overflow: hidden;
+}
 </style>
 <style lang="scss">
 .trace-details {
@@ -1273,7 +1285,6 @@ $traceChartCollapseHeight: 42px;
   .q-btn__content {
     span {
       font-size: 12px;
-      color: #343434;
     }
   }
 }

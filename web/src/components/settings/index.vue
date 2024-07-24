@@ -133,7 +133,7 @@ export default defineComponent({
       router,
       config,
       settingsTab,
-      splitterModel: ref(225),
+      splitterModel: ref(250),
       outlinedSettings,
       isMetaOrg,
     };
