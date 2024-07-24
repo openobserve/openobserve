@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-subtitle1 q-mr-lg">
+          <div class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name">
             {{ traceTree[0]["operationName"] }}
           </div>
           <div class="q-mr-lg flex items-center text-body2">
@@ -1209,7 +1209,10 @@ $traceChartCollapseHeight: 42px;
 
 .toolbar-trace-id {
   width: 150px;
-  overflow: hidden;
+}
+
+.toolbar-operation-name {
+  width: 225px;
 }
 </style>
 <style lang="scss">
