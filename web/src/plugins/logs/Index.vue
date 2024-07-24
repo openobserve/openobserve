@@ -119,7 +119,7 @@ color="warning" size="10rem" /><br />
                     >
                       Result not found.
                     </div>
-                    <div data-test="logs-search-result-not-found-text" v-else>
+                    <div data-test="logs-search-error-message" v-else>
                       Error occurred while retrieving search events.
                       <q-btn
                         @click="toggleErrorDetails"
@@ -131,7 +131,7 @@ color="warning" size="10rem" /><br />
 
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
-                        data-test="logs-search-error-message"
+                        data-test="logs-search-detail-error-message"
                         :htmlContent="searchObj.data.errorMsg"
                       />
                     </span>
