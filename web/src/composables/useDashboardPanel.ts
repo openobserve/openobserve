@@ -1149,11 +1149,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown.splice(
+      ].fields?.breakdown?.splice(
         0,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown.length,
+        ].fields?.breakdown?.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
