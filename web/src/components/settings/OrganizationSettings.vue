@@ -151,14 +151,14 @@ const saveOrgSettings = async () => {
       message: "Organization settings updated successfully",
       color: "positive",
       position: "bottom",
-      timeout: 2000,
+      timeout: 3000,
     });
   } catch (e: any) {
     q.notify({
       message: e?.message || "Error saving organization settings",
       color: "negative",
       position: "bottom",
-      timeout: 2000,
+      timeout: 3000,
     });
   }
 };
