@@ -1115,7 +1115,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             })
-            .then(async (res) => {
+            .then(async (res: any) => {
               removeTraceId(traceId);
               searchObj.data.queryResults.partitionDetail = {
                 partitions: [],
@@ -1215,6 +1215,42 @@ const useLogs = () => {
                     -1
                   );
                 }
+              }
+            })
+            .catch((err: any) => {
+              searchObj.loading = false;
+              let trace_id = "";
+              searchObj.data.errorMsg = "Error while processing partition request.";
+              if (err.response != undefined) {
+                searchObj.data.errorMsg =
+                  err.response.data.error +
+                  " TraceID:" +
+                  err.response.data?.trace_id;
+                if (err.response.data.hasOwnProperty("trace_id")) {
+                  trace_id = err.response.data?.trace_id;
+                }
+              } else {
+                searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+                if (err.hasOwnProperty("trace_id")) {
+                  trace_id = err?.trace_id;
+                }
+              }
+
+              notificationMsg.value = searchObj.data.errorMsg;
+
+              if (err?.request?.status >= 429) {
+                notificationMsg.value = err?.response?.data?.message;
+                searchObj.data.errorMsg =
+                  err?.response?.data?.message;
+              }
+
+              if (trace_id) {
+                searchObj.data.errorMsg +=
+                  " <br><span class='text-subtitle1'>TraceID:" +
+                  trace_id +
+                  "</span>";
+                notificationMsg.value += " TraceID:" + trace_id;
+                trace_id = "";
               }
             });
         }
