@@ -128,6 +128,8 @@ pub struct AxisItem {
     pub sort_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<AxisArg>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_derived: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
