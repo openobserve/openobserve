@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-scroll
             style="width: 100%; height: 100%"
             v-model="splitterModel"
-            :limits="[50, 100]"
+            :limits="[30, promqlMode ? 100 : 70]"
             :disable="promqlMode"
           >
             <template #before>
