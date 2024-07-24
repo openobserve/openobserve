@@ -1777,15 +1777,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // add group by statement
     const xAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.x.map((it: any) => it?.alias);
+    ].fields.x
+      .map((it: any) => it?.alias)
+      .filter((it: any) => !it?.isDerived);
 
     const yAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.y.map((it: any) => it?.alias);
+    ].fields.y
+      .map((it: any) => it?.alias)
+      .filter((it: any) => !it?.isDerived);
 
     const bAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields?.breakdown?.map((it: any) => it?.alias);
+    ].fields?.breakdown
+      ?.map((it: any) => it?.alias)
+      .filter((it: any) => !it?.isDerived);
 
     if (dashboardPanelData.data.type == "heatmap") {
       query +=
