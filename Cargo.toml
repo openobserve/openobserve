@@ -228,7 +228,7 @@ arrow = { version = "52.1.0", features = ["ipc_compression", "prettyprint"] }
 arrow-json = "52.1.0"
 arrow-schema = { version = "52.1.0", features = ["serde"] }
 parquet = { version = "52.1.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.10.1", features = ["aws", "azure", "gcp"] }
+object_store = { version = "0.10.2", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
