@@ -211,7 +211,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .unwrap();
         grpc_runtime.block_on(async move {
             if is_router(&LOCAL_NODE_ROLE) {
-                init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)
+                init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx).await
             } else {
                 init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx).await
             }
@@ -258,8 +258,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // stop gRPC server
     grpc_shutudown_tx.send(()).ok();
     grpc_stopped_rx.await.ok();
-    log::info!("gRPC server stopped");
     _ = grpc_rt_handle.join().expect("gPRC join handle failed");
+    log::info!("gRPC server stopped");
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
@@ -351,7 +351,7 @@ async fn init_common_grpc_server(
     Ok(())
 }
 
-fn init_router_grpc_server(
+async fn init_router_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
@@ -373,21 +373,19 @@ fn init_router_grpc_server(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
-    tokio::task::spawn(async move {
-        log::info!("starting gRPC server at {}", gaddr);
-        tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
-            .add_service(logs_svc)
-            .add_service(metrics_svc)
-            .add_service(traces_svc)
-            .serve_with_shutdown(gaddr, async {
-                shutdown_rx.await.ok();
-                log::info!("gRPC server starts shutting down");
-            })
-            .await
-            .expect("gRPC server init failed");
-        stopped_tx.send(()).ok();
-    });
+    log::info!("starting gRPC server at {}", gaddr);
+    tonic::transport::Server::builder()
+        .layer(tonic::service::interceptor(check_auth))
+        .add_service(logs_svc)
+        .add_service(metrics_svc)
+        .add_service(traces_svc)
+        .serve_with_shutdown(gaddr, async {
+            shutdown_rx.await.ok();
+            log::info!("gRPC server starts shutting down");
+        })
+        .await
+        .expect("gRPC server init failed");
+    stopped_tx.send(()).ok();
     Ok(())
 }
 
