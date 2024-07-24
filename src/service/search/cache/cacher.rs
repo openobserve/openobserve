@@ -259,7 +259,6 @@ pub async fn get_cached_results(
                                 return None;
                             }
                         };
-                        
                         let first_ts = get_ts_value(
                             &cache_req.ts_column,
                             cached_response.hits.first().unwrap(),
