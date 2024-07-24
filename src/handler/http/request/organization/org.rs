@@ -16,7 +16,6 @@
 use std::{collections::HashSet, io::Error};
 
 use actix_web::{get, http, post, put, web, HttpResponse, Result};
-use infra::schema::STREAM_SCHEMAS_LATEST;
 
 use crate::{
     common::{
@@ -25,7 +24,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
                 OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
+                RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{is_root_user, UserEmail},
@@ -58,36 +57,19 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
         email: user_id.to_string(),
     };
 
+    let all_orgs = organization::list_all_orgs().await.unwrap();
     let is_root_user = is_root_user(user_id);
     if is_root_user {
-        id += 1;
-        org_names.insert(DEFAULT_ORG.to_string());
-        orgs.push(OrgDetails {
-            id,
-            identifier: DEFAULT_ORG.to_string(),
-            name: DEFAULT_ORG.to_string(),
-            user_email: user_id.to_string(),
-            ingest_threshold: THRESHOLD,
-            search_threshold: THRESHOLD,
-            org_type: DEFAULT_ORG.to_string(),
-            user_obj: user_detail.clone(),
-        });
-
-        let r = STREAM_SCHEMAS_LATEST.read().await;
-        for key in r.keys() {
-            if !key.contains('/') {
-                continue;
-            }
-
+        for org in all_orgs {
             id += 1;
             let org = OrgDetails {
                 id,
-                identifier: key.split('/').collect::<Vec<&str>>()[0].to_string(),
-                name: key.split('/').collect::<Vec<&str>>()[0].to_string(),
+                identifier: org.identifier.clone(),
+                name: org.name,
                 user_email: user_id.to_string(),
                 ingest_threshold: THRESHOLD,
                 search_threshold: THRESHOLD,
-                org_type: CUSTOM.to_string(),
+                org_type: org.org_type,
                 user_obj: user_detail.clone(),
             };
             if !org_names.contains(&org.identifier) {
@@ -95,30 +77,25 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
                 orgs.push(org)
             }
         }
-        drop(r);
-    }
-    for user in USERS.iter() {
-        if !user.key().contains('/') {
-            continue;
-        }
-        if !user.key().ends_with(&format!("/{user_id}")) {
-            continue;
-        }
-
-        id += 1;
-        let org = OrgDetails {
-            id,
-            identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-            name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-            user_email: user_id.to_string(),
-            ingest_threshold: THRESHOLD,
-            search_threshold: THRESHOLD,
-            org_type: CUSTOM.to_string(),
-            user_obj: user_detail.clone(),
-        };
-        if !org_names.contains(&org.identifier) {
-            org_names.insert(org.identifier.clone());
-            orgs.push(org)
+    } else {
+        for org in all_orgs {
+            if USERS.contains_key(&format!("{}/{user_id}", org.identifier)) {
+                id += 1;
+                let org = OrgDetails {
+                    id,
+                    identifier: org.identifier.clone(),
+                    name: org.name,
+                    user_email: user_id.to_string(),
+                    ingest_threshold: THRESHOLD,
+                    search_threshold: THRESHOLD,
+                    org_type: org.org_type,
+                    user_obj: user_detail.clone(),
+                };
+                if !org_names.contains(&org.identifier) {
+                    org_names.insert(org.identifier.clone());
+                    orgs.push(org)
+                }
+            }
         }
     }
     orgs.sort_by(|a, b| a.name.cmp(&b.name));
@@ -346,14 +323,50 @@ async fn create_user_rumtoken(
 )]
 #[post("/organizations")]
 async fn create_org(
-    _user_email: UserEmail,
+    user_email: UserEmail,
     org: web::Json<Organization>,
 ) -> Result<HttpResponse, Error> {
-    let org = org.into_inner();
+    let mut org = org.into_inner();
 
-    let result = organization::create_org(&mut org).await;
+    let result = organization::create_org(&mut org, &user_email.user_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Err(err),
+        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            err.to_string(),
+        ))),
+    }
+}
+
+/// CreateOrganization
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "RenameOrganization",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("new_name" = String, Path, description = "New organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+    )
+)]
+#[put("/{org_id}/rename/{new_name}")]
+async fn rename_org(
+    user_email: UserEmail,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
+    let (org, new_name) = path.into_inner();
+
+    let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
+    match result {
+        Ok(org) => Ok(HttpResponse::Ok().json(org)),
+        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            err.to_string(),
+        ))),
     }
 }

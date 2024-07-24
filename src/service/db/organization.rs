@@ -229,3 +229,12 @@ pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
+pub(crate) async fn list() -> Result<Vec<Organization>, anyhow::Error> {
+    let db_key = format!("{ORG_KEY_PREFIX}/");
+    db::list(&db_key)
+        .await?
+        .into_values()
+        .map(|val| json::from_slice(&val).map_err(|e| anyhow::anyhow!(e)))
+        .collect()
+}

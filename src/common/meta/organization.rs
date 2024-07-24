@@ -25,6 +25,7 @@ pub const THRESHOLD: i64 = 9383939382;
 pub struct Organization {
     pub identifier: String,
     pub name: String,
+    pub org_type: String,
 }
 
 #[derive(Serialize, Clone, ToSchema)]

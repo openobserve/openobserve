@@ -13,21 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
-
 use config::{ider, meta::stream::StreamType, utils::rand::generate_random_string};
+use o2_enterprise::enterprise::openfga::authorizer::authz::save_org_tuples;
 
+use super::users::{add_admin_to_org, get_user};
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
                 IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-                RumIngestionToken,
+                RumIngestionToken, CUSTOM, DEFAULT_ORG,
             },
-            user::UserOrg,
+            user::{UserOrg, UserRole},
         },
-        utils::auth::is_root_user,
+        utils::auth::{delete_org_tuples, is_root_user},
     },
     service::{db, stream::get_streams},
 };
@@ -192,41 +192,97 @@ async fn update_passcode_inner(
     Ok(ret)
 }
 
-pub async fn create_org(org: &mut Organization) -> Result<Organization, Error> {
-    if db::organization::get(&org.identifier).await.is_some() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Organization already exists".to_string(),
-        )));
-    }
-    org.identifier = ider::generate();
+pub async fn list_all_orgs() -> Result<Vec<Organization>, anyhow::Error> {
+    db::organization::list().await
+}
+
+/// Always creates a new org. Also, makes the user an admin of the org
+pub async fn create_org(
+    org: &mut Organization,
+    user_email: &str,
+) -> Result<Organization, anyhow::Error> {
+    org.identifier = format!("{}_{}", org.name, ider::generate());
     match db::organization::set(org).await {
-        Ok(_) => Ok(org.clone()),
+        Ok(_) => {
+            save_org_tuples(&org.identifier).await;
+            add_admin_to_org(&org.identifier, user_email).await?;
+            Ok(org.clone())
+        }
         Err(e) => {
             log::error!("Error creating org: {}", e);
-            Err(Error::new(
-                ErrorKind::Other,
-                format!("Error creating org: {}", e),
-            ))
+            Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
 }
 
-pub async fn remove_org(org_id: &str) -> Result<(), Error> {
-    if db::organization::get(&org.identifier).await.is_none() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Organization does not exist".to_string(),
-        )));
+/// Checks if the org exists, otherwise creates the org. Does not associate any user
+/// with the org, only saves the org in the meta and creates org tuples.
+pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
+    if let Some(org) = get_org(org_id).await {
+        return Ok(org);
+    }
+
+    let org = &Organization {
+        identifier: org_id.to_owned(),
+        name: org_id.to_owned(),
+        org_type: if org_id.eq(DEFAULT_ORG) {
+            DEFAULT_ORG.to_owned()
+        } else {
+            CUSTOM.to_owned()
+        },
+    };
+    match db::organization::set(org).await {
+        Ok(_) => {
+            save_org_tuples(&org.identifier).await;
+            Ok(org.clone())
+        }
+        Err(e) => {
+            log::error!("Error creating org: {}", e);
+            Err(anyhow::anyhow!("Error creating org: {}", e))
+        }
+    }
+}
+
+pub async fn rename_org(
+    org_id: &str,
+    name: &str,
+    user_email: &str,
+) -> Result<Organization, anyhow::Error> {
+    match get_user(Some(org_id), user_email).await {
+        Some(user) => {
+            if !(user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)) {
+                return Err(anyhow::anyhow!("Unauthorized access"));
+            }
+        }
+        None => return Err(anyhow::anyhow!("Unauthorized access")),
+    }
+
+    if get_org(org_id).await.is_none() {
+        return Err(anyhow::anyhow!("Organization doesn't exist"));
+    }
+    let mut org = get_org(org_id).await.unwrap();
+    org.name = name.to_owned();
+    match db::organization::set(&org).await {
+        Ok(_) => Ok(org),
+        Err(e) => {
+            log::error!("Error creating org: {}", e);
+            Err(anyhow::anyhow!("Error creating org: {}", e))
+        }
+    }
+}
+
+pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if get_org(&org_id).await.is_none() {
+        return Err(anyhow::anyhow!("Organization does not exist"));
     }
     match db::organization::delete(org_id).await {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            delete_org_tuples(org_id).await;
+            Ok(())
+        }
         Err(e) => {
             log::error!("Error deleting org: {}", e);
-            Err(Error::new(
-                ErrorKind::Other,
-                format!("Error deleting org: {}", e),
-            ))
+            Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
 }

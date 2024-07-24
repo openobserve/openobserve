@@ -32,7 +32,7 @@ use crate::{
         },
         utils::auth::{get_hash, get_role, is_root_user},
     },
-    service::db,
+    service::{db, organization},
 };
 
 pub async fn post_user(
@@ -359,6 +359,55 @@ pub async fn update_user(
     }
 }
 
+pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
+    if is_root_user(user_email) {
+        // user is already a root user
+        Ok(())
+    } else {
+        let existing_user = db::user::get_db_user(user_email).await;
+        if let Ok(mut user) = existing_user {
+            let token = generate_random_string(16);
+            let rum_token = format!("rum{}", generate_random_string(16));
+            user.organizations.push(UserOrg {
+                name: org_id.to_string(),
+                token,
+                rum_token: Some(rum_token),
+                role: UserRole::Admin,
+            });
+            db::user::set(&user).await?;
+
+            // Update OFGA
+            #[cfg(feature = "enterprise")]
+            {
+                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                    get_user_role_tuple, update_tuples,
+                };
+                if O2_CONFIG.openfga.enabled {
+                    let mut tuples = vec![];
+                    get_user_role_tuple(
+                        &UserRole::Admin.to_string(),
+                        user_email,
+                        org_id,
+                        &mut tuples,
+                    );
+                    match update_tuples(tuples, vec![]).await {
+                        Ok(_) => {
+                            log::info!("User added to org successfully in openfga");
+                        }
+                        Err(e) => {
+                            log::error!("Error adding user to the org in openfga: {}", e);
+                        }
+                    }
+                }
+            }
+
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("User does not exist"))
+        }
+    }
+}
+
 pub async fn add_user_to_org(
     org_id: &str,
     email: &str,
@@ -372,6 +421,8 @@ pub async fn add_user_to_org(
         let local_org;
         let initiating_user = if is_root_user(initiator_id) {
             local_org = org_id.replace(' ', "_");
+            // If the org does not exist, create it
+            let _ = organization::check_and_create_org(&local_org).await;
             root_user.get("root").unwrap().clone()
         } else {
             local_org = org_id.to_owned();
@@ -419,25 +470,12 @@ pub async fn add_user_to_org(
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{
-                        get_org_creation_tuples, get_user_role_tuple, update_tuples,
-                    },
-                    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                    get_user_role_tuple, update_tuples,
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
-                    get_org_creation_tuples(
-                        org_id,
-                        &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
-                            .collect(),
-                        NON_OWNING_ORG.to_vec(),
-                    )
-                    .await;
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("User added to org successfully in openfga");
