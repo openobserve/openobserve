@@ -173,7 +173,11 @@ pub async fn search(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, req.timeout as u64)
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.uuid.to_string())
+            .collect::<HashSet<_>>();
+        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS

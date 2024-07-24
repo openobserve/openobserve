@@ -42,7 +42,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     };
 
     // get lock
-    let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0).await?;
+    let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0, None).await?;
 
     // after get lock, need check again
     match upgrade_schema_row_per_version().await {

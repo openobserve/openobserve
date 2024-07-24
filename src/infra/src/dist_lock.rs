@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use hashbrown::HashSet;
+
 use crate::{
     db::{etcd, nats},
     errors::Result,
@@ -27,7 +29,11 @@ enum LockerStore {
 
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
-pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
+pub async fn lock(
+    key: &str,
+    wait_ttl: u64,
+    node_ids: Option<HashSet<String>>,
+) -> Result<Option<Locker>> {
     let cfg = config::get_config();
     if cfg.common.local_mode {
         return Ok(None);
@@ -35,7 +41,7 @@ pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
     match cfg.common.cluster_coordinator.as_str() {
         "nats" => {
             let mut lock = nats::Locker::new(key);
-            lock.lock(wait_ttl).await?;
+            lock.lock(wait_ttl, node_ids).await?;
             Ok(Some(Locker(LockerStore::Nats(lock))))
         }
         _ => {

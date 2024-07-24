@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{cluster, get_config, ider, utils::base64};
 use futures::{StreamExt, TryStreamExt};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 use tokio::{
     sync::{mpsc, Mutex, OnceCell},
@@ -254,7 +254,7 @@ impl super::Db for NatsDb {
     ) -> Result<()> {
         // acquire lock and update
         let lock_key = format!("/meta{key}/{}", start_dt.unwrap_or_default());
-        let locker = match dist_lock::lock(&lock_key, 0).await {
+        let locker = match dist_lock::lock(&lock_key, 0, None).await {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(
@@ -704,7 +704,11 @@ impl Locker {
     }
 
     /// lock with timeout, 0 means use default timeout, unit: second
-    pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
+    pub(crate) async fn lock(
+        &mut self,
+        timeout: u64,
+        node_ids: Option<HashSet<String>>,
+    ) -> Result<()> {
         let cfg = get_config();
         let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
         let timeout = if timeout == 0 {
@@ -714,7 +718,12 @@ impl Locker {
         };
         let expiration =
             chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
-        let value = Bytes::from(format!("{}:{}", self.lock_id, expiration));
+        let value = Bytes::from(format!(
+            "{}:{}:{}",
+            self.lock_id,
+            cluster::LOCAL_NODE_UUID.as_str(),
+            expiration
+        ));
         let key = key_encode(new_key);
 
         // check local global locker
@@ -730,18 +739,23 @@ impl Locker {
         drop(local_mutex);
         let _lock_guard = locker.lock().await;
 
-        // check if the locker already expired, clean it
+        // removes locks that are expired or acquired by nodes that are no longer alive
         if let Ok(Some(ret)) = bucket.get(&key).await {
             let ret = String::from_utf8_lossy(&ret).to_string();
-            let expiration = ret.split(':').last().unwrap();
+            let ret_parts = ret.split(':').collect::<Vec<_>>();
+            let expiration = ret_parts.last().unwrap();
             let expiration = expiration.parse::<i64>().unwrap();
-            if expiration < chrono::Utc::now().timestamp_micros() {
+            if (expiration < chrono::Utc::now().timestamp_micros())
+                || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
+                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[2])))
+            {
                 if let Err(err) = bucket.purge(&key).await {
                     log::error!("nats purge lock for key: {}, error: {}", self.key, err);
                     return Err(Error::Message("nats lock error".to_string()));
                 };
             }
         }
+
         let mut last_err = None;
         while expiration > chrono::Utc::now().timestamp_micros() {
             match bucket.create(&key, value.clone()).await {

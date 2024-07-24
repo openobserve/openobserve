@@ -380,7 +380,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
 
         // before start processing, set current node to lock the organization
         let lock_key = format!("/compact/organization/{org_id}");
-        let locker = dist_lock::lock(&lock_key, 0).await?;
+        let locker = dist_lock::lock(&lock_key, 0, None).await?;
         // check the working node for the organization again, maybe other node locked it
         // first
         let (offset, node) =
