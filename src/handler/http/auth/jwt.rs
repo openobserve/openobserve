@@ -40,10 +40,7 @@ use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::meta::{
-            organization::Organization,
-            user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
-        },
+        common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
         service::{db, organization, users},
     },
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
@@ -123,6 +120,7 @@ pub async fn process_token(
 
         if o2cfg.openfga.enabled {
             for (index, org) in source_orgs.iter().enumerate() {
+                // Assuming all the relevant tuples for this org exist
                 let mut tuples = vec![];
                 get_user_creation_tuples(
                     &org.name,
@@ -130,26 +128,16 @@ pub async fn process_token(
                     &org.role.to_string(),
                     &mut tuples,
                 );
-                get_org_creation_tuples(
-                    &org.name,
-                    &mut tuples,
-                    OFGA_MODELS
-                        .iter()
-                        .map(|(_, fga_entity)| fga_entity.key)
-                        .collect(),
-                    NON_OWNING_ORG.to_vec(),
-                )
-                .await;
+
+                // Create the org if it does not exist. `org.name` is the id of the org.
+                // Also it creates necessary ofga tuples for the newly created org
+                let _ = organization::check_and_create_org(&org.name).await;
 
                 if index == 0 {
                     // this is to allow user call organization api with org
                     tuples.push(get_user_org_tuple(&user_email, &user_email));
                 }
-                let _ = organization::create_org(&mut Organization {
-                    identifier: org.name.to_owned(),
-                    name: org.name.to_owned(),
-                })
-                .await;
+
                 tuples_to_add.insert(org.name.to_owned(), tuples);
             }
         }
@@ -219,7 +207,6 @@ pub async fn process_token(
                 None => {
                     // The organization is not found in source_orgs, hence removed
                     // TODO: Check if removing org from db is the right thing to do
-                    let _ = organization::remove_org(&existing_org.name.to_owned()).await;
                     orgs_removed.push(existing_org);
                 }
             }
@@ -227,11 +214,7 @@ pub async fn process_token(
 
         // Add the user to the newly added organizations
         for org in orgs_added {
-            let _ = organization::create_org(&mut Organization {
-                identifier: org.name.to_owned(),
-                name: org.name.to_owned(),
-            })
-            .await;
+            let _ = organization::check_and_create_org(&org.name).await;
 
             match users::add_user_to_org(
                 &org.name,
