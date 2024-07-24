@@ -303,6 +303,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
+                    :disable="
+                      !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                        (vrlField: any) => vrlField.name == props.row.name,
+                      )
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-data"
@@ -366,6 +371,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
+                    :disable="
+                      !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                        (vrlField: any) => vrlField.name == props.row.name,
+                      )
+                    "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
                     data-test="dashboard-add-filter-geomap-data"
@@ -428,6 +438,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
+                    "
+                    :disable="
+                      !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                        (vrlField: any) => vrlField.name == props.row.name,
+                      )
                     "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
