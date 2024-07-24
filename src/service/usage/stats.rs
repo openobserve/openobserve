@@ -52,7 +52,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         }
 
         // get lock
-        let locker = dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0).await?;
+        let locker = dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0, None).await?;
         let (last_query_ts, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
