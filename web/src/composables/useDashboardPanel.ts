@@ -739,7 +739,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
-          if (itemY.aggregationFunction === null) {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
             itemY.aggregationFunction = "count";
           }
         });
@@ -772,7 +772,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
-          if (itemY.aggregationFunction === null) {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
             itemY.aggregationFunction = "count";
           }
         });
@@ -1424,7 +1424,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
                 ];
             }
             // If the current field is a y or z field, set the aggregation function to "count"
-            if (currentFieldType === "y" || currentFieldType === "z") {
+            if (
+              (currentFieldType === "y" || currentFieldType === "z") &&
+              !field.isDerived
+            ) {
               field.aggregationFunction = "count";
             }
           }
