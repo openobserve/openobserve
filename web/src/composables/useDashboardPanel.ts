@@ -1793,7 +1793,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const bAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.breakdown
-      .filter((it: any) => !it?.isDerived)
+      ?.filter((it: any) => !it?.isDerived)
       ?.map((it: any) => it?.alias);
 
     if (dashboardPanelData.data.type == "heatmap") {
