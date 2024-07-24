@@ -69,11 +69,12 @@ pub async fn ingest(
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_functions(
-        org_id,
-        &StreamType::Logs,
-        &stream_name,
-    );
+    let (before_local_trans, after_local_trans, stream_vrl_map) =
+        crate::service::ingestion::register_stream_functions(
+            org_id,
+            &StreamType::Logs,
+            &stream_name,
+        );
     // End Register Transforms for stream
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
@@ -195,7 +196,8 @@ pub async fn ingest(
         // Start row based transform
         let mut res = match apply_functions(
             item,
-            &local_trans,
+            &before_local_trans,
+            &after_local_trans,
             &stream_vrl_map,
             org_id,
             &stream_name,
@@ -234,7 +236,7 @@ pub async fn ingest(
             .entry(stream_name.clone())
             .or_insert((Vec::new(), None));
         ts_data.push((timestamp, local_val));
-        *fn_num = need_usage_report.then_some(local_trans.len());
+        *fn_num = need_usage_report.then_some(before_local_trans.len() + after_local_trans.len());
     }
 
     // if no data, fast return
@@ -304,18 +306,30 @@ pub async fn ingest(
 
 pub fn apply_functions<'a>(
     item: json::Value,
-    local_trans: &[StreamTransform],
+    before_local_trans: &[StreamTransform],
+    after_local_trans: &[StreamTransform],
     stream_vrl_map: &'a HashMap<String, VRLResultResolver>,
     org_id: &'a str,
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value> {
     let cfg = get_config();
-    let mut value = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
-
-    if !local_trans.is_empty() {
+    let mut value = item;
+    if !before_local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
-            local_trans,
+            before_local_trans,
+            value,
+            stream_vrl_map,
+            org_id,
+            stream_name,
+            runtime,
+        )?;
+    }
+    value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
+
+    if !after_local_trans.is_empty() {
+        value = crate::service::ingestion::apply_stream_functions(
+            after_local_trans,
             value,
             stream_vrl_map,
             org_id,

@@ -134,7 +134,8 @@ pub fn apply_vrl_fn(
 
 pub async fn get_stream_functions<'a>(
     streams: &[StreamParams],
-    stream_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
+    stream_before_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
+    stream_after_functions_map: &mut HashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
 ) {
     for stream in streams {
@@ -142,12 +143,14 @@ pub async fn get_stream_functions<'a>(
             "{}/{}/{}",
             stream.org_id, stream.stream_type, stream.stream_name
         );
-        if stream_functions_map.contains_key(&key) {
+        if stream_after_functions_map.contains_key(&key)
+            || stream_before_functions_map.contains_key(&key)
+        {
             return;
         }
         //   let mut _local_trans: Vec<StreamTransform> = vec![];
         // let local_stream_vrl_map;
-        let (_local_trans, local_stream_vrl_map) =
+        let (before_local_trans, after_local_trans, local_stream_vrl_map) =
             crate::service::ingestion::register_stream_functions(
                 &stream.org_id,
                 &stream.stream_type,
@@ -155,7 +158,8 @@ pub async fn get_stream_functions<'a>(
             );
         stream_vrl_map.extend(local_stream_vrl_map);
 
-        stream_functions_map.insert(key, _local_trans);
+        stream_before_functions_map.insert(key.clone(), before_local_trans);
+        stream_after_functions_map.insert(key, after_local_trans);
     }
 }
 
@@ -324,15 +328,24 @@ pub fn register_stream_functions(
     org_id: &str,
     stream_type: &StreamType,
     stream_name: &str,
-) -> (Vec<StreamTransform>, HashMap<String, VRLResultResolver>) {
-    let mut local_trans = vec![];
+) -> (
+    Vec<StreamTransform>,
+    Vec<StreamTransform>,
+    HashMap<String, VRLResultResolver>,
+) {
+    let mut before_local_trans = vec![];
+    let mut after_local_trans = vec![];
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_trans = (*transforms.list).to_vec();
-        local_trans.sort_by(|a, b| a.order.cmp(&b.order));
-        for trans in &local_trans {
+        (before_local_trans, after_local_trans) = (*transforms.list)
+            .iter()
+            .cloned()
+            .partition(|elem| elem.apply_before_flattening);
+        before_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
+        after_local_trans.sort_by(|a, b| a.order.cmp(&b.order));
+        for trans in before_local_trans.iter().chain(after_local_trans.iter()) {
             let func_key = format!("{}/{}", &stream_name, trans.transform.name);
             if let Ok(vrl_runtime_config) = compile_vrl_function(&trans.transform.function, org_id)
             {
@@ -352,7 +365,7 @@ pub fn register_stream_functions(
         }
     }
 
-    (local_trans, stream_vrl_map)
+    (before_local_trans, after_local_trans, stream_vrl_map)
 }
 
 pub fn apply_stream_functions(
