@@ -193,6 +193,8 @@ import {
   computed,
   onMounted,
   defineAsyncComponent,
+  nextTick,
+  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -315,6 +317,23 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
     );
+
+
+    // this is only for VRLs
+    const resizeEventListener = async () => {
+      await nextTick();
+      vrlFnEditorRef?.value?.resetEditorLayout();
+    };
+
+    onMounted(async () => {
+      window.removeEventListener("resize", resizeEventListener);
+      window.addEventListener("resize", resizeEventListener)
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("resize", resizeEventListener);
+    });
+    // End for VRL resize
 
     onMounted(() => {
       dashboardPanelData.meta.errors.queryErrors = [];
