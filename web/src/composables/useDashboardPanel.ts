@@ -1778,20 +1778,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const xAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.x
-      .map((it: any) => it?.alias)
-      .filter((it: any) => !it?.isDerived);
+      .filter((it: any) => !it?.isDerived)
+      .map((it: any) => it?.alias);
 
     const yAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.y
-      .map((it: any) => it?.alias)
-      .filter((it: any) => !it?.isDerived);
+      .filter((it: any) => !it?.isDerived)
+      .map((it: any) => it?.alias);
 
     const bAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.breakdown
-      ?.map((it: any) => it?.alias)
-      .filter((it: any) => !it?.isDerived);
+      .filter((it: any) => !it?.isDerived)
+      ?.map((it: any) => it?.alias);
 
     if (dashboardPanelData.data.type == "heatmap") {
       query +=
