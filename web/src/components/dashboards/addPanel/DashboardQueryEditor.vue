@@ -117,8 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-splitter
             no-scroll
             style="width: 100%; height: 100%"
-            v-model="splitterModelRef"
-            @update:model-value="layoutSplitterUpdated"
+            v-model="splitterModel"
+            :limits="[50, 100]"
+            :disable="promqlMode"
           >
             <template #before>
               <SqlQueryEditor
@@ -229,17 +230,12 @@ export default defineComponent({
     );
     const splitterModel = ref(70);
 
-    const splitterModelRef = computed(() => {
-      if (dashboardPanelData.data.queryType === "promql") {
-        return 100;
-      } else {
-        return splitterModel.value;
-      }
-    });
-
-    const layoutSplitterUpdated = () => {
-      window.dispatchEvent(new Event("resize"));
-    };
+    watch(
+      () => splitterModel.value,
+      () => {
+        window.dispatchEvent(new Event("resize"));
+      },
+    );
 
     const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -263,6 +259,17 @@ export default defineComponent({
         updatePromQLQuery(query, fields);
       }
     };
+
+    watch(
+      () => [promqlMode.value],
+      () => {
+        if (promqlMode.value) {
+          splitterModel.value = 100;
+        } else {
+          splitterModel.value = 70;
+        }
+      },
+    );
 
     const removeTab = async (index) => {
       if (
@@ -381,8 +388,7 @@ export default defineComponent({
       updateQuery,
       functionEditorPlaceholderFlag,
       vrlFnEditorRef,
-      splitterModelRef,
-      layoutSplitterUpdated,
+      splitterModel,
     };
   },
 });
