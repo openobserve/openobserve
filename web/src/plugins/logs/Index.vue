@@ -120,7 +120,7 @@ color="warning" size="10rem" /><br />
                       Result not found.
                     </div>
                     <div data-test="logs-search-result-not-found-text" v-else>
-                      Error while fetching data.
+                      Error occurred while retrieving search events.
                       <q-btn
                         @click="toggleErrorDetails"
                         size="sm"
