@@ -21,7 +21,7 @@ use std::{
     time::Duration,
 };
 
-use ahash::HashSet;
+use hashbrown::HashSet;
 use async_nats::{
     jetstream::{self, kv::Store},
     Client, ServerAddr,
@@ -808,43 +808,22 @@ impl Locker {
     pub(crate) async fn clean(
         &self,
         bucket: &Store,
-        curr_key: &str,
+        key: &str,
         node_ids: Option<HashSet<String>>,
     ) -> Result<()> {
-        let Some(node_ids) = node_ids else {
-            // Only need to check if exists and expired -> early return
-            if let Ok(Some(ret)) = bucket.get(curr_key).await {
-                let ret = String::from_utf8_lossy(&ret).to_string();
-                let ret_parts = ret.split(':');
-                let expiration = ret_parts.last().unwrap();
-                let expiration = expiration.parse::<i64>().unwrap();
-                if expiration < chrono::Utc::now().timestamp_micros() {
-                    if let Err(err) = bucket.purge(curr_key).await {
-                        log::error!("nats purge lock for key: {}, error: {}", self.key, err);
-                        return Err(Error::Message("nats lock error".to_string()));
-                    };
-                }
-            }
-            return Ok(());
-        };
-
-        // Iterate through all keys
-        let mut existing_keys = bucket.keys().await?.boxed();
-        while let Some(key) = existing_keys.try_next().await? {
-            if let Ok(Some(ret)) = bucket.get(&key).await {
-                let ret = String::from_utf8_lossy(&ret).to_string();
-                let ret_parts = ret.split(':').collect::<Vec<_>>();
-                let expiration = ret_parts.last().unwrap();
-                let expiration = expiration.parse::<i64>().unwrap();
-                if (key == curr_key && expiration < chrono::Utc::now().timestamp_micros())
-                    || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
-                        && !node_ids.contains(ret_parts[1]))
-                {
-                    if let Err(err) = bucket.purge(&key).await {
-                        log::error!("nats purge lock for key: {}, error: {}", self.key, err);
-                        return Err(Error::Message("nats lock error".to_string()));
-                    };
-                }
+        if let Ok(Some(ret)) = bucket.get(key).await {
+            let ret = String::from_utf8_lossy(&ret).to_string();
+            let ret_parts = ret.split(':').collect::<Vec<_>>();
+            let expiration = ret_parts.last().unwrap();
+            let expiration = expiration.parse::<i64>().unwrap();
+            if (expiration < chrono::Utc::now().timestamp_micros())
+                || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
+                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[2])))
+            {
+                if let Err(err) = bucket.purge(&key).await {
+                    log::error!("nats purge lock for key: {}, error: {}", self.key, err);
+                    return Err(Error::Message("nats lock error".to_string()));
+                };
             }
         }
         Ok(())
