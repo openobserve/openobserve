@@ -391,7 +391,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: null,
         aggregationFunction:
-          row.name == store.state.zoConfig.timestamp_column
+          row.name == store.state.zoConfig.timestamp_column && !isDerived
             ? "histogram"
             : null,
         sortBy:
@@ -451,7 +451,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: null,
         aggregationFunction:
-          row.name == store.state.zoConfig.timestamp_column
+          row.name == store.state.zoConfig.timestamp_column && !isDerived
             ? "histogram"
             : null,
         sortBy:
@@ -510,7 +510,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction:
-          dashboardPanelData.data.type == "heatmap" ? null : "count",
+          dashboardPanelData.data.type == "heatmap" || isDerived
+            ? null
+            : "count",
         isDerived,
       });
     }
@@ -559,7 +561,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : row.name,
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: "count",
+        aggregationFunction: isDerived ? null : "count",
         isDerived,
       });
     }
@@ -620,7 +622,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         alias: isDerived ? row.name : "weight",
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: "count", // You can set the appropriate aggregation function here
+        aggregationFunction: isDerived ? null : "count", // You can set the appropriate aggregation function here
         isDerived,
       };
     }
@@ -680,7 +682,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         alias: isDerived ? row.name : "value",
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: "sum", // You can set the appropriate aggregation function here
+        aggregationFunction: isDerived ? null : "sum", // You can set the appropriate aggregation function here
         isDerived,
       };
     }
@@ -1719,16 +1721,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields;
 
-    if (latitude && longitude) {
+    if (latitude && !latitude.isDerived && longitude && !longitude.isDerived) {
       query += `SELECT ${latitude.column} as ${latitude.alias}, ${longitude.column} as ${longitude.alias}`;
-    } else if (latitude) {
+    } else if (latitude && !latitude.isDerived) {
       query += `SELECT ${latitude.column} as ${latitude.alias}`;
-    } else if (longitude) {
+    } else if (longitude && !longitude.isDerived) {
       query += `SELECT ${longitude.column} as ${longitude.alias}`;
     }
 
     if (query) {
-      if (weight) {
+      if (weight && !weight.isDerived) {
         switch (weight?.aggregationFunction) {
           case "p50":
             query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
@@ -1812,22 +1814,30 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     // Group By clause
-    if (latitude || longitude) {
-      const aliases = [latitude?.alias, longitude?.alias]
-        .filter(Boolean)
-        .join(", ");
+    let aliases: any = [];
+
+    if (latitude && !latitude.isDerived) {
+      aliases.push(latitude?.alias);
+    }
+    if (longitude && !longitude.isDerived) {
+      aliases.push(longitude?.alias);
+    }
+    if (aliases.length) {
+      aliases = aliases.filter(Boolean).join(", ");
       query += `GROUP BY ${aliases}`;
     }
 
     // array of sorting fields with followed by asc or desc
     const orderByArr: string[] = [];
 
-    [latitude, longitude, weight].forEach((it: any) => {
-      // ignore if None is selected or sortBy is not there
-      if (it?.sortBy) {
-        orderByArr.push(`${it.alias} ${it.sortBy}`);
-      }
-    });
+    [latitude, longitude, weight]
+      .filter((it: any) => !it?.isDerived)
+      .forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
 
     // append with query by joining array with comma
     query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
@@ -1858,15 +1868,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     let query = "SELECT ";
     const selectFields = [];
 
-    if (source) {
+    if (source && !source.isDerived) {
       selectFields.push(`${source.column} as ${source.alias}`);
     }
 
-    if (target) {
+    if (target && !target.isDerived) {
       selectFields.push(`${target.column} as ${target.alias}`);
     }
 
-    if (value) {
+    if (value && !value.isDerived) {
       switch (value?.aggregationFunction) {
         case "p50":
           selectFields.push(
@@ -1944,18 +1954,29 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       query += " WHERE " + filterConditions.join(" AND ");
     }
 
-    // Adding group by statement
-    if (source && target) {
-      query += ` GROUP BY ${source.alias}, ${target.alias}`;
+    // Group By clause
+    let aliases: any = [];
+
+    if (source && !source.isDerived) {
+      aliases.push(source?.alias);
+    }
+    if (target && !target.isDerived) {
+      aliases.push(target?.alias);
+    }
+    if (aliases.length) {
+      aliases = aliases.filter(Boolean).join(", ");
+      query += `GROUP BY ${aliases}`;
     }
 
     // Adding sorting
     const orderByArr: string[] = [];
-    [source, target, value].forEach((field) => {
-      if (field && field.sortBy) {
-        orderByArr.push(`${field.alias} ${field.sortBy}`);
-      }
-    });
+    [source, target, value]
+      .filter((it: any) => !it?.isDerived)
+      .forEach((field) => {
+        if (field && field.sortBy) {
+          orderByArr.push(`${field.alias} ${field.sortBy}`);
+        }
+      });
 
     if (orderByArr.length > 0) {
       query += ` ORDER BY ${orderByArr.join(", ")}`;

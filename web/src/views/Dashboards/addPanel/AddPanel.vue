@@ -844,6 +844,15 @@ export default defineComponent({
         }
       });
 
+      // add breakdown alias
+      dashboardPanelData?.data?.queries[0]?.fields?.breakdown?.forEach(
+        (it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        },
+      );
+
       // add y axis alias
       dashboardPanelData?.data?.queries[0]?.fields?.y?.forEach((it: any) => {
         if (!it.isDerived) {
@@ -859,31 +868,65 @@ export default defineComponent({
       });
 
       // add latitude alias
-      dashboardPanelData?.data?.queries[0]?.fields?.latitude?.forEach(
-        (it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        },
-      );
+      if (
+        dashboardPanelData?.data?.queries[0]?.fields?.latitude?.alias &&
+        !dashboardPanelData?.data?.queries[0]?.fields?.latitude?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[0]?.fields?.latitude.alias,
+        );
+      }
 
       // add longitude alias
-      dashboardPanelData?.data?.queries[0]?.fields?.longitude?.forEach(
-        (it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        },
-      );
+      if (
+        dashboardPanelData?.data?.queries[0]?.fields?.longitude?.alias &&
+        !dashboardPanelData?.data?.queries[0]?.fields?.longitude?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[0]?.fields?.longitude.alias,
+        );
+      }
 
       // add weight alias
-      dashboardPanelData?.data?.queries[0]?.fields?.weight?.forEach(
-        (it: any) => {
-          if (!it.isDerived) {
-            aliasList.push(it.alias);
-          }
-        },
-      );
+      if (
+        dashboardPanelData?.data?.queries[0]?.fields?.weight?.alias &&
+        !dashboardPanelData?.data?.queries[0]?.fields?.weight?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[0]?.fields?.weight.alias,
+        );
+      }
+
+      // add source alias
+      if (
+        dashboardPanelData?.data?.queries[0]?.fields?.source?.alias &&
+        !dashboardPanelData?.data?.queries[0]?.fields?.source?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[0]?.fields?.source.alias,
+        );
+      }
+
+      // add target alias
+      if (
+        dashboardPanelData?.data?.queries[0]?.fields?.target?.alias &&
+        !dashboardPanelData?.data?.queries[0]?.fields?.target?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[0]?.fields?.target.alias,
+        );
+      }
+
+      // add source alias
+      if (
+        dashboardPanelData?.data?.queries[0]?.fields?.value?.alias &&
+        !dashboardPanelData?.data?.queries[0]?.fields?.value?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[0]?.fields?.value.alias,
+        );
+      }
+
       // remove custom query fields from field list
       dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
         aliasList.push(it.name);
