@@ -1267,7 +1267,7 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  onStreamChange(itemObj.value);
+                  onStreamChange(searchObj.data.editorValue);
                   // searchObj.data.stream.selectedStreamFields = [];
 
                   // if (searchObj.data.stream.selectedStreamFields.length == 0)
