@@ -794,10 +794,9 @@ SELECT stream, max(id) as id, COUNT(*) AS num
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
         let pool = CLIENT_RO.clone();
 
-        let ret =
-            sqlx::query(r#"SELECT org, stream AS counts FROM file_list_jobs WHERE stream = 0;"#)
-                .fetch_all(&pool)
-                .await?;
+        let ret = sqlx::query(r#"SELECT org, stream FROM file_list_jobs WHERE status = 0;"#)
+            .fetch_all(&pool)
+            .await?;
 
         let mut job_status: stdHashMap<String, stdHashMap<String, i64>> = stdHashMap::new();
 
