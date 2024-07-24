@@ -540,7 +540,7 @@ export default defineComponent({
         !dashboardPanelData.data.config.unit &&
         !dashboardPanelData.data.config.unit_custom &&
         dashboardPanelData.data.queries[0].fields.x.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.breakdown.length == 0 &&
+        dashboardPanelData.data.queries[0].fields?.breakdown?.length == 0 &&
         dashboardPanelData.data.queries[0].fields.y.length == 0 &&
         dashboardPanelData.data.queries[0].fields.z.length == 0 &&
         dashboardPanelData.data.queries[0].fields.filter.length == 0 &&
