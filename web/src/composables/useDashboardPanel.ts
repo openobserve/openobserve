@@ -2382,7 +2382,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.filter(
           (it: any) =>
-            it.aggregationFunction == null || it.aggregationFunction == "",
+            !it.isDerived &&
+            (it.aggregationFunction == null || it.aggregationFunction == ""),
         );
         if (
           dashboardPanelData.data.queries[
