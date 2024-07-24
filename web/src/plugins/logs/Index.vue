@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.filterErrMsg !== '' &&
                     searchObj.loading == false
                   "
+                  class="q-mt-lg"
                 >
                   <h5 class="text-center">
                     <q-icon name="warning"
@@ -111,30 +112,28 @@ color="warning" size="10rem" /><br />
                   v-else-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
+                  class="q-ma-lg"
                 >
-                  <h5 class="text-center">
+                  <h5 class="text-center q-ma-none">
                     <div
                       data-test="logs-search-result-not-found-text"
-                      v-if="searchObj.data.errorCode == 0"
+                      v-if="
+                        searchObj.data.errorCode == 0 &&
+                        searchObj.data.errorMsg == ''
+                      "
                     >
                       Result not found.
                     </div>
                     <div data-test="logs-search-error-message" v-else>
                       Error occurred while retrieving search events.
                       <q-btn
+                        v-if="searchObj.data.errorMsg != ''"
                         @click="toggleErrorDetails"
                         size="sm"
                         data-test="logs-page-result-error-details-btn"
                         >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-                      ><br />
+                      >
                     </div>
-
-                    <span v-if="disableMoreErrorDetails">
-                      <SanitizedHtmlRenderer
-                        data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg"
-                      />
-                    </span>
                     <div
                       data-test="logs-search-error-20003"
                       v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -153,7 +152,6 @@ color="warning" size="10rem" /><br />
                       >
                       to configure a full text search field to the stream.
                     </div>
-                    <br />
                     <q-item-label>{{
                       searchObj.data.additionalErrorMsg
                     }}</q-item-label>
@@ -164,11 +162,11 @@ color="warning" size="10rem" /><br />
                     searchObj.data.stream.selectedStream.length == 0 &&
                     searchObj.loading == false
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center col-10 q-mx-auto"
+                    class="text-center col-10 q-mx-none"
                   >
                     <q-icon name="info"
 color="primary" size="md" /> Select a
@@ -184,15 +182,22 @@ color="primary" size="md" /> Select a
                     searchObj.loading == false &&
                     searchObj.meta.searchApplied == true
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-error-message"
-                    class="text-center q-mx-auto col-10"
+                    class="text-center q-ma-none col-10"
                   >
                     <q-icon name="info"
 color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
+                    <q-btn
+                      v-if="searchObj.data.errorMsg != ''"
+                      @click="toggleErrorDetails"
+                      size="sm"
+                      data-test="logs-page-result-error-details-btn"
+                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                    ><br />
                   </h6>
                 </div>
                 <div
@@ -202,11 +207,11 @@ color="primary" size="md" />
                     searchObj.loading == false &&
                     searchObj.meta.searchApplied == false
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-error-message"
-                    class="text-center q-mx-auto col-10"
+                    class="text-center q-ma-none col-10"
                   >
                     <q-icon name="info"
 color="primary" size="md" />
@@ -226,6 +231,16 @@ color="primary" size="md" />
                     @update:recordsPerPage="getMoreDataRecordsPerPage"
                     @expandlog="toggleExpandLog"
                   />
+                </div>
+                <div class="text-center col-10 q-ma-none">
+                  <h5>
+                    <span v-if="disableMoreErrorDetails">
+                      <SanitizedHtmlRenderer
+                        data-test="logs-search-detail-error-message"
+                        :htmlContent="searchObj.data.errorMsg"
+                      />
+                    </span>
+                  </h5>
                 </div>
               </template>
             </q-splitter>
