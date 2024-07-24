@@ -835,29 +835,29 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
         let pool = CLIENT.clone();
 
-        let ret = sqlx::query(r#"SELECT org, stream FROM file_list_jobs WHERE status = 0;"#)
-            .fetch_all(&pool)
-            .await?;
+        let ret =
+            sqlx::query(r#"SELECT stream, count(*) as counts FROM file_list_jobs WHERE status = 0 GROUP BY stream;"#)
+                .fetch_all(&pool)
+                .await?;
 
         let mut job_status: stdHashMap<String, stdHashMap<String, i64>> = stdHashMap::new();
 
         for r in ret.iter() {
-            let org = r.get::<String, &str>("org");
             let stream = r.get::<String, &str>("stream");
+            let counts = r.get::<i64, &str>("counts");
             let parts: Vec<&str> = stream.split('/').collect();
             let mut stream_type = "";
+            let mut org = "";
             if parts.len() >= 2 {
+                org = parts[0];
                 stream_type = parts[1];
             }
             job_status
-                .entry(org)
+                .entry(org.to_string())
                 .and_modify(|inner_map| {
-                    inner_map
-                        .entry(stream_type.to_string())
-                        .and_modify(|counter| *counter += 1)
-                        .or_insert(1);
+                    inner_map.entry(stream_type.to_string()).or_insert(counts);
                 })
-                .or_insert(stdHashMap::from([(stream_type.to_string(), 1)]));
+                .or_insert(stdHashMap::from([(stream_type.to_string(), counts)]));
         }
         Ok(job_status)
     }
