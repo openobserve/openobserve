@@ -837,10 +837,22 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
-    #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
-    pub http_worker_num: usize,
-    #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)] // equals to 1024 if 0
-    pub http_worker_max_blocking: usize,
+    #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
+    pub http_worker_num: usize, // equals to cpu_num if 0
+    #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
+    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
+    pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
+    #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
+    pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    #[env_config(name = "ZO_GRPC_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub grpc_runtime_shutdown_timeout: u64,
+    #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
+    pub job_runtime_worker_num: usize, // equals to cpu_num if 0
+    #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
+    pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
@@ -850,7 +862,7 @@ pub struct Limit {
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub shutdown_timeout: u64,
+    pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1197,6 +1209,18 @@ pub fn init() -> Config {
     }
     if cfg.limit.http_worker_max_blocking == 0 {
         cfg.limit.http_worker_max_blocking = 1024;
+    }
+    if cfg.limit.grpc_runtime_worker_num == 0 {
+        cfg.limit.grpc_runtime_worker_num = cpu_num;
+    }
+    if cfg.limit.grpc_runtime_blocking_worker_num == 0 {
+        cfg.limit.grpc_runtime_blocking_worker_num = 512;
+    }
+    if cfg.limit.job_runtime_worker_num == 0 {
+        cfg.limit.job_runtime_worker_num = cpu_num;
+    }
+    if cfg.limit.job_runtime_blocking_worker_num == 0 {
+        cfg.limit.job_runtime_blocking_worker_num = 512;
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {

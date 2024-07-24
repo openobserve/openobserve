@@ -59,7 +59,7 @@ pub async fn init() {
     }
 
     // 1. create a cluster lock
-    let locker = dist_lock::lock("/ofga/model/", 0)
+    let locker = dist_lock::lock("/ofga/model/", 0, None)
         .await
         .expect("Failed to acquire lock for openFGA");
     match db::ofga::set_ofga_model(existing_meta).await {
