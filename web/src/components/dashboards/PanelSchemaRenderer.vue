@@ -222,6 +222,7 @@ export default defineComponent({
     "metadata-update",
     "result-metadata-update",
     "update:initialVariableValues",
+    "updated:vrlFunctionFieldList",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -250,7 +251,7 @@ export default defineComponent({
         variablesData,
         chartPanelRef,
         forceLoad,
-        searchType
+        searchType,
       );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -266,7 +267,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {} }
+      { panels: {}, variablesData: {} },
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -285,6 +286,30 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
+        // emit vrl function field list
+        if (data.value.length && data.value[0] && data.value[0].length) {
+          // Find the index of the record with max attributes
+          const maxAttributesIndex = data.value[0].reduce(
+            (
+              maxIndex: string | number,
+              obj: {},
+              currentIndex: any,
+              array: { [x: string]: {} },
+            ) => {
+              const numAttributes = Object.keys(obj).length;
+              const maxNumAttributes = Object.keys(array[maxIndex]).length;
+              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
+            },
+            0,
+          );
+
+          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
+
+          const responseFields = Object.keys(recordwithMaxAttribute);
+
+          emit("updated:vrlFunctionFieldList", responseFields);
+        }
+
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
           try {
@@ -296,7 +321,7 @@ export default defineComponent({
               chartPanelRef,
               hoveredSeriesState,
               resultMetaData,
-              metadata.value
+              metadata.value,
             );
 
             errorDetail.value = "";
@@ -312,13 +337,13 @@ export default defineComponent({
             panelSchema.value?.error_config?.default_data_on_error
           ) {
             data.value = JSON.parse(
-              panelSchema.value?.error_config?.default_data_on_error
+              panelSchema.value?.error_config?.default_data_on_error,
             );
             errorDetail.value = "";
           }
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // when we get the new metadata from the apis, emit the metadata update
@@ -332,13 +357,13 @@ export default defineComponent({
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
       const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
       const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias
+        (it: any) => it.alias,
       );
 
       switch (panelType) {
@@ -366,7 +391,7 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every(
               (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0
+                data.value[0][0][y] != null || data.value[0][0][y] === 0,
             )
           );
         }
@@ -621,7 +646,7 @@ export default defineComponent({
             // open url
             return window.open(
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
-              drilldownData.targetBlank ? "_blank" : "_self"
+              drilldownData.targetBlank ? "_blank" : "_self",
             );
           } catch (error) {}
         } else if (drilldownData.type == "byDashboard") {
@@ -637,7 +662,7 @@ export default defineComponent({
             await getFoldersList(store);
           }
           const folderId = store.state.organizationData.folders.find(
-            (folder: any) => folder.name == drilldownData.data.folder
+            (folder: any) => folder.name == drilldownData.data.folder,
           )?.folderId;
 
           if (!folderId) {
@@ -647,10 +672,10 @@ export default defineComponent({
           // get dashboard id
           const allDashboardData = await getAllDashboardsByFolderId(
             store,
-            folderId
+            folderId,
           );
           const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title == drilldownData.data.dashboard
+            (dashboard: any) => dashboard.title == drilldownData.data.dashboard,
           );
 
           if (!dashboardData) {
@@ -660,7 +685,7 @@ export default defineComponent({
           // get tab id
           const tabId =
             dashboardData.tabs.find(
-              (tab: any) => tab.name == drilldownData.data.tab
+              (tab: any) => tab.name == drilldownData.data.tab,
             )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
@@ -693,7 +718,7 @@ export default defineComponent({
                 url.searchParams.set(
                   "var-" +
                     replacePlaceholders(variable.name, drilldownVariables),
-                  replacePlaceholders(variable.value, drilldownVariables)
+                  replacePlaceholders(variable.value, drilldownVariables),
                 );
               }
             });
