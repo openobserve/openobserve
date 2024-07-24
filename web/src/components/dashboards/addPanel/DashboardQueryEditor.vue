@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     dashboardPanelData.data.queries[
                       dashboardPanelData.layout.currentQueryIndex
-                    ].vrlFunctionQuery == '' && functionEditorPlaceholderFlag
+                    ]?.vrlFunctionQuery == '' && functionEditorPlaceholderFlag
                       ? 'empty-function'
                       : ''
                   "
@@ -406,7 +406,7 @@ export default defineComponent({
   border-radius: 50%;
 }
 
-.empty-function {
+:deep(.empty-function .monaco-editor-background) {
   background-image: url("../../../assets/images/common/vrl-function.png");
   background-repeat: no-repeat;
   background-size: 170px;
