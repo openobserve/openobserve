@@ -21,7 +21,7 @@
         filled
         dense
         :rules="[
-          (val, rules) =>
+          (val: string) =>
             !!val
               ? isValidTraceField ||
                 `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
@@ -49,7 +49,7 @@
         filled
         dense
         :rules="[
-          (val, rules) =>
+          (val: string) =>
             !!val
               ? isValidSpanField ||
                 `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
@@ -153,8 +153,7 @@ const saveOrgSettings = async () => {
       position: "bottom",
       timeout: 2000,
     });
-  } catch (e) {
-    console.log("Error saving organization settings");
+  } catch (e: any) {
     q.notify({
       message: e?.message || "Error saving organization settings",
       color: "negative",
