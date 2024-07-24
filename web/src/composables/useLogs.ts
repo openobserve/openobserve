@@ -1224,15 +1224,12 @@ const useLogs = () => {
               let trace_id = "";
               searchObj.data.errorMsg = "Error while processing partition request.";
               if (err.response != undefined) {
-                searchObj.data.errorMsg =
-                  err.response.data.error +
-                  " TraceID:" +
-                  err.response.data?.trace_id;
+                searchObj.data.errorMsg = err.response.data.error;
                 if (err.response.data.hasOwnProperty("trace_id")) {
                   trace_id = err.response.data?.trace_id;
                 }
               } else {
-                searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+                searchObj.data.errorMsg = err.message;
                 if (err.hasOwnProperty("trace_id")) {
                   trace_id = err?.trace_id;
                 }
@@ -2155,15 +2152,12 @@ const useLogs = () => {
                   ? err
                   : "Error while processing histogram request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg =
-              err.response.data.error +
-              " TraceID:" +
-              err.response.data?.trace_id;
+            searchObj.data.errorMsg = err.response.data.error;
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
-            searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+            searchObj.data.errorMsg = err.message;
             if (err.hasOwnProperty("trace_id")) {
               trace_id = err?.trace_id;
             }
@@ -2321,16 +2315,12 @@ const useLogs = () => {
                   ? err
                   : "Error while processing histogram request.";
               if (err.response != undefined) {
-                searchObj.data.histogram.errorMsg =
-                  err.response.data.error +
-                  " TraceID:" +
-                  err.response.data?.trace_id;
+                searchObj.data.histogram.errorMsg = err.response.data.error;
                 if (err.response.data.hasOwnProperty("trace_id")) {
                   trace_id = err.response.data?.trace_id;
                 }
               } else {
-                searchObj.data.histogram.errorMsg =
-                  err.message + " TraceID:" + err?.trace_id;
+                searchObj.data.histogram.errorMsg = err.message;
                 if (err.hasOwnProperty("trace_id")) {
                   trace_id = err?.trace_id;
                 }
@@ -3277,15 +3267,12 @@ const useLogs = () => {
           let trace_id = "";
           searchObj.data.errorMsg = "Error while processing search request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg =
-              err.response.data.error +
-              " TraceID:" +
-              err.response.data?.trace_id;
+            searchObj.data.errorMsg = err.response.data.error;
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
-            searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+            searchObj.data.errorMsg = err.message;
             if (err.hasOwnProperty("trace_id")) {
               trace_id = err?.trace_id;
             }
