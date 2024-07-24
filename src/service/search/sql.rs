@@ -944,7 +944,7 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
         where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
     } else if !meta.order_by.is_empty() {
         where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
-    } else if meta.limit > 0 {
+    } else if meta.limit > 0 || where_str.to_lowercase().ends_with(" limit 0") {
         where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
     } else if meta.offset > 0 {
         where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
