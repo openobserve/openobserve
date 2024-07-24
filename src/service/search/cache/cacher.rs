@@ -249,7 +249,17 @@ pub async fn get_cached_results(
 
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
-                        let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
+                        let mut cached_response: Response = match json::from_str::<Response>(&v){
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::error!(
+                                    "[trace_id {trace_id}] Error parsing cached response: {:?}",
+                                    e
+                                );
+                                return None;
+                            }
+                        };
+                        
                         let first_ts = get_ts_value(
                             &cache_req.ts_column,
                             cached_response.hits.first().unwrap(),
