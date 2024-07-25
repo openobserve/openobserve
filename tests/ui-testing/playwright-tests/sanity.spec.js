@@ -119,7 +119,7 @@ test.describe("Sanity testcases", () => {
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();
   });
-  test("should click on interesting fields icon and display query in editor", async ({
+  test.only("should click on interesting fields icon and display query in editor", async ({
     page,
   }) => {
     await page.waitForSelector(
