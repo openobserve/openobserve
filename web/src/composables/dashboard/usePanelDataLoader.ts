@@ -329,6 +329,11 @@ export const usePanelDataLoader = (
                 state.errorDetail = "";
                 // console.log("API response received");
 
+                // if there is an error in vrl function, throw error
+                if (res.data.function_error) {
+                  throw new Error(res.data.function_error);
+                }
+
                 return {
                   result: res.data.hits,
                   metadata: metadata,
