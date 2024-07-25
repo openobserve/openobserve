@@ -18,13 +18,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
-      - name: Check licenses
+      - name: Check paths
         run: |
           results=$(git show --name-only HEAD | grep "package.*.json")
           if [ -z "$result" ]; then
+            export SKIP_LICENSE_CHECK=true
             echo "No package.json or package-lock.json files changed. Skipping license check."
+            exit 0
+          fi
+      - name: Build frontend code
+        run: |
+          if [ !-z "$SKIP_LICENSE_CHECK" ]; then
+            exit 0
+          fi
+          cd web && npm install && npm run build
+      - name: Check licenses
+        run: |
+          if [ !-z "$SKIP_LICENSE_CHECK" ]; then
             exit 0
           fi
           npm install -g license-checker
