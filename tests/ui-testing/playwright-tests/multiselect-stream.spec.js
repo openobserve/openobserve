@@ -213,7 +213,7 @@ await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').first().click();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("kubernetes_host");
     await page.waitForTimeout(2000);
     await page
       .locator(".field-container")
