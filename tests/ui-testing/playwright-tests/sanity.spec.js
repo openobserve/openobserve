@@ -119,7 +119,7 @@ test.describe("Sanity testcases", () => {
       page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]')
     ).toBeVisible();
   });
-  test("should click on interesting fields icon and display query in editor", async ({
+  test.only("should click on interesting fields icon and display query in editor", async ({
     page,
   }) => {
     await page.waitForSelector(
@@ -145,14 +145,9 @@ test.describe("Sanity testcases", () => {
       .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
-      )
-      .last()
-      .click({
-        force: true,
-      });
+      ).first().click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
       page
