@@ -36,6 +36,7 @@
             fill-input
             emit-value
             @filter="filterStreamFn"
+            @update:model-value="handleFieldChange"
           />
           <div style="height: 100%">
             <div class="q-pa-xs" style="height: 100%">
@@ -216,6 +217,10 @@ export default defineComponent({
       emit("logical-operator-change", newOperator);
     };
 
+    const handleFieldChange = (newValue: string) => {
+      props.loadFilterItem(newValue);
+    };
+
     return {
       operators,
       showMenu,
@@ -226,6 +231,7 @@ export default defineComponent({
       filterStreamFn,
       filterOptions,
       emitLogicalOperatorChange,
+      handleFieldChange,
     };
   },
 });
