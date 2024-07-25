@@ -46,7 +46,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
-    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
+    let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
@@ -76,6 +76,10 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                 .collect()
         } else {
             // compile vrl function & apply the same before returning the response
+            let apply_over_hits = query_fn.trim().starts_with("#ResultArray#");
+            if apply_over_hits {
+                query_fn = query_fn.trim().replace("#ResultArray#", "");
+            }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
                 match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
@@ -91,23 +95,52 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                     }
                 };
             match program {
-                Some(program) => json_rows
-                    .into_iter()
-                    .filter(|v| !v.is_empty())
-                    .filter_map(|hit| {
+                Some(program) => {
+                    if apply_over_hits {
                         let ret_val = crate::service::ingestion::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
                                 fields: program.fields.clone(),
                             },
-                            &json::Value::Object(hit.clone()),
+                            &json::Value::Array(
+                                json_rows
+                                    .into_iter()
+                                    .filter(|v| !v.is_empty())
+                                    .map(json::Value::Object)
+                                    .collect(),
+                            ),
                             &sql.org_id,
                             &sql.stream_name,
                         );
-                        (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
-                    })
-                    .collect(),
+                        ret_val
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .filter_map(|v| {
+                                (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
+                            })
+                            .collect()
+                    } else {
+                        json_rows
+                            .into_iter()
+                            .filter(|v| !v.is_empty())
+                            .filter_map(|hit| {
+                                let ret_val = crate::service::ingestion::apply_vrl_fn(
+                                    &mut runtime,
+                                    &VRLResultResolver {
+                                        program: program.program.clone(),
+                                        fields: program.fields.clone(),
+                                    },
+                                    &json::Value::Object(hit.clone()),
+                                    &sql.org_id,
+                                    &sql.stream_name,
+                                );
+                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
+                            })
+                            .collect()
+                    }
+                }
                 None => json_rows
                     .into_iter()
                     .filter(|v| !v.is_empty())
