@@ -312,12 +312,10 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-      await expect(
-        page
-          .locator('[data-test="log-table-column-1-source"]')
-          .getByText(/source/)
-          .first()
-      ).toBeVisible();
+    await expect(
+      page
+        .locator('[data-test="log-search-result-table-th-source"]')
+    ).toHaveText(/source/);
 
  });
 });
