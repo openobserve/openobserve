@@ -22,10 +22,7 @@ use config::{
     get_config,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{
-        flatten,
-        json::{self, get_string_value},
-    },
+    utils::{flatten, json},
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
@@ -188,7 +185,7 @@ pub async fn traces_json(
 
                     let mut span_ref = HashMap::new();
                     if let Some(v) = span.get("parentSpanId") {
-                        span_ref.insert(PARENT_SPAN_ID.to_string(), get_string_value(v));
+                        span_ref.insert(PARENT_SPAN_ID.to_string(), json::get_string_value(v));
                         span_ref.insert(PARENT_TRACE_ID.to_string(), trace_id.clone());
                         span_ref
                             .insert(REF_TYPE.to_string(), format!("{:?}", SpanRefType::ChildOf));
