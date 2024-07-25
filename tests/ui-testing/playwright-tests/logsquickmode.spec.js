@@ -236,7 +236,7 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .locator('text=level')
+        .locator('text=_timestamp')
     ).toBeVisible();
     await page
       .locator(
@@ -253,8 +253,8 @@ test.describe("Logs Quickmode testcases", () => {
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
     await expect(
-      page.locator('[data-test="log-table-column-0-source"]')
-    ).not.toHaveText(/_timestamp/);
+      page.locator('[data-test="log-table-column-1-source"]')
+    ).not.toHaveText(/source/);
   });
 
   test("should display order by in sql mode by default even after page reload", async ({
