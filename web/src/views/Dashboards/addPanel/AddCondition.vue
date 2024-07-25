@@ -22,7 +22,7 @@
         :label="computedLabel(condition)"
         class="q-pl-sm"
       >
-        <q-menu class="q-pa-md" @show="(e) => loadFilterItem(condition.column)">
+        <q-menu class="q-pa-md" @show="(e: any) => loadFilterItem(condition.column)">
           <q-select
             v-model="selectedSchemas"
             :options="schemaOptions"
@@ -100,7 +100,7 @@
                       emit-value
                       map-options
                       :rules="[
-                        (val) => val.length > 0 || 'At least 1 item required',
+                        (val: any) => val.length > 0 || 'At least 1 item required',
                       ]"
                     >
                       <template v-slot:selected>
