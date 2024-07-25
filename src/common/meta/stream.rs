@@ -64,11 +64,29 @@ pub struct ListStream {
     pub list: Vec<Stream>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StreamParams {
     pub org_id: faststr::FastStr,
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
+}
+
+impl PartialEq for StreamParams {
+    fn eq(&self, other: &Self) -> bool {
+        self.org_id == other.org_id
+            && self.stream_name == other.stream_name
+            && self.stream_type == other.stream_type
+    }
+}
+
+impl Default for StreamParams {
+    fn default() -> Self {
+        Self {
+            org_id: String::default().into(),
+            stream_name: String::default().into(),
+            stream_type: StreamType::default(),
+        }
+    }
 }
 
 impl StreamParams {

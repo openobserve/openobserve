@@ -27,7 +27,7 @@ use cron::Schedule;
 use futures::future::try_join_all;
 
 use crate::{
-    common::meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
+    common::meta::{dashboards::reports::ReportFrequencyType, scheduled_ops::AlertFrequencyType},
     service::{db, usage::publish_triggers_usage},
 };
 
@@ -101,7 +101,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
-    let alert = match super::get(org_id, stream_type, stream_name, alert_name).await? {
+    let alert = match super::alerts::get(org_id, stream_type, stream_name, alert_name).await? {
         Some(alert) => alert,
         None => {
             return Err(anyhow::anyhow!(

@@ -70,7 +70,7 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = service::alerts::alert_manager::run().await {
+        if let Err(e) = service::scheduled_ops::alert_manager::run().await {
             log::error!("[ALERT MANAGER] run schedule jobs error: {}", e);
         }
     }

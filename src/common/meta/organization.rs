@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{alerts::Alert, functions::Transform};
+use super::{functions::Transform, scheduled_ops::alerts::Alert};
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";

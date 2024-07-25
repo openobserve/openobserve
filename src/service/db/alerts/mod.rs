@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{meta::stream::StreamType, utils::json};
 
 use crate::{
-    common::{infra::config::STREAM_ALERTS, meta::alerts::Alert},
+    common::{infra::config::STREAM_ALERTS, meta::scheduled_ops::alerts::Alert},
     service::db,
 };
 

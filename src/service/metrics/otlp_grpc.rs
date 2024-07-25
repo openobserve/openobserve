@@ -39,9 +39,9 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts,
         http::HttpResponse as MetaHttpResponse,
         prom::*,
+        scheduled_ops::alerts,
         stream::{SchemaRecords, StreamParams},
     },
     service::{

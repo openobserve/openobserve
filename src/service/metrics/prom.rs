@@ -43,9 +43,9 @@ use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::{
-            alerts,
             functions::StreamTransform,
             prom::*,
+            scheduled_ops::alerts,
             stream::{SchemaRecords, StreamParams},
         },
     },

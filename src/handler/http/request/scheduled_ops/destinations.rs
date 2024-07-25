@@ -18,102 +18,108 @@ use std::io::Error;
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
-    common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse},
-    service::alerts::templates,
+    common::meta::{scheduled_ops::destinations::Destination, http::HttpResponse as MetaHttpResponse},
+    service::scheduled_ops::destinations,
 };
 
-/// CreateTemplate
+/// CreateDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "CreateTemplate",
+    operation_id = "CreateDestination",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/alerts/templates")]
-pub async fn save_template(
+#[post("/{org_id}/alerts/destinations")]
+pub async fn save_destination(
     path: web::Path<String>,
-    tmpl: web::Json<Template>,
+    dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let tmpl = tmpl.into_inner();
-    match templates::save(&org_id, "", tmpl, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    let dest = dest.into_inner();
+    match destinations::save(&org_id, "", dest, true).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
+        Err(e) => match e {
+            (http::StatusCode::BAD_REQUEST, e) => Ok(MetaHttpResponse::bad_request(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
     }
 }
 
-/// UpdateTemplate
+/// UpdateDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "UpdateTemplate",
+    operation_id = "UpdateDestination",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("template_name" = String, Path, description = "Template name"),
+        ("destination_name" = String, Path, description = "Destination name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/alerts/templates/{template_name}")]
-pub async fn update_template(
+#[put("/{org_id}/alerts/destinations/{destination_name}")]
+pub async fn update_destination(
     path: web::Path<(String, String)>,
-    tmpl: web::Json<Template>,
+    dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let tmpl = tmpl.into_inner();
-    match templates::save(&org_id, &name, tmpl, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    let dest = dest.into_inner();
+    match destinations::save(&org_id, &name, dest, false).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
+        Err(e) => match e {
+            (http::StatusCode::BAD_REQUEST, e) => Ok(MetaHttpResponse::bad_request(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
     }
 }
 
-/// GetTemplateByName
+/// GetDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "GetTemplate",
+    operation_id = "GetDestination",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("template_name" = String, Path, description = "Template name"),
+        ("destination_name" = String, Path, description = "Destination name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Template),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = Destination),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse), 
     )
 )]
-#[get("/{org_id}/alerts/templates/{template_name}")]
-async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+#[get("/{org_id}/alerts/destinations/{destination_name}")]
+async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    match templates::get(&org_id, &name).await {
+    match destinations::get(&org_id, &name).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
 
-/// ListTemplates
+/// ListDestinations
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "ListTemplates",
+    operation_id = "ListDestinations",
     security(
         ("Authorization"= [])
     ),
@@ -121,12 +127,15 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/alerts/templates")]
-async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
+#[get("/{org_id}/alerts/destinations")]
+async fn list_destinations(
+    path: web::Path<String>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     let mut _permitted = None;
@@ -138,7 +147,7 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
             &org_id,
             user_id.to_str().unwrap(),
             "GET",
-            "template",
+            "destination",
         )
         .await
         {
@@ -154,23 +163,23 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
         // Get List of allowed objects ends
     }
 
-    match templates::list(&org_id, _permitted).await {
+    match destinations::list(&org_id, _permitted).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
 
-/// DeleteTemplate
+/// DeleteDestination
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "DeleteAlertTemplate",
+    operation_id = "DeleteAlertDestination",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("template_name" = String, Path, description = "Template name"),
+        ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
         (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
@@ -179,11 +188,11 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
         (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/alerts/templates/{template_name}")]
-async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+#[delete("/{org_id}/alerts/destinations/{destination_name}")]
+async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    match templates::delete(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template deleted")),
+    match destinations::delete(&org_id, &name).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination deleted")),
         Err(e) => match e {
             (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),

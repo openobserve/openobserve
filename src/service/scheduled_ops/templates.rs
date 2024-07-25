@@ -18,7 +18,7 @@ use actix_web::http;
 use crate::{
     common::{
         infra::config::ALERTS_DESTINATIONS,
-        meta::{alerts::templates::Template, authz::Authz},
+        meta::{scheduled_ops::templates::Template, authz::Authz},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::db,

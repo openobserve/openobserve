@@ -43,8 +43,8 @@ use super::{
 };
 use crate::{
     common::meta::{
-        alerts::Alert,
         ingestion::IngestionStatus,
+        scheduled_ops::alerts::Alert,
         stream::{SchemaRecords, StreamParams},
     },
     service::{

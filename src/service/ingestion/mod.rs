@@ -43,8 +43,8 @@ use crate::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
         meta::{
-            alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+            scheduled_ops::alerts::Alert,
             stream::{SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,

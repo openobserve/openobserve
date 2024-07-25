@@ -16,7 +16,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-pub mod alerts;
+pub mod scheduled_ops;
 pub mod compact;
 pub mod dashboards;
 pub mod db;

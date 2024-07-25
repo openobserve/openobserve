@@ -13,72 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, utils::json::Value};
-use hashbrown::HashMap;
+use config::utils::json::Value;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub mod alerts;
+pub mod derived_streams;
 pub mod destinations;
 pub mod templates;
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Alert {
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub org_id: String,
-    #[serde(default)]
-    pub stream_type: StreamType,
-    #[serde(default)]
-    pub stream_name: String,
-    #[serde(default)]
-    pub is_real_time: bool,
-    #[serde(default)]
-    pub query_condition: QueryCondition,
-    #[serde(default)]
-    pub trigger_condition: TriggerCondition,
-    pub destinations: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context_attributes: Option<HashMap<String, String>>,
-    #[serde(default)]
-    pub row_template: String,
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    /// Timezone offset in minutes.
-    /// The negative secs means the Western Hemisphere
-    pub tz_offset: i32,
-}
-
-impl PartialEq for Alert {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.stream_type == other.stream_type
-            && self.stream_name == other.stream_name
-    }
-}
-
-impl Default for Alert {
-    fn default() -> Self {
-        Self {
-            name: "".to_string(),
-            org_id: "".to_string(),
-            stream_type: StreamType::default(),
-            stream_name: "".to_string(),
-            is_real_time: false,
-            query_condition: QueryCondition::default(),
-            trigger_condition: TriggerCondition::default(),
-            destinations: vec![],
-            context_attributes: None,
-            row_template: "".to_string(),
-            description: "".to_string(),
-            enabled: false,
-            tz_offset: 0, // UTC
-        }
-    }
-}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct TriggerCondition {

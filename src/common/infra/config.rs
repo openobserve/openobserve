@@ -24,13 +24,13 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        alerts,
         dashboards::reports,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
         pipelines::PipeLine,
         prom::ClusterLeader,
+        scheduled_ops,
         syslog::SyslogRoute,
         user::User,
     },
@@ -60,13 +60,13 @@ pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
+pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<scheduled_ops::alerts::Alert>>> =
     Lazy::new(Default::default);
 pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
-pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
+pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, scheduled_ops::templates::Template>> =
     Lazy::new(Default::default);
-pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, alerts::destinations::Destination>> =
+pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, scheduled_ops::destinations::Destination>> =
     Lazy::new(Default::default);
 pub static DASHBOARD_REPORTS: Lazy<RwHashMap<String, reports::Report>> =
     Lazy::new(Default::default);

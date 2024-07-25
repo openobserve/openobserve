@@ -19,7 +19,7 @@ use crate::{
     common::{
         infra::config::STREAM_ALERTS,
         meta::{
-            alerts::destinations::{Destination, DestinationType, DestinationWithTemplate},
+            scheduled_ops::destinations::{Destination, DestinationType, DestinationWithTemplate},
             authz::Authz,
         },
         utils::auth::{remove_ownership, set_ownership},

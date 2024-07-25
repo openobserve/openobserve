@@ -19,7 +19,7 @@ use config::utils::json;
 use itertools::Itertools;
 
 use crate::{
-    common::{infra::config::ALERTS_DESTINATIONS, meta::alerts::destinations::Destination},
+    common::{infra::config::ALERTS_DESTINATIONS, meta::scheduled_ops::destinations::Destination},
     service::db,
 };
 

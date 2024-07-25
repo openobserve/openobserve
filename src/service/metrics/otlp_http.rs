@@ -40,7 +40,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         self,
-        alerts::Alert,
+        scheduled_ops::alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
         stream::{SchemaRecords, StreamParams},

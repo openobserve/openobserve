@@ -19,14 +19,11 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::{
-        meta::{alerts::Alert, http::HttpResponse as MetaHttpResponse},
+        meta::{http::HttpResponse as MetaHttpResponse, scheduled_ops::alerts::Alert},
         utils::http::get_stream_type_from_request,
     },
-    service::alerts,
+    service::scheduled_ops::alerts,
 };
-
-pub mod destinations;
-pub mod templates;
 
 /// CreateAlert
 #[utoipa::path(
