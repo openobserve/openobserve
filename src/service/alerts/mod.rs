@@ -114,13 +114,14 @@ pub async fn save(
     // before saving alert check alert context attributes
     if alert.context_attributes.is_some() {
         let attrs = alert.context_attributes.as_ref().unwrap();
-        let mut new_attrs = HashMap::with_capacity(attrs.len());
+        let mut new_attrs = hashbrown::HashMap::with_capacity(attrs.len());
         for key in attrs.keys() {
             let new_key = key.trim().to_string();
             if !new_key.is_empty() {
                 new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
             }
         }
+        alert.context_attributes = Some(new_attrs);
     }
 
     // before saving alert check column type to decide numeric condition
