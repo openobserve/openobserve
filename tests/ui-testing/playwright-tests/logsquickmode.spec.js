@@ -195,7 +195,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=_timestamp FROM "e2e_automate" ORDER BY _timestamp DESC')
+      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=job FROM "e2e_automate" ORDER BY _timestamp DESC')
     ).toBeVisible();
     
    
@@ -209,14 +209,11 @@ test.describe("Logs Quickmode testcases", () => {
       .fill("_timestamp");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
         '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
