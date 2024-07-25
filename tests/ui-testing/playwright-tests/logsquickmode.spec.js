@@ -187,10 +187,8 @@ test.describe("Logs Quickmode testcases", () => {
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=_timestamp FROM "e2e_automate" ORDER BY _timestamp DESC')
