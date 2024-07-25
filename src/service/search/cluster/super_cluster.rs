@@ -45,7 +45,7 @@ pub async fn search(
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
-    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
+    let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
