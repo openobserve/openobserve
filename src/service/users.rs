@@ -72,9 +72,7 @@ pub async fn post_user(
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{
-                        get_org_creation_tuples, get_user_role_tuple, update_tuples,
-                    },
+                    authorizer::authz::{get_user_role_tuple, update_tuples},
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
                 if get_o2_config().openfga.enabled {
@@ -85,16 +83,8 @@ pub async fn post_user(
                         &org_id.replace(' ', "_"),
                         &mut tuples,
                     );
-                    get_org_creation_tuples(
-                        org_id,
-                        &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
-                            .collect(),
-                        NON_OWNING_ORG.to_vec(),
-                    )
-                    .await;
+                    // TODO: create another function to update the &mut tuples
+                    let _ = organization::check_and_create_org(org_id).await;
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("User saved successfully in openfga");
