@@ -70,15 +70,26 @@ pub async fn search(
             return Err(Error::Message(e.to_string()));
         }
     };
+
     let stream_name = &parsed_sql.source;
 
+    let mut req = in_req.clone();
+    let mut query_fn = req
+        .query
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
     let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&origin_sql);
+    let hashed_query = if let Some(vrl_function) = &query_fn {
+        h.sum64(&format!("{}{}", origin_sql, vrl_function))
+    } else {
+        h.sum64(&origin_sql)
+    };
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let mut req = in_req.clone();
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
@@ -127,7 +138,6 @@ pub async fn search(
     let mut res = if !should_exec_query {
         c_resp.cached_response
     } else {
-        let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
         if let Some(vrl_function) = &query_fn {
             if !vrl_function.trim().ends_with('.') {
                 query_fn = Some(format!("{} \n .", vrl_function));
