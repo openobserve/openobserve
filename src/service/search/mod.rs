@@ -311,9 +311,13 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
-        .await
-        .unwrap();
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!("query_status: no querier node online");
+            return Err(server_internal_error("no querier node online"));
+        }
+    };
     // sort nodes by node_id this will improve hit cache ratio
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     let nodes = nodes;
@@ -468,9 +472,13 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
-        .await
-        .unwrap();
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!("cancel_query: no querier node online");
+            return Err(server_internal_error("no querier node online"));
+        }
+    };
     // sort nodes by node_id this will improve hit cache ratio
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     let nodes = nodes;
