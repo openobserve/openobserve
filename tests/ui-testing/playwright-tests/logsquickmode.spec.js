@@ -184,7 +184,6 @@ test.describe("Logs Quickmode testcases", () => {
     page,
   }) => {
     await page
-      .locator(".field-container")
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
