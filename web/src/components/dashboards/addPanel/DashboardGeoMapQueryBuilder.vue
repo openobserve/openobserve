@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.name.label
                     "
-                    :rules="[(val) => val > 0 || 'Required']"
+                    :rules="[(val: any) => val > 0 || 'Required']"
                   />
                   <div
                     v-if="
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.value_for_maps.label
                     "
-                    :rules="[(val) => val > 0 || 'Required']"
+                    :rules="[(val: any) => val > 0 || 'Required']"
                   />
                   <div
                     v-if="
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-menu
               class="q-pa-md"
-              @show="(e) => loadFilterItem(filteredItem.column)"
+              @show="(e: any) => loadFilterItem(filteredItem.column)"
               :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
             >
               <div style="height: 100%">
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :label="t('common.operator')"
                             data-test="dashboard-filter-condition-dropdown"
                             style="width: 100%"
-                            :rules="[(val) => !!val || 'Required']"
+                            :rules="[(val: any) => !!val || 'Required']"
                           />
                           <CommonAutoComplete
                             v-if="
@@ -464,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           emit-value
                           map-options
                           :rules="[
-                            (val) =>
+                            (val: any) =>
                               val.length > 0 || 'At least 1 item required',
                           ]"
                         >
