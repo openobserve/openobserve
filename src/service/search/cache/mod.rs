@@ -231,7 +231,9 @@ pub async fn search(
             );
             c_resp.cached_response
         } else {
-            results[0].clone()
+            let mut reps = results[0].clone();
+            sort_response(c_resp.is_descending, &mut reps, &c_resp.ts_column);
+            reps
         }
     };
 
@@ -343,15 +345,7 @@ fn merge_response(
         }
         cache_response.hits.extend(res.hits.clone());
     }
-    if is_descending {
-        cache_response
-            .hits
-            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
-    } else {
-        cache_response
-            .hits
-            .sort_by_key(|a| get_ts_value(ts_column, a));
-    }
+    sort_response(is_descending, cache_response, ts_column);
 
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
@@ -364,6 +358,18 @@ fn merge_response(
     );
     cache_response.result_cache_ratio =
         (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+}
+
+fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_column: &str) {
+    if is_descending {
+        cache_response
+            .hits
+            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
+    } else {
+        cache_response
+            .hits
+            .sort_by_key(|a| get_ts_value(ts_column, a));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
