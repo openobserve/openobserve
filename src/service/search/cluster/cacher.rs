@@ -33,9 +33,13 @@ pub async fn get_cached_results(
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
-        .await
-        .unwrap();
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
+            return None;
+        }
+    };
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
 
@@ -254,9 +258,13 @@ pub async fn delete_cached_results(path: String) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
-    let mut nodes = infra_cluster::get_cached_online_query_nodes(None)
-        .await
-        .unwrap();
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!("[trace_id {trace_id}] delete_cached_results: no querier node online");
+            return false;
+        }
+    };
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
 
