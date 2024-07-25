@@ -97,6 +97,10 @@ impl StreamParams {
             stream_type,
         }
     }
+
+    pub fn is_valid(&self) -> bool {
+        !(self.org_id.is_empty() || self.stream_name.is_empty())
+    }
 }
 
 pub struct SchemaEvolution {

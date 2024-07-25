@@ -34,6 +34,7 @@ use crate::{
 
 pub mod alert_manager;
 pub mod alerts;
+pub mod derived_streams;
 pub mod destinations;
 pub mod templates;
 
