@@ -23,6 +23,7 @@
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
+          :dashboard-panel-data="dashboardPanelData"
           @add-condition="addConditionToGroup"
           @add-group="addGroupToGroup"
           @remove-group="removeGroupFromNested(index)"
@@ -34,6 +35,7 @@
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
+          :dashboard-panel-data="dashboardPanelData"
           @remove-condition="removeConditionFromGroup(index)"
           @logical-operator-change="emitLogicalOperatorChange"
           :condition-index="index"
@@ -85,6 +87,10 @@ export default defineComponent({
     },
     loadFilterItem: {
       type: Function,
+      required: true,
+    },
+    dashboardPanelData: {
+      type: Object,
       required: true,
     },
   },

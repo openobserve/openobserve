@@ -24,6 +24,7 @@
           :schema-options="schemaOptions"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems(0)"
           :load-filter-item="loadFilterItem"
+          :dashboard-panel-data="dashboardPanelData"
           @add-condition="addConditionToGroup"
           @add-group="addGroupToGroup"
           @remove-group="() => removeGroup(0)"
