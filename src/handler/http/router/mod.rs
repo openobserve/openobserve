@@ -463,6 +463,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::handle_kinesis_request)
             .service(logs::ingest::handle_gcp_request)
             .service(organization::org::create_org)
+            .service(organization::org::rename_org)
             .service(authz::fga::create_role)
             .service(authz::fga::get_roles)
             .service(authz::fga::update_role)

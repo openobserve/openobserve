@@ -334,6 +334,13 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS.get("streams").unwrap().key,
                     path_columns[1]
                 )
+            } else if path_columns[1].starts_with("rename") {
+                // Org rename
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("organizations").unwrap().key,
+                    org_id
+                )
             } else if method.eq("PUT")
                 || method.eq("DELETE")
                 || path_columns[1].starts_with("reports")
