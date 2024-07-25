@@ -184,6 +184,10 @@ test.describe("Logs Quickmode testcases", () => {
     page,
   }) => {
     await page
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("job");
+    await page.waitForTimeout(2000);
+    await page
       .locator(
         '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
