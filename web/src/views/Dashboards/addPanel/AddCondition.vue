@@ -26,7 +26,7 @@
           <q-select
             v-model="selectedSchemas"
             :options="schemaOptions"
-            label="FieldList"
+            label="Filters on Field"
             dense
             filled
             style="width: 100%"
