@@ -98,7 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="`dashboard-panel-query-tab-add`"
         ></q-btn>
       </div>
-      <div>
+      <div style="display: flex; gap: 4px">
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="dashboardPanelData.layout.vrlFunctionToggle"
+          :icon="'img:' + getImageURL('images/common/function.svg')"
+          title="Toggle Function Editor"
+          class="float-left"
+          size="28px"
+          @update:model-value="onFunctionToggle"
+          :disable="promqlMode"
+        />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
@@ -118,8 +128,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-scroll
             style="width: 100%; height: 100%"
             v-model="splitterModel"
-            :limits="[30, promqlMode ? 100 : 70]"
-            :disable="promqlMode"
+            :limits="[
+              30,
+              promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
+                ? 100
+                : 70,
+            ]"
+            :disable="
+              promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
+            "
           >
             <template #before>
               <SqlQueryEditor
@@ -205,6 +222,7 @@ import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import { inject } from "vue";
 import { onBeforeMount } from "vue";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -230,7 +248,13 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const splitterModel = ref(70);
+
+    const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
+
+    const splitterModel = ref(
+      promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
+    );
 
     watch(
       () => splitterModel.value,
@@ -238,9 +262,6 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
     );
-
-    const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
 
     const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
@@ -263,9 +284,9 @@ export default defineComponent({
     };
 
     watch(
-      () => [promqlMode.value],
+      () => [promqlMode.value, dashboardPanelData.layout.vrlFunctionToggle],
       () => {
-        if (promqlMode.value) {
+        if (promqlMode.value || !dashboardPanelData.layout.vrlFunctionToggle) {
           splitterModel.value = 100;
         } else {
           splitterModel.value = 70;
@@ -318,7 +339,6 @@ export default defineComponent({
       },
     );
 
-
     // this is only for VRLs
     const resizeEventListener = async () => {
       await nextTick();
@@ -327,7 +347,7 @@ export default defineComponent({
 
     onMounted(async () => {
       window.removeEventListener("resize", resizeEventListener);
-      window.addEventListener("resize", resizeEventListener)
+      window.addEventListener("resize", resizeEventListener);
     });
 
     onUnmounted(() => {
@@ -388,6 +408,24 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = [];
     };
 
+    const onFunctionToggle = (value, event) => {
+      event.stopPropagation();
+
+      // if value is false
+      if (!value) {
+        // hide function editor
+        splitterModel.value = 100;
+
+        // reset function query
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery = "";
+      }
+
+      // open query editor
+      dashboardPanelData.layout.showQueryBar = true;
+    };
+
     return {
       t,
       router,
@@ -408,6 +446,8 @@ export default defineComponent({
       functionEditorPlaceholderFlag,
       vrlFnEditorRef,
       splitterModel,
+      getImageURL,
+      onFunctionToggle,
     };
   },
 });
