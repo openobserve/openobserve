@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-};
+use std::str::FromStr;
 
 use actix_web::http;
 use arrow_schema::DataType;
@@ -31,6 +28,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
+use hashbrown::{HashMap, HashSet};
 use lettre::{message::SinglePart, AsyncTransport, Message};
 
 use super::promql;
@@ -121,6 +119,7 @@ pub async fn save(
                 new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
             }
         }
+        alert.context_attributes = Some(new_attrs);
     }
 
     // before saving alert check column type to decide numeric condition
