@@ -201,6 +201,10 @@ export default defineComponent({
       await nextTick(); // let the watchers execute first
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
+
+      // empty the errors
+      dashboardPanelData.meta.errors.queryErrors = [];
+
       if (selectedButtonType.value == "promql") {
         dashboardPanelData.layout.currentQueryIndex = 0;
         dashboardPanelData.data.queries = dashboardPanelData.data.queries.slice(

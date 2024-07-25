@@ -2434,18 +2434,24 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs"
+      "logs",
     );
-    const { resetDashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
-    );
+    const { dashboardPanelData, resetDashboardPanelData } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const changeLogsVisualizeToggle = () => {
       // change logs visualize toggle
       searchObj.meta.logsVisualizeToggle = "logs";
       confirmLogsVisualizeModeChangeDialog.value = false;
+
+      // store dashboardPanelData meta object
+      const dashboardPanelDataMetaObj = dashboardPanelData.meta;
+
       // reset old dashboardPanelData
       resetDashboardPanelData();
+
+      // assign, old dashboardPanelData meta object
+      dashboardPanelData.meta = dashboardPanelDataMetaObj;
     };
 
     return {
