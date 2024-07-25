@@ -217,11 +217,11 @@ test.describe("Logs Quickmode testcases", () => {
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("kubernetes_pod_id");
+      .fill("level");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
       )
       .last()
       .click({
@@ -236,11 +236,11 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .locator('text=kubernetes_pod_id')
+        .locator('text=level')
     ).toBeVisible();
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
       )
       .last()
       .click({
@@ -248,13 +248,13 @@ test.describe("Logs Quickmode testcases", () => {
       });
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]')
-    ).not.toHaveText(/kubernetes_pod_id/);
+    ).not.toHaveText(/level/);
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
     await expect(
       page.locator('[data-test="log-table-column-0-source"]')
-    ).not.toHaveText(/kubernetes_pod_id/);
+    ).not.toHaveText(/_timestamp/);
   });
 
   test("should display order by in sql mode by default even after page reload", async ({
