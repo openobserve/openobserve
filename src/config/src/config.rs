@@ -868,8 +868,8 @@ pub struct Common {
     pub es_version: String,
     #[env_config(
         name = "ZO_CREATE_ORG_THROUGH_INGESTION",
-        default = false,
-        help = "If true, new org can be automatically created through ingestion for root user"
+        default = true,
+        help = "If true, new org can be automatically created through ingestion for root user. Default is true."
     )]
     pub create_org_through_ingestion: bool,
 }

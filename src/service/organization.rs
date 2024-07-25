@@ -271,7 +271,7 @@ pub async fn rename_org(
 }
 
 pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
-    if get_org(&org_id).await.is_none() {
+    if get_org(org_id).await.is_none() {
         return Err(anyhow::anyhow!("Organization does not exist"));
     }
     match db::organization::delete(org_id).await {
