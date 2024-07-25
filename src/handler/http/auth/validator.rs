@@ -752,6 +752,11 @@ pub(crate) async fn check_permissions(
         None => "".to_string(),
     };
     let org_id = if auth_info.org_id.eq("organizations") {
+        if auth_info.method.eq("POST") {
+            // The user is trying to create a new org
+            // No need to check permission, return true
+            return true;
+        }
         user_id
     } else {
         &auth_info.org_id

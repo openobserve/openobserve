@@ -247,13 +247,15 @@ pub async fn rename_org(
     name: &str,
     user_email: &str,
 ) -> Result<Organization, anyhow::Error> {
-    match get_user(Some(org_id), user_email).await {
-        Some(user) => {
-            if !(user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)) {
-                return Err(anyhow::anyhow!("Unauthorized access"));
+    if !is_root_user(user_email) {
+        match get_user(Some(org_id), user_email).await {
+            Some(user) => {
+                if !(user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)) {
+                    return Err(anyhow::anyhow!("Unauthorized access"));
+                }
             }
+            None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
-        None => return Err(anyhow::anyhow!("Unauthorized access")),
     }
 
     if get_org(org_id).await.is_none() {
