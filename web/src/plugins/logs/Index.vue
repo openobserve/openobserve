@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
-            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -245,7 +245,10 @@ color="primary" size="md" />
               </template>
             </q-splitter>
           </div>
-          <div else :style="`height: calc(100vh - ${splitterModel}vh - 40px);`">
+          <div
+            v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
+            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+          >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"

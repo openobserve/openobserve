@@ -2693,7 +2693,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery &&
-      dashboardPanelData.data.queryType != "promql"
+      dashboardPanelData.data.queryType != "promql" &&
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query
     ) {
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
