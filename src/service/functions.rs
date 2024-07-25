@@ -221,7 +221,7 @@ pub async fn list_stream_functions(
 
 pub async fn delete_stream_function(
     org_id: &str,
-    _stream_type: StreamType,
+    stream_type: StreamType,
     stream_name: &str,
     fn_name: &str,
 ) -> Result<HttpResponse, Error> {
@@ -237,7 +237,7 @@ pub async fn delete_stream_function(
 
     if let Some(ref mut val) = existing_fn.streams {
         for stream in val.iter_mut() {
-            if stream.stream == stream_name {
+            if stream.stream == stream_name && stream.stream_type == stream_type {
                 stream.is_removed = true;
                 stream.order = 0;
                 break;
@@ -289,9 +289,12 @@ pub async fn add_function_to_stream(
     stream_order.stream_type = stream_type;
 
     if let Some(mut val) = existing_fn.streams {
-        if let Some(existing) = val.iter_mut().find(|x| x.stream == stream_order.stream) {
+        if let Some(existing) = val.iter_mut().find(|x| {
+            x.stream == stream_order.stream && x.stream_type.eq(&stream_order.stream_type)
+        }) {
             existing.is_removed = false;
             existing.order = stream_order.order;
+            existing.apply_before_flattening = stream_order.apply_before_flattening;
         } else {
             val.push(stream_order);
         }
@@ -382,6 +385,7 @@ mod tests {
                 stream_type: StreamType::Logs,
                 order: 0,
                 is_removed: false,
+                apply_before_flattening: false,
             }]),
         };
 

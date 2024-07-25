@@ -221,6 +221,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
+                          @updated:vrlFunctionFieldList="
+                            updateVrlFunctionFieldList
+                          "
                           searchType="Dashboards"
                         />
                         <q-dialog v-model="showViewPanel">
@@ -366,7 +369,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     DashboardQueryEditor: defineAsyncComponent(
-      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue")
+      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
     QueryInspector,
     CustomHTMLEditor,
@@ -450,11 +453,11 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId,
           route.query.folder,
-          route.query.tab
+          route.query.tab,
         );
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData))
+          JSON.parse(JSON.stringify(panelData)),
         );
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -494,9 +497,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default"
-          )
-        )
+            route.query.folder ?? "default",
+          ),
+        ),
       );
       // console.timeEnd("AddPanel:loadDashboard");
 
@@ -537,7 +540,7 @@ export default defineComponent({
         !dashboardPanelData.data.config.unit &&
         !dashboardPanelData.data.config.unit_custom &&
         dashboardPanelData.data.queries[0].fields.x.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.breakdown.length == 0 &&
+        dashboardPanelData.data.queries[0].fields?.breakdown?.length == 0 &&
         dashboardPanelData.data.queries[0].fields.y.length == 0 &&
         dashboardPanelData.data.queries[0].fields.z.length == 0 &&
         dashboardPanelData.data.queries[0].fields.filter.length == 0 &&
@@ -563,7 +566,7 @@ export default defineComponent({
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // console.timeEnd("watch:dashboardPanelData.data.type");
-      }
+      },
     );
 
     watch(selectedDate, () => {
@@ -579,7 +582,7 @@ export default defineComponent({
         // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
         // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
-      }
+      },
     );
 
     // resize the chart when query editor is opened and closed
@@ -596,7 +599,7 @@ export default defineComponent({
           }
         }
         // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
-      }
+      },
     );
 
     const runQuery = () => {
@@ -642,7 +645,7 @@ export default defineComponent({
         }
         // console.timeEnd("watch:dashboardPanelData.data");
       },
-      { deep: true }
+      { deep: true },
     );
 
     const beforeUnloadHandler = (e: any) => {
@@ -705,7 +708,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
       }
 
@@ -729,11 +732,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
-              "Error saving panel configuration : " + errorMessageOnSave.message
+              "Error saving panel configuration : " +
+                errorMessageOnSave.message,
             );
             return;
           }
@@ -749,12 +753,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
               "Error saving panel configuration  : " +
-                errorMessageOnSave.message
+                errorMessageOnSave.message,
             );
             return;
           }
@@ -782,7 +786,7 @@ export default defineComponent({
               : "Error while creating panel"),
           {
             timeout: 2000,
-          }
+          },
         );
       }
     };
@@ -827,6 +831,157 @@ export default defineComponent({
       // console.timeEnd("onDataZoom");
     };
 
+    const updateVrlFunctionFieldList = (fieldList: any) => {
+      // extract all panelSchema alias
+      const aliasList: any = [];
+
+      // remove panelschema fields from field list
+
+      // add x axis alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.x?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add breakdown alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.breakdown?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add y axis alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.y?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add z axis alias
+      dashboardPanelData?.data?.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.z?.forEach((it: any) => {
+        if (!it.isDerived) {
+          aliasList.push(it.alias);
+        }
+      });
+
+      // add latitude alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.latitude?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.latitude.alias,
+        );
+      }
+
+      // add longitude alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.longitude?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.longitude.alias,
+        );
+      }
+
+      // add weight alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.weight?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.weight.alias,
+        );
+      }
+
+      // add source alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.source?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.source.alias,
+        );
+      }
+
+      // add target alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.target?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.target.alias,
+        );
+      }
+
+      // add source alias
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.alias &&
+        !dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.value?.isDerived
+      ) {
+        aliasList.push(
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.value.alias,
+        );
+      }
+
+      // remove custom query fields from field list
+      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
+        aliasList.push(it.name);
+      });
+
+      // rest will be vrl function fields
+      fieldList = fieldList
+        .filter((field: any) => aliasList.indexOf(field) < 0)
+        .map((field: any) => ({ name: field, type: "Utf8" }));
+
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
+    };
+
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
       panelId: -1,
@@ -840,7 +995,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -884,6 +1039,7 @@ export default defineComponent({
       panelTitle,
       onDataZoom,
       showTutorial,
+      updateVrlFunctionFieldList,
     };
   },
   methods: {

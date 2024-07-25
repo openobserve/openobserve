@@ -84,6 +84,7 @@ pub struct Panel {
 #[serde(rename_all = "camelCase")]
 pub struct Query {
     pub query: Option<String>,
+    pub vrl_function_query: Option<String>,
     pub custom_query: bool,
     pub fields: PanelFields,
     pub config: QueryConfig,
@@ -127,6 +128,8 @@ pub struct AxisItem {
     pub sort_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<AxisArg>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_derived: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

@@ -32,6 +32,7 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -39,7 +40,7 @@ export const usePanelDataLoader = (
   variablesData: any,
   chartPanelRef: any,
   forceLoad: any,
-  searchType: any
+  searchType: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -69,14 +70,14 @@ export const usePanelDataLoader = (
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
             ?.filter((it: any) => {
               const regexForVariable = new RegExp(
-                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
               );
 
               return panelSchema.value.queries
                 ?.map((q: any) => regexForVariable.test(q?.query))
                 ?.includes(true);
-            })
-        )
+            }),
+        ),
       )
     : [];
 
@@ -97,8 +98,8 @@ export const usePanelDataLoader = (
             ?.filter((it: any) => it.type === "dynamic_filters")
             ?.map((it: any) => it?.value)
             ?.flat()
-            ?.filter((it: any) => it?.operator && it?.name && it?.value)
-        )
+            ?.filter((it: any) => it?.operator && it?.name && it?.value),
+        ),
       )
     : [];
   // let currentAdHocVariablesData: any = null;
@@ -156,7 +157,7 @@ export const usePanelDataLoader = (
             resolve();
             stopWatching(); // Stop watching once isVisible is true
           }
-        }
+        },
       );
 
       // Listen to the abort signal
@@ -210,7 +211,7 @@ export const usePanelDataLoader = (
         timestamps.end_time != "Invalid Date"
       ) {
         startISOTimestamp = new Date(
-          timestamps.start_time.toISOString()
+          timestamps.start_time.toISOString(),
         ).getTime();
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
@@ -228,7 +229,7 @@ export const usePanelDataLoader = (
               it.query,
               startISOTimestamp,
               endISOTimestamp,
-              panelSchema.value.queryType
+              panelSchema.value.queryType,
             );
             // console.log("Calling queryPromises", query1);
 
@@ -262,7 +263,7 @@ export const usePanelDataLoader = (
                 processApiError(error, "promql");
                 return { result: null, metadata: metadata };
               });
-          }
+          },
         );
 
         // Wait for all query promises to resolve
@@ -284,7 +285,7 @@ export const usePanelDataLoader = (
               it.query,
               startISOTimestamp,
               endISOTimestamp,
-              panelSchema.value.queryType
+              panelSchema.value.queryType,
             );
 
             const { query: query2, metadata: metadata2 } =
@@ -309,6 +310,9 @@ export const usePanelDataLoader = (
                   query: {
                     query: {
                       sql: query,
+                      query_fn: it.vrlFunctionQuery
+                        ? b64EncodeUnicode(it.vrlFunctionQuery)
+                        : null,
                       sql_mode: "full",
                       start_time: startISOTimestamp,
                       end_time: endISOTimestamp,
@@ -317,13 +321,18 @@ export const usePanelDataLoader = (
                   },
                   page_type: pageType,
                 },
-                searchType.value ?? "Dashboards"
+                searchType.value ?? "Dashboards",
               )
               .then((res) => {
                 // Set searchQueryData.data to the API response hits
                 // state.data = res.data.hits;
                 state.errorDetail = "";
                 // console.log("API response received");
+
+                // if there is an error in vrl function, throw error
+                if (res.data.function_error) {
+                  throw new Error(`Function error: ${res.data.function_error}`);
+                }
 
                 return {
                   result: res.data.hits,
@@ -338,7 +347,7 @@ export const usePanelDataLoader = (
                 processApiError(error, "sql");
                 return { result: null, metadata: metadata };
               });
-          }
+          },
         );
         // Wait for all query promises to resolve
         const sqlqueryResults = await Promise.all(sqlqueryPromise);
@@ -348,9 +357,7 @@ export const usePanelDataLoader = (
           queries: sqlqueryResults.map((it) => it?.metadata),
         };
 
-        state.resultMetaData = sqlqueryResults.map(
-          (it) => it?.resultMetaData
-        );
+        state.resultMetaData = sqlqueryResults.map((it) => it?.resultMetaData);
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
@@ -373,7 +380,7 @@ export const usePanelDataLoader = (
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
-    }
+    },
   );
 
   /**
@@ -386,7 +393,7 @@ export const usePanelDataLoader = (
     query: any,
     startISOTimestamp: any,
     endISOTimestamp: any,
-    queryType: any
+    queryType: any,
   ) => {
     const metadata: any[] = [];
 
@@ -413,16 +420,16 @@ export const usePanelDataLoader = (
     const __rate_interval: any = Math.max(
       getTimeInSecondsBasedOnUnit(
         formattedInterval.value,
-        formattedInterval.unit
+        formattedInterval.unit,
       ) + scrapeInterval,
-      4 * scrapeInterval
+      4 * scrapeInterval,
     );
 
     //get interval in ms
     const __interval_ms =
       getTimeInSecondsBasedOnUnit(
         formattedInterval.value,
-        formattedInterval.unit
+        formattedInterval.unit,
       ) * 1000;
 
     const fixedVariables = [
@@ -500,7 +507,7 @@ export const usePanelDataLoader = (
             }
             query = query.replaceAll(
               placeHolderObj.placeHolder,
-              placeHolderObj.value
+              placeHolderObj.value,
             );
           });
         } else {
@@ -555,7 +562,7 @@ export const usePanelDataLoader = (
           query,
           variable.name,
           variable.value,
-          variable.operator
+          variable.operator,
         );
       });
     }
@@ -655,7 +662,7 @@ export const usePanelDataLoader = (
         loadData();
       }
     },
-    { deep: true }
+    { deep: true },
   );
 
   // [START] Variables functions
@@ -663,14 +670,14 @@ export const usePanelDataLoader = (
     variablesData.value?.values?.some(
       (it: any) =>
         it.type === "dynamic_filters" &&
-        (it.isLoading || it.isVariableLoadingPending)
+        (it.isLoading || it.isVariableLoadingPending),
     );
 
   const areDependentVariablesStillLoadingWith = (
-    newDependentVariablesData: any
+    newDependentVariablesData: any,
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => it.isLoading || it.isVariableLoadingPending
+      (it: any) => it.isLoading || it.isVariableLoadingPending,
     );
 
   const getDependentVariablesData = () =>
@@ -678,7 +685,7 @@ export const usePanelDataLoader = (
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) => {
         const regexForVariable = new RegExp(
-          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
         );
 
         return panelSchema.value.queries
@@ -706,16 +713,16 @@ export const usePanelDataLoader = (
   };
 
   const updateCurrentDependentVariablesData = (
-    newDependentVariablesData: any
+    newDependentVariablesData: any,
   ) => {
     currentDependentVariablesData = JSON.parse(
-      JSON.stringify(newDependentVariablesData)
+      JSON.stringify(newDependentVariablesData),
     );
   };
 
   const updateCurrentDynamicVariablesData = (newDynamicVariablesData: any) => {
     currentDynamicVariablesData = JSON.parse(
-      JSON.stringify(newDynamicVariablesData)
+      JSON.stringify(newDynamicVariablesData),
     );
   };
 
@@ -741,11 +748,11 @@ export const usePanelDataLoader = (
   };
 
   const isAllRegularVariablesValuesSameWith = (
-    newDependentVariablesData: any
+    newDependentVariablesData: any,
   ) =>
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find(
-        (it2: any) => it2.name == it.name
+        (it2: any) => it2.name == it.name,
       );
       // return it.value == oldValue?.value && oldValue?.value != "";
       return it.multiSelect
@@ -756,7 +763,7 @@ export const usePanelDataLoader = (
   const isAllDynamicVariablesValuesSameWith = (newDynamicVariablesData: any) =>
     newDynamicVariablesData.every((it: any) => {
       const oldValue = currentDynamicVariablesData?.find(
-        (it2: any) => it2.name == it.name
+        (it2: any) => it2.name == it.name,
       );
       return (
         oldValue?.value != "" &&
@@ -817,30 +824,30 @@ export const usePanelDataLoader = (
 
     log(
       "Step3: newDependentVariablesData,",
-      JSON.stringify(newDependentVariablesData, null, 2)
+      JSON.stringify(newDependentVariablesData, null, 2),
     );
     log(
       "Step3: newDynamicVariablesData...",
-      JSON.stringify(newDynamicVariablesData, null, 2)
+      JSON.stringify(newDynamicVariablesData, null, 2),
     );
 
     // if the length of the any of the regular and old dynamic data has changed,
     // we need to fire the query
     log(
       "Step3: newDependentVariablesData?.length",
-      newDependentVariablesData?.length
+      newDependentVariablesData?.length,
     );
     log(
       "Step3: newDynamicVariablesData?.length",
-      newDynamicVariablesData?.length
+      newDynamicVariablesData?.length,
     );
     log(
       "Step3: currentDependentVariablesData?.length",
-      currentDependentVariablesData?.length
+      currentDependentVariablesData?.length,
     );
     log(
       "Step3: currentAdHocVariablesData?.length",
-      currentDynamicVariablesData?.length
+      currentDynamicVariablesData?.length,
     );
 
     if (
@@ -852,7 +859,7 @@ export const usePanelDataLoader = (
       updateCurrentDynamicVariablesData(newDynamicVariablesData);
 
       log(
-        "Step3: length of the any of the regular and old dynamic data has changed, we need to fire the query"
+        "Step3: length of the any of the regular and old dynamic data has changed, we need to fire the query",
       );
       return true;
     }
@@ -872,11 +879,11 @@ export const usePanelDataLoader = (
 
     log(
       "Step4: newDependentVariablesData.length",
-      newDependentVariablesData?.length
+      newDependentVariablesData?.length,
     );
     log(
       "Step4: newDynamicVariablesData.length",
-      newDynamicVariablesData?.length
+      newDynamicVariablesData?.length,
     );
 
     // execute different scenarios based on the count of variables
@@ -889,7 +896,7 @@ export const usePanelDataLoader = (
       !newDependentVariablesData?.length && !newDynamicVariablesData?.length;
 
       log(
-        "Step4: 1: no variables are there, no waiting, can call the api, returning true..."
+        "Step4: 1: no variables are there, no waiting, can call the api, returning true...",
       );
 
       return true;
@@ -956,17 +963,17 @@ export const usePanelDataLoader = (
 
       log(
         "Step4: 4: isAllRegularVariablesValuesSame",
-        isAllRegularVariablesValuesSame
+        isAllRegularVariablesValuesSame,
       );
       log(
         "Step4: 4: isAllDynamicVariablesValuesSame",
-        isAllDynamicVariablesValuesSame
+        isAllDynamicVariablesValuesSame,
       );
 
       // if any has changed
       if (isAllRegularVariablesValuesSame && isAllDynamicVariablesValuesSame) {
         log(
-          "Step4: 4: regular and dynamic variables has same old value, returning false"
+          "Step4: 4: regular and dynamic variables has same old value, returning false",
         );
         return false;
       }

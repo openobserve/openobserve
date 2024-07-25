@@ -99,15 +99,6 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    // let tokio steal the thread
-    let rt_handle = tokio::runtime::Handle::current();
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(Duration::from_secs(10));
-            rt_handle.spawn(std::future::ready(()));
-        }
-    });
-
     // setup profiling
     #[cfg(feature = "profiling")]
     let agent = if !cfg.profiling.enabled {
@@ -166,47 +157,111 @@ async fn main() -> Result<(), anyhow::Error> {
         cfg.limit.disk_free / 1024 / 1024 / 1024,
     );
 
-    // it must be initialized before the server starts
-    cluster::register_and_keepalive()
-        .await
-        .expect("cluster init failed");
-    // init config
-    config::init().await.expect("config init failed");
-    // init infra
-    infra::init().await.expect("infra init failed");
-    common_infra::init()
-        .await
-        .expect("common infra init failed");
+    // init backend jobs
+    let (job_init_tx, job_init_rx) = oneshot::channel();
+    let (job_shutudown_tx, job_shutdown_rx) = oneshot::channel();
+    let (job_stopped_tx, job_stopped_rx) = oneshot::channel();
+    let job_rt_handle = std::thread::spawn(move || {
+        let cfg = get_config();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(cfg.limit.job_runtime_worker_num)
+            .enable_all()
+            .thread_name("job_runtime")
+            .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
+            .build()
+            .expect("job runtime init failed");
+        let _guard = rt.enter();
+        rt.block_on(async move {
+            // it must be initialized before the server starts
+            cluster::register_and_keepalive()
+                .await
+                .expect("cluster init failed");
+            // init config
+            config::init().await.expect("config init failed");
+            // init infra
+            infra::init().await.expect("infra init failed");
+            common_infra::init()
+                .await
+                .expect("common infra init failed");
 
-    // init enterprise
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::init()
-        .await
-        .expect("enerprise init failed");
+            // init enterprise
+            #[cfg(feature = "enterprise")]
+            o2_enterprise::enterprise::init()
+                .await
+                .expect("enerprise init failed");
 
-    // check version upgrade
-    let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-    migration::check_upgrade(&old_version, VERSION).await?;
-    // migrate dashboards
-    migration::dashboards::run().await?;
+            // check version upgrade
+            let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
+            migration::check_upgrade(&old_version, VERSION)
+                .await
+                .expect("check upgrade failed");
+            // migrate dashboards
+            migration::dashboards::run()
+                .await
+                .expect("migrate dashboards failed");
 
-    // ingester init
-    ingester::init().await.expect("ingester init failed");
+            // ingester init
+            ingester::init().await.expect("ingester init failed");
 
-    // init job
-    job::init().await.expect("job init failed");
+            // init job
+            job::init().await.expect("job init failed");
 
-    // gRPC server
+            // init meter provider
+            let meter_provider = job::metrics::init_meter_provider()
+                .await
+                .expect("meter provider init failed");
+
+            job_init_tx.send(()).ok();
+            job_shutdown_rx.await.ok();
+            job_stopped_tx.send(()).ok();
+
+            // shutdown meter provider
+            let _ = meter_provider.shutdown();
+
+            // flush distinct values
+            _ = metadata::close().await;
+            // flush WAL cache to disk
+            common_infra::wal::flush_all_to_disk().await;
+            // flush compact offset cache to disk disk
+            _ = db::compact::files::sync_cache_to_db().await;
+            // flush db
+            let db = infra::db::get_db().await;
+            _ = db.close().await;
+        });
+    });
+
+    // wait for job init
+    job_init_rx.await.ok();
+
+    // init gRPC server
+    let (grpc_init_tx, grpc_init_rx) = oneshot::channel();
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    if config::cluster::LOCAL_NODE.is_router() {
-        init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
-    } else {
-        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
-    }
+    let grpc_rt_handle = std::thread::spawn(move || {
+        let cfg = get_config();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(cfg.limit.grpc_runtime_worker_num)
+            .enable_all()
+            .thread_name("grpc_runtime")
+            .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
+            .build()
+            .expect("grpc runtime init failed");
+        let _guard = rt.enter();
+        rt.block_on(async move {
+            if config::cluster::LOCAL_NODE.is_router() {
+                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
+                    .await
+                    .expect("router gRPC server init failed");
+            } else {
+                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
+                    .await
+                    .expect("router gRPC server init failed");
+            }
+        });
+    });
 
-    // init meter provider
-    let meter_provider = job::metrics::init_meter_provider().await?;
+    // wait for gRPC init
+    grpc_init_rx.await.ok();
 
     // let node online
     let _ = cluster::set_online(false).await;
@@ -238,9 +293,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     log::info!("HTTP server stopped");
 
-    // shutdown meter provider
-    let _ = meter_provider.shutdown();
-
     // flush useage report
     usage::flush().await;
 
@@ -251,17 +303,14 @@ async fn main() -> Result<(), anyhow::Error> {
     // stop gRPC server
     grpc_shutudown_tx.send(()).ok();
     grpc_stopped_rx.await.ok();
+    grpc_rt_handle.join().ok();
     log::info!("gRPC server stopped");
 
-    // flush WAL cache to disk
-    common_infra::wal::flush_all_to_disk().await;
-    // flush distinct values
-    _ = metadata::close().await;
-    // flush compact offset cache to disk disk
-    _ = db::compact::files::sync_cache_to_db().await;
-    // flush db
-    let db = infra::db::get_db().await;
-    _ = db.close().await;
+    // stop backend jobs
+    job_shutudown_tx.send(()).ok();
+    job_stopped_rx.await.ok();
+    job_rt_handle.join().ok();
+    log::info!("backend job stopped");
 
     // stop telemetry
     if cfg.common.telemetry_enabled {
@@ -270,18 +319,19 @@ async fn main() -> Result<(), anyhow::Error> {
             .await;
     }
 
-    log::info!("server stopped");
-
     #[cfg(feature = "profiling")]
     if let Some(agent) = agent {
         let agent_ready = agent.stop().unwrap();
         agent_ready.shutdown();
     }
 
+    log::info!("server stopped");
+
     Ok(())
 }
 
-fn init_common_grpc_server(
+async fn init_common_grpc_server(
+    init_tx: oneshot::Sender<()>,
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
@@ -321,31 +371,31 @@ fn init_common_grpc_server(
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
-    tokio::task::spawn(async move {
-        log::info!("starting gRPC server at {}", gaddr);
-        tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
-            .add_service(event_svc)
-            .add_service(search_svc)
-            .add_service(filelist_svc)
-            .add_service(metrics_svc)
-            .add_service(metrics_ingest_svc)
-            .add_service(trace_svc)
-            .add_service(usage_svc)
-            .add_service(logs_svc)
-            .add_service(query_cache_svc)
-            .serve_with_shutdown(gaddr, async {
-                shutdown_rx.await.ok();
-                log::info!("gRPC server starts shutting down");
-            })
-            .await
-            .expect("gRPC server init failed");
-        stopped_tx.send(()).ok();
-    });
+    log::info!("starting gRPC server at {}", gaddr);
+    init_tx.send(()).ok();
+    tonic::transport::Server::builder()
+        .layer(tonic::service::interceptor(check_auth))
+        .add_service(event_svc)
+        .add_service(search_svc)
+        .add_service(filelist_svc)
+        .add_service(metrics_svc)
+        .add_service(metrics_ingest_svc)
+        .add_service(trace_svc)
+        .add_service(usage_svc)
+        .add_service(logs_svc)
+        .add_service(query_cache_svc)
+        .serve_with_shutdown(gaddr, async {
+            shutdown_rx.await.ok();
+            log::info!("gRPC server starts shutting down");
+        })
+        .await
+        .expect("gRPC server init failed");
+    stopped_tx.send(()).ok();
     Ok(())
 }
 
-fn init_router_grpc_server(
+async fn init_router_grpc_server(
+    init_tx: oneshot::Sender<()>,
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
 ) -> Result<(), anyhow::Error> {
@@ -367,21 +417,20 @@ fn init_router_grpc_server(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
-    tokio::task::spawn(async move {
-        log::info!("starting gRPC server at {}", gaddr);
-        tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
-            .add_service(logs_svc)
-            .add_service(metrics_svc)
-            .add_service(traces_svc)
-            .serve_with_shutdown(gaddr, async {
-                shutdown_rx.await.ok();
-                log::info!("gRPC server starts shutting down");
-            })
-            .await
-            .expect("gRPC server init failed");
-        stopped_tx.send(()).ok();
-    });
+    log::info!("starting gRPC server at {}", gaddr);
+    init_tx.send(()).ok();
+    tonic::transport::Server::builder()
+        .layer(tonic::service::interceptor(check_auth))
+        .add_service(logs_svc)
+        .add_service(metrics_svc)
+        .add_service(traces_svc)
+        .serve_with_shutdown(gaddr, async {
+            shutdown_rx.await.ok();
+            log::info!("gRPC server starts shutting down");
+        })
+        .await
+        .expect("gRPC server init failed");
+    stopped_tx.send(()).ok();
     Ok(())
 }
 
@@ -448,7 +497,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         cfg.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.shutdown_timeout))
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout))
     .bind(haddr)?;
 
     let server = server
@@ -526,7 +575,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         cfg.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.shutdown_timeout))
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout))
     .bind(haddr)?;
 
     let server = server

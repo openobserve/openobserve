@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
-            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -97,9 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.filterErrMsg !== '' &&
                     searchObj.loading == false
                   "
+                  class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
+                    <q-icon name="warning"
+color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -110,18 +112,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
+                  class="q-ma-lg"
                 >
-                  <h5 class="text-center">
+                  <h5 class="text-center q-ma-none">
                     <div
                       data-test="logs-search-result-not-found-text"
-                      v-if="searchObj.data.errorCode == 0"
+                      v-if="
+                        searchObj.data.errorCode == 0 &&
+                        searchObj.data.errorMsg == ''
+                      "
                     >
                       Result not found.
                     </div>
-                    <SanitizedHtmlRenderer
-                      data-test="logs-search-error-message"
-                      :htmlContent="searchObj.data.errorMsg"
-                    />
+                    <div data-test="logs-search-error-message" v-else>
+                      Error occurred while retrieving search events.
+                      <q-btn
+                        v-if="searchObj.data.errorMsg != ''"
+                        @click="toggleErrorDetails"
+                        size="sm"
+                        data-test="logs-page-result-error-details-btn"
+                        >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                      >
+                    </div>
                     <div
                       data-test="logs-search-error-20003"
                       v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -140,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                       to configure a full text search field to the stream.
                     </div>
-                    <br />
                     <q-item-label>{{
                       searchObj.data.additionalErrorMsg
                     }}</q-item-label>
@@ -151,13 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.stream.selectedStream.length == 0 &&
                     searchObj.loading == false
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center col-10 q-mx-auto"
+                    class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -170,14 +182,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.loading == false &&
                     searchObj.meta.searchApplied == true
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-error-message"
-                    class="text-center q-mx-auto col-10"
+                    class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
+                    <q-btn
+                      v-if="searchObj.data.errorMsg != ''"
+                      @click="toggleErrorDetails"
+                      size="sm"
+                      data-test="logs-page-result-error-details-btn"
+                      >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                    ><br />
                   </h6>
                 </div>
                 <div
@@ -187,13 +207,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.loading == false &&
                     searchObj.meta.searchApplied == false
                   "
-                  class="row"
+                  class="row q-mt-lg"
                 >
                   <h6
                     data-test="logs-search-error-message"
-                    class="text-center q-mx-auto col-10"
+                    class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -211,10 +232,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @expandlog="toggleExpandLog"
                   />
                 </div>
+                <div class="text-center col-10 q-ma-none">
+                  <h5>
+                    <span v-if="disableMoreErrorDetails">
+                      <SanitizedHtmlRenderer
+                        data-test="logs-search-detail-error-message"
+                        :htmlContent="searchObj.data.errorMsg"
+                      />
+                    </span>
+                  </h5>
+                </div>
               </template>
             </q-splitter>
           </div>
-          <div else :style="`height: calc(100vh - ${splitterModel}vh - 40px);`">
+          <div
+            v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
+            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+          >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
@@ -388,12 +422,16 @@ export default defineComponent({
         }
       }
     },
+    toggleErrorDetails() {
+      this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
+    },
   },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+    const disableMoreErrorDetails: boolean = ref(false);
     let {
       searchObj,
       getQueryData,
@@ -496,7 +534,8 @@ export default defineComponent({
 
         if (
           searchObj.organizationIdetifier !=
-          store.state.selectedOrganization.identifier && searchObj.loading == false
+            store.state.selectedOrganization.identifier &&
+          searchObj.loading == false
         ) {
           loadLogsData();
         } else if (!searchObj.loading) updateStreams();
@@ -523,7 +562,7 @@ export default defineComponent({
         searchObj.organizationIdetifier =
           store.state.selectedOrganization.identifier;
         restoreUrlQueryParams();
-        if(searchObj.loading==false){
+        if (searchObj.loading == false) {
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
@@ -1066,6 +1105,7 @@ export default defineComponent({
       handleChartApiError,
       visualizeErrorData,
       streamListUpdated,
+      disableMoreErrorDetails,
     };
   },
   computed: {

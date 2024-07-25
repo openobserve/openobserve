@@ -94,9 +94,13 @@ pub async fn search(
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let mut nodes = infra_cluster::get_cached_online_query_nodes(req_node_group)
-        .await
-        .unwrap();
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!("[trace_id {trace_id}] service:search:cluster:run: no querier node online");
+            return Err(Error::Message("no querier node online".to_string()));
+        }
+    };
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
@@ -194,7 +198,11 @@ pub async fn search(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        dist_lock::lock(&locker_key, req.timeout as u64)
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.uuid.to_string())
+            .collect::<HashSet<_>>();
+        dist_lock::lock(&locker_key, req.timeout as u64, Some(node_ids))
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
