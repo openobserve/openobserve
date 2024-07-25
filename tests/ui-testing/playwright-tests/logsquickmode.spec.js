@@ -262,12 +262,11 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
       .last()
       .click({
@@ -285,7 +284,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=SELECT _timestamp FROM "e2e_automate" ORDER BY _timestamp DESC'
+          'text=job FROM "e2e_automate" ORDER BY _timestamp DESC'
         )
     ).toBeVisible();
   });
