@@ -1,15 +1,8 @@
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div style="height: 200px" data-test="alert-preview-chart">
-      <PanelSchemaRenderer
-        v-if="chartData"
-        :height="6"
-        :width="6"
-        :panelSchema="chartData"
-        :selectedTimeObj="dashboardPanelData.meta.dateTime"
-        :variablesData="{}"
-        searchType="UI"
-      />
+      <PanelSchemaRenderer v-if="chartData" :height="6" :width="6" :panelSchema="chartData"
+        :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="{}" searchType="UI" />
     </div>
   </div>
 </template>
@@ -146,7 +139,10 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
-  const startTime = endTime - relativeTime * 60 * 1000000;
+  let new_relative_time = 5;
+  if (relativeTime < 5) { new_relative_time = relativeTime };
+
+  const startTime = endTime - new_relative_time * 60 * 1000000;
 
   dashboardPanelData.meta.dateTime = {
     start_time: new Date(startTime),
