@@ -2731,7 +2731,9 @@ const useLogs = () => {
                 streams: [stream.name],
                 showValues: field !== timestampField && field !== allField,
                 isInterestingField:
-                  searchObj.data.stream.interestingFieldList.includes(field)
+                  searchObj.data.stream.interestingFieldList.includes(
+                    field.name,
+                  )
                     ? true
                     : false,
               };
@@ -2741,9 +2743,11 @@ const useLogs = () => {
                 stream.settings.hasOwnProperty("defined_schema_fields") &&
                 userDefineSchemaSettings.length > 0
               ) {
-                if (userDefineSchemaSettings.includes(field)) {
-                  schemaFieldsIndex = schemaFields.indexOf(field);
-                  commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
+                if (userDefineSchemaSettings.includes(field.name)) {
+                  schemaFieldsIndex = schemaFields.indexOf(field.name);
+                  commonSchemaFieldsIndex = commonSchemaFields.indexOf(
+                    field.name,
+                  );
                   if (schemaFieldsIndex > -1) {
                     fieldObj.group = "common";
 
@@ -2802,8 +2806,10 @@ const useLogs = () => {
                 //   break;
                 // }
               } else {
-                schemaFieldsIndex = schemaFields.indexOf(field);
-                commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
+                schemaFieldsIndex = schemaFields.indexOf(field.name);
+                commonSchemaFieldsIndex = commonSchemaFields.indexOf(
+                  field.name,
+                );
                 if (schemaFieldsIndex > -1) {
                   fieldObj.group = "common";
                   if (
@@ -3015,7 +3021,7 @@ const useLogs = () => {
         ) {
           searchObj.data.resultGrid.columns.push({
             name: "@timestamp",
-            field: (row: any) =>
+            accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
@@ -3028,19 +3034,32 @@ const useLogs = () => {
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
             label: t("search.timestamp") + ` (${store.state.timezone})`,
+            header: t("search.timestamp") + ` (${store.state.timezone})`,
             align: "left",
             sortable: true,
+            enableResizing: true,
+            size: "250px",
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
           });
         }
 
         if (searchObj.data.stream.selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
             name: "source",
-            field: (row: any) => JSON.stringify(row),
-            prop: (row: any) => JSON.stringify(row),
-            label: "source",
-            align: "left",
+            accessorFn: (row: any) => JSON.stringify(row),
+            cell: (info: any) => info.getValue(),
+            header: "source",
             sortable: true,
+            enableResizing: true,
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
           });
         }
       } else {
@@ -3048,7 +3067,7 @@ const useLogs = () => {
         if (searchObj.data.hasSearchDataTimestampField == true) {
           searchObj.data.resultGrid.columns.unshift({
             name: "@timestamp",
-            field: (row: any) =>
+            accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
@@ -3061,26 +3080,34 @@ const useLogs = () => {
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
             label: t("search.timestamp") + ` (${store.state.timezone})`,
+            header: t("search.timestamp") + ` (${store.state.timezone})`,
             align: "left",
             sortable: true,
+            enableResizing: true,
+            size: "250px",
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
           });
         }
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             searchObj.data.resultGrid.columns.push({
               name: field,
-              field: (row: { [x: string]: any; source: any }) => {
+              accessorFn: (row: { [x: string]: any; source: any }) => {
                 return byString(row, field);
               },
-              prop: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              label: field,
-              align: "left",
+              header: field,
               sortable: true,
-              closable: true,
-              showWrap: true,
-              wrapContent: false,
+              enableResizing: true,
+              size: "250px",
+              meta: {
+                closable: true,
+                showWrap: true,
+                wrapContent: false,
+              },
             });
           }
         }

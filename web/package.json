@@ -29,6 +29,8 @@
     "@openobserve/browser-rum": "^0.2.11",
     "@openobserve/rrweb-player": "^0.1.1",
     "@quasar/extras": "^1.16.12",
+    "@tanstack/vue-table": "^8.19.3",
+    "@tanstack/vue-virtual": "^3.8.3",
     "cron-parser": "^4.9.0",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.1.3",

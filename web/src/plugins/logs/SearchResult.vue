@@ -84,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-if="searchObj.data.histogram.errorMsg == ''">
-        <!-- <ChartRenderer
+        <ChartRenderer
           v-if="searchObj.meta.showHistogram"
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
           style="max-height: 100px"
           @updated:dataZoom="onChartUpdate"
-        /> -->
+        />
         <div
           class="q-pb-lg"
           style="top: 50px; position: absolute; left: 45%"
@@ -398,6 +398,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
       </q-virtual-scroll> -->
+      <tenstack-table
+        :columns="searchObj.data.resultGrid.columns"
+        :rows="searchObj.data.queryResults.hits"
+        class="col-12"
+        @copy="copyLogToClipboard"
+        @add-field-to-table="addFieldToTable"
+        @add-search-term="addSearchTerm"
+        @close-column="closeColumn"
+      />
       <q-dialog
         data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
@@ -463,6 +472,7 @@ import useLogs from "../../composables/useLogs";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
+import TenstackTable from "./TenstackTable.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -476,6 +486,7 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
+    TenstackTable,
   },
   emits: [
     "update:scroll",
