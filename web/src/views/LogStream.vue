@@ -170,7 +170,16 @@ size="sm" color="secondary" />
 
       <template #bottom="scope">
         <div class="bottom-bar">
-          <q-btn v-if="selected.length > 0"class="delete-btn" color="red" icon="delete" label="Delete" @click="confirmBatchDeleteAction" />
+
+              <q-btn
+                v-if="selected.length > 0"
+                class="delete-btn"
+                color="red"
+                icon="delete"
+                :label="isDeleting ? 'Deleting...' : 'Delete'"
+                :disable="isDeleting"
+                @click="confirmBatchDeleteAction"
+              />
         <QTablePagination
           data-test="log-stream-table-pagination"
           :scope="scope"
@@ -297,6 +306,7 @@ export default defineComponent({
     const router = useRouter();
     const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
+    const isDeleting = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
@@ -567,6 +577,7 @@ export default defineComponent({
         })
     };
     const deleteBatchStream = () => {
+      isDeleting.value = true;
       const selectedItems = selected.value
   const promises = [];
 
@@ -614,6 +625,8 @@ export default defineComponent({
         color: "negative",
         message: "Error while deleting streams.",
       });
+    }).finally(() => {
+      isDeleting.value = false;
     });
 };
 
@@ -736,6 +749,7 @@ export default defineComponent({
       loadingState,
       getSelectedString,
       getSelectedItems,
+      isDeleting,
     };
 
   },
