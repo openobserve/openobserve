@@ -36,7 +36,7 @@ let parser: any;
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
-    version: 4,
+    version: 5,
     id: "",
     type: "bar",
     title: "",
@@ -92,7 +92,11 @@ const getDefaultDashboardPanelData: any = () => ({
           y: [],
           z: [],
           breakdown: [],
-          filter: [],
+          filter: {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [],
+          },
           latitude: null,
           longitude: null,
           weight: null,
@@ -201,7 +205,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         y: [],
         z: [],
         breakdown: [],
-        filter: [],
+        filter: {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [],
+        },
         latitude: null,
         longitude: null,
         weight: null,
@@ -1036,18 +1044,26 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     // Add the new filter item
-    currentQuery.fields.filter.push({
+    currentQuery.fields.filter.conditions.push({
       type: "list",
       values: [],
       column: name,
       operator: null,
       value: null,
+      logicalOperator: "AND",
+      filterType: "condition",
     });
 
     // Ensure the filterValue array is initialized
     if (!dashboardPanelData.meta.filterValue) {
       dashboardPanelData.meta.filterValue = [];
     }
+    console.log(
+      "filterValue",
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.filter,
+    );
 
     try {
       const res = await StreamService.fieldValues({
@@ -1698,7 +1714,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const filter = [
       ...dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields?.filter,
+      ].fields?.filter.conditions,
     ];
     const array = fields.map((field, i) => {
       let selector = "";

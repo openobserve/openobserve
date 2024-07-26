@@ -58,14 +58,9 @@ export default defineComponent({
     const showAddMenu = ref(false);
 
     const topLevelGroup = computed(() => {
-      return {
-        filterType: "group",
-        logicalOperator: "AND",
-        conditions:
-          dashboardPanelData?.data?.queries?.[
-            dashboardPanelData?.layout?.currentQueryIndex || 0
-          ]?.fields?.filter || [],
-      };
+      return dashboardPanelData?.data?.queries?.[
+        dashboardPanelData?.layout?.currentQueryIndex || 0
+      ]?.fields?.filter;
     });
 
     const addFilter = (filterType: string) => {
@@ -85,7 +80,7 @@ export default defineComponent({
           logicalOperator: "AND",
           values: [],
         };
-        currentQuery.fields?.filter.push(defaultCondition);
+        currentQuery.fields?.filter.conditions.push(defaultCondition);
       } else if (filterType === "group") {
         const defaultGroup = {
           conditions: [
@@ -102,7 +97,7 @@ export default defineComponent({
           filterType: "group",
           logicalOperator: "AND",
         };
-        currentQuery.fields?.filter.push(defaultGroup);
+        currentQuery.fields?.filter.conditions.push(defaultGroup);
       }
     };
 
@@ -152,7 +147,7 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ];
-      const item = currentQuery.fields?.filter[index];
+      const item = currentQuery.fields?.filter.conditions[index];
 
       if (item) {
         if (item.filterType === "condition") {
