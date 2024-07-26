@@ -5,7 +5,7 @@
         Preview is not available in SQL mode
       </p>
       <PanelSchemaRenderer
-        v-else
+        v-else-if="chartData"
         :height="6"
         :width="6"
         :panelSchema="chartData"
