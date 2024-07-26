@@ -166,29 +166,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #after>
               <div style="height: 100%; width: 100%">
-                <query-editor
-                  v-if="!promqlMode"
-                  data-test="dashboard-vrl-function-editor"
-                  style="width: 100%; height: 100%"
-                  ref="vrlFnEditorRef"
-                  editor-id="fnEditor"
-                  class="monaco-editor"
-                  v-model:query="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].vrlFunctionQuery
-                  "
-                  :class="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ]?.vrlFunctionQuery == '' && functionEditorPlaceholderFlag
-                      ? 'empty-function'
-                      : ''
-                  "
-                  language="ruby"
-                  @focus="functionEditorPlaceholderFlag = false"
-                  @blur="functionEditorPlaceholderFlag = true"
-                />
+                <div style="height: 28px; width: 100%">
+                  <q-btn-dropdown
+                    color="primary"
+                    label="Select function"
+                    class="float-right"
+                    padding="1px 4px"
+                  >
+                    <q-list data-test="logs-search-saved-function-list">
+                      <q-item-label header class="q-pa-sm">{{
+                        t("search.functionPlaceholder")
+                      }}</q-item-label>
+                      <q-separator inset></q-separator>
+
+                      <div v-if="functionOptions.length">
+                        <q-item
+                          class="q-pa-sm saved-view-item"
+                          clickable
+                          v-for="(item, i) in functionOptions"
+                          :key="'saved-view-' + i"
+                          v-close-popup
+                        >
+                          <q-item-section
+                            @click.stop="
+                              populateFunctionImplementation(item, true)
+                            "
+                            v-close-popup
+                          >
+                            <q-item-label>{{ item.name }}</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </div>
+                      <div v-else>
+                        <q-item>
+                          <q-item-section>
+                            <q-item-label>{{
+                              t("search.savedFunctionNotFound")
+                            }}</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </div>
+                    </q-list>
+                  </q-btn-dropdown>
+                </div>
+                <div style="height: calc(100% - 28px); width: 100%">
+                  <query-editor
+                    v-if="!promqlMode"
+                    data-test="dashboard-vrl-function-editor"
+                    style="width: 100%; height: 100%"
+                    ref="vrlFnEditorRef"
+                    editor-id="fnEditor"
+                    class="monaco-editor"
+                    v-model:query="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].vrlFunctionQuery
+                    "
+                    :class="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ]?.vrlFunctionQuery == '' && functionEditorPlaceholderFlag
+                        ? 'empty-function'
+                        : ''
+                    "
+                    language="ruby"
+                    @focus="functionEditorPlaceholderFlag = false"
+                    @blur="functionEditorPlaceholderFlag = true"
+                  />
+                </div>
               </div>
             </template>
           </q-splitter>
@@ -215,7 +260,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -223,6 +267,9 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import { inject } from "vue";
 import { onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import useNotifications from "@/composables/useNotifications";
+import { useStore } from "vuex";
+import useFunctions from "@/composables/useFunctions";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -243,11 +290,61 @@ export default defineComponent({
   setup() {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
+    const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
+
+    const { getAllFunctions } = useFunctions();
+    const functionOptions = ref([]);
+
+    const getFunctions = async () => {
+      try {
+        if (store.state.organizationData.functions.length == 0) {
+          await getAllFunctions();
+        }
+
+        store.state.organizationData.functions.map((data: any) => {
+          const args: any = [];
+          for (let i = 0; i < parseInt(data.num_args); i++) {
+            args.push("'${1:value}'");
+          }
+
+          const itemObj: {
+            name: any;
+            args: string;
+          } = {
+            name: data.name,
+            args: "(" + args.join(",") + ")",
+          };
+          functionOptions.value.push({
+            name: data.name,
+            function: data.function,
+          });
+          // if (!data.stream_name) {
+          //   searchObj.data.stream.functions.push(itemObj);
+          // }
+        });
+        return;
+      } catch (e) {
+        showErrorNotification("Error while fetching functions");
+      }
+    };
+
+    const populateFunctionImplementation = (fnValue, flag = false) => {
+      if (flag) {
+        showPositiveNotification(
+          `${fnValue.name} function applied successfully.`,
+        );
+      }
+      dashboardPanelData.layout.vrlFunctionToggle = true;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].vrlFunctionQuery = fnValue.function;
+    };
 
     const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -348,6 +445,7 @@ export default defineComponent({
     onMounted(async () => {
       window.removeEventListener("resize", resizeEventListener);
       window.addEventListener("resize", resizeEventListener);
+      getFunctions();
     });
 
     onUnmounted(() => {
@@ -448,6 +546,8 @@ export default defineComponent({
       splitterModel,
       getImageURL,
       onFunctionToggle,
+      functionOptions,
+      populateFunctionImplementation,
     };
   },
 });
