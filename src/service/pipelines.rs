@@ -47,19 +47,13 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
     if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
-            if !derived_stream.is_valid() {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid DerivedStream details. Name and destination required ".to_string(),
-                )));
-            }
             if let Err(e) =
                 super::scheduled_ops::derived_streams::save(derived_stream.clone()).await
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     format!(
-                        "Failed to save DerivedStream details with error {}",
+                        "Failed to save DerivedStream details error: {}",
                         e.to_string()
                     ),
                 )));

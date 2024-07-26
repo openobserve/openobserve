@@ -16,28 +16,16 @@
 use std::str::FromStr;
 
 use actix_web::http;
-use chrono::{Duration, Local, TimeZone, Utc};
-use config::{
-    get_config,
-    meta::stream::StreamType,
-    utils::{
-        base64,
-        json::{Map, Value},
-    },
-    SMTP_CLIENT,
-};
+use config::get_config;
 use cron::Schedule;
-use hashbrown::{HashMap, HashSet};
-use lettre::{message::SinglePart, AsyncTransport, Message};
+use hashbrown::HashMap;
 
 use crate::{
     common::{
         meta::{
             authz::Authz,
             scheduled_ops::{
-                derived_streams::DerivedStreamMeta,
-                destinations::{DestinationType, DestinationWithTemplate, HTTPType},
-                AlertFrequencyType, Operator, QueryType,
+                derived_streams::DerivedStreamMeta, AlertFrequencyType, Operator, QueryType,
             },
             stream::StreamParams,
         },
@@ -49,80 +37,37 @@ use crate::{
     },
 };
 
-pub async fn save(mut derived_streams: DerivedStreamMeta) -> Result<(), anyhow::Error> {
-    derived_streams.name = derived_streams.name.trim().to_string();
-
-    // 1. check if db already exists
-
-    // 2. Update the frequency
-    // if derived_streams.trigger_condition.frequency_type == AlertFrequencyType::Cron {
-    //     // Check the cron expression
-    //     Schedule::from_str(&derived_streams.trigger_condition.cron)?;
-    // } else if derived_streams.trigger_condition.frequency == 0 {
-    //     // default frequency is 60 seconds
-    //     derived_streams.trigger_condition.frequency =
-    //         std::cmp::max(10, get_config().limit.alert_schedule_interval);
-    // }
-
-    // 3. validate before saving
-    if derived_streams.name.is_empty() {
-        return Err(anyhow::anyhow!("DerivedStream name is required."));
-    }
-    // QUESTION(taiming): why not / and do we need the same for derived_streams?
-    // if alert.name.contains('/') {
-    //     return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
-    // }
-
-    if !derived_streams.destination.is_valid() {
-        return Err(anyhow::anyhow!(
-            "DerivedStreams destination is not valid. Both org_id and stream_name are required"
-        ));
+pub async fn save(mut derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Error> {
+    derived_stream.name = derived_stream.name.trim().to_string();
+    // 1. Start validate DerivedStream
+    if !derived_stream.is_valid() {
+        return Err(anyhow::anyhow!("Name and destination required"));
     }
 
-    // before saving alert check alert context attributes
-    if let Some(attrs) = &derived_streams.context_attributes {
-        let mut new_attrs = HashMap::with_capacity(attrs.len());
-        for key in attrs.keys() {
-            let new_key = key.trim().to_string();
-            if !new_key.is_empty() {
-                new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
-            }
-        }
-        derived_streams.context_attributes = Some(new_attrs);
-    }
-
-    // before saving alert check column type to decide numeric condition
-    // get and check schema
-    // let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    // if stream_name.is_empty() || schema.fields().is_empty() {
-    //     return Err(anyhow::anyhow!("Stream {stream_name} not found"));
-    // }
-
-    if derived_streams.is_real_time
-        && derived_streams.query_condition.query_type != QueryType::Custom
+    // query_type for realtime
+    if derived_stream.is_real_time && derived_stream.query_condition.query_type != QueryType::Custom
     {
         return Err(anyhow::anyhow!(
-            "Realtime DerivedStreams should use Custom query type"
+            "Realtime DerivedStream should use Custom query type"
         ));
     }
 
-    // TODO: check if applicable to DerivedStreams
-    match derived_streams.query_condition.query_type {
+    // other checks for query type
+    match derived_stream.query_condition.query_type {
         QueryType::Custom => {
-            if derived_streams.query_condition.aggregation.is_some() {
+            if derived_stream.query_condition.aggregation.is_some() {
+                // TODO(taiming): this might only apply to alert?
                 // if it has result we should fire the alert when enable aggregation
-                derived_streams.trigger_condition.operator = Operator::GreaterThanEquals;
-                derived_streams.trigger_condition.threshold = 1;
+                derived_stream.trigger_condition.operator = Operator::GreaterThanEquals;
+                derived_stream.trigger_condition.threshold = 1;
             }
         }
         QueryType::SQL => {
-            if derived_streams.query_condition.sql.is_none()
-                || derived_streams
-                    .query_condition
-                    .sql
-                    .as_ref()
-                    .unwrap()
-                    .is_empty()
+            if derived_stream
+                .query_condition
+                .sql
+                .as_ref()
+                .map_or(false, |sql| sql.is_empty())
             {
                 return Err(anyhow::anyhow!(
                     "DerivedStreams with SQL mode should have a query"
@@ -130,32 +75,119 @@ pub async fn save(mut derived_streams: DerivedStreamMeta) -> Result<(), anyhow::
             }
         }
         QueryType::PromQL => {
-            if derived_streams.query_condition.promql.is_none()
-                || derived_streams
-                    .query_condition
-                    .promql
-                    .as_ref()
-                    .unwrap()
-                    .is_empty()
-                || derived_streams.query_condition.promql_condition.is_none()
+            if derived_stream
+                .query_condition
+                .promql
+                .as_ref()
+                .map_or(false, |promql| promql.is_empty())
+                || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
-                    "DerivedStreams with PromQL mode should have a query"
+                    "DerivedStreams with SQL mode should have a query"
                 ));
             }
         }
     }
 
-    // test the alert
-    // _ = &alert.evaluate(None).await?;
+    // check if db already exists
+    if get_existing_derived_stream(&derived_stream.name, &derived_stream.source)
+        .await
+        .is_some()
+    {
+        return Err(anyhow::anyhow!("Derived Stream already exists"));
+    }
 
-    // TODO: call db save the alert
-    Ok(())
+    // QUESTION(taiming): saw this in alerts. is this necessary?
+    // check source stream schema
+    let schema = infra::schema::get(
+        &derived_stream.source.org_id,
+        &derived_stream.source.stream_name,
+        derived_stream.source.stream_type,
+    )
+    .await?;
+    if schema.fields().is_empty() {
+        return Err(anyhow::anyhow!(
+            "Source Stream {}/{} schema is empty.",
+            derived_stream.source.org_id,
+            derived_stream.source.stream_name,
+        ));
+    }
+    // End input validation
+
+    // 2. update the frequency
+    if derived_stream.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+        // Check the cron expression
+        Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+    } else if derived_stream.trigger_condition.frequency == 0 {
+        // default frequency is 60 seconds
+        derived_stream.trigger_condition.frequency =
+            std::cmp::max(10, get_config().limit.alert_schedule_interval);
+    }
+
+    // 3. clean up DerivedStream context attributes
+    if let Some(attrs) = &derived_stream.context_attributes {
+        let mut new_attrs = HashMap::with_capacity(attrs.len());
+        for (key, val) in attrs.iter() {
+            new_attrs.insert(key.trim().to_string(), val.to_string());
+        }
+        derived_stream.context_attributes = Some(new_attrs);
+    }
+
+    // TODO(taiming): test derived_stream
+    // _ = &derived_stream.evaluate(None).await?;
+
+    match db::scheduled_ops::derived_streams::set(&derived_stream).await {
+        Ok(_) => {
+            // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
+            set_ownership(
+                &derived_stream.source.org_id,
+                "derived_stream",
+                Authz::new(&derived_stream.name),
+            )
+            .await;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Error> {
-    // TODO: call db to to check if exists and delete is so
-    Ok(())
+    if get_existing_derived_stream(&derived_stream.name, &derived_stream.source)
+        .await
+        .is_none()
+    {
+        return Err(anyhow::anyhow!("Derived Stream not found"));
+    }
+
+    match db::scheduled_ops::derived_streams::delete(&derived_stream).await {
+        Ok(_) => {
+            remove_ownership(
+                &derived_stream.source.org_id,
+                "derived_stream",
+                Authz::new(&derived_stream.name),
+            )
+            .await;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+async fn get_existing_derived_stream(
+    name: &str,
+    source: &StreamParams,
+) -> Option<DerivedStreamMeta> {
+    match db::scheduled_ops::derived_streams::get(
+        &source.org_id,
+        source.stream_type,
+        &source.stream_name,
+        name,
+    )
+    .await
+    {
+        Ok(ret) => ret,
+        Err(_) => None,
+    }
 }
 
 pub async fn enable(

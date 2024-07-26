@@ -40,7 +40,7 @@ pub async fn get(
     }
 }
 
-pub async fn set(derived_stream: &DerivedStreamMeta, create: bool) -> Result<(), anyhow::Error> {
+pub async fn set(derived_stream: &DerivedStreamMeta) -> Result<(), anyhow::Error> {
     match db::put(
         &derived_stream.get_store_key(),
         json::to_vec(derived_stream).unwrap().into(),
@@ -59,21 +59,11 @@ pub async fn set(derived_stream: &DerivedStreamMeta, create: bool) -> Result<(),
                 is_silenced: false,
                 ..Default::default()
             };
-            if create {
-                match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to save trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            } else {
-                match db::scheduler::update_trigger(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to update trigger: {}", e);
-                        Ok(())
-                    }
+            match db::scheduler::push(trigger).await {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    log::error!("Failed to save trigger: {}", e);
+                    Ok(())
                 }
             }
         }
@@ -81,7 +71,7 @@ pub async fn set(derived_stream: &DerivedStreamMeta, create: bool) -> Result<(),
     }
 }
 
-pub async fn delete(derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Error> {
+pub async fn delete(derived_stream: &DerivedStreamMeta) -> Result<(), anyhow::Error> {
     match db::delete(&derived_stream.get_store_key(), false, db::NEED_WATCH, None).await {
         Ok(_) => {
             match db::scheduler::delete(
