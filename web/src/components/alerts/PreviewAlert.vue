@@ -2,7 +2,7 @@
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div style="height: 200px" data-test="alert-preview-chart">
       <p class="sql-preview" v-if="selectedTab === 'sql'">
-        Sql Query Preview Not Supported
+        Sql Query Preview Not Available
       </p>
       <PanelSchemaRenderer
         v-else
