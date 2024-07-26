@@ -109,7 +109,13 @@ impl RumExtraData {
 
             user_agent_hashmap.insert("ip".into(), ip_address.into());
 
-            let ip: IpAddr = ip_address.split(':').next().unwrap().parse().unwrap();
+            let ip: IpAddr = match ip_address.split(':').next().unwrap().parse() {
+                Ok(ip) => ip,
+                Err(e) => {
+                    log::error!("Error parsing IP address: {}, {}", ip_address, e);
+                    IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))
+                }
+            };
 
             let geo_info = if let Some(client) = &(*maxminddb_client) {
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
