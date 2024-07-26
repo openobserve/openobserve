@@ -158,7 +158,9 @@ pub enum AggregationFunc {
 #[serde(tag = "filterType", rename_all = "camelCase")]
 pub enum PanelFilter {
     Condition(FilterCondition),
+    #[serde(rename_all = "camelCase")]
     Group {
+        filter_type: String,
         logical_operator: String,
         conditions: Vec<PanelFilter>,
     },
