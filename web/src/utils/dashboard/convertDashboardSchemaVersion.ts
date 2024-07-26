@@ -128,6 +128,36 @@ export function convertDashboardSchemaVersion(data: any) {
       data.version = 4;
       break;
     }
+    case 4: {
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.queries.forEach((queryItem: any) => {
+            if (queryItem.fields.filter.length > 0) {
+              const newFilter = {
+                filterType: "group",
+                logicalOperator: "AND",
+                conditions: queryItem.fields.filter.map((filter: any) => ({
+                  type: filter.type,
+                  values: filter.values,
+                  column: filter.column,
+                  operator: filter.operator,
+                  value: filter.value,
+                  logicalOperator: "AND",
+                  filterType: "condition",
+                })),
+              };
+              console.log("newFilter", newFilter);
+              
+              queryItem.fields.filter = newFilter;
+            }
+          });
+        });
+      });
+      // update the version
+      data.version = 5;
+      break;
+    }
+    default:
   }
 
   // return converted data
