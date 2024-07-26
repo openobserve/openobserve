@@ -161,7 +161,7 @@ pub enum PanelFilter {
     Group {
         filter_type: String,
         logical_operator: String,
-        conditions: Vec<PanelFilter>,
+        conditions: Vec<FilterCondition>,
     },
 }
 
