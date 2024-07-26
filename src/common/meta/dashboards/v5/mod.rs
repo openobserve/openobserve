@@ -159,7 +159,6 @@ pub enum AggregationFunc {
 pub enum PanelFilter {
     Condition(FilterCondition),
     Group {
-        filter_type: String,
         logical_operator: String,
         conditions: Vec<FilterCondition>,
     },
