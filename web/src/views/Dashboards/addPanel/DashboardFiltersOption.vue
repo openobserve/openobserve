@@ -175,7 +175,7 @@ export default defineComponent({
         const operator =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields?.filter?.[index]?.operator || null;
+          ].fields?.filter?.conditions?.[index]?.operator || null;
 
         if (operator === "Contains" || operator === "Not Contains") {
           value = it.multiSelect
