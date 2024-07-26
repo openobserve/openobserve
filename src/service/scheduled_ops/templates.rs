@@ -44,7 +44,7 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert template name cannot contain '/'"));
     }
 
-    match db::alerts::templates::get(org_id, &template.name).await {
+    match db::scheduled_ops::templates::get(org_id, &template.name).await {
         Ok(_) => {
             if create {
                 return Err(anyhow::anyhow!("Alert template already exists"));
@@ -57,7 +57,7 @@ pub async fn save(
         }
     }
 
-    match db::alerts::templates::set(org_id, &mut template).await {
+    match db::scheduled_ops::templates::set(org_id, &mut template).await {
         Ok(_) => {
             if name.is_empty() {
                 set_ownership(org_id, "templates", Authz::new(&template.name)).await;
@@ -69,7 +69,7 @@ pub async fn save(
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
-    db::alerts::templates::get(org_id, name)
+    db::scheduled_ops::templates::get(org_id, name)
         .await
         .map_err(|_| anyhow::anyhow!("Alert template not found"))
 }
@@ -78,7 +78,7 @@ pub async fn list(
     org_id: &str,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Template>, anyhow::Error> {
-    match db::alerts::templates::list(org_id).await {
+    match db::scheduled_ops::templates::list(org_id).await {
         Ok(templates) => {
             let mut result = Vec::new();
             for template in templates {
@@ -114,13 +114,13 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
         }
     }
 
-    if db::alerts::templates::get(org_id, name).await.is_err() {
+    if db::scheduled_ops::templates::get(org_id, name).await.is_err() {
         return Err((
             http::StatusCode::NOT_FOUND,
             anyhow::anyhow!("Alert template not found {}", name),
         ));
     }
-    match db::alerts::templates::delete(org_id, name).await {
+    match db::scheduled_ops::templates::delete(org_id, name).await {
         Ok(_) => {
             remove_ownership(org_id, "templates", Authz::new(name)).await;
             Ok(())

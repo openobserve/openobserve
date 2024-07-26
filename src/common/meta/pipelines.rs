@@ -22,19 +22,22 @@ use config::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::meta::functions::StreamFunctionsList;
+use crate::common::meta::{
+    functions::StreamFunctionsList, scheduled_ops::derived_streams::DerivedStreamMeta,
+    stream::StreamParams,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct PipeLine {
     pub name: String,
     #[serde(default)]
+    pub source: StreamParams,
+    #[serde(default)]
     pub description: String,
-    #[serde(default)]
-    pub stream_name: String,
-    #[serde(default)]
-    pub stream_type: StreamType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_streams: Option<Vec<DerivedStreamMeta>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, Value>>,
 }
@@ -44,9 +47,10 @@ impl PipeLine {
         PipeLineResponse {
             name: self.name,
             description: self.description,
-            stream_name: self.stream_name,
-            stream_type: self.stream_type,
+            stream_name: self.source.stream_name.into(),
+            stream_type: self.source.stream_type,
             routing: self.routing,
+            derived_streams: self.derived_streams,
             functions,
             meta: self.meta,
         }
@@ -66,6 +70,8 @@ pub struct PipeLineResponse {
     pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub functions: Option<StreamFunctionsList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_streams: Option<Vec<DerivedStreamMeta>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, Value>>,
 }

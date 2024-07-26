@@ -22,7 +22,7 @@ pub mod derived_streams;
 pub mod destinations;
 pub mod templates;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
     pub period: i64, // 10 minutes
     #[serde(default)]
@@ -48,7 +48,7 @@ pub enum AlertFrequencyType {
     Minutes,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
@@ -62,7 +62,7 @@ pub struct QueryCondition {
     pub vrl_function: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,

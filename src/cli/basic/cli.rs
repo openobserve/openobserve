@@ -161,7 +161,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::user::reset().await?;
                 }
                 "alert" => {
-                    db::alerts::reset().await?;
+                    db::scheduled_ops::alerts::reset().await?;
                 }
                 "dashboard" => {
                     db::dashboards::reset().await?;

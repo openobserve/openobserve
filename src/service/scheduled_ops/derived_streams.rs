@@ -39,6 +39,7 @@ use crate::{
                 destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 AlertFrequencyType, Operator, QueryType,
             },
+            stream::StreamParams,
         },
         utils::auth::{remove_ownership, set_ownership},
     },
@@ -48,15 +49,7 @@ use crate::{
     },
 };
 
-pub async fn save(
-    org_id: &str,
-    name: &str,
-    mut derived_streams: DerivedStreamMeta,
-    create: bool,
-) -> Result<(), anyhow::Error> {
-    if !name.is_empty() {
-        derived_streams.name = name.to_string();
-    }
+pub async fn save(mut derived_streams: DerivedStreamMeta) -> Result<(), anyhow::Error> {
     derived_streams.name = derived_streams.name.trim().to_string();
 
     // 1. check if db already exists
@@ -80,11 +73,6 @@ pub async fn save(
     //     return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
     // }
 
-    if !derived_streams.source.is_valid() {
-        return Err(anyhow::anyhow!(
-            "DerivedStreams source is not valid. Both org_id and stream_name are required"
-        ));
-    }
     if !derived_streams.destination.is_valid() {
         return Err(anyhow::anyhow!(
             "DerivedStreams destination is not valid. Both org_id and stream_name are required"
@@ -165,17 +153,7 @@ pub async fn save(
     Ok(())
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Option<DerivedStreamMeta>, anyhow::Error> {
-    // TODO: call db to get the derived_streams
-    Ok(None)
-}
-
-pub async fn list(org_id: &str, name: &str) -> Result<Vec<DerivedStreamMeta>, anyhow::Error> {
-    // TODO: call db to list the derived_streams
-    Ok(Vec::new())
-}
-
-pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn delete(derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Error> {
     // TODO: call db to to check if exists and delete is so
     Ok(())
 }
@@ -194,4 +172,23 @@ pub async fn trigger(org_id: &str, name: &str) -> Result<(), (http::StatusCode, 
     Ok(())
 }
 
-impl DerivedStreamMeta {}
+impl DerivedStreamMeta {
+    pub fn is_valid(&self) -> bool {
+        !self.name.is_empty() && self.source.is_valid() && self.destination.is_valid()
+    }
+
+    pub fn get_schedule_key(&self) -> String {
+        format!(
+            "{}/{}/{}",
+            self.source.stream_type, self.source.stream_name, self.name
+        )
+    }
+
+    pub fn get_store_key(&self) -> String {
+        format!(
+            "/derived_streams/{}/{}",
+            self.source.org_id,
+            self.get_schedule_key()
+        )
+    }
+}

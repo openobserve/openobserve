@@ -66,6 +66,9 @@ pub async fn handle_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyh
     match trigger.module {
         db::scheduler::TriggerModule::Report => handle_report_triggers(trigger).await,
         db::scheduler::TriggerModule::Alert => handle_alert_triggers(trigger).await,
+        db::scheduler::TriggerModule::DerivedStream => {
+            handle_derived_stream_triggers(trigger).await
+        }
     }
 }
 
@@ -400,5 +403,11 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     }
     publish_triggers_usage(trigger_data_stream).await;
 
+    Ok(())
+}
+
+async fn handle_derived_stream_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
     Ok(())
 }

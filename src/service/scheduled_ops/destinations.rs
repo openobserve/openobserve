@@ -76,7 +76,7 @@ pub async fn save(
         ));
     }
 
-    if db::alerts::templates::get(org_id, &destination.template)
+    if db::scheduled_ops::templates::get(org_id, &destination.template)
         .await
         .is_err()
     {
@@ -86,7 +86,7 @@ pub async fn save(
         ));
     }
 
-    match db::alerts::destinations::get(org_id, &destination.name).await {
+    match db::scheduled_ops::destinations::get(org_id, &destination.name).await {
         Ok(_) => {
             if create {
                 return Err((
@@ -105,7 +105,7 @@ pub async fn save(
         }
     }
 
-    match db::alerts::destinations::set(org_id, &destination).await {
+    match db::scheduled_ops::destinations::set(org_id, &destination).await {
         Ok(_) => {
             if name.is_empty() {
                 set_ownership(org_id, "destinations", Authz::new(&destination.name)).await;
@@ -117,7 +117,7 @@ pub async fn save(
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
-    db::alerts::destinations::get(org_id, name)
+    db::scheduled_ops::destinations::get(org_id, name)
         .await
         .map_err(|_| anyhow::anyhow!("Alert destination not found"))
 }
@@ -127,7 +127,7 @@ pub async fn get_with_template(
     name: &str,
 ) -> Result<DestinationWithTemplate, anyhow::Error> {
     let dest = get(org_id, name).await?;
-    let template = db::alerts::templates::get(org_id, &dest.template).await?;
+    let template = db::scheduled_ops::templates::get(org_id, &dest.template).await?;
     Ok(dest.with_template(template))
 }
 
@@ -135,7 +135,7 @@ pub async fn list(
     org_id: &str,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Destination>, anyhow::Error> {
-    match db::alerts::destinations::list(org_id).await {
+    match db::scheduled_ops::destinations::list(org_id).await {
         Ok(destinations) => {
             let mut result = Vec::new();
             for dest in destinations {
@@ -172,14 +172,14 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
     }
     drop(cacher);
 
-    if db::alerts::destinations::get(org_id, name).await.is_err() {
+    if db::scheduled_ops::destinations::get(org_id, name).await.is_err() {
         return Err((
             http::StatusCode::NOT_FOUND,
             anyhow::anyhow!("Alert destination not found {}", name),
         ));
     }
 
-    match db::alerts::destinations::delete(org_id, name).await {
+    match db::scheduled_ops::destinations::delete(org_id, name).await {
         Ok(_) => {
             remove_ownership(org_id, "destinations", Authz::new(name)).await;
             Ok(())

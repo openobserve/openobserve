@@ -19,7 +19,6 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::stream::StreamType;
 
 use super::db;
 use crate::common::{
@@ -27,24 +26,48 @@ use crate::common::{
     meta::{
         http::HttpResponse as MetaHttpResponse,
         pipelines::{PipeLine, PipeLineList},
+        stream::StreamParams,
     },
 };
 
+// TODO(taiming): add tracing fields since function signature changed
 #[tracing::instrument(skip(pipeline))]
-pub async fn save_pipeline(org_id: String, pipeline: PipeLine) -> Result<HttpResponse, Error> {
-    if let Some(_existing_pipeline) = check_existing_pipeline(
-        &org_id,
-        pipeline.stream_type,
-        &pipeline.stream_name,
-        &pipeline.name,
-    )
-    .await
+pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error> {
+    if check_existing_pipeline(&pipeline.name, &pipeline.source)
+        .await
+        .is_some()
     {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
             "Pipeline already exits".to_string(),
-        )))
-    } else if let Err(error) = db::pipelines::set(&org_id, &pipeline.name, &pipeline).await {
+        )));
+    }
+
+    // Save DerivedStream details if there's any
+    if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
+        for derived_stream in derived_streams {
+            derived_stream.source = pipeline.source.clone();
+            if !derived_stream.is_valid() {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Invalid DerivedStream details. Name and destination required ".to_string(),
+                )));
+            }
+            if let Err(e) =
+                super::scheduled_ops::derived_streams::save(derived_stream.clone()).await
+            {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!(
+                        "Failed to save DerivedStream details with error {}",
+                        e.to_string()
+                    ),
+                )));
+            }
+        }
+    }
+
+    if let Err(error) = db::pipelines::set(&pipeline).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -60,19 +83,8 @@ pub async fn save_pipeline(org_id: String, pipeline: PipeLine) -> Result<HttpRes
 }
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn update_pipeline(
-    org_id: &str,
-    pipeline_name: &str,
-    pipeline: PipeLine,
-) -> Result<HttpResponse, Error> {
-    let existing_pipeline = match check_existing_pipeline(
-        org_id,
-        pipeline.stream_type,
-        &pipeline.stream_name,
-        pipeline_name,
-    )
-    .await
-    {
+pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error> {
+    let existing_pipeline = match check_existing_pipeline(&pipeline.name, &pipeline.source).await {
         Some(pipeline) => pipeline,
         None => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -85,7 +97,42 @@ pub async fn update_pipeline(
         return Ok(HttpResponse::Ok().json(pipeline));
     }
 
-    if let Err(error) = db::pipelines::set(org_id, &pipeline.name, &pipeline).await {
+    // QUESTION(taiming): is this necessary?
+    // delete the existing pipeline
+    if let Err(error) = delete_pipeline(&existing_pipeline.name, existing_pipeline.source).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        );
+    }
+
+    // Update DerivedStream details if there's any
+    if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
+        for derived_stream in derived_streams {
+            derived_stream.source = pipeline.source.clone();
+            if !derived_stream.is_valid() {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Invalid DerivedStream details. Name and destination required ".to_string(),
+                )));
+            }
+            if let Err(e) =
+                super::scheduled_ops::derived_streams::save(derived_stream.clone()).await
+            {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!(
+                        "Failed to update DerivedStream details with error {}",
+                        e.to_string()
+                    ),
+                )));
+            }
+        }
+    }
+
+    if let Err(error) = db::pipelines::set(&pipeline).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -111,7 +158,7 @@ pub async fn list_pipelines(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("logs:{}", pipeline.stream_name))
+                    .contains(&format!("logs:{}", pipeline.source.stream_name))
                 || permitted
                     .as_ref()
                     .unwrap()
@@ -120,7 +167,7 @@ pub async fn list_pipelines(
                 let fn_list = STREAM_FUNCTIONS
                     .get(&format!(
                         "{}/{}/{}",
-                        org_id, &pipeline.stream_type, &pipeline.stream_name
+                        org_id, &pipeline.source.stream_type, &pipeline.source.stream_name
                     ))
                     .map(|val| val.value().clone());
                 result.push(pipeline.into_response(fn_list));
@@ -135,12 +182,41 @@ pub async fn list_pipelines(
 
 #[tracing::instrument]
 pub async fn delete_pipeline(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
     pipeline_name: &str,
+    source: StreamParams,
 ) -> Result<HttpResponse, Error> {
-    let result = db::pipelines::delete(org_id, stream_type, stream_name, pipeline_name).await;
+    let existing_pipeline = match check_existing_pipeline(&pipeline_name, &source).await {
+        Some(pipeline) => pipeline,
+        None => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                "Pipeline not found".to_string(),
+            )));
+        }
+    };
+
+    // delete DerivedStream details if there's any
+    if let Some(derived_streams) = existing_pipeline.derived_streams {
+        for derived_stream in derived_streams {
+            if let Err(error) = super::scheduled_ops::derived_streams::delete(derived_stream).await
+            {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        error.to_string(),
+                    )),
+                );
+            }
+        }
+    }
+
+    let result = db::pipelines::delete(
+        &source.org_id,
+        source.stream_type,
+        &source.stream_name,
+        pipeline_name,
+    )
+    .await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -153,13 +229,15 @@ pub async fn delete_pipeline(
     }
 }
 
-async fn check_existing_pipeline(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Option<PipeLine> {
-    match db::pipelines::get(org_id, stream_type, stream_name, name).await {
+async fn check_existing_pipeline(name: &str, source: &StreamParams) -> Option<PipeLine> {
+    match db::pipelines::get(
+        &source.org_id,
+        source.stream_type,
+        &source.stream_name,
+        name,
+    )
+    .await
+    {
         Ok(pipeline) => Some(pipeline),
         Err(_) => None,
     }

@@ -22,10 +22,6 @@ use crate::{
     service::db,
 };
 
-pub mod destinations;
-pub mod realtime_triggers;
-pub mod templates;
-
 pub async fn get(
     org_id: &str,
     stream_type: StreamType,

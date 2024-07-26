@@ -32,7 +32,7 @@ use crate::{
     service::search as SearchService,
 };
 
-pub mod alert_manager;
+pub mod ops_manager;
 pub mod alerts;
 pub mod derived_streams;
 pub mod destinations;

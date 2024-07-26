@@ -22,7 +22,7 @@ use crate::common::meta::{
     stream::StreamParams,
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct DerivedStreamMeta {
     #[serde(default)]
     pub name: String,
@@ -42,12 +42,6 @@ pub struct DerivedStreamMeta {
     pub description: String,
     #[serde(default)]
     pub enabled: bool,
-}
-
-impl PartialEq for DerivedStreamMeta {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.source == other.source
-    }
 }
 
 impl Default for DerivedStreamMeta {
