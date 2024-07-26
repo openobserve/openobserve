@@ -942,6 +942,8 @@ export default defineComponent({
       });
     },
     onSubmit() {
+      console.log(this.formData,"check formData")
+
       if (this.formData.stream_name == "") {
         this.q.notify({
           type: "negative",
@@ -1046,6 +1048,7 @@ export default defineComponent({
       });
     },
   },
+  
 });
 </script>
 
