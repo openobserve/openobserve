@@ -35,6 +35,9 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
 
 fn is_aggregate_in_select(query: Box<Query>) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
+        if select.distinct.is_some() {
+            return true;
+        }
         for select_item in &select.projection {
             if let SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, alias: _ } =
                 select_item
