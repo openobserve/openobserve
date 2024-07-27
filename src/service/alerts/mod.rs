@@ -910,6 +910,13 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
     let mut rows_tpl = Vec::with_capacity(rows.len());
     for row in rows.iter() {
         let mut resp = tpl.to_string();
+
+        if let Some(context_attributes) = alert.context_attributes.as_ref() {
+            for (key, value) in context_attributes.iter() {
+                process_variable_replace(&mut resp, key, &VarValue::Str(&value));
+            }
+        }
+
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
