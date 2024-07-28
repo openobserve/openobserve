@@ -132,7 +132,7 @@ export function convertDashboardSchemaVersion(data: any) {
       data.tabs.forEach((tabItem: any) => {
         tabItem.panels.forEach((panelItem: any) => {
           panelItem.queries.forEach((queryItem: any) => {
-            if (queryItem.fields.filter.length > 0) {
+            if (queryItem.fields.filter && queryItem.fields.filter.length > 0) {
               const newFilter = {
                 filterType: "group",
                 logicalOperator: "AND",
