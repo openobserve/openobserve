@@ -156,7 +156,7 @@ pub enum AggregationFunc {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "filterType", rename_all = "camelCase")]
+#[serde(tag = "filter_type", rename_all = "camelCase")]
 pub enum PanelFilter {
     Condition(FilterCondition),
     Group(GroupType),
@@ -165,7 +165,7 @@ pub enum PanelFilter {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupType {
-    // pub filter_type: String,
+    pub filter_type: String,
     pub logical_operator: String,
     pub conditions: Vec<PanelFilter>,
 }
