@@ -112,7 +112,8 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
-    pub filter: PanelFilter,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<PanelFilter>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
