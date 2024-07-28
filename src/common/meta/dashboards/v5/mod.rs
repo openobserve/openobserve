@@ -164,7 +164,7 @@ pub enum PanelFilter {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupType {
-    pub filter_type: String,
+    // pub filter_type: String,
     pub logical_operator: String,
     pub conditions: Vec<PanelFilter>,
 }
