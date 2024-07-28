@@ -157,13 +157,16 @@ pub enum AggregationFunc {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "filterType", rename_all = "camelCase")]
 pub enum PanelFilter {
-    Condition(FilterCondition),
-    #[serde(rename_all = "camelCase")]
-    Group {
-        filter_type: String,
-        logical_operator: String,
-        conditions: Vec<PanelFilter>,
-    },
+    Condition (FilterCondition),
+    Group (GroupType),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupType {
+    pub filter_type: String,
+    pub logical_operator: String,
+    pub conditions: Vec<PanelFilter>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
