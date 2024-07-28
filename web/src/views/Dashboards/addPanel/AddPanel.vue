@@ -470,6 +470,8 @@ export default defineComponent({
           route.query.folder,
           route.query.tab,
         );
+        console.log("panelData", panelData);
+
         Object.assign(
           dashboardPanelData.data,
           JSON.parse(JSON.stringify(panelData)),
@@ -800,6 +802,7 @@ export default defineComponent({
 
         isPanelConfigWatcherActivated = false;
         isPanelConfigChanged.value = false;
+        console.log("panel saved successfully", dashboardPanelData.data);
 
         await nextTick();
         return router.push({
