@@ -166,76 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #after>
               <div style="height: 100%; width: 100%">
-                <div style="height: 28px; width: 100%">
-                  <div style="display: flex; justify-content: flex-end">
-                    <q-btn
-                      no-caps
-                      padding="xs"
-                      class=""
-                      size="sm"
-                      flat
-                      icon="info_outline"
-                      data-test="dashboard-addpanel-config-drilldown-info"
-                    >
-                      <q-tooltip
-                        class="bg-grey-8"
-                        anchor="bottom middle"
-                        self="top middle"
-                        max-width="250px"
-                      >
-                        To use extracted VRL fields in the chart, write a VRL
-                        function and click on the Apply button. The fields will be
-                        extracted, allowing you to use them to build the chart.
-                      </q-tooltip>
-                    </q-btn>
-                    <q-btn-dropdown
-                      color="primary"
-                      label="Use Saved function"
-                      no-caps
-                      class="float-right"
-                      padding="1px 4px"
-                    >
-                      <q-list
-                        data-test="logs-search-saved-function-list"
-                        style="max-height: 300px"
-                      >
-                        <q-item-label header class="q-pa-sm">{{
-                          t("search.functionPlaceholder")
-                        }}</q-item-label>
-                        <q-separator inset></q-separator>
-
-                        <div v-if="functionOptions.length">
-                          <q-item
-                            class="q-pa-sm saved-view-item"
-                            clickable
-                            v-for="(item, i) in functionOptions"
-                            :key="'saved-view-' + i"
-                            v-close-popup
-                          >
-                            <q-item-section
-                              @click.stop="
-                                populateFunctionImplementation(item, true)
-                              "
-                              v-close-popup
-                            >
-                              <q-item-label>{{ item.name }}</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                        </div>
-                        <div v-else>
-                          <q-item>
-                            <q-item-section>
-                              <q-item-label>{{
-                                t("search.savedFunctionNotFound")
-                              }}</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                        </div>
-                      </q-list>
-                    </q-btn-dropdown>
-                  </div>
-                </div>
-                <div style="height: calc(100% - 28px); width: 100%">
+                <div style="height: calc(100% - 40px); width: 100%">
                   <query-editor
                     v-if="!promqlMode"
                     data-test="dashboard-vrl-function-editor"
@@ -259,6 +190,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @focus="functionEditorPlaceholderFlag = false"
                     @blur="functionEditorPlaceholderFlag = true"
                   />
+                </div>
+                <div style="height: 40px; width: 100%">
+                  <div style="display: flex; height: 40px">
+                    <q-select
+                      v-model="selectedFunction"
+                      label="Use Saved function"
+                      :options="functionOptions"
+                      data-test="dashboard-use-saved-vrl-function"
+                      input-debounce="0"
+                      behavior="menu"
+                      use-input
+                      filled
+                      borderless
+                      dense
+                      hide-selected
+                      menu-anchor="top left"
+                      fill-input
+                      @filter="filterFunctionOptions"
+                      option-label="name"
+                      option-value="function"
+                      @update:modelValue="onFunctionSelect"
+                      style="width: 100%"
+                    >
+                      <template #no-option>
+                        <q-item>
+                          <q-item-section>
+                            {{ t("search.noResult") }}</q-item-section
+                          >
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <q-btn
+                      no-caps
+                      padding="xs"
+                      class=""
+                      size="sm"
+                      flat
+                      icon="info_outline"
+                      data-test="dashboard-addpanel-config-drilldown-info"
+                    >
+                      <q-tooltip
+                        class="bg-grey-8"
+                        anchor="bottom middle"
+                        self="top right"
+                        max-width="250px"
+                      >
+                        To use extracted VRL fields in the chart, write a VRL
+                        function and click on the Apply button. The fields will
+                        be extracted, allowing you to use them to build the
+                        chart.
+                      </q-tooltip>
+                    </q-btn>
+                  </div>
                 </div>
               </div>
             </template>
@@ -325,7 +309,9 @@ export default defineComponent({
     );
 
     const { getAllFunctions } = useFunctions();
+    const functionList = ref([]);
     const functionOptions = ref([]);
+    const selectedFunction = ref("");
 
     const getFunctions = async () => {
       try {
@@ -346,7 +332,8 @@ export default defineComponent({
             name: data.name,
             args: "(" + args.join(",") + ")",
           };
-          functionOptions.value.push({
+
+          functionList.value.push({
             name: data.name,
             function: data.function,
           });
@@ -360,16 +347,24 @@ export default defineComponent({
       }
     };
 
-    const populateFunctionImplementation = (fnValue, flag = false) => {
-      if (flag) {
-        showPositiveNotification(
-          `${fnValue.name} function applied successfully.`,
-        );
-      }
-      dashboardPanelData.layout.vrlFunctionToggle = true;
+    const filterFunctionOptions = (val: string, update: any) => {
+      update(() => {
+        functionOptions.value = functionList.value.filter((fn: any) => {
+          return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+        });
+      });
+    };
+
+    const onFunctionSelect = (val: any) => {
+      // assign selected vrl function
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].vrlFunctionQuery = fnValue.function;
+      ].vrlFunctionQuery = val.function;
+      // clear v-model
+      selectedFunction.value = "";
+
+      // show success message
+      showPositiveNotification(`${val.name} function applied successfully.`);
     };
 
     const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
@@ -573,7 +568,9 @@ export default defineComponent({
       getImageURL,
       onFunctionToggle,
       functionOptions,
-      populateFunctionImplementation,
+      selectedFunction,
+      filterFunctionOptions,
+      onFunctionSelect,
     };
   },
 });
