@@ -158,8 +158,8 @@ pub enum AggregationFunc {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "filterType", rename_all = "camelCase")]
 pub enum PanelFilter {
-    Condition(FilterCondition),
-    Group(GroupType),
+    condition(FilterCondition),
+    group(GroupType),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
