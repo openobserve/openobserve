@@ -167,47 +167,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #after>
               <div style="height: 100%; width: 100%">
                 <div style="height: 28px; width: 100%">
-                  <q-btn-dropdown
-                    color="primary"
-                    label="Select function"
-                    class="float-right"
-                    padding="1px 4px"
-                  >
-                    <q-list data-test="logs-search-saved-function-list">
-                      <q-item-label header class="q-pa-sm">{{
-                        t("search.functionPlaceholder")
-                      }}</q-item-label>
-                      <q-separator inset></q-separator>
+                  <div style="display: flex; justify-content: flex-end">
+                    <q-btn
+                      no-caps
+                      padding="xs"
+                      class=""
+                      size="sm"
+                      flat
+                      icon="info_outline"
+                      data-test="dashboard-addpanel-config-drilldown-info"
+                    >
+                      <q-tooltip
+                        class="bg-grey-8"
+                        anchor="bottom middle"
+                        self="top middle"
+                        max-width="250px"
+                      >
+                        To use extracted VRL fields in the chart, write a VRL
+                        function and click on the Apply button. The fields will be
+                        extracted, allowing you to use them to build the chart.
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn-dropdown
+                      color="primary"
+                      label="Use Saved function"
+                      no-caps
+                      class="float-right"
+                      padding="1px 4px"
+                    >
+                      <q-list
+                        data-test="logs-search-saved-function-list"
+                        style="max-height: 300px"
+                      >
+                        <q-item-label header class="q-pa-sm">{{
+                          t("search.functionPlaceholder")
+                        }}</q-item-label>
+                        <q-separator inset></q-separator>
 
-                      <div v-if="functionOptions.length">
-                        <q-item
-                          class="q-pa-sm saved-view-item"
-                          clickable
-                          v-for="(item, i) in functionOptions"
-                          :key="'saved-view-' + i"
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="
-                              populateFunctionImplementation(item, true)
-                            "
+                        <div v-if="functionOptions.length">
+                          <q-item
+                            class="q-pa-sm saved-view-item"
+                            clickable
+                            v-for="(item, i) in functionOptions"
+                            :key="'saved-view-' + i"
                             v-close-popup
                           >
-                            <q-item-label>{{ item.name }}</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </div>
-                      <div v-else>
-                        <q-item>
-                          <q-item-section>
-                            <q-item-label>{{
-                              t("search.savedFunctionNotFound")
-                            }}</q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </div>
-                    </q-list>
-                  </q-btn-dropdown>
+                            <q-item-section
+                              @click.stop="
+                                populateFunctionImplementation(item, true)
+                              "
+                              v-close-popup
+                            >
+                              <q-item-label>{{ item.name }}</q-item-label>
+                            </q-item-section>
+                          </q-item>
+                        </div>
+                        <div v-else>
+                          <q-item>
+                            <q-item-section>
+                              <q-item-label>{{
+                                t("search.savedFunctionNotFound")
+                              }}</q-item-label>
+                            </q-item-section>
+                          </q-item>
+                        </div>
+                      </q-list>
+                    </q-btn-dropdown>
+                  </div>
                 </div>
                 <div style="height: calc(100% - 28px); width: 100%">
                   <query-editor
