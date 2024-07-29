@@ -112,8 +112,7 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filter: Option<PanelFilter>,
+    pub filter: PanelFilter,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -184,8 +183,8 @@ pub struct FilterCondition {
     pub value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logical_operator: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filter_type: Option<String>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub filter_type: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
