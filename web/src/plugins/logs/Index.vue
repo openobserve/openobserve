@@ -898,6 +898,28 @@ export default defineComponent({
       return true;
     };
 
+    watch(
+      () => [
+        searchObj.data.tempFunctionContent,
+        searchObj.meta.logsVisualizeToggle,
+      ],
+      () => {
+        if (
+          searchObj.meta.logsVisualizeToggle == "visualize" &&
+          searchObj.meta.toggleFunction &&
+          searchObj.data.tempFunctionContent
+        ) {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+        } else {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery = "";
+        }
+      },
+    );
+
     const setFieldsAndConditions = async () => {
       let logsQuery = searchObj.data.query ?? "";
 
@@ -976,19 +998,8 @@ export default defineComponent({
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          // hide VRL function editor
-          searchObj.config.fnSplitterModel = 99.5;
-
           // set fields and conditions
           await setFieldsAndConditions();
-        } else {
-          // else check if VRL function toggle is true or false
-          // based on that set the splitter model
-          if (searchObj.meta.toggleFunction == false) {
-            searchObj.config.fnSplitterModel = 99.5;
-          } else {
-            searchObj.config.fnSplitterModel = 60;
-          }
         }
       }
     );
