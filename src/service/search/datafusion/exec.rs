@@ -20,7 +20,6 @@ use config::{
     get_config,
     meta::{
         search::{SearchType, Session as SearchSession, StorageType},
-        sql,
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{
@@ -99,7 +98,6 @@ pub async fn sql(
         return Ok(HashMap::new());
     }
 
-    let cfg = get_config();
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
     // let select_wildcard = RE_SELECT_WILDCARD.is_match(origin_sql.as_str());
@@ -153,67 +151,6 @@ pub async fn sql(
         )
         .await?,
     );
-    let mut spend_time = start.elapsed().as_millis();
-
-    // get alias from context query for agg sql
-    let meta_sql = sql::Sql::new(&sql.query_context);
-
-    for (name, orig_agg_sql) in sql.aggs.iter() {
-        // Debug SQL
-        if cfg.common.print_key_sql {
-            log::info!("[trace_id {trace_id}] Query agg sql: {}", orig_agg_sql.0);
-        }
-
-        let mut agg_sql = orig_agg_sql.0.to_owned();
-        if meta_sql.is_ok() {
-            for alias in &meta_sql.as_ref().unwrap().field_alias {
-                replace_in_query(&alias.1, &mut agg_sql, true);
-            }
-        }
-
-        let mut df = match ctx.sql(&agg_sql).await {
-            Ok(df) => df,
-            Err(e) => {
-                log::error!(
-                    "aggs sql execute failed, session: {:?}, sql: {}, err: {:?}",
-                    session,
-                    agg_sql,
-                    e
-                );
-                return Err(e);
-            }
-        };
-
-        if !rules.is_empty() {
-            let mut exprs = Vec::with_capacity(df.schema().fields().len());
-            for (qualifier, field) in df.schema().iter() {
-                if let Some(v) = qualifier {
-                    if v.to_string() != "tbl" {
-                        exprs.push(col(field.name()));
-                        continue;
-                    }
-                }
-                exprs.push(match rules.get(field.name()) {
-                    Some(rule) => Expr::Alias(Alias::new(
-                        cast(col(field.name()), rule.clone()),
-                        None::<&str>,
-                        field.name().to_string(),
-                    )),
-                    None => col(field.name()),
-                });
-            }
-            df = df.select(exprs)?;
-        }
-        let batches = df.collect().await?;
-        result.insert(format!("agg_{name}"), batches);
-
-        let q_time = start.elapsed().as_millis();
-        log::info!(
-            "[trace_id {trace_id}] Query agg:{name} took {} ms",
-            q_time - spend_time
-        );
-        spend_time = q_time;
-    }
 
     // drop table
     ctx.deregister_table("tbl")?;
@@ -278,9 +215,7 @@ async fn exec_query(
         };
     }
     // query
-    let query = if !&sql.query_context.is_empty() {
-        sql.query_context.replace(&sql.stream_name, "tbl").clone()
-    } else if !fast_mode
+    let query = if !fast_mode
         && ((!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some())
     {
         match sql.meta.time_range {
@@ -365,15 +300,8 @@ async fn exec_query(
         return Ok(batches);
     }
 
-    if !sql.query_context.is_empty() {
-        q_ctx.deregister_table("tbl")?;
-        q_ctx.register_table("tbl", df.clone().into_view())?;
-        // re-register to ctx
-        if !fast_mode {
-            ctx.deregister_table("tbl")?;
-            ctx.register_table("tbl", df.into_view())?;
-        }
-    } else if sql.query_fn.is_some() {
+    // TODO: we don't need this part, we onlly apply function when we get the result
+    if sql.query_fn.is_some() {
         let batches = df.collect().await?;
         let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
         match handle_query_fn(

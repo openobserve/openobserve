@@ -328,7 +328,6 @@ pub async fn search_multi(
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.append(&mut res.columns);
                 multi_res.hits.append(&mut res.hits);
-                multi_res.aggs.extend(res.aggs.into_iter());
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
@@ -691,16 +690,13 @@ pub async fn around_multi(
                 start_time: around_start_time,
                 end_time: around_key,
                 sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
-                sql_mode: "".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
             clusters: clusters.clone(),
@@ -766,16 +762,13 @@ pub async fn around_multi(
                 start_time: around_key,
                 end_time: around_end_time,
                 sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
-                sql_mode: "".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
             clusters: clusters.clone(),

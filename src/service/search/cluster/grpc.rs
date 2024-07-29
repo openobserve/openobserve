@@ -74,31 +74,6 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
         hits_buf = writer.into_inner().unwrap();
     }
 
-    // finally aggs result
-    let mut aggs_buf = Vec::new();
-    for (key, batches) in merge_results {
-        if key == "query" || batches.is_empty() {
-            continue;
-        }
-        let mut buf = Vec::new();
-        let schema = batches[0].schema();
-        let ipc_options = ipc::writer::IpcWriteOptions::default();
-        let ipc_options = ipc_options
-            .try_with_compression(Some(ipc::CompressionType::ZSTD))
-            .unwrap();
-        let mut writer =
-            ipc::writer::FileWriter::try_new_with_options(buf, &schema, ipc_options).unwrap();
-        for batch in batches {
-            writer.write(&batch).unwrap();
-        }
-        writer.finish().unwrap();
-        buf = writer.into_inner().unwrap();
-        aggs_buf.push(cluster_rpc::SearchAggResponse {
-            name: key.strip_prefix("agg_").unwrap().to_string(),
-            hits: buf,
-        });
-    }
-
     let result = cluster_rpc::SearchResponse {
         job,
         took: start.elapsed().as_millis() as i32,
@@ -107,7 +82,6 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
         size: sql.meta.limit as i32,
         total: hits_total as i64,
         hits: hits_buf,
-        aggs: aggs_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
         is_partial,
     };

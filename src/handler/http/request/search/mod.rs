@@ -420,8 +420,6 @@ pub async fn around(
         .with_label_values(&[&org_id])
         .dec();
 
-    let query_context: Option<String> = None;
-
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -445,16 +443,13 @@ pub async fn around(
             start_time: around_start_time,
             end_time: around_key,
             sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
-            sql_mode: "".to_string(),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            query_context: query_context.clone(),
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: regions.clone(),
         clusters: clusters.clone(),
@@ -498,16 +493,13 @@ pub async fn around(
             start_time: around_key,
             end_time: around_end_time,
             sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
-            sql_mode: "".to_string(),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            query_context,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
         clusters,
@@ -652,10 +644,6 @@ pub async fn values(
         None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
     };
 
-    let query_context = match query.get("sql") {
-        None => "".to_string(),
-        Some(v) => base64::decode_url(v).unwrap_or("".to_string()),
-    };
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -673,10 +661,7 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    if fields.len() == 1
-        && DISTINCT_FIELDS.contains(&fields[0])
-        && !query_context.to_lowercase().contains(" where ")
-    {
+    if fields.len() == 1 && DISTINCT_FIELDS.contains(&fields[0]) {
         if let Some(v) = query.get("filter") {
             if !v.is_empty() {
                 let column = v.splitn(2, '=').collect::<Vec<_>>();
@@ -794,25 +779,15 @@ async fn values_v1(
         }
     };
 
-    let mut query_context = match query.get("sql") {
-        None => None,
-        Some(v) => match base64::decode_url(v) {
-            Err(_) => None,
-            Ok(sql) => {
-                uses_fn = functions::get_all_transform_keys(org_id)
-                    .await
-                    .iter()
-                    .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-                Some(sql)
-            }
-        },
+    if let Some(v) = query.get("sql") {
+        if let Ok(sql) = base64::decode_url(v) {
+            uses_fn = functions::get_all_transform_keys(org_id)
+                .await
+                .iter()
+                .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
+            query_sql = sql;
+        }
     };
-
-    if query_context.is_some() {
-        query_sql = query_context.clone().unwrap();
-        // We don't need query_context now
-        query_context = None;
-    }
 
     // pick up where clause from sql
     let where_str = match SearchService::sql::pickup_where(&query_sql, None) {
@@ -862,17 +837,14 @@ async fn values_v1(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql,
-            sql_mode: "full".to_string(),
             from: 0,
             size: config::meta::sql::MAX_LIMIT,
             start_time,
             end_time,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
-            query_context,
             ..Default::default()
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
         clusters,
@@ -1163,16 +1135,13 @@ async fn values_v2(
             start_time,
             end_time,
             sort_by: None,
-            sql_mode: "full".to_string(),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            query_context: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
         clusters,

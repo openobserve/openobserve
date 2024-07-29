@@ -226,12 +226,7 @@ pub async fn search(
         let session = config::meta::search::Session {
             id: format!("{trace_id}-{ver}"),
             storage_type: StorageType::Memory,
-            search_type: if !sql.meta.group_by.is_empty()
-                || sql
-                    .aggs
-                    .iter()
-                    .any(|(_, (_, meta))| !meta.group_by.is_empty())
-            {
+            search_type: if !sql.meta.group_by.is_empty() {
                 SearchType::Aggregation
             } else {
                 SearchType::Normal

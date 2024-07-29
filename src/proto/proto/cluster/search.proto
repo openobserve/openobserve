@@ -19,7 +19,6 @@ service Search {
 // Search request query
 message SearchQuery {
     string              sql = 1;
-    string         sql_mode = 2;
     bool         quick_mode = 3;
     int32              from = 4;
     int32              size = 5;
@@ -28,7 +27,6 @@ message SearchQuery {
     string          sort_by = 8;
     bool   track_total_hits = 9;
     string      query_type = 10;
-    string   query_context = 11;
     bool        uses_zo_fn = 12;
     string        query_fn = 13;
     bool          skip_wal = 14;
@@ -41,8 +39,8 @@ message SearchRequest {
     string                 stream_type = 3;
     SearchType                   stype = 4;
     SearchQuery                  query = 5;
-    repeated FileKey         file_list = 6;
-    repeated SearchAggRequest     aggs = 7;
+    SearchMode                    mode = 6;
+    repeated FileKey         file_list = 7;
     int64                      timeout = 8;
     string                  work_group = 9;
     optional string           user_id = 10;
@@ -56,20 +54,14 @@ message SearchResponse {
     int32                      from = 4;
     int32                      size = 5;
     bytes                      hits = 6;
-    repeated SearchAggResponse aggs = 7;
     ScanStats            scan_stats = 8;
     bool                 is_partial = 9;
     int32                 idx_took = 10;
 }
 
-message SearchAggRequest {
-    string name = 1;
-    string  sql = 2;
-}
-
-message SearchAggResponse {
-    string name = 1;
-    bytes  hits = 2;
+enum SearchMode {
+    Final   = 0;
+    Partial = 1;
 }
 
 message QueryStatusRequest {
@@ -92,9 +84,9 @@ message QueryStatus {
     optional WorkGroup work_group = 10;
 }
 
-enum WorkGroup{
+enum WorkGroup {
     SHORT = 0;
-    LONG = 1;
+    LONG  = 1;
 }
 
 message Query {

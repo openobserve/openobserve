@@ -174,28 +174,6 @@ pub async fn search(
         }
     }
 
-    // aggs
-    for (name, batch) in merge_batches {
-        if name == "query" || batch.is_empty() {
-            continue;
-        }
-        let name = name.strip_prefix("agg_").unwrap().to_string();
-        let batch_ref: Vec<&RecordBatch> = batch.iter().collect();
-        let json_rows = record_batches_to_json_rows(&batch_ref)
-            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-        let sources: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
-        for source in sources {
-            result.add_agg(&name, &source);
-        }
-    }
-
-    // total
-    let total = match result.aggs.get("_count") {
-        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => result.hits.len(),
-    };
-    result.aggs.remove("_count");
-
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);
     result.set_partial(is_partial);

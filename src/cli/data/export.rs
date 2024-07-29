@@ -50,14 +50,12 @@ impl Context for Export {
             sql: format!("select * from {}", table),
             from: 0,
             size: 100,
-            sql_mode: "full".to_owned(),
             quick_mode: false,
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
             sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
             track_total_hits: false,
-            query_context: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
@@ -65,7 +63,6 @@ impl Context for Export {
 
         let req = search::Request {
             query,
-            aggs: HashMap::new(),
             encoding: search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
