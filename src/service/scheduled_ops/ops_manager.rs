@@ -22,6 +22,7 @@ use config::{
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
+    utils::json,
 };
 use cron::Schedule;
 use futures::future::try_join_all;
@@ -409,5 +410,96 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
 async fn handle_derived_stream_triggers(
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
+    log::debug!(
+        "Inside handle_derived_stream_triggers processing trigger: {}",
+        trigger.module_key
+    );
+    let now = Utc::now().timestamp_micros();
+
+    // module_key format: stream_type/stream_name/pipeline_name/derived_stream_name
+    let columns = trigger.module_key.split('/').collect::<Vec<_>>();
+    assert_eq!(columns.len(), 4);
+    let org_id = &trigger.org;
+    let stream_type: StreamType = columns[0].into();
+    let stream_name = columns[1];
+    let pipeline_name = columns[2];
+    let name = columns[3];
+
+    // QUESTION(taiming): should derived_stream be realtime, silenced?
+    let is_real_time = trigger.is_realtime;
+    let is_silenced = trigger.is_silenced;
+    if is_real_time && is_silenced {
+        log::debug!(
+            "Realtime derived_stream needs to wake up, {}/{}",
+            org_id,
+            trigger.module_key
+        );
+        let new_trigger = db::scheduler::Trigger {
+            next_run_at: Utc::now().timestamp_micros(),
+            is_silenced: false,
+            status: db::scheduler::TriggerStatus::Waiting,
+            ..trigger.clone()
+        };
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
+
+    let Ok(pipeline) = db::pipelines::get(org_id, stream_type, stream_name, pipeline_name).await
+    else {
+        return Err(anyhow::anyhow!(
+            "Pipeline associated with trigger not found: {}/{}/{}/{}",
+            org_id,
+            stream_name,
+            stream_type,
+            pipeline_name
+        ));
+    };
+
+    let Some(derived_stream) = pipeline
+        .derived_streams
+        .and_then(|ds| ds.into_iter().find(|ds| ds.name == name))
+    else {
+        return Err(anyhow::anyhow!(
+            "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}/{}",
+            org_id,
+            stream_name,
+            stream_type,
+            name,
+        ));
+    };
+
+    let next_run_at = now
+        + Duration::try_seconds(derived_stream.trigger_condition.frequency)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+    let mut new_trigger = db::scheduler::Trigger {
+        next_run_at,
+        is_silenced: false,
+        status: db::scheduler::TriggerStatus::Waiting,
+        ..trigger.clone()
+    };
+
+    let ret = derived_stream.evaluate(None).await?;
+    if ret.is_some() && derived_stream.trigger_condition.silence > 0 {
+        new_trigger.next_run_at += Duration::try_minutes(derived_stream.trigger_condition.silence)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        new_trigger.is_silenced = true;
+    }
+
+    // QUESTION(taiming): is it necessary to create another gPRC service for this ingestion
+    // or use service/logs/ingest.rs::ingest directly?
+    // since destination can be logs, enrichmenttable,
+    // ingest evaluation result into destination
+    if let Some(data) = ret {
+        let local_val = data
+            .into_iter()
+            .map(|map| json::Value::Object(map))
+            .collect::<Vec<_>>();
+    }
+
     Ok(())
 }

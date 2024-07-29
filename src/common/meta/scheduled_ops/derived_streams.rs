@@ -35,7 +35,7 @@ pub struct DerivedStreamMeta {
     #[serde(default)]
     pub query_condition: QueryCondition,
     #[serde(default)]
-    pub trigger_condition: TriggerCondition,
+    pub trigger_condition: TriggerCondition, // Frequency type only supports minutes
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]

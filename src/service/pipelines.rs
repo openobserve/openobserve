@@ -48,7 +48,8 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
             if let Err(e) =
-                super::scheduled_ops::derived_streams::save(derived_stream.clone()).await
+                super::scheduled_ops::derived_streams::save(derived_stream.clone(), &pipeline.name)
+                    .await
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
@@ -113,7 +114,8 @@ pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Err
                 )));
             }
             if let Err(e) =
-                super::scheduled_ops::derived_streams::save(derived_stream.clone()).await
+                super::scheduled_ops::derived_streams::save(derived_stream.clone(), &pipeline.name)
+                    .await
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
@@ -192,7 +194,11 @@ pub async fn delete_pipeline(
     // delete DerivedStream details if there's any
     if let Some(derived_streams) = existing_pipeline.derived_streams {
         for derived_stream in derived_streams {
-            if let Err(error) = super::scheduled_ops::derived_streams::delete(derived_stream).await
+            if let Err(error) = super::scheduled_ops::derived_streams::delete(
+                derived_stream,
+                &existing_pipeline.name,
+            )
+            .await
             {
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::message(

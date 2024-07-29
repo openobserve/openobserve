@@ -16,7 +16,13 @@
 use std::str::FromStr;
 
 use actix_web::http;
-use config::get_config;
+use config::{
+    get_config,
+    utils::{
+        base64,
+        json::{Map, Value},
+    },
+};
 use cron::Schedule;
 use hashbrown::HashMap;
 
@@ -37,7 +43,10 @@ use crate::{
     },
 };
 
-pub async fn save(mut derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Error> {
+pub async fn save(
+    mut derived_stream: DerivedStreamMeta,
+    pipeline_name: &str,
+) -> Result<(), anyhow::Error> {
     derived_stream.name = derived_stream.name.trim().to_string();
     // 1. Start validate DerivedStream
     if !derived_stream.is_valid() {
@@ -89,14 +98,6 @@ pub async fn save(mut derived_stream: DerivedStreamMeta) -> Result<(), anyhow::E
         }
     }
 
-    // check if db already exists
-    if get_existing_derived_stream(&derived_stream.name, &derived_stream.source)
-        .await
-        .is_some()
-    {
-        return Err(anyhow::anyhow!("Derived Stream already exists"));
-    }
-
     // QUESTION(taiming): saw this in alerts. is this necessary?
     // check source stream schema
     let schema = infra::schema::get(
@@ -119,6 +120,7 @@ pub async fn save(mut derived_stream: DerivedStreamMeta) -> Result<(), anyhow::E
         // Check the cron expression
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
+        // TODO(taiming): need default freq for derived streams
         // default frequency is 60 seconds
         derived_stream.trigger_condition.frequency =
             std::cmp::max(10, get_config().limit.alert_schedule_interval);
@@ -133,10 +135,29 @@ pub async fn save(mut derived_stream: DerivedStreamMeta) -> Result<(), anyhow::E
         derived_stream.context_attributes = Some(new_attrs);
     }
 
-    // TODO(taiming): test derived_stream
-    // _ = &derived_stream.evaluate(None).await?;
+    // test derived_stream
+    _ = &derived_stream.evaluate(None).await?;
 
-    match db::scheduled_ops::derived_streams::set(&derived_stream).await {
+    // Save the trigger to db
+    let trigger = db::scheduler::Trigger {
+        org: derived_stream.source.org_id.to_string(),
+        module: db::scheduler::TriggerModule::DerivedStream,
+        module_key: derived_stream.get_schedule_key(pipeline_name),
+        next_run_at: chrono::Utc::now().timestamp_micros(),
+        is_realtime: derived_stream.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    // check if trigger already exists
+    if db::scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key)
+        .await
+        .is_ok()
+    {
+        return Err(anyhow::anyhow!("Trigger already exists"));
+    }
+
+    match db::scheduler::push(trigger).await {
         Ok(_) => {
             // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
             set_ownership(
@@ -147,19 +168,21 @@ pub async fn save(mut derived_stream: DerivedStreamMeta) -> Result<(), anyhow::E
             .await;
             Ok(())
         }
-        Err(e) => Err(e),
+        Err(e) => Err(anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
     }
 }
 
-pub async fn delete(derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Error> {
-    if get_existing_derived_stream(&derived_stream.name, &derived_stream.source)
-        .await
-        .is_none()
+pub async fn delete(
+    derived_stream: DerivedStreamMeta,
+    pipeline_name: &str,
+) -> Result<(), anyhow::Error> {
+    match db::scheduler::delete(
+        &derived_stream.source.org_id,
+        db::scheduler::TriggerModule::DerivedStream,
+        &derived_stream.get_schedule_key(pipeline_name),
+    )
+    .await
     {
-        return Err(anyhow::anyhow!("Derived Stream not found"));
-    }
-
-    match db::scheduled_ops::derived_streams::delete(&derived_stream).await {
         Ok(_) => {
             remove_ownership(
                 &derived_stream.source.org_id,
@@ -169,39 +192,8 @@ pub async fn delete(derived_stream: DerivedStreamMeta) -> Result<(), anyhow::Err
             .await;
             Ok(())
         }
-        Err(e) => Err(e),
+        Err(e) => Err(anyhow::anyhow!("Error deleting derived stream: {e}")),
     }
-}
-
-async fn get_existing_derived_stream(
-    name: &str,
-    source: &StreamParams,
-) -> Option<DerivedStreamMeta> {
-    match db::scheduled_ops::derived_streams::get(
-        &source.org_id,
-        source.stream_type,
-        &source.stream_name,
-        name,
-    )
-    .await
-    {
-        Ok(ret) => ret,
-        Err(_) => None,
-    }
-}
-
-pub async fn enable(
-    org_id: &str,
-    name: &str,
-    value: bool,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    // TODO: call db to get the derived_streams and change [enabled] and save again
-    Ok(())
-}
-
-pub async fn trigger(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    // TODO: call db to get the derived_streams and change [enabled] and save again
-    Ok(())
 }
 
 impl DerivedStreamMeta {
@@ -209,18 +201,23 @@ impl DerivedStreamMeta {
         !self.name.is_empty() && self.source.is_valid() && self.destination.is_valid()
     }
 
-    pub fn get_schedule_key(&self) -> String {
+    pub fn get_schedule_key(&self, pipeline_name: &str) -> String {
         format!(
-            "{}/{}/{}",
-            self.source.stream_type, self.source.stream_name, self.name
+            "{}/{}/{}/{}",
+            self.source.stream_type, self.source.stream_name, pipeline_name, self.name
         )
     }
 
-    pub fn get_store_key(&self) -> String {
-        format!(
-            "/derived_streams/{}/{}",
-            self.source.org_id,
-            self.get_schedule_key()
-        )
+    pub async fn evaluate(
+        &self,
+        row: Option<&Map<String, Value>>,
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        if self.is_real_time {
+            self.query_condition.evaluate_realtime(row).await
+        } else {
+            self.query_condition
+                .evaluate_scheduled(&self.source, &self.trigger_condition)
+                .await
+        }
     }
 }

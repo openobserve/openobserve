@@ -26,16 +26,19 @@ use config::{
 
 use super::promql;
 use crate::{
-    common::meta::scheduled_ops::{
-        alerts::Alert, AggFunction, Condition, Operator, QueryCondition, QueryType,
+    common::meta::{
+        scheduled_ops::{
+            AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
+        },
+        stream::StreamParams,
     },
     service::search as SearchService,
 };
 
-pub mod ops_manager;
 pub mod alerts;
 pub mod derived_streams;
 pub mod destinations;
+pub mod ops_manager;
 pub mod templates;
 
 impl QueryCondition {
@@ -66,7 +69,8 @@ impl QueryCondition {
 
     pub async fn evaluate_scheduled(
         &self,
-        alert: &Alert,
+        stream_param: &StreamParams,
+        trigger_condition: &TriggerCondition,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
@@ -74,7 +78,7 @@ impl QueryCondition {
                 let Some(v) = self.conditions.as_ref() else {
                     return Ok(None);
                 };
-                build_sql(alert, v).await?
+                build_sql(stream_param, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
@@ -94,7 +98,7 @@ impl QueryCondition {
                     return Ok(None);
                 }
                 let start = now
-                    - Duration::try_minutes(alert.trigger_condition.period)
+                    - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
                         .num_microseconds()
                         .unwrap();
@@ -117,7 +121,7 @@ impl QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                 };
-                let resp = match promql::search::search(&alert.org_id, &req, 0, "").await {
+                let resp = match promql::search::search(&stream_param.org_id, &req, 0, "").await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok(None);
@@ -134,7 +138,7 @@ impl QueryCondition {
                 // TODO calculate the sample in a row, suddenly a sample can be ignored
                 let value = value
                     .into_iter()
-                    .filter(|f| f.samples.len() >= alert.trigger_condition.threshold as usize)
+                    .filter(|f| f.samples.len() >= trigger_condition.threshold as usize)
                     .collect::<Vec<_>>();
                 return if value.is_empty() {
                     Ok(None)
@@ -168,7 +172,7 @@ impl QueryCondition {
                 from: 0,
                 size: 100,
                 start_time: now
-                    - Duration::try_minutes(alert.trigger_condition.period)
+                    - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
                         .num_microseconds()
                         .unwrap(),
@@ -191,16 +195,21 @@ impl QueryCondition {
             search_type: Some(SearchEventType::Alerts),
         };
         let trace_id = ider::uuid();
-        let resp =
-            match SearchService::search(&trace_id, &alert.org_id, alert.stream_type, None, &req)
-                .await
-            {
-                Ok(v) => v,
-                Err(_) => {
-                    return Ok(None);
-                }
-            };
-        if resp.total < alert.trigger_condition.threshold as usize {
+        let resp = match SearchService::search(
+            &trace_id,
+            &stream_param.org_id,
+            stream_param.stream_type,
+            None,
+            &req,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(_) => {
+                return Ok(None);
+            }
+        };
+        if resp.total < trigger_condition.threshold as usize {
             Ok(None)
         } else {
             Ok(Some(
@@ -279,8 +288,17 @@ impl Condition {
     }
 }
 
-async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, anyhow::Error> {
-    let schema = infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
+async fn build_sql(
+    stream_params: &StreamParams,
+    query_condition: &QueryCondition,
+    conditions: &[Condition],
+) -> Result<String, anyhow::Error> {
+    let schema = infra::schema::get(
+        &stream_params.org_id,
+        &stream_params.stream_name,
+        stream_params.stream_type,
+    )
+    .await?;
     let mut wheres = Vec::with_capacity(conditions.len());
     for cond in conditions.iter() {
         let data_type = match schema.field_with_name(&cond.column) {
@@ -289,7 +307,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                 return Err(anyhow::anyhow!(
                     "Column {} not found on stream {}",
                     &cond.column,
-                    &alert.stream_name
+                    &stream_params.stream_name
                 ));
             }
         };
@@ -301,16 +319,16 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
     } else {
         String::new()
     };
-    if alert.query_condition.aggregation.is_none() {
+    if query_condition.aggregation.is_none() {
         return Ok(format!(
             "SELECT * FROM \"{}\" {}",
-            alert.stream_name, where_sql
+            stream_params.stream_name, where_sql
         ));
     }
 
     // handle aggregation
     let mut sql = String::new();
-    let agg = alert.query_condition.aggregation.as_ref().unwrap();
+    let agg = query_condition.aggregation.as_ref().unwrap();
     let having_expr = {
         let data_type = match schema.field_with_name(&agg.having.column) {
             Ok(field) => field.data_type(),
@@ -318,7 +336,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                 return Err(anyhow::anyhow!(
                     "Aggregation column {} not found on stream {}",
                     &agg.having.column,
-                    &alert.stream_name
+                    &stream_params.stream_name
                 ));
             }
         };
@@ -347,7 +365,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
                 func_expr,
                 cfg.common.column_timestamp,
                 cfg.common.column_timestamp,
-                alert.stream_name,
+                stream_params.stream_name,
                 where_sql,
                 group.join(", "),
                 having_expr
@@ -360,7 +378,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
             func_expr,
             cfg.common.column_timestamp,
             cfg.common.column_timestamp,
-            alert.stream_name,
+            stream_params.stream_name,
             where_sql,
             having_expr
         );

@@ -30,10 +30,7 @@ use crate::{
         organization::OrganizationSetting,
         pipelines::PipeLine,
         prom::ClusterLeader,
-        scheduled_ops::{
-            alerts::Alert, derived_streams::DerivedStreamMeta, destinations::Destination,
-            templates::Template,
-        },
+        scheduled_ops::{alerts::Alert, destinations::Destination, templates::Template},
         syslog::SyslogRoute,
         user::User,
     },
@@ -87,5 +84,3 @@ pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static STREAM_PIPELINES: Lazy<RwHashMap<String, PipeLine>> = Lazy::new(DashMap::default);
-pub static DERIVED_STREAMS: Lazy<RwHashMap<String, DerivedStreamMeta>> =
-    Lazy::new(DashMap::default);
