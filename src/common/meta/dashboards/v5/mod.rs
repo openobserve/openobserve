@@ -181,10 +181,8 @@ pub struct FilterCondition {
     pub column: String,
     pub operator: Option<String>,
     pub value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logical_operator: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filter_type: Option<String>,
+    pub logical_operator: String,
+    pub filter_type: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
