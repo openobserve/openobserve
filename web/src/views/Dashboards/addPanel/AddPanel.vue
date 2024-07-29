@@ -459,6 +459,17 @@ export default defineComponent({
           dashboardPanelData.data,
           JSON.parse(JSON.stringify(panelData)),
         );
+
+        // check if vrl function exists
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery
+        ) {
+          // enable vrl function editor
+          dashboardPanelData.layout.vrlFunctionToggle = true;
+        }
+
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         updateDateTime(selectedDate.value);
