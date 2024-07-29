@@ -1,28 +1,51 @@
 <template>
-  <div >
+  <div>
     <div ref="parentRef" class="container tw-overflow-x-auto">
-      <table class="tw-w-full tw-table-auto">
+      <table
+        class="tw-w-full tw-table-auto"
+        :style="{
+          ...columnSizeVars,
+          width: table.getCenterTotalSize() + 'px',
+        }"
+      >
         <thead class="tw-sticky">
-          <tr
+          <vue-draggable
+            v-model="columnOrder"
             v-for="headerGroup in table.getHeaderGroups()"
             :key="headerGroup.id"
+            :element="'table'"
+            :animation="200"
+            :sort="!isResizingHeader"
+            handle=".table-head"
+            :class="{
+              'tw-cursor-move': table.getState().columnOrder.length > 1,
+            }"
+            tag="tr"
+            @start="(event) => handleDragStart(event)"
+            @end="(event) => handleDragEnd(event)"
           >
             <th
               v-for="header in headerGroup.headers"
               :key="header.id"
-              :style="{ width: `${header.getSize()}` }"
+              :id="header.id"
               class="tw-px-2 tw-relative table-head"
+              :style="{ width: header.getSize() + 'px' }"
             >
               <div
+                v-if="header.column.getCanResize()"
                 @dblclick="header.column.resetSize()"
-                @mousedown="header.getResizeHandler()"
-                @touchstart="header.getResizeHandler()"
+                @mousedown.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
+                @touchstart.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
                 :class="[
                   'resizer',
-                  columnResizeDirection,
                   header.column.getIsResizing() ? 'isResizing' : '',
                 ]"
                 :style="{}"
+                class="tw-right-0"
               />
 
               <div
@@ -44,18 +67,17 @@
                   :render="header.column.columnDef.header"
                   :props="header.getContext()"
                 />
-                <span v-if="header.column.getIsSorted() === 'asc'"> 🔼</span>
-                <span v-if="header.column.getIsSorted() === 'desc'"> 🔽</span>
-
+                <!-- <span v-if="header.column.getIsSorted() === 'asc'"> 🔼</span>
+                <span v-if="header.column.getIsSorted() === 'desc'"> 🔽</span> -->
 
                 <div
-                    class="tw-invisible tw-items-center tw-absolute tw-right-0 tw-top-0 tw-bg-white tw-px-2 column-actions"
-                    :class="
-                      store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                    "
-                    v-if="(header.column.columnDef.meta as any).closable || (header.column.columnDef.meta as any).showWrap"
-                  >
-                    <span
+                  class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-bg-white tw-px-2 column-actions"
+                  :class="
+                    store.state.theme === 'dark' ? 'field_overlay_dark' : ''
+                  "
+                  v-if="(header.column.columnDef.meta as any).closable || (header.column.columnDef.meta as any).showWrap"
+                >
+                  <!-- <span
                       v-if="(header.column.columnDef.meta as any).showWrap"
                       style="font-weight: normal"
                       :class="
@@ -78,51 +100,54 @@
                       "
                       size="xs"
                       dense
-                    />
+                    /> -->
 
-                    <q-icon
-                      v-if="(header.column.columnDef.meta as any).closable"
-                      :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                      name="cancel"
-                      class="q-ma-none close-icon cursor-pointer"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-white'
-                          : 'text-grey-7'
-                      "
-                      :title="t('common.close')"
-                      size="18px"
-                      @click="closeColumn(header.column.columnDef)"
-                    >
-                    </q-icon>
-                  </div>
+                  <q-icon
+                    v-if="(header.column.columnDef.meta as any).closable"
+                    :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                    name="cancel"
+                    class="q-ma-none close-icon cursor-pointer"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-white'
+                        : 'text-grey-7'
+                    "
+                    :title="t('common.close')"
+                    size="18px"
+                    @click="closeColumn(header.column.columnDef)"
+                  >
+                  </q-icon>
+                </div>
               </div>
             </th>
-          </tr>
+          </vue-draggable>
         </thead>
         <tbody class="tw-relative">
-          <template             
-            v-for="virtualRow in virtualRows"
-            :key="JSON.stringify(formattedRows[virtualRow.index].original)"
+          <template
+            v-for="virtualRow in table.getRowModel().rows"
+            :key="virtualRow.id"
           >
-          <tr
-            :style="{
-              transform: `translateY(${virtualRow.start}px)`,
-              position: 'absolute',
-            }"
-            class="tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b "
-            :class="store.state.theme === 'dark' ? 'w-border-gray-800' : 'w-border-gray-100'"
-          >
-            <td
-              v-for="cell, cellIndex in formattedRows[virtualRow.index].getVisibleCells()"
-              :key="cell.id"
-              class="tw-py-1 tw-px-2 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-flex tw-items-center tw-justify-start"
-              :style="{
-                width: cell.column.getSize(),
-                height: '26px'
-              }"
+            <tr
+              :style="{}"
+              class="tw-table-row tw-w-max tw-items-center tw-justify-start tw-border-b"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'w-border-gray-800'
+                  : 'w-border-gray-100'
+              "
             >
-            <q-btn
+              <td
+                v-for="(cell, cellIndex) in formattedRows[
+                  virtualRow.index
+                ].getVisibleCells()"
+                :key="cell.id"
+                class="tw-py-1 tw-px-2 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-table-cell tw-items-center tw-justify-start"
+                :style="{
+                  width: (cell.column.columnDef.meta as any).closable && cell.column.getSize() + 'px',
+                  height: '26px',
+                }"
+              >
+                <q-btn
                   v-if="cellIndex == 0"
                   :icon="
                     formattedRows[virtualRow.index].getIsExpanded()
@@ -136,31 +161,37 @@
                   data-test="table-row-expand-menu"
                   @click.stop="formattedRows[virtualRow.index].toggleExpanded()"
                 ></q-btn>
-              <FlexRender
-                :render="cell.column.columnDef.cell"
-                :props="cell.getContext()"
-              />
-            </td>
-          </tr>
-          <tr v-if="formattedRows[virtualRow.index].getIsExpanded()"             
-          :style="{
-              transform: `translateY(${virtualRow.start + 26})`,
-              position: 'relative',
-              width: '100%'
-            }" >
-            <td colspan="4">
-              <json-preview
-                :value="rows[virtualRow.index]"
-                show-copy-button
-                class="tw-border-b  tw-py-1"
-                :class="store.state.theme === 'dark' ? 'w-border-gray-800' : 'w-border-gray-100'"
-                @copy="copyLogToClipboard"
-                @add-field-to-table="addFieldToTable"
-                @add-search-term="addSearchTerm"
-              />
-            </td>
-          </tr>
-        </template>
+                <FlexRender
+                  :render="cell.column.columnDef.cell"
+                  :props="cell.getContext()"
+                />
+              </td>
+            </tr>
+            <tr
+              v-if="formattedRows[virtualRow.index].getIsExpanded()"
+              :style="{
+                transform: `translateY(${virtualRow.start + 26})`,
+                position: 'relative',
+                width: '100%',
+              }"
+            >
+              <td colspan="4">
+                <json-preview
+                  :value="rows[virtualRow.index]"
+                  show-copy-button
+                  class="tw-border-b tw-py-1"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'w-border-gray-800'
+                      : 'w-border-gray-100'
+                  "
+                  @copy="copyLogToClipboard"
+                  @add-field-to-table="addFieldToTable"
+                  @add-search-term="addSearchTerm"
+                />
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
@@ -168,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, watch } from "vue";
+import { ref, computed, defineEmits, watch, nextTick } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   FlexRender,
@@ -181,6 +212,7 @@ import {
 import JsonPreview from "./JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 
 const props = defineProps({
   rows: {
@@ -193,9 +225,14 @@ const props = defineProps({
   },
 });
 
-const {t} = useI18n();
+const { t } = useI18n();
 
-const emits = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "closeColumn"]);
+const emits = defineEmits([
+  "copy",
+  "addSearchTerm",
+  "addFieldToTable",
+  "closeColumn",
+]);
 
 const sorting = ref<SortingState>([]);
 
@@ -215,31 +252,79 @@ const columnResizeMode = "onChange";
 
 const columnResizeDirection = "ltr";
 
+const columnOrder = ref<any>([]);
+
+watch(
+  () => props.columns,
+  (newVal) => {
+    columnOrder.value = newVal.map((column: any) => column.id);
+  },
+  {
+    deep: true,
+  }
+);
+
 const table = useVueTable({
   get data() {
     return props.rows || [];
   },
   get columns() {
-    return props.columns as ColumnDef<any>[]
-  }, 
+    return props.columns as ColumnDef<any>[];
+  },
   state: {
     get sorting() {
       return sorting.value;
+    },
+    get columnOrder() {
+      return columnOrder.value;
     },
   },
   onSortingChange: setSorting,
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
+  defaultColumn: {
+    minSize: 60,
+    maxSize: 800,
+  },
   debugTable: true,
   debugHeaders: true,
   debugColumns: true,
   columnResizeMode,
-  columnResizeDirection,
+  enableColumnResizing: true,
+});
+
+const columnSizeVars = computed(() => {
+  const headers = table.getFlatHeaders();
+  const colSizes: { [key: string]: number } = {};
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i]!;
+    colSizes[`--header-${header.id}-size`] = header.getSize();
+    colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
+  }
+  return colSizes;
 });
 
 const formattedRows = computed(() => {
   return table.getRowModel().rows;
 });
+
+const isResizingHeader = ref(false);
+
+const headerGroups = computed(() => table.getHeaderGroups()[0]);
+
+const headers = computed(() => headerGroups.value.headers);
+
+watch(
+  () => headers.value,
+  (newVal) => {
+    isResizingHeader.value = newVal.some((header) =>
+      header.column.getIsResizing()
+    );
+  },
+  {
+    deep: true,
+  }
+);
 
 const parentRef = ref<HTMLElement | null>(null);
 
@@ -250,8 +335,8 @@ const rowVirtualizerOptions = computed(() => {
     estimateSize: () => 26,
     overscan: 5,
     measureElement:
-      typeof window !== 'undefined' &&
-      navigator.userAgent.indexOf('Firefox') === -1
+      typeof window !== "undefined" &&
+      navigator.userAgent.indexOf("Firefox") === -1
         ? (element: any) => element?.getBoundingClientRect().height
         : undefined,
   };
@@ -265,17 +350,36 @@ const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
 const copyLogToClipboard = (value: any) => {
   emits("copy", value);
-    };
-    const addSearchTerm = (value: string) => {
-      emits("addSearchTerm", value);
-    };
-    const addFieldToTable = (value: string) => {
-      emits("addFieldToTable", value);
-    };
+};
+const addSearchTerm = (value: string) => {
+  emits("addSearchTerm", value);
+};
+const addFieldToTable = (value: string) => {
+  emits("addFieldToTable", value);
+};
 
-    const closeColumn = (data: any) => {
-      emits("closeColumn", data);
-    }
+const closeColumn = (data: any) => {
+  emits("closeColumn", data);
+};
+
+const handleDragStart = (event: any) => {
+  if (columnOrder.value[event.oldIndex] === "timestamp") {
+    isResizingHeader.value = true;
+  } else {
+    isResizingHeader.value = false;
+  }
+};
+
+const handleDragEnd = async (event: any) => {
+  if (columnOrder.value[0] !== "timestamp") {
+    await nextTick();
+    const newItem = columnOrder.value[event.newIndex];
+    columnOrder.value[event.newIndex] = columnOrder.value[event.oldIndex];
+    columnOrder.value[event.oldIndex] = newItem;
+
+    columnOrder.value = [...columnOrder.value];
+  }
+};
 </script>
 <style scoped lang="scss">
 .resizer {
@@ -340,16 +444,14 @@ thead {
   background: lightgray;
 }
 
-.table-row{
+.table-row {
   border-bottom: 1px solid gray;
 }
 
-
 th {
-
   text-align: left;
 
-  &:hover{
+  &:hover {
     .column-actions {
       visibility: visible !important;
     }
@@ -372,8 +474,6 @@ td {
 .q-table--dark .tfoot-sticky tr > * {
   background: #565656;
 }
-
-
 </style>
 
 <!-- <template>

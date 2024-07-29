@@ -3020,7 +3020,7 @@ const useLogs = () => {
           )
         ) {
           searchObj.data.resultGrid.columns.push({
-            name: "@timestamp",
+            id: "timestamp",
             accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
@@ -3049,7 +3049,7 @@ const useLogs = () => {
 
         if (searchObj.data.stream.selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
-            name: "source",
+            id: "source",
             accessorFn: (row: any) => JSON.stringify(row),
             cell: (info: any) => info.getValue(),
             header: "source",
@@ -3095,7 +3095,7 @@ const useLogs = () => {
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             searchObj.data.resultGrid.columns.push({
-              name: field,
+              id: field,
               accessorFn: (row: { [x: string]: any; source: any }) => {
                 return byString(row, field);
               },
