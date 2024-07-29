@@ -15,6 +15,7 @@
 
 use std::cmp::max;
 
+use cache::result_utils::is_aggregate_query;
 use chrono::Duration;
 use config::{
     get_config, ider,
@@ -271,6 +272,15 @@ pub async fn search_partition(
         compressed_size: compressed_size as usize,
         partitions: vec![],
     };
+
+    // if is aggregate query, return single partitions
+    if let Ok(v) = is_aggregate_query(&req.sql) {
+        if v {
+            resp.partitions.push([req.start_time, req.end_time]);
+            return Ok(resp);
+        }
+    }
+
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
     if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
         total_secs += 1;
