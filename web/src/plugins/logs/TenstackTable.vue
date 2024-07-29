@@ -1,34 +1,40 @@
 <template>
   <div>
-    <div ref="parentRef" class="container tw-overflow-x-auto">
+    <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
       <table
         class="tw-w-full tw-table-auto"
         :style="{
           ...columnSizeVars,
-          width: table.getCenterTotalSize() + 'px',
+          width: !columnOrder.includes('source')
+            ? table.getCenterTotalSize() + 'px'
+            : '100%',
         }"
       >
-        <thead class="tw-sticky">
+        <thead class="tw-sticky tw-top-0">
           <vue-draggable
             v-model="columnOrder"
             v-for="headerGroup in table.getHeaderGroups()"
             :key="headerGroup.id"
             :element="'table'"
             :animation="200"
-            :sort="!isResizingHeader"
+            :sort="!isResizingHeader || !columnOrder.includes('source')"
             handle=".table-head"
             :class="{
               'tw-cursor-move': table.getState().columnOrder.length > 1,
             }"
+            :style="{
+              width: tableRowSize + 'px',
+            }"
             tag="tr"
             @start="(event) => handleDragStart(event)"
             @end="(event) => handleDragEnd(event)"
+            class="tw-flex items-center"
           >
             <th
               v-for="header in headerGroup.headers"
               :key="header.id"
               :id="header.id"
-              class="tw-px-2 tw-relative table-head"
+              class="tw-px-2 tw-relative table-head tw-text-ellipsis"
               :style="{ width: header.getSize() + 'px' }"
             >
               <div
@@ -62,6 +68,7 @@
                     header.column.getToggleSortingHandler()
                   )
                 "
+                class="tw-overflow-hidden tw-text-ellipsis"
               >
                 <FlexRender
                   :render="header.column.columnDef.header"
@@ -122,30 +129,34 @@
             </th>
           </vue-draggable>
         </thead>
-        <tbody class="tw-relative">
-          <template
-            v-for="virtualRow in table.getRowModel().rows"
-            :key="virtualRow.id"
-          >
+        <tbody ref="tableBodyRef" class="tw-relative">
+          <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
             <tr
-              :style="{}"
-              class="tw-table-row tw-w-max tw-items-center tw-justify-start tw-border-b"
-              :class="
+              :style="{
+                transform: `translateY(${virtualRow.start}px)`,
+                width: '100%',
+              }"
+              class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b"
+              :class="[
                 store.state.theme === 'dark'
                   ? 'w-border-gray-800'
-                  : 'w-border-gray-100'
-              "
+                  : 'w-border-gray-100',
+                columnOrder.includes('source') ? 'tw-table-row' : 'tw-flex',
+              ]"
             >
               <td
                 v-for="(cell, cellIndex) in formattedRows[
                   virtualRow.index
                 ].getVisibleCells()"
                 :key="cell.id"
-                class="tw-py-1 tw-px-2 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-table-cell tw-items-center tw-justify-start"
+                class="tw-py-1 tw-px-2 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-items-center tw-justify-start"
                 :style="{
                   width: (cell.column.columnDef.meta as any).closable && cell.column.getSize() + 'px',
                   height: '26px',
                 }"
+                :class="[
+                  columnOrder.includes('source') ? 'tw-table-cell' : 'tw-block',
+                ]"
               >
                 <q-btn
                   v-if="cellIndex == 0"
@@ -170,7 +181,7 @@
             <tr
               v-if="formattedRows[virtualRow.index].getIsExpanded()"
               :style="{
-                transform: `translateY(${virtualRow.start + 26})`,
+                transform: `translateY(${virtualRow.start + 26}px)`,
                 position: 'relative',
                 width: '100%',
               }"
@@ -248,7 +259,11 @@ const setSorting = (sortingUpdater: any) => {
   sorting.value = newSortVal;
 };
 
+const tableBodyRef = ref<any>(null);
+
 const columnResizeMode = "onChange";
+
+const tableRowSize = ref(0);
 
 const columnResizeDirection = "ltr";
 
@@ -291,6 +306,10 @@ const table = useVueTable({
   debugColumns: true,
   columnResizeMode,
   enableColumnResizing: true,
+  onStateChange: async (state) => {
+    await nextTick();
+    tableRowSize.value = tableBodyRef.value.children[0]?.scrollWidth;
+  },
 });
 
 const columnSizeVars = computed(() => {
@@ -371,7 +390,10 @@ const handleDragStart = (event: any) => {
 };
 
 const handleDragEnd = async (event: any) => {
-  if (columnOrder.value[0] !== "timestamp") {
+  if (
+    columnOrder.value.includes("timestamp") &&
+    columnOrder.value[0] !== "timestamp"
+  ) {
     await nextTick();
     const newItem = columnOrder.value[event.newIndex];
     columnOrder.value[event.newIndex] = columnOrder.value[event.oldIndex];
@@ -417,7 +439,7 @@ const handleDragEnd = async (event: any) => {
 }
 
 .container {
-  height: 600px;
+  height: calc(100vh - 294px);
   overflow: auto;
 }
 
