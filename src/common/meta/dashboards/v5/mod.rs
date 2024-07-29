@@ -155,7 +155,7 @@ pub enum AggregationFunc {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "filter_type", rename_all = "camelCase")]
+#[serde(tag = "filterType")]
 pub enum PanelFilter {
     #[serde(rename = "condition")]
     Condition(FilterCondition),
