@@ -112,7 +112,7 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
-    pub filter: PanelFilter,
+    pub filter: FilterCondition,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -154,23 +154,23 @@ pub enum AggregationFunc {
     P99,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "filter_type", rename_all = "camelCase")]
-pub enum PanelFilter {
-    #[serde(rename = "condition")]
-    Condition(FilterCondition),
+// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+// #[serde(tag = "filter_type", rename_all = "camelCase")]
+// pub enum PanelFilter {
+//     #[serde(rename = "condition")]
+//     Condition(FilterCondition),
     
-    #[serde(rename = "group")]
-    Group(GroupType),
-}
+//     #[serde(rename = "group")]
+//     Group(GroupType),
+// }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct GroupType {
-    pub filter_type: String,
-    pub logical_operator: String,
-    pub conditions: Vec<PanelFilter>,
-}
+// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+// #[serde(rename_all = "camelCase")]
+// pub struct GroupType {
+//     pub filter_type: String,
+//     pub logical_operator: String,
+//     pub conditions: Vec<PanelFilter>,
+// }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -183,6 +183,7 @@ pub struct FilterCondition {
     pub value: Option<String>,
     pub logical_operator: String,
     pub filter_type: String,
+    pub conditions: Vec<FilterCondition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
