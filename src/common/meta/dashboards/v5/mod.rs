@@ -112,8 +112,7 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filter: Option<FilterCondition>,
+    pub filter: PanelFilter,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -155,43 +154,35 @@ pub enum AggregationFunc {
     P99,
 }
 
-// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-// #[serde(tag = "filter_type", rename_all = "camelCase")]
-// pub enum PanelFilter {
-//     #[serde(rename = "condition")]
-//     Condition(FilterCondition),
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(untagged, rename_all = "camelCase")]
+pub enum PanelFilter {
+    #[serde(rename = "condition")]
+    Condition(FilterCondition),
     
-//     #[serde(rename = "group")]
-//     Group(GroupType),
-// }
+    #[serde(rename = "group")]
+    Group(GroupType),
+}
 
-// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-// #[serde(rename_all = "camelCase")]
-// pub struct GroupType {
-//     pub filter_type: String,
-//     pub logical_operator: String,
-//     pub conditions: Vec<PanelFilter>,
-// }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupType {
+    pub filter_type: String,
+    pub logical_operator: String,
+    pub conditions: Vec<PanelFilter>,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "type")]
-    pub typ: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub values: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub column: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub typ: String,
+    pub values: Vec<String>,
+    pub column: String,
     pub operator: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logical_operator: Option<String>,
+    pub logical_operator: String,
     pub filter_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub conditions: Option<Vec<FilterCondition>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
