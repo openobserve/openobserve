@@ -177,6 +177,7 @@ impl FileData {
             need_release_size
         );
         let mut release_size = 0;
+        let mut remove_result_files = vec![];
         loop {
             let item = self.data.remove();
             if item.is_none() {
@@ -199,6 +200,14 @@ impl FileData {
                     file_path,
                     e
                 );
+            }
+            if key.starts_with("results/") {
+                let columns = key.split('/').collect::<Vec<&str>>();
+                let query_key = format!(
+                    "{}_{}_{}_{}",
+                    columns[1], columns[2], columns[3], columns[4]
+                );
+                remove_result_files.push(query_key);
             }
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
@@ -223,10 +232,19 @@ impl FileData {
             }
         }
         self.cur_size -= release_size;
+
+        if !remove_result_files.is_empty() {
+            let mut r = QUERY_RESULT_CACHE.write().await;
+            for query_key in remove_result_files {
+                r.remove(&query_key);
+            }
+            drop(r);
+        }
         log::info!(
             "[trace_id {trace_id}] File disk cache gc done, released {} bytes",
             release_size
         );
+
         Ok(())
     }
 

@@ -117,7 +117,7 @@ export function convertDashboardSchemaVersion(data: any) {
             }
 
             // Move excess x-axis fields to breakdown
-            if (queryItem.fields.x.length > 1 && queryItem.type != "table") {
+            if (queryItem.fields.x.length > 1 && panelItem.type != "table") {
               queryItem.fields.breakdown.push(...queryItem.fields.x.slice(1));
               queryItem.fields.x = [queryItem.fields.x[0]];
             }

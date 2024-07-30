@@ -882,6 +882,7 @@
     "status": "Status",
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
-    "refreshQuery": "Refresh Query"
+    "refreshQuery": "Refresh Query",
+    "queryType": "Query Type"
   }
 }

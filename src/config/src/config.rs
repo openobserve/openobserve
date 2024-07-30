@@ -558,8 +558,6 @@ pub struct Common {
     pub bloom_filter_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
     pub bloom_filter_disabled_on_search: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_ON_ALL_FIELDS", default = false)]
-    pub bloom_filter_on_all_fields: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(

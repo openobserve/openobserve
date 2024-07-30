@@ -75,25 +75,10 @@ pub fn new_parquet_writer<'a>(
         bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
     }
     if cfg.common.bloom_filter_enabled {
-        // if bloom_filter_on_all_fields is true, then use all string fields
-        let fields = if cfg.common.bloom_filter_on_all_fields {
-            schema
-                .fields()
-                .iter()
-                .filter(|f| {
-                    f.data_type() == &arrow::datatypes::DataType::Utf8
-                        && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(f.name())
-                        && !full_text_search_fields.contains(f.name())
-                })
-                .map(|f| f.name().to_string())
-                .collect::<Vec<_>>()
-        } else {
-            let mut fields = bloom_filter_fields.to_vec();
-            fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
-            fields.sort();
-            fields.dedup();
-            fields
-        };
+        let mut fields = bloom_filter_fields.to_vec();
+        fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+        fields.sort();
+        fields.dedup();
         for field in fields {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(field.as_str().into(), true)
