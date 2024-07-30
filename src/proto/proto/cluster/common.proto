@@ -23,12 +23,14 @@ message FileMeta {
 }
 
 enum StreamType {
-    LOGS     = 0;
-    METRICS  = 1;
-    TRACES   = 2;
-    METADATA = 3;
-    FILELIST = 4;
-    INDEX    = 5;
+    LOGS             = 0;
+    METRICS          = 1;
+    TRACES           = 2;
+    METADATA         = 3;
+    EnrichmentTables = 4;
+    FILELIST         = 5;
+    INDEX            = 6;
+
 }
 
 // Search request type

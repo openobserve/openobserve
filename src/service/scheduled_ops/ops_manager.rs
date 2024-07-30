@@ -425,7 +425,6 @@ async fn handle_derived_stream_triggers(
     let pipeline_name = columns[2];
     let name = columns[3];
 
-    // QUESTION(taiming): should derived_stream be realtime, silenced?
     let is_real_time = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
     if is_real_time && is_silenced {
@@ -469,7 +468,7 @@ async fn handle_derived_stream_triggers(
     };
 
     let next_run_at = now
-        + Duration::try_seconds(derived_stream.trigger_condition.frequency)
+        + Duration::try_minutes(derived_stream.trigger_condition.frequency)
             .unwrap()
             .num_microseconds()
             .unwrap();

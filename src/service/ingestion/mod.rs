@@ -30,6 +30,7 @@ use config::{
     utils::{flatten, json::*},
     SIZE_IN_MB,
 };
+use proto::cluster_rpc::IngestionType;
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -44,6 +45,7 @@ use crate::{
         },
         meta::{
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+            ingestion::IngestionRequest,
             scheduled_ops::alerts::Alert,
             stream::{SchemaRecords, StreamParams},
         },
@@ -53,6 +55,7 @@ use crate::{
 };
 
 pub mod grpc;
+pub mod ingestion_service;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -572,6 +575,20 @@ pub async fn get_user_defined_schema(
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }
         }
+    }
+}
+
+// TODO(taiming) -> better error handling
+pub fn create_log_ingestion_req<'a>(
+    ingestion_type: i32,
+    data: &'a actix_web::web::Bytes,
+) -> IngestionRequest {
+    match IngestionType::try_from(ingestion_type) {
+        Ok(IngestionType::Json) => IngestionRequest::JSON(data),
+        Ok(IngestionType::Multi) => IngestionRequest::Multi(data),
+        Ok(IngestionType::Usage) => IngestionRequest::Usage(data),
+        Ok(IngestionType::Rum) => IngestionRequest::RUM(data),
+        _ => todo!("Future improvement"),
     }
 }
 
