@@ -875,7 +875,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.breakdown = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions = [];
+        ].fields.filter = {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [],
+        };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queries?.forEach((query: any) => {
@@ -1040,7 +1044,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     // Ensure the filter array is initialized
     if (!currentQuery.fields.filter) {
-      currentQuery.fields.filter = [];
+      currentQuery.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      };
     }
 
     // Add the new filter item
@@ -2107,7 +2115,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     query += ` FROM "${stream}"`;
 
     // Adding filter conditions
-    const filterData = queryData.fields.filter || [];
+    const filterData = queryData.fields.filter || {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: []
+    };
     const filterConditions = filterData.map((field: any) => {
       let selectFilter = "";
       if (field.type === "list" && field.values?.length > 0) {

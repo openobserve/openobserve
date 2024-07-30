@@ -132,23 +132,30 @@ export function convertDashboardSchemaVersion(data: any) {
       data.tabs.forEach((tabItem: any) => {
         tabItem.panels.forEach((panelItem: any) => {
           panelItem.queries.forEach((queryItem: any) => {
-            if (queryItem.fields.filter && queryItem.fields.filter.length > 0) {
-              const newFilter = {
-                filterType: "group",
-                logicalOperator: "AND",
-                conditions: queryItem.fields.filter.map((filter: any) => ({
-                  type: filter.type,
-                  values: filter.values,
-                  column: filter.column,
-                  operator: filter.operator,
-                  value: filter.value,
+            if (queryItem.fields.filter) {
+              if (queryItem.fields.filter.length > 0) {
+                const newFilter = {
+                  filterType: "group",
                   logicalOperator: "AND",
-                  filterType: "condition",
-                })),
-              };
-              console.log("newFilter", newFilter);
-              
-              queryItem.fields.filter = newFilter;
+                  conditions: queryItem.fields.filter.map((filter: any) => ({
+                    type: filter.type,
+                    values: filter.values,
+                    column: filter.column,
+                    operator: filter.operator,
+                    value: filter.value,
+                    logicalOperator: "AND",
+                    filterType: "condition",
+                  })),
+                };
+                queryItem.fields.filter = newFilter;
+              } else {
+                // Handle the case where filter is an empty array
+                queryItem.fields.filter = {
+                  filterType: "group",
+                  logicalOperator: "AND",
+                  conditions: [],
+                };
+              }
             }
           });
         });
