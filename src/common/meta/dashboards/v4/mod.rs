@@ -189,6 +189,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     drilldown: Option<Vec<DrillDown>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    mark_line: Option<Vec<MarkLine>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     no_value_replacement: Option<String>,
@@ -210,6 +212,19 @@ pub struct DrillDown {
     find_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<DrillDownData>,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkLine {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    typee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
