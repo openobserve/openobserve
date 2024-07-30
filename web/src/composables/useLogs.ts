@@ -1224,7 +1224,8 @@ const useLogs = () => {
             .catch((err: any) => {
               searchObj.loading = false;
               let trace_id = "";
-              searchObj.data.errorMsg = "Error while processing partition request.";
+              searchObj.data.errorMsg =
+                "Error while processing partition request.";
               if (err.response != undefined) {
                 searchObj.data.errorMsg = err.response.data.error;
                 if (err.response.data.hasOwnProperty("trace_id")) {
@@ -1241,8 +1242,7 @@ const useLogs = () => {
 
               if (err?.request?.status >= 429) {
                 notificationMsg.value = err?.response?.data?.message;
-                searchObj.data.errorMsg =
-                  err?.response?.data?.message;
+                searchObj.data.errorMsg = err?.response?.data?.message;
               }
 
               if (trace_id) {
@@ -1668,7 +1668,53 @@ const useLogs = () => {
             searchObj.data.resultGrid.currentPage == 1)
         ) {
           if (searchObj.data.queryResults.hits.length > 0) {
-            await getHistogramQueryData(searchObj.data.histogramQuery);
+            if (searchObj.data.stream.selectedStream.length > 1) {
+              searchObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {
+                  title: getHistogramTitle(),
+                  unparsed_x_data: [],
+                  timezone: "",
+                },
+                errorCode: 0,
+                errorMsg: "Histogram is not available for multi stream search.",
+                errorDetail: "",
+              };
+            } else {
+              // console.log(searchObj.data.queryResults.partitionDetail.paginations)
+              searchObjDebug["histogramStartTime"] = performance.now();
+              searchObj.data.histogram.errorMsg = "";
+              searchObj.data.histogram.errorCode = 0;
+              searchObj.data.histogram.errorDetail = "";
+              searchObj.loadingHistogram = true;
+
+              const parsedSQL: any = fnParsedSQL();
+              searchObj.data.queryResults.aggs = [];
+
+              const partitions =
+                searchObj.data.queryResults.partitionDetail.partitions;
+              for (const partition of partitions) {
+                searchObj.data.histogramQuery.query.start_time = partition[0];
+                searchObj.data.histogramQuery.query.end_time = partition[1];
+                await getHistogramQueryData(searchObj.data.histogramQuery);
+                setTimeout(async () => {
+                  await generateHistogramData();
+
+                  let regeratePaginationFlag = false;
+                  if (
+                    searchObj.data.queryResults.aggs.length !=
+                    searchObj.meta.resultGrid.rowsPerPage
+                  ) {
+                    regeratePaginationFlag = true;
+                  }
+                  // if total records in partition is greate than recordsPerPage then we need to update pagination
+                  // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+                  refreshPartitionPagination(regeratePaginationFlag);
+                }, 100);
+              }
+              searchObj.loadingHistogram = false;
+            }
           }
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
@@ -1872,7 +1918,8 @@ const useLogs = () => {
         .catch((err) => {
           searchObj.loading = false;
           let trace_id = "";
-          searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+          searchObj.data.countErrorMsg =
+            "Error while retrieving total events: ";
           if (err.response != undefined) {
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
@@ -1890,13 +1937,11 @@ const useLogs = () => {
 
           if (err?.request?.status >= 429) {
             notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.countErrorMsg +=
-              err?.response?.data?.message;
+            searchObj.data.countErrorMsg += err?.response?.data?.message;
           }
 
           if (trace_id) {
-            searchObj.data.countErrorMsg +=
-              " TraceID:" + trace_id;
+            searchObj.data.countErrorMsg += " TraceID:" + trace_id;
             notificationMsg.value += " TraceID:" + trace_id;
             trace_id = "";
           }
@@ -2153,9 +2198,9 @@ const useLogs = () => {
           searchObj.loading = false;
           let trace_id = "";
           searchObj.data.errorMsg =
-                typeof err == "string" && err
-                  ? err
-                  : "Error while processing histogram request.";
+            typeof err == "string" && err
+              ? err
+              : "Error while processing histogram request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
             if (err.response.data.hasOwnProperty("trace_id")) {
@@ -2179,8 +2224,7 @@ const useLogs = () => {
 
           if (err?.request?.status >= 429) {
             notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg =
-              err?.response?.data?.message;
+            searchObj.data.errorMsg = err?.response?.data?.message;
           }
 
           if (trace_id) {
@@ -2223,145 +2267,101 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
-        if (searchObj.data.stream.selectedStream.length > 1) {
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {
-              title: getHistogramTitle(),
-              unparsed_x_data: [],
-              timezone: "",
+        const { traceparent, traceId } = generateTraceContext();
+        addTraceId(traceId);
+        queryReq.query.size = -1;
+
+        searchService
+          .search(
+            {
+              org_identifier: searchObj.organizationIdetifier,
+              query: queryReq,
+              page_type: searchObj.data.stream.streamType,
+              traceparent,
             },
-            errorCode: 0,
-            errorMsg: "Histogram is not available for multi stream search.",
-            errorDetail: "",
-          };
-        } else {
-          searchObjDebug["histogramStartTime"] = performance.now();
-          searchObj.data.histogram.errorMsg = "";
-          searchObj.data.histogram.errorCode = 0;
-          searchObj.data.histogram.errorDetail = "";
-          searchObj.loadingHistogram = true;
-          queryReq.query.size = -1;
-          const parsedSQL: any = fnParsedSQL();
+            "UI"
+          )
+          .then(async (res: any) => {
+            removeTraceId(traceId);
+            searchObjDebug["histogramProcessingStartTime"] = performance.now();
+            searchObj.loading = false;
+            searchObj.data.queryResults.aggs.push(...res.data.hits);
+            searchObj.data.queryResults.scan_size += res.data.scan_size;
+            searchObj.data.queryResults.took += res.data.took;
+            searchObj.data.queryResults.result_cache_ratio +=
+              res.data.result_cache_ratio;
+            // if (hasAggregationFlag) {
+            //   searchObj.data.queryResults.total = res.data.total;
+            // }
 
-          // let hasAggregationFlag = false;
-          // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-          //   hasAggregationFlag = hasAggregation(parsedSQL?.columns);
-          //   if (hasAggregationFlag) {
-          //     queryReq.query.track_total_hits = true;
-          //   }
-          // }
+            //searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
-          const { traceparent, traceId } = generateTraceContext();
-          addTraceId(traceId);
-
-          searchService
-            .search(
-              {
-                org_identifier: searchObj.organizationIdetifier,
-                query: queryReq,
-                page_type: searchObj.data.stream.streamType,
-                traceparent,
-              },
-              "UI"
-            )
-            .then(async (res) => {
-              removeTraceId(traceId);
-              searchObjDebug["histogramProcessingStartTime"] =
-                performance.now();
-              searchObj.loading = false;
-              searchObj.data.queryResults.aggs = res.data.hits;
-              searchObj.data.queryResults.scan_size = res.data.scan_size;
-              searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.result_cache_ratio +=
-                res.data.result_cache_ratio;
-              // if (hasAggregationFlag) {
-              //   searchObj.data.queryResults.total = res.data.total;
-              // }
-              await generateHistogramData();
-
-              let regeratePaginationFlag = false;
-              if (
-                res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage
-              ) {
-                regeratePaginationFlag = true;
+            searchObjDebug["histogramProcessingEndTime"] = performance.now();
+            searchObjDebug["histogramEndTime"] = performance.now();
+            console.log(
+              `Histogram processing after data received took ${
+                searchObjDebug["histogramProcessingEndTime"] -
+                searchObjDebug["histogramProcessingStartTime"]
+              } milliseconds to complete`
+            );
+            console.log(
+              `Entire Histogram took ${
+                searchObjDebug["histogramEndTime"] -
+                searchObjDebug["histogramStartTime"]
+              } milliseconds to complete`
+            );
+            console.log("=================== End Debug ===================");
+            dismiss();
+            resolve(true);
+          })
+          .catch((err) => {
+            searchObj.loadingHistogram = false;
+            let trace_id = "";
+            searchObj.data.histogram.errorMsg =
+              typeof err == "string" && err
+                ? err
+                : "Error while processing histogram request.";
+            if (err.response != undefined) {
+              searchObj.data.histogram.errorMsg = err.response.data.error;
+              if (err.response.data.hasOwnProperty("trace_id")) {
+                trace_id = err.response.data?.trace_id;
               }
-              // if total records in partition is greate than recordsPerPage then we need to update pagination
-              // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-              refreshPartitionPagination(regeratePaginationFlag);
-
-              //searchObj.data.histogram.chartParams.title = getHistogramTitle();
-              searchObj.loadingHistogram = false;
-
-              searchObjDebug["histogramProcessingEndTime"] = performance.now();
-              searchObjDebug["histogramEndTime"] = performance.now();
-              console.log(
-                `Histogram processing after data received took ${
-                  searchObjDebug["histogramProcessingEndTime"] -
-                  searchObjDebug["histogramProcessingStartTime"]
-                } milliseconds to complete`
-              );
-              console.log(
-                `Entire Histogram took ${
-                  searchObjDebug["histogramEndTime"] -
-                  searchObjDebug["histogramStartTime"]
-                } milliseconds to complete`
-              );
-              console.log("=================== End Debug ===================");
-              dismiss();
-              resolve(true);
-            })
-            .catch((err) => {
-              searchObj.loadingHistogram = false;
-              let trace_id = "";
-              searchObj.data.histogram.errorMsg =
-                typeof err == "string" && err
-                  ? err
-                  : "Error while processing histogram request.";
-              if (err.response != undefined) {
-                searchObj.data.histogram.errorMsg = err.response.data.error;
-                if (err.response.data.hasOwnProperty("trace_id")) {
-                  trace_id = err.response.data?.trace_id;
-                }
-              } else {
-                searchObj.data.histogram.errorMsg = err.message;
-                if (err.hasOwnProperty("trace_id")) {
-                  trace_id = err?.trace_id;
-                }
+            } else {
+              searchObj.data.histogram.errorMsg = err.message;
+              if (err.hasOwnProperty("trace_id")) {
+                trace_id = err?.trace_id;
               }
+            }
 
-              const customMessage = logsErrorMessage(err?.response?.data.code);
-              searchObj.data.histogram.errorCode = err?.response?.data.code;
+            const customMessage = logsErrorMessage(err?.response?.data.code);
+            searchObj.data.histogram.errorCode = err?.response?.data.code;
+            searchObj.data.histogram.errorDetail =
+              err?.response?.data?.error_detail;
+
+            if (customMessage != "") {
+              searchObj.data.histogram.errorMsg = t(customMessage);
+            }
+
+            notificationMsg.value = searchObj.data.histogram.errorMsg;
+
+            if (err?.request?.status >= 429) {
+              notificationMsg.value = err?.response?.data?.message;
+              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
               searchObj.data.histogram.errorDetail =
                 err?.response?.data?.error_detail;
+            }
 
-              if (customMessage != "") {
-                searchObj.data.histogram.errorMsg = t(customMessage);
-              }
+            if (trace_id) {
+              searchObj.data.histogram.errorMsg +=
+                " <br><span class='text-subtitle1'>TraceID:" +
+                trace_id +
+                "</span>";
+              notificationMsg.value += " TraceID:" + trace_id;
+              trace_id = "";
+            }
 
-              notificationMsg.value = searchObj.data.histogram.errorMsg;
-
-              if (err?.request?.status >= 429) {
-                notificationMsg.value = err?.response?.data?.message;
-                searchObj.data.histogram.errorMsg =
-                  err?.response?.data?.message;
-                searchObj.data.histogram.errorDetail =
-                  err?.response?.data?.error_detail;
-              }
-
-              if (trace_id) {
-                searchObj.data.histogram.errorMsg +=
-                  " <br><span class='text-subtitle1'>TraceID:" +
-                  trace_id +
-                  "</span>";
-                notificationMsg.value += " TraceID:" + trace_id;
-                trace_id = "";
-              }
-
-              reject(false);
-            });
-        }
+            reject(false);
+          });
       } catch (e: any) {
         dismiss();
         searchObj.data.histogram.errorMsg = e.message;
@@ -3094,6 +3094,8 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
+      console.log(searchObj.data.histogram);
+      return true;
     } catch (e: any) {
       console.log("Error while generating histogram data", e);
       notificationMsg.value = "Error while generating histogram data.";
@@ -3294,8 +3296,7 @@ const useLogs = () => {
 
           if (err?.request?.status >= 429) {
             notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg =
-              err?.response?.data?.message;
+            searchObj.data.errorMsg = err?.response?.data?.message;
           }
 
           if (trace_id) {
