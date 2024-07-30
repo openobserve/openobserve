@@ -1668,6 +1668,88 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     updateQueryValue();
   };
 
+  const buildWhereClause = (filterData: any) => {
+    const buildCondition = (condition: any) => {
+      if (condition.filterType === "group") {
+        const groupConditions = condition.conditions
+          .map(buildCondition)
+          .filter(Boolean);
+        const logicalOperators = condition.conditions
+          .map((c: any) => c.logicalOperator)
+          .filter(Boolean);
+
+        let groupQuery = "";
+        groupConditions.forEach((cond: any, index: any) => {
+          if (index > 0) {
+            groupQuery += ` ${logicalOperators[index]} `;
+          }
+          groupQuery += cond;
+        });
+
+        return groupConditions.length ? `(${groupQuery})` : "";
+      } else if (condition.type === "list" && condition.values?.length > 0) {
+        return `${condition.column} IN (${condition.values
+          .map((value: any) => `'${value}'`)
+          .join(", ")})`;
+      } else if (condition.type === "condition" && condition.operator != null) {
+        let selectFilter = `${condition.column} `;
+        if (["Is Null", "Is Not Null"].includes(condition.operator)) {
+          switch (condition.operator) {
+            case "Is Null":
+              selectFilter += `IS NULL`;
+              break;
+            case "Is Not Null":
+              selectFilter += `IS NOT NULL`;
+              break;
+          }
+        } else if (condition.value != null && condition.value != "") {
+          switch (condition.operator) {
+            case "=":
+            case "<>":
+            case "<":
+            case ">":
+            case "<=":
+            case ">=":
+              selectFilter += `${condition.operator} ${condition.value}`;
+              break;
+            case "Contains":
+              selectFilter += `LIKE '%${condition.value}%'`;
+              break;
+            case "Not Contains":
+              selectFilter += `NOT LIKE '%${condition.value}%'`;
+              break;
+            default:
+              selectFilter += `${condition.operator} ${condition.value}`;
+              break;
+          }
+        }
+        return selectFilter;
+      }
+      return "";
+    };
+
+    const whereConditions = filterData.map(buildCondition).filter(Boolean);
+
+    const logicalOperators = filterData.map((it: any) => it.logicalOperator);
+
+    if (whereConditions.length > 0) {
+      return ` WHERE ${whereConditions
+        .map((cond: any, index: any) => {
+          const logicalOperator =
+            index < logicalOperators.length && logicalOperators[index + 1]
+              ? logicalOperators[index + 1]
+              : "";
+
+          return index < logicalOperators.length
+            ? `${cond} ${logicalOperator}`
+            : cond;
+        })
+        .join(" ")}`;
+    }
+
+    return "";
+  };
+
   const sqlchart = () => {
     // STEP 1: first check if there is at least 1 field selected
     if (
@@ -1774,89 +1856,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }" `;
 
     // Add the AND/OR condition logic
-    const buildCondition = (condition: any) => {
-      if (condition.filterType === "group") {
-        const groupConditions = condition.conditions
-          .map(buildCondition)
-          .filter(Boolean);
-        const logicalOperators = condition.conditions
-          .map((c: any) => c.logicalOperator)
-          .filter(Boolean);
-        // console.log("groupConditions", groupConditions, logicalOperators);
+    const filterData =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.filter.conditions;
 
-        let groupQuery = "";
-        groupConditions.forEach((cond: any, index: any) => {
-          // console.log("groupConditions cond", cond, index);
-
-          if (index > 0) {
-            groupQuery += ` ${logicalOperators[index]} `;
-          }
-          groupQuery += cond;
-        });
-
-        return groupConditions.length ? `(${groupQuery})` : "";
-      } else if (condition.type === "list" && condition.values?.length > 0) {
-        return `${condition.column} IN (${condition.values
-          .map((value: any) => `'${value}'`)
-          .join(", ")})`;
-      } else if (condition.type === "condition" && condition.operator != null) {
-        let selectFilter = `${condition.column} `;
-        if (["Is Null", "Is Not Null"].includes(condition.operator)) {
-          switch (condition.operator) {
-            case "Is Null":
-              selectFilter += `IS NULL`;
-              break;
-            case "Is Not Null":
-              selectFilter += `IS NOT NULL`;
-              break;
-          }
-        } else if (condition.value != null && condition.value != "") {
-          switch (condition.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${condition.operator} ${condition.value}`;
-              break;
-            case "Contains":
-              selectFilter += `LIKE '%${condition.value}%'`;
-              break;
-            case "Not Contains":
-              selectFilter += `NOT LIKE '%${condition.value}%'`;
-              break;
-            default:
-              selectFilter += `${condition.operator} ${condition.value}`;
-              break;
-          }
-        }
-        return selectFilter;
-      }
-      return "";
-    };
-
-    const whereConditions = filter.map(buildCondition).filter(Boolean);
-
-    const logicalOperators = filter.map((it: any) => it.logicalOperator);
-    // console.log("whereConditions", whereConditions, logicalOperators);
-
-    if (whereConditions.length > 0) {
-      query += ` WHERE ${whereConditions
-        .map((cond, index) => {
-          // console.log("cond", cond, index);
-
-          const logicalOperator =
-            index < logicalOperators.length && logicalOperators[index + 1]
-              ? logicalOperators[index + 1]
-              : "";
-
-          return index < logicalOperators.length
-            ? `${cond} ${logicalOperator}`
-            : cond;
-        })
-        .join(" ")}`;
-    }
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
     // add group by statement
     const xAxisAlias = dashboardPanelData.data.queries[
@@ -1966,55 +1972,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const filterData =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter;
+      ].fields.filter.conditions;
 
-    const filterItems = filterData.map((field: any) => {
-      let selectFilter = "";
-      // Handle different filter types and operators
-      if (field.type == "list" && field.values?.length > 0) {
-        selectFilter += `${field.column} IN (${field.values
-          .map((it: any) => `'${it}'`)
-          .join(", ")})`;
-      } else if (field.type == "condition" && field.operator != null) {
-        selectFilter += `${field?.column} `;
-        if (["Is Null", "Is Not Null"].includes(field.operator)) {
-          switch (field?.operator) {
-            case "Is Null":
-              selectFilter += `IS NULL`;
-              break;
-            case "Is Not Null":
-              selectFilter += `IS NOT NULL`;
-              break;
-          }
-        } else if (field.value != null && field.value != "") {
-          switch (field.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${field?.operator} ${field?.value}`;
-              break;
-            case "Contains":
-              selectFilter += `LIKE '%${field.value}%'`;
-              break;
-            case "Not Contains":
-              selectFilter += `NOT LIKE '%${field.value}%'`;
-              break;
-            default:
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-          }
-        }
-      }
-      return selectFilter;
-    });
-
-    const whereClause = filterItems.filter((it: any) => it).join(" AND ");
-    if (whereClause) {
-      query += ` WHERE ${whereClause} `;
-    }
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
     // Group By clause
     let aliases: any = [];
@@ -2115,51 +2076,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     query += ` FROM "${stream}"`;
 
     // Adding filter conditions
-    const filterData = queryData.fields.filter || {
-      filterType: "group",
-      logicalOperator: "AND",
-      conditions: [],
-    };
-    const filterConditions = filterData.map((field: any) => {
-      let selectFilter = "";
-      if (field.type === "list" && field.values?.length > 0) {
-        selectFilter += `${field.column} IN (${field.values
-          .map((it: string) => `'${it}'`)
-          .join(", ")})`;
-      } else if (field.type === "condition" && field.operator != null) {
-        selectFilter += `${field.column} `;
-        if (["Is Null", "Is Not Null"].includes(field.operator)) {
-          selectFilter +=
-            field.operator === "Is Null" ? "IS NULL" : "IS NOT NULL";
-        } else if (field.value != null && field.value !== "") {
-          switch (field.operator) {
-            case "=":
-            case "<>":
-            case "<":
-            case ">":
-            case "<=":
-            case ">=":
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-            case "Contains":
-              selectFilter += `LIKE '%${field.value}%'`;
-              break;
-            case "Not Contains":
-              selectFilter += `NOT LIKE '%${field.value}%'`;
-              break;
-            default:
-              selectFilter += `${field.operator} ${field.value}`;
-              break;
-          }
-        }
-      }
-      return selectFilter;
-    });
+    const filterData = queryData.fields.filter.conditions;
 
-    // Adding filter conditions to the query
-    if (filterConditions.length > 0) {
-      query += " WHERE " + filterConditions.join(" AND ");
-    }
+    const whereClause = buildWhereClause(filterData);
+    query += whereClause;
 
     // Group By clause
     let aliases: any = [];
