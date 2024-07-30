@@ -176,14 +176,21 @@ pub enum AggregationFunc {
 #[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type")]
-    pub typ: String,
-    pub values: Vec<String>,
-    pub column: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub typ: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub values: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub operator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
-    pub logical_operator: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logical_operator: Option<String>,
     pub filter_type: String,
-    pub conditions: Vec<FilterCondition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conditions: Option<Vec<FilterCondition>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
