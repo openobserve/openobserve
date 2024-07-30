@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use config::{ider, meta::stream::StreamType, utils::rand::generate_random_string};
 
 use super::users::{add_admin_to_org, get_user};
@@ -22,7 +24,7 @@ use crate::{
         meta::{
             organization::{
                 IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-                RumIngestionToken, CUSTOM, DEFAULT_ORG,
+                OrganizationInvites, RumIngestionToken, CUSTOM, DEFAULT_ORG,
             },
             user::{UserOrg, UserRole},
         },
@@ -229,6 +231,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
         } else {
             CUSTOM.to_owned()
         },
+        invites: None,
     };
     match db::organization::set(org).await {
         Ok(_) => {
@@ -285,6 +288,70 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
             log::error!("Error deleting org: {}", e);
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
+    }
+}
+
+pub async fn generate_invitation(
+    org_id: &str,
+    user_email: &str,
+    invites: OrganizationInvites,
+) -> Result<String, anyhow::Error> {
+    if !is_root_user(user_email) {
+        match get_user(Some(org_id), user_email).await {
+            Some(user) => {
+                if !(user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)) {
+                    return Err(anyhow::anyhow!("Unauthorized access"));
+                }
+            }
+            None => return Err(anyhow::anyhow!("Unauthorized access")),
+        }
+    }
+    if let Some(mut org) = get_org(org_id).await {
+        let invite_token = config::ider::generate();
+        if let Some(invites_map) = org.invites.as_mut() {
+            invites_map.insert(invite_token, invites);
+        } else {
+            let mut invites_map = HashMap::new();
+            invites_map.insert(invite_token, invites);
+            org.invites = Some(invites_map);
+        }
+        match db::organization::set(&org).await {
+            Ok(_) => Ok(invite_token.clone()),
+            Err(e) => {
+                log::error!("Error creating org member invitation: {}", e);
+                Err(anyhow::anyhow!("Error creating invitation: {}", e))
+            }
+        }
+        Ok("".to_string())
+    } else {
+        Err(anyhow::anyhow!("Organization doesn't exist"))
+    }
+}
+
+pub async fn accept_invitation(
+    org_id: &str,
+    user_email: &str,
+    invite_token: &str,
+) -> Result<(), anyhow::Error> {
+    if let Some(mut org) = get_org(org_id).await {
+        let invite_token = config::ider::generate();
+        if let Some(invites_map) = org.invites.as_mut() {
+            invites_map.insert(invite_token, invites);
+        } else {
+            let mut invites_map = HashMap::new();
+            invites_map.insert(invite_token, invites);
+            org.invites = Some(invites_map);
+        }
+        match db::organization::set(&org).await {
+            Ok(_) => Ok(invite_token.clone()),
+            Err(e) => {
+                log::error!("Error creating org member invitation: {}", e);
+                Err(anyhow::anyhow!("Error creating invitation: {}", e))
+            }
+        }
+        Ok("".to_string())
+    } else {
+        Err(anyhow::anyhow!("Organization doesn't exist"))
     }
 }
 

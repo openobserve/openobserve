@@ -23,8 +23,8 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, THRESHOLD,
+                OrgDetails, OrgUser, Organization, OrganizationInvites, OrganizationResponse,
+                PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{is_root_user, UserEmail},
@@ -338,7 +338,7 @@ async fn create_org(
     }
 }
 
-/// CreateOrganization
+/// RenameOrganization
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -362,6 +362,73 @@ async fn rename_org(
     let (org, new_name) = path.into_inner();
 
     let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
+    match result {
+        Ok(org) => Ok(HttpResponse::Ok().json(org)),
+        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            err.to_string(),
+        ))),
+    }
+}
+
+/// InviteOrganizationMembers
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "InviteOrganizationMembers",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+    )
+)]
+#[put("/{org_id}/generate_invite")]
+async fn generate_org_invite(
+    user_email: UserEmail,
+    path: web::Path<String>,
+    invites: web::Json<OrganizationInvites>,
+) -> Result<HttpResponse, Error> {
+    let org = path.into_inner();
+    let invites = invites.into_inner();
+
+    let result = organization::generate_invitation(&org, &user_email.user_id, invites).await;
+    match result {
+        Ok(org) => Ok(HttpResponse::Ok().json(org)),
+        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            err.to_string(),
+        ))),
+    }
+}
+
+/// InviteOrganizationMembers
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "InviteOrganizationMembers",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+    )
+)]
+#[put("/{org_id}/accept_invite/{invite_token}")]
+async fn accept_org_invite(
+    user_email: UserEmail,
+    path: web::Path<(String, String)>,
+    invites: web::Json<OrganizationInvites>,
+) -> Result<HttpResponse, Error> {
+    let (org, invite_token) = path.into_inner();
+
+    let result = organization::accept_invitation(&org, &user_email.user_id, &invite_token).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

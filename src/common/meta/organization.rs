@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{alerts::alert::Alert, function::Transform};
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::{alerts::alert::Alert, functions::Transform, user::UserRole};
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
@@ -28,6 +31,15 @@ pub struct Organization {
     pub name: String,
     #[serde(default)]
     pub org_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invites: Option<HashMap<String, OrganizationInvites>>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInvites {
+    #[serde(default)]
+    pub invites: Vec<String>, // user emails
+    pub role: UserRole,
 }
 
 #[derive(Serialize, Clone, ToSchema)]
