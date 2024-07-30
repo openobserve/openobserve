@@ -2118,7 +2118,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const filterData = queryData.fields.filter || {
       filterType: "group",
       logicalOperator: "AND",
-      conditions: []
+      conditions: [],
     };
     const filterConditions = filterData.map((field: any) => {
       let selectFilter = "";
@@ -2625,58 +2625,66 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
 
       // if there are filters
+      function validateConditions(
+        conditions: any,
+        errors: any,
+        conditionTabSelected: any,
+      ) {
+        conditions.forEach((it: any) => {
+          if (it.filterType === "condition") {
+            // check if at least 1 item from the list is selected
+            if (it.type == "list" && !it.values?.length) {
+              errors.push(
+                `Filter: ${it.column}: Select at least 1 item from the list`,
+              );
+            }
+
+            if (conditionTabSelected) {
+              // check if condition operator is selected
+              if (it.operator == null) {
+                errors.push(
+                  `Filter: ${it.column}: Operator selection required`,
+                );
+              }
+
+              if (
+                !["Is Null", "Is Not Null"].includes(it.operator) &&
+                (it.value == null || it.value == "")
+              ) {
+                errors.push(`Filter: ${it.column}: Condition value required`);
+              }
+            }
+          } else if (it.filterType === "group") {
+            validateConditions(it.conditions, errors, conditionTabSelected);
+          }
+        });
+      }
+
       if (
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter.conditions.length
       ) {
-        // check if at least 1 item from the list is selected
-        const listFilterError = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions.filter(
-          (it: any) => it.type == "list" && !it.values?.length,
-        );
-        if (listFilterError.length) {
-          errors.push(
-            ...listFilterError.map(
-              (it: any) =>
-                `Filter: ${it.column}: Select at least 1 item from the list`,
-            ),
-          );
-        }
+        // Determine if the condition tab is selected
+        const conditions =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.conditions;
 
-        // check if condition operator is selected
-        const conditionFilterError = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions.filter(
-          (it: any) => it.type == "condition" && it.operator == null,
+        const conditionTabSelected = conditions.some(
+          (it: any) => it.type == "condition",
         );
-        if (conditionFilterError.length) {
-          errors.push(
-            ...conditionFilterError.map(
-              (it: any) => `Filter: ${it.column}: Operator selection required`,
-            ),
-          );
-        }
+        console.log("conditionTabSelected", conditionTabSelected);
 
-        // check if condition value is selected
-        const conditionValueFilterError = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions.filter(
-          (it: any) =>
-            it.type == "condition" &&
-            !["Is Null", "Is Not Null"].includes(it.operator) &&
-            (it.value == null || it.value == ""),
+        // Validate the top-level conditions
+        validateConditions(
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter.conditions,
+          errors,
+          conditionTabSelected,
         );
-        if (conditionValueFilterError.length) {
-          errors.push(
-            ...conditionValueFilterError.map(
-              (it: any) => `Filter: ${it.column}: Condition value required`,
-            ),
-          );
-        }
       }
-
       // check if query syntax is valid
       if (
         dashboardPanelData.data.queries[
