@@ -103,6 +103,7 @@ import {
   PolarComponent,
   VisualMapComponent,
   DataZoomComponent,
+  MarkLineComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
@@ -128,6 +129,7 @@ import type {
   PolarComponentOption,
   VisualMapComponentOption,
   DataZoomComponentOption,
+  MarkLineComponentOption,
 } from "echarts/components";
 
 type ECOption = ComposeOption<
@@ -149,6 +151,7 @@ type ECOption = ComposeOption<
   | PolarComponentOption
   | VisualMapComponentOption
   | DataZoomComponentOption
+  | MarkLineComponentOption
 >;
 
 echarts.use([
@@ -161,6 +164,7 @@ echarts.use([
   PolarComponent,
   VisualMapComponent,
   DataZoomComponent,
+  MarkLineComponent,
   BarChart,
   LineChart,
   CustomChart,

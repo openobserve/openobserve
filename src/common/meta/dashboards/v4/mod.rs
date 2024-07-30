@@ -224,7 +224,7 @@ pub struct MarkLine {
     #[serde(rename = "type")]
     typee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<bool>,
+    value: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
