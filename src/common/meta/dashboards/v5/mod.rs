@@ -112,7 +112,8 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
-    pub filter: FilterCondition,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<FilterCondition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -175,8 +176,8 @@ pub enum AggregationFunc {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
-    #[serde(rename = "type")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
     pub typ: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
