@@ -659,6 +659,8 @@ export const convertSQLData = async (
                 ...defaultSeriesProps,
                 // markLine if exist
                 markLine: {
+                  silent: true,
+                  animation: false,
                   data: getMarkLineData(panelSchema),
                 },
                 // config to connect null values
@@ -689,6 +691,8 @@ export const convertSQLData = async (
             ...defaultSeriesProps,
             // markLine if exist
             markLine: {
+              silent: true,
+              animation: false,
               data: getMarkLineData(panelSchema),
             },
             // config to connect null values
@@ -769,6 +773,8 @@ export const convertSQLData = async (
             ...defaultSeriesProps,
             // markLine if exist
             markLine: {
+              silent: true,
+              animation: false,
               data: getMarkLineData(panelSchema),
             },
             // config to connect null values
@@ -793,6 +799,8 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           // markLine if exist
           markLine: {
+            silent: true,
+            animation: false,
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
@@ -815,6 +823,8 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           // markLine if exist
           markLine: {
+            silent: true,
+            animation: false,
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
@@ -989,6 +999,8 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           // markLine if exist
           markLine: {
+            silent: true,
+            animation: false,
             data: getMarkLineData(panelSchema),
           },
           data: options.xAxis[0].data.map(
@@ -1196,6 +1208,8 @@ export const convertSQLData = async (
           ...defaultSeriesProps,
           // markLine if exist
           markLine: {
+            silent: true,
+            animation: false,
             data: getMarkLineData(panelSchema),
           },
           data: options.xAxis[0].data.map(
