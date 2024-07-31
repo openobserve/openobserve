@@ -55,10 +55,7 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 pub static RE_SELECT_WILDCARD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
-
 pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
-
-static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
@@ -67,9 +64,6 @@ static RE_MATCH_ALL_RAW: Lazy<Regex> =
 static RE_MATCH_ALL_RAW_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-
-pub static _TS_WITH_ALIAS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
 
 pub static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
@@ -135,7 +129,7 @@ impl Sql {
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
 
-        let track_total_hits = req_query.track_total_hits;
+        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
         let fast_mode = !track_total_hits
             && is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
 
@@ -518,32 +512,20 @@ impl Sql {
 
         // Hack for track total hits
         if track_total_hits {
-            let mut sql = "SELECT COUNT(*) as zo_sql_num FROM tbl".to_string();
-
-            if !where_str.is_empty() {
-                match RE_ONLY_WHERE.captures(&sql) {
-                    Some(caps) => {
-                        sql = sql
-                            .replace(&caps[0].to_string(), &format!(" WHERE ({where_str}) AND "));
-                    }
-                    None => {
-                        sql = sql.replace(
-                            &" FROM tbl ".to_string(),
-                            &format!(" FROM tbl WHERE ({where_str}) "),
-                        );
-                    }
-                }
-            }
+            let sql = if where_str.is_empty() {
+                "SELECT COUNT(*) as zo_sql_num FROM tbl".to_string()
+            } else {
+                format!("SELECT COUNT(*) as zo_sql_num FROM tbl WHERE {}", where_str)
+            };
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
                 log::error!(
-                    "sql_meta: parse sql error: {}, sql: {}",
+                    "sql_meta: parse track_total_hits sql error: {}, sql: {}",
                     sql_meta.err().unwrap(),
                     sql
                 );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
-
             origin_sql = sql;
         }
 

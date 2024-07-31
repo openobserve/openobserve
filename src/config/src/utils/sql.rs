@@ -19,12 +19,13 @@ use sqlparser::{
     parser::Parser,
 };
 
-const AGGREGATE_UDF_LIST: [&str; 7] = [
+pub const AGGREGATE_UDF_LIST: [&str; 8] = [
     "min",
     "max",
-    "count",
     "avg",
     "sum",
+    "count",
+    "median",
     "array_agg",
     "approx_percentile_cont",
 ];

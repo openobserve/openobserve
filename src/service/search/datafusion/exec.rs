@@ -22,7 +22,7 @@ use config::{
         search::{SearchType, Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt, sql::AGGREGATE_UDF_LIST},
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -67,16 +67,6 @@ use crate::service::search::{
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
-
-const AGGREGATE_UDF_LIST: [&str; 7] = [
-    "min",
-    "max",
-    "count",
-    "avg",
-    "sum",
-    "array_agg",
-    "approx_percentile_cont",
-];
 
 pub async fn sql(
     session: &SearchSession,
