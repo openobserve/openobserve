@@ -210,7 +210,7 @@ export default defineComponent({
       ">",
       "<",
       "IN",
-      "Match ALL",
+      "match_all",
       "Contains",
       "Not Contains",
       "Is Null",

@@ -1703,7 +1703,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               selectFilter += `IS NOT NULL`;
               break;
           }
-        } else if (condition.operator === "Match ALL") {
+        } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${condition.value})`;
         } else if (condition.value != null && condition.value !== "") {
           selectFilter += `${condition.column} `;
