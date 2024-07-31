@@ -644,6 +644,11 @@ pub async fn values(
         None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
     };
 
+    let query_sql = match query.get("sql") {
+        None => "".to_string(),
+        Some(v) => base64::decode_url(v).unwrap_or("".to_string()),
+    };
+
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -661,7 +666,10 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    if fields.len() == 1 && DISTINCT_FIELDS.contains(&fields[0]) {
+    if fields.len() == 1
+        && DISTINCT_FIELDS.contains(&fields[0])
+        && !query_sql.to_lowercase().contains(" where ")
+    {
         if let Some(v) = query.get("filter") {
             if !v.is_empty() {
                 let column = v.splitn(2, '=').collect::<Vec<_>>();
