@@ -609,6 +609,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
         AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
         AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
+        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
         AggFunction::P50 => format!("approx_percentile_cont(\"{}\", 0.5)", agg.having.column),
         AggFunction::P75 => format!("approx_percentile_cont(\"{}\", 0.75)", agg.having.column),
         AggFunction::P90 => format!("approx_percentile_cont(\"{}\", 0.9)", agg.having.column),

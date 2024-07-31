@@ -260,7 +260,7 @@ impl Sql {
 
         if meta.subquery.is_some() {
             // Hack select in subquery for _timestamp, add _timestamp to select clause
-            let re = Regex::new(r"(?i)\b(avg|count|min|max|sum|group_concat)\b").unwrap();
+            let re = Regex::new(r"(?i)\b(avg|median|count|min|max|sum|group_concat)\b").unwrap();
             let has_aggregate_function = re.is_match(meta.subquery.as_ref().unwrap());
             if !has_aggregate_function && !RE_ONLY_GROUPBY.is_match(meta.subquery.as_ref().unwrap())
             {

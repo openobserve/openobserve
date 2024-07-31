@@ -61,12 +61,13 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
     }
 }
 
-const AGGREGATE_UDF_LIST: [&str; 7] = [
+const AGGREGATE_UDF_LIST: [&str; 8] = [
     "min",
     "max",
     "count",
-    "avg",
     "sum",
+    "avg",
+    "median",
     "array_agg",
     "approx_percentile_cont",
 ];

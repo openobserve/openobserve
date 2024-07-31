@@ -148,6 +148,7 @@ pub enum AggregationFunc {
     Min,
     Max,
     Avg,
+    Median,
     P50,
     P90,
     P95,
