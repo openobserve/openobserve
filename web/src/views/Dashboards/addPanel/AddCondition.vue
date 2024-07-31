@@ -98,11 +98,7 @@
                       dense
                       filled
                       v-model="condition.values"
-                      :options="
-                        dashboardPanelData.meta.filterValue.find(
-                          (it: any) => it.column == condition.column,
-                        )?.value
-                      "
+                      :options="filteredListOptions"
                       :label="t('common.selectFilter')"
                       multiple
                       emit-value
@@ -111,6 +107,8 @@
                         (val: any) =>
                           val.length > 0 || 'At least 1 item required',
                       ]"
+                      use-input
+                      @filter="filterListFn"
                     >
                       <template v-slot:selected>
                         {{
@@ -195,6 +193,19 @@ export default defineComponent({
       update(() => filteredSchemaOptions.value);
     };
 
+    const filteredListOptions = computed(() => {
+      return props.dashboardPanelData.meta.filterValue
+        .find((it: any) => it.column == props.condition.column)
+        ?.value.filter((option: any) =>
+          option.toLowerCase().includes(searchTerm.value.toLowerCase()),
+        );
+    });
+
+    const filterListFn = (search: any, update: any) => {
+      searchTerm.value = search;
+      update(() => filteredListOptions);
+    };
+
     const operators = [
       "=",
       "<>",
@@ -220,6 +231,7 @@ export default defineComponent({
         ? condition.column
         : selectedSchemas.value;
     };
+
     watch(selectedSchemas, (newVal) => {
       if (newVal.length > 0) {
         props.condition.column = newVal;
@@ -247,11 +259,13 @@ export default defineComponent({
       computedLabel,
       t,
       filterStreamFn,
+      filterListFn,
       filterOptions,
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
       filteredSchemaOptions,
+      filteredListOptions,
     };
   },
 });
