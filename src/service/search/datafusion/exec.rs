@@ -76,12 +76,13 @@ use crate::{
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
-const AGGREGATE_UDF_LIST: [&str; 7] = [
+const AGGREGATE_UDF_LIST: [&str; 8] = [
     "min",
     "max",
     "count",
-    "avg",
     "sum",
+    "avg",
+    "median",
     "array_agg",
     "approx_percentile_cont",
 ];
