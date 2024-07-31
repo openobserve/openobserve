@@ -83,14 +83,20 @@ export const convertSQLData = async (
   };
 
   const getMarkLineData = (panelSchema: any) => {
-    return panelSchema.config.mark_line.map((markLine: any) => {
-      return {
-        name: markLine.name,
-        type: markLine.type,
-        xAxis: markLine.type == "xAxis" ? markLine.value : null,
-        yAxis: markLine.type == "yAxis" ? markLine.value : null,
-      };
-    });
+    return (
+      panelSchema?.config?.mark_line?.map((markLine: any) => {
+        return {
+          name: markLine.name,
+          type: markLine.type,
+          xAxis: markLine.type == "xAxis" ? markLine.value : null,
+          yAxis: markLine.type == "yAxis" ? markLine.value : null,
+          label: {
+            formatter: markLine.name ? "{b}:{c}" : "{c}",
+            position: "insideEndTop",
+          },
+        };
+      }) ?? []
+    );
   };
 
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
