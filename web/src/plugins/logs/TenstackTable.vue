@@ -47,8 +47,12 @@
               <div
                 v-if="header.column.getCanResize()"
                 @dblclick="header.column.resetSize()"
-                @mousedown.self="header.getResizeHandler()?.($event)"
-                @touchstart.self="header.getResizeHandler()?.($event)"
+                @mousedown.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
+                @touchstart.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
                 :class="[
                   'resizer',
                   header.column.getIsResizing() ? 'isResizing' : '',
