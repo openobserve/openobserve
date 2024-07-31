@@ -29,7 +29,7 @@
           <div style="display: flex">
             <q-select
               v-model="selectedSchemas"
-              :options="schemaOptions"
+              :options="filteredSchemaOptions"
               label="Filters on Field"
               input-debounce="0"
               behavior="menu"
@@ -181,25 +181,18 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const searchTerm = ref("");
+
+    const filteredSchemaOptions = computed(() => {
+      const needle = searchTerm.value.toLowerCase().trim();
+      return props.schemaOptions.filter((option: any) =>
+        option.label.toLowerCase().includes(needle),
+      );
+    });
 
     const filterStreamFn = (search: any, update: any) => {
-      console.log("search", search);
-
-      const needle = search.toLowerCase().trim();
-      console.log("needle", needle);
-
-      update(() => {
-        console.log(
-          "props.schemaOptions",
-          props.schemaOptions.filter((option: any) =>
-            option.label.toLowerCase().includes(needle),
-          ),
-        );
-
-        return props.schemaOptions.filter((option: any) =>
-          option.label.toLowerCase().includes(needle),
-        );
-      });
+      searchTerm.value = search;
+      update(() => filteredSchemaOptions.value);
     };
 
     const operators = [
@@ -227,7 +220,6 @@ export default defineComponent({
         ? condition.column
         : selectedSchemas.value;
     };
-
     watch(selectedSchemas, (newVal) => {
       if (newVal.length > 0) {
         props.condition.column = newVal;
@@ -259,6 +251,7 @@ export default defineComponent({
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
+      filteredSchemaOptions,
     };
   },
 });
