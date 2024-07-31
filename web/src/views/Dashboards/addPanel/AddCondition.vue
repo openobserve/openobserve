@@ -98,7 +98,7 @@
                       dense
                       filled
                       v-model="condition.values"
-                      :options="filteredListOptions"
+                      :options="sortedFilteredListOptions"
                       :label="t('common.selectFilter')"
                       multiple
                       emit-value
@@ -185,16 +185,21 @@ export default defineComponent({
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
     const filteredListOptions = computed(() => {
-      return props.dashboardPanelData.meta.filterValue
+      const options = props.dashboardPanelData.meta.filterValue
         .find((it: any) => it.column == props.condition.column)
         ?.value.filter((option: any) =>
           option.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
+
+      // Sort options alphabetically
+      return options
+        ? options.sort((a: string, b: string) => a.localeCompare(b))
+        : [];
     });
 
     const filterListFn = (search: any, update: any) => {
       searchTerm.value = search;
-      update(() => filteredListOptions);
+      update(() => filteredListOptions.value);
     };
 
     const operators = [
@@ -250,7 +255,7 @@ export default defineComponent({
       handleFieldChange,
       removeColumnName,
       filteredSchemaOptions,
-      filteredListOptions,
+      sortedFilteredListOptions: filteredListOptions,
     };
   },
 });
