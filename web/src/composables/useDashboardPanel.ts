@@ -1712,6 +1712,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             case ">=":
               selectFilter += `${condition.operator} ${condition.value}`;
               break;
+            case "Match ALL":
+              selectFilter += `match_all(${condition.value})`;
+              break;
             case "Contains":
               selectFilter += `LIKE '%${condition.value}%'`;
               break;

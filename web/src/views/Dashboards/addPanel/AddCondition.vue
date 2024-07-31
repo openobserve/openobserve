@@ -22,22 +22,30 @@
         :label="computedLabel(condition)"
         class="q-pl-sm"
       >
-        <q-menu class="q-pa-md" @show="(e: any) => loadFilterItem(condition.column)">
-          <q-select
-            v-model="selectedSchemas"
-            :options="schemaOptions"
-            label="Filters on Field"
-            dense
-            filled
-            style="width: 100%"
-            use-input
-            borderless
-            hide-selected
-            fill-input
-            emit-value
-            @filter="filterStreamFn"
-            @update:model-value="handleFieldChange"
-          />
+        <q-menu
+          class="q-pa-md"
+          @show="(e: any) => loadFilterItem(condition.column)"
+        >
+          <div style="display: flex">
+            <q-select
+              v-model="selectedSchemas"
+              :options="schemaOptions"
+              label="Filters on Field"
+              input-debounce="0"
+              behavior="menu"
+              dense
+              filled
+              style="width: 100%"
+              use-input
+              borderless
+              hide-selected
+              fill-input
+              emit-value
+              @filter="filterStreamFn"
+              @update:model-value="handleFieldChange"
+            />
+            <q-btn size="xs" dense @click="removeColumnName" icon="close" />
+          </div>
           <div style="height: 100%">
             <div class="q-pa-xs" style="height: 100%">
               <div class="q-gutter-xs" style="height: 100%">
@@ -100,7 +108,8 @@
                       emit-value
                       map-options
                       :rules="[
-                        (val: any) => val.length > 0 || 'At least 1 item required',
+                        (val: any) =>
+                          val.length > 0 || 'At least 1 item required',
                       ]"
                     >
                       <template v-slot:selected>
@@ -174,8 +183,19 @@ export default defineComponent({
     const { t } = useI18n();
 
     const filterStreamFn = (search: any, update: any) => {
+      console.log("search", search);
+
       const needle = search.toLowerCase().trim();
+      console.log("needle", needle);
+
       update(() => {
+        console.log(
+          "props.schemaOptions",
+          props.schemaOptions.filter((option: any) =>
+            option.label.toLowerCase().includes(needle),
+          ),
+        );
+
         return props.schemaOptions.filter((option: any) =>
           option.label.toLowerCase().includes(needle),
         );
@@ -190,6 +210,7 @@ export default defineComponent({
       ">",
       "<",
       "IN",
+      "Match ALL",
       "Contains",
       "Not Contains",
       "Is Null",
@@ -221,6 +242,11 @@ export default defineComponent({
       props.loadFilterItem(newValue);
     };
 
+    const removeColumnName = () => {
+      props.condition.column = "";
+      selectedSchemas.value = [];
+    };
+
     return {
       operators,
       showMenu,
@@ -232,6 +258,7 @@ export default defineComponent({
       filterOptions,
       emitLogicalOperatorChange,
       handleFieldChange,
+      removeColumnName,
     };
   },
 });
