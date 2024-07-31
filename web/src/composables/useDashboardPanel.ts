@@ -2545,11 +2545,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
 
       // if there are filters
-      function validateConditions(
-        conditions: any,
-        errors: any,
-        conditionTabSelected: any,
-      ) {
+      function validateConditions(conditions: any, errors: any) {
         conditions.forEach((it: any) => {
           if (it.filterType === "condition") {
             // check if at least 1 item from the list is selected
@@ -2559,7 +2555,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               );
             }
 
-            if (conditionTabSelected) {
+            if (it.type == "condition") {
               // check if condition operator is selected
               if (it.operator == null) {
                 errors.push(
@@ -2575,7 +2571,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               }
             }
           } else if (it.filterType === "group") {
-            validateConditions(it.conditions, errors, conditionTabSelected);
+            validateConditions(it.conditions, errors);
           }
         });
       }
@@ -2585,24 +2581,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter.conditions.length
       ) {
-        // Determine if the condition tab is selected
-        const conditions =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.filter.conditions;
-
-        const conditionTabSelected = conditions.some(
-          (it: any) => it.type == "condition",
-        );
-        console.log("conditionTabSelected", conditionTabSelected);
-
         // Validate the top-level conditions
         validateConditions(
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.filter.conditions,
           errors,
-          conditionTabSelected,
         );
       }
       // check if query syntax is valid
