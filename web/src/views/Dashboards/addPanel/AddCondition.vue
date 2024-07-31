@@ -28,7 +28,7 @@
         >
           <div style="display: flex">
             <q-select
-              v-model="selectedSchemas"
+              v-model="condition.column"
               :options="filteredSchemaOptions"
               label="Filters on Field"
               input-debounce="0"
@@ -157,10 +157,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, toRef } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
+import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 
 export default defineComponent({
   name: "AddCondition",
@@ -170,28 +171,24 @@ export default defineComponent({
   },
   props: [
     "condition",
-    "schemaOptions",
+    "schemaOptions", // fields
     "dashboardVariablesFilterItems",
     "dashboardPanelData",
-    "label",
+    "label", // not used
     "loadFilterItem",
     "conditionIndex",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const searchTerm = ref("");
+    const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
+      useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
-    const filteredSchemaOptions = computed(() => {
-      const needle = searchTerm.value.toLowerCase().trim();
-      return props.schemaOptions.filter((option: any) =>
-        option.label.toLowerCase().includes(needle),
-      );
-    });
-
-    const filterStreamFn = (search: any, update: any) => {
-      searchTerm.value = search;
-      update(() => filteredSchemaOptions.value);
-    };
+    console.log("filteredSchemaOptions", filteredSchemaOptions.value);
+    console.log(
+      "props.schemaOptions",
+      props.dashboardPanelData.meta.filterValue,
+    );
 
     const filteredListOptions = computed(() => {
       return props.dashboardPanelData.meta.filterValue
@@ -224,19 +221,10 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
     const showMenu = ref(false);
     const addLabel = ref("AND");
-    const selectedSchemas = ref<any[]>([]);
 
     const computedLabel = (condition: any) => {
-      return selectedSchemas.value.length === 0
-        ? condition.column
-        : selectedSchemas.value;
+      return props.condition.column;
     };
-
-    watch(selectedSchemas, (newVal) => {
-      if (newVal.length > 0) {
-        props.condition.column = newVal;
-      }
-    });
 
     const emitLogicalOperatorChange = (newOperator: string) => {
       emit("logical-operator-change", newOperator);
@@ -248,14 +236,12 @@ export default defineComponent({
 
     const removeColumnName = () => {
       props.condition.column = "";
-      selectedSchemas.value = [];
     };
 
     return {
       operators,
       showMenu,
       addLabel,
-      selectedSchemas,
       computedLabel,
       t,
       filterStreamFn,
