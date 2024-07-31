@@ -77,8 +77,6 @@
                   :render="header.column.columnDef.header"
                   :props="header.getContext()"
                 />
-                <!-- <span v-if="header.column.getIsSorted() === 'asc'"> 🔼</span>
-                  <span v-if="header.column.getIsSorted() === 'desc'"> 🔽</span> -->
 
                 <div
                   class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-bg-white tw-px-2 column-actions"
@@ -167,7 +165,7 @@
               }"
               :data-index="virtualRow.index"
               :ref="(node: any) => rowVirtualizer.measureElement(node)"
-              class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start"
+              class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b"
               :class="[
                 store.state.theme === 'dark'
                   ? 'w-border-gray-800'
@@ -175,53 +173,66 @@
                 columnOrder.includes('source') && !wrap
                   ? 'tw-table-row'
                   : 'tw-flex',
-                !formattedRows[virtualRow.index].getIsExpanded() &&
-                  'tw-border-b',
               ]"
             >
               <td
-                v-for="(cell, cellIndex) in formattedRows[
-                  virtualRow.index
-                ].getVisibleCells()"
-                :key="cell.id"
-                class="tw-py-1 tw-px-2 tw-items-center tw-justify-start"
-                :style="{
-                  width:
-                    cell.column.columnDef.id !== 'source'
-                      ? cell.column.getSize() + 'px'
-                      : wrap
-                      ? width - 225 - 12 + 'px'
-                      : 'auto',
-                  height: wrap ? '100%' : '26px',
-                }"
-                :class="[
-                  columnOrder.includes('source') && !wrap
-                    ? 'tw-table-cell'
-                    : 'tw-block',
-                  !wrap &&
-                    'tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap',
-                  wrap && ' tw-break-words',
-                ]"
+                v-if="formattedRows[virtualRow.index]?.original?.isExpandedRow"
+                :colspan="columnOrder.length"
               >
-                <q-btn
-                  v-if="cellIndex == 0"
-                  :icon="
-                    formattedRows[virtualRow.index].getIsExpanded()
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  data-test="table-row-expand-menu"
-                  @click.stop="formattedRows[virtualRow.index].toggleExpanded()"
-                ></q-btn>
-                <FlexRender
-                  :render="cell.column.columnDef.cell"
-                  :props="cell.getContext()"
+                <json-preview
+                  :value="tableRows[virtualRow.index - 1] as any"
+                  show-copy-button
+                  class="tw-py-1"
+                  @copy="copyLogToClipboard"
+                  @add-field-to-table="addFieldToTable"
+                  @add-search-term="addSearchTerm"
                 />
               </td>
+              <template v-else>
+                <td
+                  v-for="(cell, cellIndex) in formattedRows[
+                    virtualRow.index
+                  ].getVisibleCells()"
+                  :key="cell.id"
+                  class="tw-py-1 tw-px-2 tw-items-center tw-justify-start"
+                  :style="{
+                    width:
+                      cell.column.columnDef.id !== 'source'
+                        ? cell.column.getSize() + 'px'
+                        : wrap
+                        ? width - 225 - 12 + 'px'
+                        : 'auto',
+                    height: wrap ? '100%' : '26px',
+                  }"
+                  :class="[
+                    columnOrder.includes('source') && !wrap
+                      ? 'tw-table-cell'
+                      : 'tw-block',
+                    !wrap &&
+                      'tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap',
+                    wrap && ' tw-break-words',
+                  ]"
+                >
+                  <q-btn
+                    v-if="cellIndex == 0"
+                    :icon="
+                      formattedRows[virtualRow.index].getIsExpanded()
+                        ? 'expand_more'
+                        : 'chevron_right'
+                    "
+                    dense
+                    size="xs"
+                    flat
+                    class="q-mr-xs"
+                    data-test="table-row-expand-menu"
+                    @click="expandRow(virtualRow.index)"
+                  ></q-btn>
+                  <FlexRender
+                    :render="cell.column.columnDef.cell"
+                    :props="cell.getContext()"
+                  />
+                </td>
+              </template>
             </tr>
           </template>
         </tbody>
@@ -302,9 +313,9 @@ const columnResizeMode = "onChange";
 
 const tableRowSize = ref(0);
 
-const columnResizeDirection = "ltr";
-
 const columnOrder = ref<any>([]);
+
+const tableRows = ref(props.rows);
 
 watch(
   () => props.columns,
@@ -316,9 +327,19 @@ watch(
   }
 );
 
+watch(
+  () => props.rows,
+  (newVal) => {
+    if (newVal) tableRows.value = [...newVal];
+  },
+  {
+    deep: true,
+  }
+);
+
 const table = useVueTable({
   get data() {
-    return props.rows || [];
+    return tableRows.value || [];
   },
   get columns() {
     return props.columns as ColumnDef<unknown, any>[];
@@ -438,6 +459,26 @@ const handleDragEnd = async (event: any) => {
 
     columnOrder.value = [...columnOrder.value];
   }
+};
+
+const expandedRowIndices = ref<number[]>([]);
+
+const expandRow = async (index: number) => {
+  if (expandedRowIndices.value.includes(index)) {
+    expandedRowIndices.value = expandedRowIndices.value.filter(
+      (i) => i !== index
+    );
+    tableRows.value.splice(index + 1, 1);
+  } else {
+    expandedRowIndices.value.push(index);
+    tableRows.value.splice(index + 1, 0, {
+      isExpandedRow: true,
+      ...(props.rows[index] as {}),
+    });
+  }
+
+  formattedRows.value[index].toggleExpanded();
+  tableRows.value = [...tableRows.value];
 };
 </script>
 <style scoped lang="scss">
