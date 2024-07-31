@@ -180,7 +180,7 @@
               ]"
             >
               <td
-                v-if="formattedRows[virtualRow.index]?.original?.isExpandedRow"
+                v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
                 :colspan="columnOrder.length"
               >
                 <json-preview
