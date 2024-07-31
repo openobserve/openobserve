@@ -994,6 +994,10 @@ export default defineComponent({
     watch(
       () => [searchObj.meta.logsVisualizeToggle],
       async () => {
+        // emit resize event
+        // this will rerender/call resize method of already rendered chart to resize
+        window.dispatchEvent(new Event("resize"));
+
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           // reset old rendered chart
           visualizeChartData.value = {};

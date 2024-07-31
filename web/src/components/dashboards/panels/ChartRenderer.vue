@@ -367,6 +367,7 @@ export default defineComponent({
         emit("mouseover", params);
       });
 
+      window.removeEventListener("resize", windowResizeEventCallback);
       window.addEventListener("resize", windowResizeEventCallback);
 
       // we need that toolbox datazoom button initally selected
