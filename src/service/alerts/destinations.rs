@@ -22,7 +22,7 @@ use crate::{
             alerts::destinations::{Destination, DestinationType, DestinationWithTemplate},
             authz::Authz,
         },
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{remove_ownership, set_ownership, RE_OFGA_UNSUPPORTED_NAME},
     },
     service::db,
 };
@@ -63,6 +63,10 @@ pub async fn save(
         destination.name = name.to_string();
     }
     destination.name = destination.name.trim().to_string();
+    // Replace the characters not supported by ofga with '_'
+    destination.name = RE_OFGA_UNSUPPORTED_NAME
+        .replace_all(&destination.name, "_")
+        .to_string();
     if destination.name.is_empty() {
         return Err((
             http::StatusCode::BAD_REQUEST,

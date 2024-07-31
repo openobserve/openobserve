@@ -19,7 +19,7 @@ use crate::{
     common::{
         infra::config::ALERTS_DESTINATIONS,
         meta::{alerts::templates::Template, authz::Authz},
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{remove_ownership, set_ownership, RE_OFGA_UNSUPPORTED_NAME},
     },
     service::db,
 };
@@ -37,6 +37,10 @@ pub async fn save(
         template.name = name.to_owned();
     }
     template.name = template.name.trim().to_string();
+    // Replace the characters not supported by ofga with '_'
+    template.name = RE_OFGA_UNSUPPORTED_NAME
+        .replace_all(&template.name, "_")
+        .to_string();
     if template.name.is_empty() {
         return Err(anyhow::anyhow!("Alert template name is required"));
     }

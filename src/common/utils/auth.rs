@@ -18,6 +18,8 @@ use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHashe
 use base64::Engine;
 use config::utils::json;
 use futures::future::{ready, Ready};
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
@@ -31,6 +33,8 @@ use crate::common::{
         user::{AuthTokens, UserRole},
     },
 };
+
+pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[:#?\s]").unwrap());
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
