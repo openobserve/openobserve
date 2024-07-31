@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-};
+use std::collections::HashMap;
 
 use chrono::Duration;
 use config::{
@@ -25,6 +22,7 @@ use config::{
         sql::{Sql as MetaSql, SqlOperator},
         stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
     },
+    utils::sql::is_aggregate_query,
     QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -39,7 +37,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
 use crate::{
@@ -54,16 +52,10 @@ const SQL_DELIMITERS: [u8; 12] = [
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
-static RE_SELECT_FIELD: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 pub static RE_SELECT_WILDCARD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
-
 pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
-
-static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
-static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
@@ -72,9 +64,6 @@ static RE_MATCH_ALL_RAW: Lazy<Regex> =
 static RE_MATCH_ALL_RAW_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-
-pub static _TS_WITH_ALIAS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)?\s*").unwrap());
 
 pub static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
@@ -91,44 +80,16 @@ pub struct Sql {
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
-    pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
-    pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no group by, no aggregatioin,
                           * no where or only 1 equality where clause with term as a partition
                           * key, we can just get data from the latest file */
     pub schema: Schema,
-    pub query_context: String,
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
     pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
     pub use_inverted_index: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum SqlMode {
-    Context,
-    Full,
-}
-
-impl From<&str> for SqlMode {
-    fn from(mode: &str) -> Self {
-        match mode.to_lowercase().as_str() {
-            "full" => SqlMode::Full,
-            "context" => SqlMode::Context,
-            _ => SqlMode::Context,
-        }
-    }
-}
-
-impl Display for SqlMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SqlMode::Context => write!(f, "context"),
-            SqlMode::Full => write!(f, "full"),
-        }
-    }
 }
 
 impl Sql {
@@ -167,75 +128,12 @@ impl Sql {
         // Hack for table name
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
-        let mut fast_mode =
-            is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
+
+        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
+        let fast_mode = !track_total_hits
+            && is_fast_mode(&meta, &origin_sql, &org_id, &stream_type, &stream_name).await;
 
         let cfg = get_config();
-
-        // check sql_mode
-        let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
-        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
-
-        // check SQL limitation
-        // in context mode, disallow, [limit|offset|group by|having|join|union]
-        // in full    mode, disallow, [join|union]
-        if sql_mode.eq(&SqlMode::Context)
-            && (meta.offset > 0 || meta.limit > 0 || !meta.group_by.is_empty())
-        {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "sql_mode=context, Query SQL does not supported [limit|offset|group by|having|join|union]".to_string()
-            )));
-        }
-
-        // check Agg SQL
-        // 1. must from query
-        // 2. disallow select *
-        // 3. must select group by field
-        let mut req_aggs = HashMap::new();
-        for agg in req.aggs.iter() {
-            req_aggs.insert(agg.name.to_string(), agg.sql.to_string());
-        }
-        if sql_mode.eq(&SqlMode::Full) && !req_aggs.is_empty() {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "sql_mode=full, Query not supported aggs".to_string(),
-            )));
-        }
-
-        // check aggs
-        for sql in req_aggs.values() {
-            if !RE_ONLY_FROM.is_match(sql) {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Aggregation SQL only support 'from query' as context".to_string(),
-                )));
-            }
-            if RE_ONLY_SELECT.is_match(sql) {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Aggregation SQL is not supported 'select *' please specify the fields"
-                        .to_string(),
-                )));
-            }
-            if RE_ONLY_GROUPBY.is_match(sql) {
-                let caps = RE_ONLY_GROUPBY.captures(sql).unwrap();
-                let group_by = caps
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .trim_matches(|v| v == '\'' || v == '"');
-                let select_caps = match RE_SELECT_FIELD.captures(sql) {
-                    Some(caps) => caps,
-                    None => {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                            sql.to_owned(),
-                        )));
-                    }
-                };
-                if !select_caps.get(1).unwrap().as_str().contains(group_by) {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-                        "Aggregation SQL used [group by] you should select the field [{group_by}]"
-                    ))));
-                }
-            }
-        }
 
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{stream_name}[ '"]?"#)).unwrap();
 
@@ -282,7 +180,8 @@ impl Sql {
         }
 
         // Hack select for _timestamp, add _timestamp to select clause
-        if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
+        let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
+        if !is_aggregate && meta.order_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(&cfg.common.column_timestamp) {
@@ -389,15 +288,14 @@ impl Sql {
                 cfg.limit.query_default_limit * std::cmp::max(1, meta.group_by.len() as i64)
             };
             origin_sql = if meta.order_by.is_empty()
-                && (!sql_mode.eq(&SqlMode::Full)
-                    || (meta.group_by.is_empty()
-                        && !origin_sql
-                            .to_lowercase()
-                            .split(" from ")
-                            .next()
-                            .unwrap_or_default()
-                            .contains('('))
-                        && !origin_sql.to_lowercase().contains("distinct"))
+                && ((meta.group_by.is_empty()
+                    && !origin_sql
+                        .to_lowercase()
+                        .split(" from ")
+                        .next()
+                        .unwrap_or_default()
+                        .contains('('))
+                    && !origin_sql.to_lowercase().contains("distinct"))
             {
                 let sort_by = if req_query.sort_by.is_empty() {
                     meta.order_by = vec![(cfg.common.column_timestamp.to_string(), true)];
@@ -612,69 +510,23 @@ impl Sql {
             None => "".to_string(),
         };
 
-        // Hack for aggregation
+        // Hack for track total hits
         if track_total_hits {
-            req_aggs.insert(
-                "_count".to_string(),
-                String::from("SELECT COUNT(*) as num from query"),
-            );
-        }
-        let mut aggs = hashbrown::HashMap::new();
-        for (key, sql) in &req_aggs {
-            let mut sql = sql.to_string();
-            if let Some(caps) = RE_ONLY_FROM.captures(&sql) {
-                sql = sql.replace(&caps[0].to_string(), " FROM tbl ");
-            }
-            if !where_str.is_empty() {
-                match RE_ONLY_WHERE.captures(&sql) {
-                    Some(caps) => {
-                        sql = sql
-                            .replace(&caps[0].to_string(), &format!(" WHERE ({where_str}) AND "));
-                    }
-                    None => {
-                        sql = sql.replace(
-                            &" FROM tbl ".to_string(),
-                            &format!(" FROM tbl WHERE ({where_str}) "),
-                        );
-                    }
-                }
-            }
+            let sql = if where_str.is_empty() {
+                "SELECT COUNT(*) as zo_sql_num FROM tbl".to_string()
+            } else {
+                format!("SELECT COUNT(*) as zo_sql_num FROM tbl WHERE {}", where_str)
+            };
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
                 log::error!(
-                    "sql_meta: parse sql error: {}, sql: {}",
+                    "sql_meta: parse track_total_hits sql error: {}, sql: {}",
                     sql_meta.err().unwrap(),
                     sql
                 );
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
-            let sql_meta = sql_meta.unwrap();
-            for cap in RE_HISTOGRAM.captures_iter(sql.clone().as_str()) {
-                let attrs = cap
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .split(',')
-                    .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-                    .collect::<Vec<&str>>();
-                let field = attrs.first().unwrap();
-                let interval = attrs.get(1).unwrap();
-                sql = sql.replace(
-                    cap.get(0).unwrap().as_str(),
-                    &format!(
-                        "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))"
-                    )
-                );
-            }
-
-            if !(sql_meta.group_by.is_empty()
-                || (sql_meta.field_alias.len() == 2
-                    && sql_meta.field_alias[0].1 == "zo_sql_key"
-                    && sql_meta.field_alias[1].1 == "zo_sql_num"))
-            {
-                fast_mode = false;
-            }
-            aggs.insert(key.clone(), (sql, sql_meta));
+            origin_sql = sql;
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());
@@ -730,11 +582,8 @@ impl Sql {
             stream_name,
             meta,
             fulltext,
-            aggs,
-            sql_mode,
             fast_mode,
             schema,
-            query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
@@ -1134,14 +983,12 @@ mod tests {
             sql: format!("select {} from {} ", col, table),
             from: 0,
             size: 100,
-            sql_mode: "full".to_owned(),
             quick_mode: false,
             query_type: "".to_owned(),
             start_time: 1667978895416,
             end_time: 1667978900217,
             sort_by: None,
             track_total_hits: false,
-            query_context: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
@@ -1149,7 +996,6 @@ mod tests {
 
         let req: config::meta::search::Request = config::meta::search::Request {
             query,
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
@@ -1246,21 +1092,18 @@ mod tests {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
-                sql_mode: "context".to_owned(),
                 quick_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 sort_by: None,
                 track_total_hits: true,
-                query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
-                aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],
@@ -1370,21 +1213,18 @@ mod tests {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
-                sql_mode: "full".to_owned(),
                 quick_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 sort_by: None,
                 track_total_hits: true,
-                query_context: None,
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
             };
             let req = config::meta::search::Request {
                 query: query.clone(),
-                aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],

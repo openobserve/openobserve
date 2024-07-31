@@ -125,10 +125,7 @@ def test_e2e_vrl(create_session, base_url):
                 "from": 0,
                 "size": 150,
                 "query_fn": "LmEgPTEgCiAu",
-            },
-            "aggs": {
-                "histogram": "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
-            },
+            }
         }
     ]
 

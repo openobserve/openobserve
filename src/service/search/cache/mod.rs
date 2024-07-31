@@ -22,7 +22,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -37,10 +37,7 @@ use crate::{
         utils::functions,
     },
     service::{
-        search::{
-            self as SearchService,
-            cache::{cacher::check_cache, result_utils::is_aggregate_query},
-        },
+        search::{self as SearchService, cache::cacher::check_cache},
         usage::{http_report_metrics, report_request_usage_stats},
     },
 };

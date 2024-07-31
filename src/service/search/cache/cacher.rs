@@ -29,7 +29,7 @@ use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
     service::search::{
         cache::result_utils::{get_ts_value, round_down_to_nearest_minute},
-        sql::{generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM},
+        sql::{generate_histogram_interval, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
 
@@ -51,7 +51,6 @@ pub async fn check_cache(
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    // check sql_mode
 
     let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
         Ok(v) => v,
@@ -60,17 +59,16 @@ pub async fn check_cache(
             return CachedQueryResponse::default();
         }
     };
-    let sql_mode: SqlMode = meta.sql_mode;
 
     // skip the queries with no timestamp column
     let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
-    if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
+    if is_aggregate && result_ts_col.is_none() {
         return CachedQueryResponse::default();
     }
 
     // skip the count queries & queries first order by is not _timestamp field
     let order_by = meta.meta.order_by;
-    if (sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits)
+    if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
             && (result_ts_col.is_none()

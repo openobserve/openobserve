@@ -18,7 +18,11 @@ use std::sync::Arc;
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
     meta::{cluster::Node, search},
-    utils::{arrow::record_batches_to_json_rows, flatten, json},
+    utils::{
+        arrow::record_batches_to_json_rows,
+        flatten,
+        json::{self, get_int_value},
+    },
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
@@ -34,6 +38,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
+    let track_total_hits = req.query.as_ref().unwrap().track_total_hits;
 
     // handle request time range
     let meta = super::super::sql::Sql::new(&req).await?;
@@ -174,27 +179,19 @@ pub async fn search(
         }
     }
 
-    // aggs
-    for (name, batch) in merge_batches {
-        if name == "query" || batch.is_empty() {
-            continue;
-        }
-        let name = name.strip_prefix("agg_").unwrap().to_string();
-        let batch_ref: Vec<&RecordBatch> = batch.iter().collect();
-        let json_rows = record_batches_to_json_rows(&batch_ref)
-            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-        let sources: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
-        for source in sources {
-            result.add_agg(&name, &source);
-        }
-    }
-
-    // total
-    let total = match result.aggs.get("_count") {
-        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => result.hits.len(),
+    let total = if !track_total_hits {
+        result.hits.len()
+    } else {
+        result
+            .hits
+            .first()
+            .map(|v| {
+                v.get("zo_sql_num")
+                    .map(|v| get_int_value(v) as usize)
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
     };
-    result.aggs.remove("_count");
 
     // Maybe inverted index count is wrong, we use the max value
     result.set_total(total);
