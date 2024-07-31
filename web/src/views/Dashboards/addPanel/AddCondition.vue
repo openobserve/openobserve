@@ -219,8 +219,6 @@ export default defineComponent({
     ];
 
     const filterOptions = ["AND", "OR"];
-    const showMenu = ref(false);
-    const addLabel = ref("AND");
 
     const computedLabel = (condition: any) => {
       return props.condition.column;
@@ -240,8 +238,6 @@ export default defineComponent({
 
     return {
       operators,
-      showMenu,
-      addLabel,
       computedLabel,
       t,
       filterStreamFn,
