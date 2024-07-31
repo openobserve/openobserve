@@ -17,7 +17,7 @@
 
 use core::ops::ControlFlow;
 
-use config::FxIndexSet;
+use config::{utils::sql::AGGREGATE_UDF_LIST, FxIndexSet};
 use datafusion::error::Result;
 use itertools::Itertools;
 use sqlparser::{
@@ -29,17 +29,6 @@ use sqlparser::{
     dialect::GenericDialect,
     parser::Parser,
 };
-
-const AGGREGATE_UDF_LIST: [&str; 8] = [
-    "min",
-    "max",
-    "count",
-    "sum",
-    "avg",
-    "median",
-    "array_agg",
-    "approx_percentile_cont",
-];
 
 pub fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String> {
     let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;

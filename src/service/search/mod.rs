@@ -15,7 +15,6 @@
 
 use std::cmp::max;
 
-use cache::result_utils::is_aggregate_query;
 use chrono::Duration;
 use config::{
     get_config, ider,
@@ -26,7 +25,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::str::find,
+    utils::{sql::is_aggregate_query, str::find},
 };
 use infra::{
     errors::{Error, ErrorCodes},
@@ -222,7 +221,6 @@ pub async fn search_partition(
         start_time: req.start_time,
         end_time: req.end_time,
         sql: req.sql.to_string(),
-        sql_mode: req.sql_mode.to_string(),
         ..Default::default()
     };
     let search_req = cluster_rpc::SearchRequest {
@@ -700,7 +698,6 @@ pub async fn search_partition_multi(
                 start_time: req.start_time,
                 end_time: req.end_time,
                 sql: query.to_string(),
-                sql_mode: req.sql_mode.to_string(),
                 regions: req.regions.clone(),
                 clusters: req.clusters.clone(),
                 encoding: req.encoding,

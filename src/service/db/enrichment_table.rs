@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use chrono::Utc;
 use config::{
     meta::stream::StreamType,
@@ -38,13 +36,11 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
         start_time: BASE_TIME.timestamp_micros(),
         end_time: Utc::now().timestamp_micros(),
-        sql_mode: "full".to_owned(),
         ..Default::default()
     };
 
     let req = config::meta::search::Request {
         query,
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],

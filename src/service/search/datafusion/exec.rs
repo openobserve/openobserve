@@ -20,13 +20,9 @@ use config::{
     get_config,
     meta::{
         search::{SearchType, Session as SearchSession, StorageType},
-        sql,
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{
-        arrow::record_batches_to_json_rows, flatten, json, parquet::new_parquet_writer,
-        schema::infer_json_schema_from_values, schema_ext::SchemaExt,
-    },
+    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt, sql::AGGREGATE_UDF_LIST},
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -49,8 +45,7 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
     logical_expr::expr::Alias,
-    prelude::{cast, col, lit, Expr, SessionContext},
-    scalar::ScalarValue,
+    prelude::{cast, col, Expr, SessionContext},
 };
 use hashbrown::HashMap;
 use infra::cache::tmpfs::Directory;
@@ -65,27 +60,13 @@ use super::{
     table_provider::NewListingTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::{
-    common::meta::functions::VRLResultResolver,
-    service::search::{
-        datafusion::{rewrite, ExtLimit},
-        sql::{Sql, RE_COUNT_DISTINCT, RE_FIELD_FN, RE_SELECT_WILDCARD, RE_WHERE},
-    },
+use crate::service::search::{
+    datafusion::{rewrite, ExtLimit},
+    sql::{Sql, RE_COUNT_DISTINCT, RE_FIELD_FN, RE_SELECT_WILDCARD, RE_WHERE},
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
-
-const AGGREGATE_UDF_LIST: [&str; 8] = [
-    "min",
-    "max",
-    "count",
-    "sum",
-    "avg",
-    "median",
-    "array_agg",
-    "approx_percentile_cont",
-];
 
 pub async fn sql(
     session: &SearchSession,
@@ -100,7 +81,6 @@ pub async fn sql(
         return Ok(HashMap::new());
     }
 
-    let cfg = get_config();
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
     // let select_wildcard = RE_SELECT_WILDCARD.is_match(origin_sql.as_str());
@@ -154,67 +134,6 @@ pub async fn sql(
         )
         .await?,
     );
-    let mut spend_time = start.elapsed().as_millis();
-
-    // get alias from context query for agg sql
-    let meta_sql = sql::Sql::new(&sql.query_context);
-
-    for (name, orig_agg_sql) in sql.aggs.iter() {
-        // Debug SQL
-        if cfg.common.print_key_sql {
-            log::info!("[trace_id {trace_id}] Query agg sql: {}", orig_agg_sql.0);
-        }
-
-        let mut agg_sql = orig_agg_sql.0.to_owned();
-        if meta_sql.is_ok() {
-            for alias in &meta_sql.as_ref().unwrap().field_alias {
-                replace_in_query(&alias.1, &mut agg_sql, true);
-            }
-        }
-
-        let mut df = match ctx.sql(&agg_sql).await {
-            Ok(df) => df,
-            Err(e) => {
-                log::error!(
-                    "aggs sql execute failed, session: {:?}, sql: {}, err: {:?}",
-                    session,
-                    agg_sql,
-                    e
-                );
-                return Err(e);
-            }
-        };
-
-        if !rules.is_empty() {
-            let mut exprs = Vec::with_capacity(df.schema().fields().len());
-            for (qualifier, field) in df.schema().iter() {
-                if let Some(v) = qualifier {
-                    if v.to_string() != "tbl" {
-                        exprs.push(col(field.name()));
-                        continue;
-                    }
-                }
-                exprs.push(match rules.get(field.name()) {
-                    Some(rule) => Expr::Alias(Alias::new(
-                        cast(col(field.name()), rule.clone()),
-                        None::<&str>,
-                        field.name().to_string(),
-                    )),
-                    None => col(field.name()),
-                });
-            }
-            df = df.select(exprs)?;
-        }
-        let batches = df.collect().await?;
-        result.insert(format!("agg_{name}"), batches);
-
-        let q_time = start.elapsed().as_millis();
-        log::info!(
-            "[trace_id {trace_id}] Query agg:{name} took {} ms",
-            q_time - spend_time
-        );
-        spend_time = q_time;
-    }
 
     // drop table
     ctx.deregister_table("tbl")?;
@@ -250,13 +169,13 @@ async fn exec_query(
         && schema.fields().len() > cfg.limit.query_optimization_num_fields;
 
     let mut fast_mode = false;
-    let (q_ctx, schema) =
-        if sql.fast_mode && sql.meta.limit > 0 && session.storage_type != StorageType::Tmpfs {
-            fast_mode = true;
-            get_fast_mode_ctx(session, schema, sql, files, file_type, without_optimizer).await?
-        } else {
-            (ctx.clone(), schema.clone())
-        };
+    let q_ctx = if sql.fast_mode && sql.meta.limit > 0 && session.storage_type != StorageType::Tmpfs
+    {
+        fast_mode = true;
+        get_fast_mode_ctx(session, schema, sql, files, file_type, without_optimizer).await?
+    } else {
+        ctx.clone()
+    };
 
     // get used UDF
     let mut field_fns = vec![];
@@ -279,9 +198,7 @@ async fn exec_query(
         };
     }
     // query
-    let query = if !&sql.query_context.is_empty() {
-        sql.query_context.replace(&sql.stream_name, "tbl").clone()
-    } else if !fast_mode
+    let query = if !fast_mode
         && ((!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some())
     {
         match sql.meta.time_range {
@@ -357,110 +274,6 @@ async fn exec_query(
         df = df.select(exprs)?;
     }
 
-    if field_fns.is_empty() && sql.query_fn.is_none() {
-        let batches = df.clone().collect().await?;
-        log::info!(
-            "[trace_id {trace_id}] Query took {} ms",
-            start.elapsed().as_millis()
-        );
-        return Ok(batches);
-    }
-
-    if !sql.query_context.is_empty() {
-        q_ctx.deregister_table("tbl")?;
-        q_ctx.register_table("tbl", df.clone().into_view())?;
-        // re-register to ctx
-        if !fast_mode {
-            ctx.deregister_table("tbl")?;
-            ctx.register_table("tbl", df.into_view())?;
-        }
-    } else if sql.query_fn.is_some() {
-        let batches = df.collect().await?;
-        let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-        match handle_query_fn(
-            sql.query_fn.clone().unwrap(),
-            &batches_ref,
-            &sql.org_id,
-            &sql.stream_name,
-            sql.stream_type,
-        ) {
-            Err(err) => {
-                return Err(datafusion::error::DataFusionError::Execution(format!(
-                    "Error applying query function: {err} "
-                )));
-            }
-            Ok(resp) => {
-                if !resp.is_empty() {
-                    let mem_table = datafusion::datasource::MemTable::try_new(
-                        resp.first().unwrap().schema(),
-                        vec![resp],
-                    )?;
-                    q_ctx.deregister_table("tbl")?;
-                    q_ctx.register_table("tbl", Arc::new(mem_table))?;
-                    // -- fix mem table, add missing columns
-                    let mut tmp_df = q_ctx.table("tbl").await?;
-                    let tmp_fields = tmp_df
-                        .schema()
-                        .field_names()
-                        .iter()
-                        .map(|f| f.strip_prefix("tbl.").unwrap().to_string())
-                        .collect::<Vec<String>>();
-                    let need_add_columns = schema
-                        .fields()
-                        .iter()
-                        .filter(|field| !tmp_fields.contains(field.name()))
-                        .collect::<Vec<_>>();
-                    if !need_add_columns.is_empty() {
-                        for column in need_add_columns {
-                            if column.data_type() == &DataType::Utf8 {
-                                tmp_df = tmp_df.with_column(
-                                    &column.name().to_string(),
-                                    lit(ScalarValue::Utf8(None)),
-                                )?;
-                            } else if let Ok(v) = ScalarValue::new_zero(column.data_type()) {
-                                tmp_df = tmp_df.with_column(&column.name().to_string(), lit(v))?;
-                            }
-                        }
-                        q_ctx.deregister_table("tbl")?;
-                        q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
-                        // re-register to ctx
-                        if !fast_mode {
-                            ctx.deregister_table("tbl")?;
-                            ctx.register_table("tbl", tmp_df.into_view())?;
-                        }
-                    }
-                    // -- fix done
-                }
-            }
-        }
-    } else {
-        return Err(datafusion::error::DataFusionError::Execution(
-            "BUG -> this shouldn't be happen".to_string(),
-        ));
-    }
-
-    let mut where_query = if !sql_parts.is_empty() {
-        format!("select * from tbl where {}", &sql_parts[1])
-    } else {
-        origin_sql.clone()
-    };
-    for alias in &sql.meta.field_alias {
-        replace_in_query(&alias.1, &mut where_query, true);
-    }
-    let additional_clause = where_query.clone();
-
-    let df = match q_ctx.sql(&additional_clause).await {
-        Ok(df) => df,
-        Err(e) => {
-            log::error!(
-                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
-                session,
-                origin_sql,
-                e
-            );
-            return Err(e);
-        }
-    };
     let batches = df.clone().collect().await?;
     log::info!(
         "[trace_id {trace_id}] Query took {} ms",
@@ -476,7 +289,7 @@ async fn get_fast_mode_ctx(
     files: &[FileKey],
     file_type: FileType,
     without_optimizer: bool,
-) -> Result<(SessionContext, Arc<Schema>)> {
+) -> Result<SessionContext> {
     let mut files = files.to_vec();
     let desc = sql.meta.order_by.is_empty() || sql.meta.order_by[0].1;
     if desc {
@@ -517,24 +330,7 @@ async fn get_fast_mode_ctx(
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
 
-    Ok((ctx, schema))
-}
-
-fn replace_in_query(replace_pat: &str, where_query: &mut String, is_alias: bool) {
-    let re1 = Regex::new(&format!("(?i){}_([a-zA-Z0-9_-]*)", replace_pat)).unwrap();
-    if let Some(caps) = re1.captures(&*where_query) {
-        let cap_str = caps.get(0).unwrap().as_str();
-        let field = caps.get(1).unwrap().as_str();
-        if is_alias {
-            *where_query = where_query.replace(cap_str, &format!("{replace_pat}['{field}']"));
-        } else {
-            let local_pattern = replace_pat
-                .replace("tbl_", "")
-                .replacen('_', "(", 1)
-                .replace('_', ")");
-            *where_query = where_query.replace(cap_str, &format!("{local_pattern}['{field}']"));
-        }
-    }
+    Ok(ctx)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1423,75 +1219,6 @@ pub async fn register_table(
     ctx.register_table(table_name, Arc::new(table))?;
 
     Ok(ctx)
-}
-
-fn handle_query_fn(
-    query_fn: String,
-    batches: &[&RecordBatch],
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<Vec<RecordBatch>> {
-    let json_rows = record_batches_to_json_rows(batches).map_err(|e| {
-        DataFusionError::Execution(format!(
-            "Error converting record batches to json rows: {}",
-            e
-        ))
-    })?;
-    apply_query_fn(query_fn, json_rows, org_id, stream_name, stream_type)
-}
-
-fn apply_query_fn(
-    query_fn_src: String,
-    in_batch: Vec<json::Map<String, json::Value>>,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<Vec<RecordBatch>> {
-    use vector_enrichment::TableRegistry;
-
-    let mut resp = vec![];
-    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-    match crate::service::ingestion::compile_vrl_function(&query_fn_src, org_id) {
-        Ok(program) => {
-            let registry = program.config.get_custom::<TableRegistry>().unwrap();
-            registry.finish_load();
-
-            let rows_val: Vec<json::Value> = in_batch
-                .iter()
-                .filter_map(|hit| {
-                    let ret_val = crate::service::ingestion::apply_vrl_fn(
-                        &mut runtime,
-                        &VRLResultResolver {
-                            program: program.program.clone(),
-                            fields: program.fields.clone(),
-                        },
-                        &json::Value::Object(hit.clone()),
-                        org_id,
-                        stream_name,
-                    );
-                    (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
-                })
-                .collect();
-
-            let value_iter = rows_val.iter();
-            let inferred_schema = infer_json_schema_from_values(value_iter, stream_type).unwrap();
-            let mut decoder =
-                arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
-
-            for value in rows_val {
-                decoder
-                    .decode(json::to_string(&value).unwrap().as_bytes())
-                    .unwrap();
-                resp.push(decoder.flush()?.unwrap());
-            }
-            Ok(resp)
-        }
-        Err(err) => Err(DataFusionError::Execution(format!(
-            "Error compiling VRL function: {}",
-            err
-        ))),
-    }
 }
 
 fn filter_schema_null_fields(schema: &mut Schema) {
