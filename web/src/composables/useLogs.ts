@@ -1593,7 +1593,9 @@ const useLogs = () => {
         //delete searchObj.data.histogramQuery.query.sql_mode;
         delete searchObj.data.histogramQuery.aggs;
         delete queryReq.aggs;
-        searchObj.data.customDownloadQueryObj = queryReq;
+        searchObj.data.customDownloadQueryObj = JSON.parse(
+          JSON.stringify(queryReq)
+        );
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1699,18 +1701,20 @@ const useLogs = () => {
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
                 setTimeout(async () => {
+                  console.log("settimeout");
                   await generateHistogramData();
 
-                  let regeratePaginationFlag = false;
-                  if (
-                    searchObj.data.queryResults.aggs.length !=
-                    searchObj.meta.resultGrid.rowsPerPage
-                  ) {
-                    regeratePaginationFlag = true;
-                  }
+                  // let regeratePaginationFlag = false;
+                  // if (
+                  //   searchObj.data.queryResults.aggs.length !=
+                  //   searchObj.meta.resultGrid.rowsPerPage
+                  // ) {
+                  //   regeratePaginationFlag = true;
+                  // }
                   // if total records in partition is greate than recordsPerPage then we need to update pagination
                   // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-                  refreshPartitionPagination(regeratePaginationFlag);
+                  // refreshPartitionPagination(regeratePaginationFlag);
+                  refreshPartitionPagination(true);
                 }, 100);
               }
               searchObj.loadingHistogram = false;
@@ -3062,7 +3066,71 @@ const useLogs = () => {
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
       ) {
-        searchObj.data.queryResults.aggs.map(
+        const intervalMap = {
+          "10 second": 10 * 1000 * 1000,
+          "15 second": 15 * 1000 * 1000,
+          "30 second": 30 * 1000 * 1000,
+          "1 minute": 60 * 1000 * 1000,
+          "5 minute": 5 * 60 * 1000 * 1000,
+          "30 minute": 30 * 60 * 1000 * 1000,
+          "1 hour": 60 * 60 * 1000 * 1000,
+          "1 day": 24 * 60 * 60 * 1000 * 1000,
+        };
+        console.log(
+          "searchObj.data.customDownloadQueryObj.query.start_time",
+          searchObj.data.customDownloadQueryObj.query.start_time
+        );
+
+        const intervalMs = intervalMap[searchObj.meta.resultGrid.chartInterval];
+        if (!intervalMs) {
+          throw new Error("Invalid interval");
+        }
+
+        const results: any = [];
+        let date = new Date();
+        const startTimeDate = new Date(
+          searchObj.data.customDownloadQueryObj.query.start_time / 1000
+        ); // Convert microseconds to milliseconds
+        if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
+          startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+        } else if (
+          searchObj.meta.resultGrid.chartInterval.includes("1 minute")
+        ) {
+          startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+          // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+        } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
+          // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+          startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+        } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
+          startTimeDate.setUTCMinutes(0, 0); // Round to the nearest whole minute
+        } else {
+          startTimeDate.setUTCHours(0, 0, 0, 0); // Round to the nearest whole minute
+        }
+
+        const startTime = startTimeDate.getTime() * 1000;
+        for (
+          let currentTime = startTime;
+          currentTime <= searchObj.data.customDownloadQueryObj.query.end_time;
+          currentTime += intervalMs
+        ) {
+          date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
+          results.push({
+            zo_sql_key: date.toISOString().slice(0, 19),
+            zo_sql_num: 0,
+          });
+        }
+
+        const dataMap = new Map(results.map((item) => [item.zo_sql_key, item]));
+        searchObj.data.queryResults.aggs.forEach((item) => {
+          // console.log("item",item)
+          if (dataMap.has(item.zo_sql_key)) {
+            dataMap.get(item.zo_sql_key).zo_sql_num = item.zo_sql_num;
+          }
+        });
+
+        const mergedData: any = Array.from(dataMap.values());
+
+        mergedData.map(
           (bucket: {
             zo_sql_key: string | number | Date;
             zo_sql_num: string;
@@ -3080,6 +3148,7 @@ const useLogs = () => {
         
         searchObj.data.queryResults.total = num_records;
       }
+      // console.log("xData", xData);
 
       const chartParams = {
         title: getHistogramTitle(),
@@ -3094,7 +3163,6 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
-      console.log(searchObj.data.histogram);
       return true;
     } catch (e: any) {
       console.log("Error while generating histogram data", e);
