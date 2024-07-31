@@ -8,10 +8,10 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"]);
     await page.waitForTimeout(1000);
-   //  await page.getByText('Login as internal user').click();
+   // await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
-        .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+        .fill(process.env["ZO_ROOT_USER_EMAIL"]); 
     //Enter Password
     await page
         .locator('[data-cy="login-password"]')
@@ -468,6 +468,19 @@ test('Ensure that switching between logs to visualize and back again results in 
 
 });
  
+test('should display histogram chart correctly when either the x or y field is removed from the visualization and when returning to the logs page.', async ({ page }) => {
+  
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.locator('[data-test="dashboard-y-item-_timestamp-remove"]').click();
+    await page.locator('[data-test="logs-logs-toggle"]').click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await expect(page.locator('[data-test="logs-search-result-bar-chart"]')).toBeVisible();
+    
+  });
+
 
   })
 
