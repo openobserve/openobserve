@@ -372,9 +372,9 @@ test.describe("Logs UI testcases", () => {
 
         //  await page.locator('.view-line').click();
         //   await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
-      //  await page.getByText('arrow_rightQueryAutoPromQLCustom SQL').click();
+        //  await page.getByText('arrow_rightQueryAutoPromQLCustom SQL').click();
 
-      //  await page.locator('.view-line').first().
+        //  await page.locator('.view-line').first().
         await page.dblclick('.view-line');
         await page.keyboard.press('End'); // Move to the end of the first
         await page.keyboard.press('Enter'); // Move to the next line
@@ -517,7 +517,7 @@ test.describe("Logs UI testcases", () => {
         // await page.getByRole('option', { name: 'default' }).locator('div').nth(2).click();
         // await page.locator('[data-test="dashboard-add-submit"]').click();
         // await expect(page.getByText('Dashboard added successfully.')).toBeVisible();
-         await page.waitForTimeout(200);
+        await page.waitForTimeout(200);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
@@ -593,12 +593,12 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-apply"]').click();
 
 
-        await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible({ timeout:30000});
+        await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible({ timeout: 30000 });
 
         await page.goto('https://alpha1.dev.zinclabs.dev/web/dashboards/add_panel?dashboard=7216685250963839834&folder=default&tab=default');
         await page.goto('https://alpha1.dev.zinclabs.dev/web/dashboards/view?org_identifier=default&dashboard=7216685250963839834&folder=default&tab=default');
         await page.goto('https://alpha1.dev.zinclabs.dev/web/dashboards/view?org_identifier=default&dashboard=7216685250963839834&folder=default&tab=default&refresh=Off&period=15m&var-Dynamic+filters=%255B%255D&print=false');
-      //  await expect(page.getByText('Defaultchevron_leftchevron_rightadd')).toBeVisible({ timeout: 30000 });
+        //  await expect(page.getByText('Defaultchevron_leftchevron_rightadd')).toBeVisible({ timeout: 30000 });
     });
 
 
@@ -739,7 +739,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
         // await page.locator('[data-test="date-time-btn"]').click();
 
-        await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-x-data"]').click();
+        //  await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-x-data"]').click();
         // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
         // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="date-time-btn"]').click();
@@ -751,12 +751,11 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
         await page.locator('[data-test="dashboard-panel-save"]').click();
         // await expect(page.locator('[data-test="chart-renderer"] div')).toBeVisible();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(200);
 
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
 
-        await page.waitForTimeout(2000);
         await page.locator('[data-test="dashboard-share-btn"]').click();
 
         await expect(page.getByText('Link copied successfully')).toBeHidden();
@@ -774,21 +773,17 @@ test.describe("Logs UI testcases", () => {
         // Expected Result: An appropriate error message is displayed if any fields are missing or incorrect.
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(1000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(4000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-        // await page.waitForTimeout(3000);
 
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
 
-        await page.waitForTimeout(1000);
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
 
@@ -797,7 +792,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="datetime-timezone-select"]').click();
         await page.getByRole('option', { name: 'Asia/Gaza' }).click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(200);
 
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
@@ -808,37 +803,36 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash_Error');
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
-
+        // await page.waitForTimeout(200)
         // await page.waitForSelector('[data-test="click-data-test-value"]');
+        //   await page.waitForURL('**/dashboards');
 
-        //     await page.locator('[data-test="dashboard-edit-panel-Dash1_Filter-dropdown"]').click();
-        //     await page.locator('[data-test="dashboard-delete-panel"]').click();
-        //     await page.waitForTimeout(1000);
-        //     await expect(page.getByText('Are you sure you want to')).toBeVisible();;
-        //     await page.locator('[data-test="confirm-button"]').click();
+
+        // await page.locator('[data-test="dashboard-edit-panel-Dash_Error_Filter-dropdown"]').click();
+        // await page.locator('[data-test="dashboard-delete-panel"]').click();
+        // await page.waitForTimeout(200);
+        // await expect(page.getByText('Are you sure you want to')).toBeVisible({ timeout: 30000 });;
+        // await page.locator('[data-test="confirm-button"]').click();
     });
 
 
     test('Verify filter functionality with different operators on dashboard field', async ({ page }) => {
         // Navigate to dashboards section
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
+        await waitForDashboardPage(page)
 
         // Add a new dashboard
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
         await expect(page.getByText('Dashboard added successfully.')).toHaveText('Dashboard added successfully.');
 
-        await page.waitForTimeout(1000);
 
         // Add a new panel and configure it
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
-        await page.waitForTimeout(3000);
 
         // Add panel fields
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
@@ -847,7 +841,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-absolute-tab"]').click();
         await page.getByRole('button', { name: '7', exact: true }).click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
         await page.getByRole('button', { name: '10', exact: true }).click();
         await page.locator('[data-test="datetime-timezone-select"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
@@ -863,7 +857,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-filter-condition-panel"]').getByText('arrow_drop_down').click();
         await page.getByRole('option', { name: 'Is Null' }).click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(200);
         //   await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
         // await expect(page.locator('[data-test="chart-renderer"] canvas')).toHaveCSS('display', 'block');
 
@@ -874,7 +868,6 @@ test.describe("Logs UI testcases", () => {
         await page.getByLabel('Value').click();
         await page.getByLabel('Value').fill('kubernetes_docker_Id');
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
         //  await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         // Apply "Is Not Null" filter
@@ -883,16 +876,16 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="date-time-relative-tab"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         await page.locator('[data-test="dashboard-filter-item-kubernetes_host"]').click();
         await page.locator('[data-test="dashboard-filter-condition-panel"]').getByText('arrow_drop_down').click();
         await page.getByText('Is Not Null').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
         //   await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
-        // Apply "<>" filter
+        //   Apply "<>" filter
         //  await page.locator('[data-test="chart-renderer"] canvas').click({ position: { x: 445, y: 15 } });
         //     await page.getByText('Kubernetes Container Hash :').click();
         //     await page.locator('[data-test="dashboard-y-item-kubernetes_container_hash"]').click();
@@ -901,7 +894,7 @@ test.describe("Logs UI testcases", () => {
         //     await page.locator('[data-test="dashboard-filter-condition-panel"]').getByText('arrow_drop_down').click();
         //     await page.getByRole('option', { name: '<>' }).click();
         //     await page.locator('[data-test="dashboard-apply"]').click();
-        //     await page.waitForTimeout(1000);
+        //     await page.waitForTimeout(100);
         // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         // Save and delete the panel
@@ -918,12 +911,10 @@ test.describe("Logs UI testcases", () => {
     test('Verify error message when required field is missing', async ({ page }) => {
         // Navigate to dashboards section
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
+        await waitForDashboardPage(page)
 
         // Add a new dashboard
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(4000);
-
         // Enter dashboard name and submit
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
@@ -936,7 +927,6 @@ test.describe("Logs UI testcases", () => {
         // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_host"] [data-test="dashboard-add-b-data"]').click();
-        await page.waitForTimeout(3000);
 
         // Remove X-Axis field and apply changes
         await page.locator('[data-test="dashboard-x-item-_timestamp-remove"]').click();
@@ -954,7 +944,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
         await page.locator('[data-test="dashboard-panel-save"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         // Add X-Axis field and save the panel
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-x-data"]').click();
@@ -1061,16 +1051,13 @@ test.describe("Logs UI testcases", () => {
 
 
     test('Verify that the breakdown field should update using Drag and Drop, +B, and Cancel this field.', async ({ page }) => {
-        // Generate a random dashboard name
-        // const randomDashboardName = 'Dashboard_' + Math.random().toString(36).substr(2, 9);
-
+    
         // Navigate to dashboards
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
+        await waitForDashboardPage(page)
 
         // Add a new dashboard
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
         await page.locator('[data-test="dashboard-add"]').click();
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
@@ -1091,11 +1078,10 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         // Verify the breakdown field removal
         await page.locator('[data-test="dashboard-b-item-kubernetes_labels_app_kubernetes_io_component-remove"]');
-        await page.waitForTimeout(2000);
 
         // await page.locator('[data-test="dashboard-b-item-kubernetes_labels_app_kubernetes_io_component-remove"]').click();
         // await page.locator('[data-test="dashboard-apply"]').click();
@@ -1108,7 +1094,7 @@ test.describe("Logs UI testcases", () => {
 
         // Save the panel with a new name
         await page.locator('[data-test="dashboard-panel-name"]').click();
-        await page.locator('[data-test="dashboard-panel-name"]').fill('ghdf');
+        await page.locator('[data-test="dashboard-panel-name"]').fill('Dash_01');
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
@@ -1120,46 +1106,40 @@ test.describe("Logs UI testcases", () => {
 
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(1000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        // await page.waitForTimeout(1000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
-        // await page.waitForTimeout(3000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-        // await page.waitForTimeout(1000);
         // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         // await page.getByText('2024-06-28 03:00:00').click(); 
-        //  await page.waitForTimeout(3000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
         await page.locator('[data-test="dashboard-b-item-kubernetes_container_hash-remove"]').click();
         await expect(page.getByText('Chart configuration has been')).toBeVisible();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash_Breakdown');
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
         // await page.hover('[data-test="hover-data-test-dashboard-panel-fullscreen-btn"]');
-        // await page.locator('[data-test="dashboard-panel-fullscreen-btn"]').click();
+        //  await page.locator('[data-test="dashboard-panel-fullscreen-btn"]').click();
 
         // Hover over the element to make the fullscreen button visible
         // await page.waitForTimeout(3000);
@@ -1192,21 +1172,19 @@ test.describe("Logs UI testcases", () => {
         // The existing added fields in the dropdown should adjust correctly according to the new chart type select
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
+        await waitForDashboardPage(page)
 
         // Add a new dashboard
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
-        await page.waitForTimeout(1000);
+        await page.locator('[data-test="dashboard-add-submit"]').click();
 
         // Add a panel to the dashboard
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
 
-        await page.waitForTimeout(1000);
 
         // Add fields to the chart
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
@@ -1217,7 +1195,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         // Verify the initial chart rendering
         //  await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
@@ -1261,13 +1239,12 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="selected-chart-bar-item"] img').click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-panel-save"]').click();
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(200);
 
         // Delete the dashboard panel
         // await page.locator('[data-test="dashboard-panel-name"]').click();
         // await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
         // await page.locator('[data-test="dashboard-panel-save"]').click();
-        await page.waitForTimeout(1000);
         await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
         await page.locator('[data-test="dashboard-delete-panel"]').click();
         await page.locator('[data-test="confirm-button"]').click();
@@ -1278,13 +1255,11 @@ test.describe("Logs UI testcases", () => {
     test('Verify that the panel is created successfully after adding a breakdown.', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
@@ -1295,17 +1270,16 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash1');
         await page.locator('[data-test="dashboard-panel-save"]').click();
-        //await page.waitForTimeout(1000);
+     // await loactor.waitForNavigation({ timeout: 30000 });
 
-        // await page.click('["class="q-icon notranslate material-icons q-btn-dropdown__arrow q-btn-dropdown__arrow-container"]');
+        //await page.click('["class="q-icon notranslate material-icons q-btn-dropdown__arrow q-btn-dropdown__arrow-container"]');
         // await page.locator('[data-test="dashboard-edit-panel-Dash1_Filter-dropdown"]').click();         // Delete panel code
         // await page.locator('[data-test="dashboard-delete-panel"]').click();
-        // await page.waitForTimeout(4000);
         // await expect(page.getByText('Are you sure you want to')).toBeVisible();
         // await page.locator('[data-test="confirm-button"]').click();
         // await expect(page.getByText('Panel deleted successfully')).toBeVisible();
@@ -1314,18 +1288,15 @@ test.describe("Logs UI testcases", () => {
     test('Verify that the selections are cleared after adding a breakdown, clicking Apply, and refreshing the page.', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(3000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_host"] [data-test="dashboard-add-b-data"]').click();
@@ -1335,7 +1306,7 @@ test.describe("Logs UI testcases", () => {
         await page.getByRole('button', { name: '16', exact: true }).click();
         await page.locator('[data-test="chart-renderer"] div').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         page.once('dialog', dialog => {
             console.log(`Dialog message: ${dialog.message()}`);
@@ -1349,18 +1320,15 @@ test.describe("Logs UI testcases", () => {
     test('Verify changing relative and absolute time with different timezones after adding breakdown and required fields.', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(2000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]').click();
@@ -1374,9 +1342,11 @@ test.describe("Logs UI testcases", () => {
 
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-absolute-tab"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
+
         await page.getByRole('button', { name: '8', exact: true }).click();
         await page.getByRole('button', { name: '16', exact: true }).click();
+
         await page.locator('#date-time-menu').getByText('arrow_drop_down').click();
         await page.locator('[data-test="datetime-timezone-select"]').click();
         await page.locator('[data-test="datetime-timezone-select"]').fill('Asia/c');
@@ -1393,24 +1363,20 @@ test.describe("Logs UI testcases", () => {
 
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(2000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(4000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(1000);
 
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_docker_id"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
 
         page.once('dialog', dialog => {
             console.log(`Dialog message: ${dialog.message()}`);
@@ -1425,18 +1391,15 @@ test.describe("Logs UI testcases", () => {
     test('Verify adding the breakdown and applying the Sort by filter, then add fields to the X and Y axes and check if the data is plotted.', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(1000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]').click();
@@ -1446,18 +1409,18 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="datetime-timezone-select"]').fill('Asia/c');
         await page.getByText('Asia/Calcutta', { exact: true }).click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
+
         await expect(page.locator('[data-test="dashboard-b-item-kubernetes_container_name"]')).toBeVisible();
         await page.locator('[data-test="dashboard-b-item-kubernetes_container_name"]').click();
         await page.locator('[data-test="dashboard-sort-by-item-asc"]').click();   //Filter A to C
-        await page.waitForTimeout(2000);
 
-        // await page.locator('[data-test="chart-renderer"] canvas').click({
-        //     position: {
-        //         x: 829,
-        //         y: 31
-        //     }
-        // });
+        await page.locator('[data-test="chart-renderer"] canvas').click({
+            position: {
+                x: 829,
+                y: 31
+            }
+        });
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-b-item-kubernetes_container_name"]').click();
         await page.locator('[data-test="dashboard-sort-by-item-desc"]').click();
@@ -1469,28 +1432,25 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-discard"]').click();
     });
 
+
     test('Ensure that string and numeric values are correctly handled and displayed when no value replacement occurs.', async ({ page }) => {
 
 
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await page.waitForTimeout(4000);
+        await waitForDashboardPage(page)
         await page.locator('[data-test="dashboard-add"]').click();
-        await page.waitForTimeout(5000);
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await page.waitForTimeout(3000);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(1000);
 
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
