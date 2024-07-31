@@ -130,10 +130,10 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const markLineTypeOptions = [
-      { label: "average", value: "average" },
-      { label: "median", value: "median" },
-      { label: "min", value: "min" },
-      { label: "max", value: "max" },
+      { label: "Average", value: "average" },
+      { label: "Median", value: "median" },
+      { label: "Min", value: "min" },
+      { label: "Max", value: "max" },
       { label: "X-Axis", value: "xAxis" },
       { label: "Y-Axis", value: "yAxis" },
     ];
