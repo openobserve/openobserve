@@ -801,11 +801,31 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
     Ok(Some(where_str))
 }
 
+fn closing_brace_index(opening_brace_index: usize, expr: &str) -> Option<usize> {
+    let mut brace_count = 0;
+    for (i, c) in expr[opening_brace_index..].chars().enumerate() {
+        if c == '(' {
+            brace_count += 1;
+        }
+        if c == ')' {
+            brace_count -= 1;
+        }
+        if brace_count == 0 {
+            return Some(opening_brace_index + i);
+        }
+    }
+
+    None
+}
+
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
     if token.is_empty() {
         return vec![];
     }
-    if token.starts_with('(') && token.ends_with(')') {
+    if token.starts_with('(')
+        && token.ends_with(')')
+        && closing_brace_index(0, token) == Some(token.len() - 1)
+    {
         return split_sql_token_unwrap_brace(&token[1..token.len() - 1]);
     }
     let tokens = split_sql_token(token);
