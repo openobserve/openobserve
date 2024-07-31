@@ -1195,7 +1195,9 @@ const useLogs = () => {
                 }
                 // });
               } else {
-                searchObj.data.queryResults.total = res.data.records;
+                // searchObj.data.queryResults.total = res.data.records;
+              
+                // generateHistogramData();
                 const partitions = res.data.partitions;
                 let pageObject = [];
                 searchObj.data.queryResults.partitionDetail.partitions =
@@ -1478,6 +1480,8 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+      searchObj.data.queryResults.total = 0;
+      // searchObj.data.histogram.chartParams.title = "";
       console.log("=================== Start Debug ===================");
       searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
@@ -1916,6 +1920,7 @@ const useLogs = () => {
   };
 
   const getPaginatedData = async (
+    
     queryReq: any,
     appendResult: boolean = false
   ) => {
@@ -2972,7 +2977,7 @@ const useLogs = () => {
         currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
       let endCount;
 
-      let totalCount = searchObj.data.queryResults.total || 0;
+      let totalCount = Math.max(searchObj.data.queryResults.hits.length,searchObj.data.queryResults.total)
       if (searchObj.meta.resultGrid.showPagination == false) {
         endCount = searchObj.data.queryResults.hits.length;
         totalCount = searchObj.data.queryResults.hits.length;
@@ -2983,7 +2988,7 @@ const useLogs = () => {
         ) {
           endCount = Math.min(
             startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-            searchObj.data.queryResults.total
+            totalCount
           );
         } else {
           endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
@@ -3041,6 +3046,7 @@ const useLogs = () => {
 
   function generateHistogramData() {
     try {
+      // searchObj.data.histogram.chartParams.title = ""
       let num_records: number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
@@ -3071,6 +3077,7 @@ const useLogs = () => {
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }
         );
+        
         searchObj.data.queryResults.total = num_records;
       }
 
@@ -3229,6 +3236,7 @@ const useLogs = () => {
             searchObj.data.queryResults.hits.push(...res.data.hits);
           } else {
             searchObj.data.queryResults = res.data;
+
           }
           //extract fields from query response
           extractFields();
@@ -3362,6 +3370,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent = "";
       searchObj.loading = true;
       await getQueryData();
+
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
@@ -3372,6 +3381,7 @@ const useLogs = () => {
       searchObj.loading = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
+      // searchObj.data.histogram.chartParams.title = ""
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
