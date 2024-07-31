@@ -255,6 +255,7 @@ pub async fn search_parquet(
                 SearchType::Normal
             },
             work_group: Some(work_group.to_string()),
+            target_partitions: 0,
         };
 
         // cacluate the diff between latest schema and group schema
@@ -469,6 +470,7 @@ pub async fn search_memtable(
                 SearchType::Normal
             },
             work_group: Some(work_group.to_string()),
+            target_partitions: 0,
         };
 
         // cacluate the diff between latest schema and group schema

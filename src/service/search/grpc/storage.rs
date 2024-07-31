@@ -206,6 +206,13 @@ pub async fn search(
         cache_type,
     );
 
+    // set target partitions based on cache type
+    let target_partitions = if cache_type == file_data::CacheType::None {
+        cfg.limit.query_thread_num
+    } else {
+        cfg.limit.cpu_num
+    };
+
     // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
@@ -232,6 +239,7 @@ pub async fn search(
                 SearchType::Normal
             },
             work_group: Some(work_group.to_string()),
+            target_partitions,
         };
 
         // cacluate the diff between latest schema and group schema

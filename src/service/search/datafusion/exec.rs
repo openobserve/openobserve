@@ -105,6 +105,7 @@ pub async fn sql(
             &session.search_type,
             false,
             false,
+            session.target_partitions,
             None,
         )
         .await?;
@@ -314,6 +315,7 @@ async fn get_fast_mode_ctx(
         storage_type: session.storage_type.clone(),
         search_type: session.search_type.clone(),
         work_group: session.work_group.clone(),
+        target_partitions: session.target_partitions,
     };
     let mut ctx = register_table(
         &fast_session,
@@ -404,7 +406,7 @@ pub async fn merge(
 
     // query data
     let mut ctx =
-        prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, None)
+        prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, 0, None)
             .await?;
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -775,7 +777,7 @@ pub async fn convert_parquet_file(
     ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, true, false, None).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, true, false, 0, None).await?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -906,8 +908,9 @@ pub async fn merge_parquet_files(
     // create datafusion context
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, None)
-        .await?;
+    let ctx =
+        prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, 0, None)
+            .await?;
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -940,14 +943,18 @@ pub async fn merge_parquet_files(
 pub fn create_session_config(
     search_type: &SearchType,
     sort_by_timestamp_desc: bool,
-    target_partition: usize,
+    target_partitions: usize,
     limit: Option<usize>,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
-    let target_partition = std::cmp::max(DATAFUSION_MIN_PARTITION, target_partition);
+    let target_partitions = if target_partitions == 0 {
+        cfg.limit.cpu_num
+    } else {
+        std::cmp::max(DATAFUSION_MIN_PARTITION, target_partitions)
+    };
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
-        .with_target_partitions(target_partition)
+        .with_target_partitions(target_partitions)
         .with_information_schema(true);
     config = config.set_bool(
         "datafusion.execution.listing_table_ignore_subdirectory",
@@ -1023,19 +1030,15 @@ pub async fn prepare_datafusion_context(
     search_type: &SearchType,
     without_optimizer: bool,
     sort_by_timestamp_desc: bool,
+    target_partitions: usize,
     limit: Option<usize>,
 ) -> Result<SessionContext, DataFusionError> {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
-    let (memory_size, target_partition) = (
-        cfg.memory_cache.datafusion_max_size,
-        cfg.limit.query_thread_num,
-    );
+    let (memory_size, target_partition) = (cfg.memory_cache.datafusion_max_size, target_partitions);
     #[cfg(feature = "enterprise")]
-    let (mut memory_size, mut target_partition) = (
-        cfg.memory_cache.datafusion_max_size,
-        cfg.limit.query_thread_num,
-    );
+    let (mut memory_size, mut target_partition) =
+        (cfg.memory_cache.datafusion_max_size, target_partitions);
     #[cfg(feature = "enterprise")]
     if let Some(wg) = _work_group {
         if let Ok(wg) = WorkGroup::from_str(&wg) {
@@ -1119,6 +1122,7 @@ pub async fn register_table(
         &session.search_type,
         without_optimizer,
         sort_by_timestamp_desc,
+        session.target_partitions,
         limit,
     )
     .await?;
