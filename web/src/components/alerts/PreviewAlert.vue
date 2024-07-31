@@ -1,8 +1,18 @@
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div style="height: 200px" data-test="alert-preview-chart">
-      <PanelSchemaRenderer v-if="chartData" :height="6" :width="6" :panelSchema="chartData"
-        :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="{}" searchType="UI" />
+      <p class="sql-preview" v-if="selectedTab === 'sql'">
+        Preview is not available in SQL mode
+      </p>
+      <PanelSchemaRenderer
+        v-else-if="chartData"
+        :height="6"
+        :width="6"
+        :panelSchema="chartData"
+        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+        :variablesData="{}"
+        searchType="UI"
+      />
     </div>
   </div>
 </template>
@@ -212,4 +222,11 @@ const refreshData = () => {
 defineExpose({ refreshData });
 </script>
 
-<style scoped></style>
+<style scoped>
+.sql-preview{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 5vh;
+}
+</style>
