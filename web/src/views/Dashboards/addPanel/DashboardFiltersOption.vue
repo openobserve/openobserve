@@ -224,7 +224,6 @@ export default defineComponent({
 <style lang="scss" scoped>
 .layout-name {
   font-size: 14px;
-  color: rgba(0, 0, 0, 0.87);
   margin-top: 10px;
 }
 
