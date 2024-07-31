@@ -39,7 +39,7 @@ message SearchRequest {
     string                 stream_type = 3;
     SearchType                   stype = 4;
     SearchQuery                  query = 5;
-    SearchMode                    mode = 6;
+    AggregateMode             agg_mode = 6;
     repeated FileKey         file_list = 7;
     int64                      timeout = 8;
     string                  work_group = 9;
@@ -59,7 +59,7 @@ message SearchResponse {
     int32                 idx_took = 10;
 }
 
-enum SearchMode {
+enum AggregateMode {
     Final   = 0;
     Partial = 1;
 }

@@ -454,7 +454,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
             job: Some(job),
             org_id: "".to_string(),
             stype: cluster_rpc::SearchType::User.into(),
-            mode: cluster_rpc::SearchMode::Final.into(),
+            agg_mode: cluster_rpc::AggregateMode::Final.into(),
             query: Some(req_query),
             file_list: vec![],
             stream_type: "".to_string(),
