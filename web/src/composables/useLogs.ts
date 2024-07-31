@@ -2367,8 +2367,14 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       if (searchObj.data.isOperationCancelled) {
         searchObj.loadingHistogram = false;
-        searchObj.data.histogram.errorDetail = "Search operation was cancelled";
         searchObj.data.isOperationCancelled = false;
+
+        searchObj.data.histogram.errorCode = 429;
+        notificationMsg.value = "Search operation was cancelled";
+        searchObj.data.histogram.errorMsg =
+          "Error while fetching histogram data.";
+        searchObj.data.histogram.errorDetail = "Search operation was cancelled";
+
         return;
       }
 
