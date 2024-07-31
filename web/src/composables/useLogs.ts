@@ -3020,6 +3020,56 @@ const useLogs = () => {
           )
         ) {
           searchObj.data.resultGrid.columns.push({
+            name: "timestamp",
+            id: "timestamp",
+            accessorFn: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS",
+              ),
+            prop: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS",
+              ),
+            label: t("search.timestamp") + ` (${store.state.timezone})`,
+            header: t("search.timestamp") + ` (${store.state.timezone})`,
+            align: "left",
+            sortable: true,
+            size: 250,
+            enableResizing: false,
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
+            size: 225,
+          });
+        }
+
+        if (searchObj.data.stream.selectedFields.length == 0) {
+          searchObj.data.resultGrid.columns.push({
+            name: "source",
+            id: "source",
+            accessorFn: (row: any) => JSON.stringify(row),
+            cell: (info: any) => info.getValue(),
+            header: "source",
+            sortable: true,
+            enableResizing: false,
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
+          });
+        }
+      } else {
+        // searchObj.data.stream.selectedFields.forEach((field: any) => {
+        if (searchObj.data.hasSearchDataTimestampField == true) {
+          searchObj.data.resultGrid.columns.unshift({
+            name: "timestamp",
             id: "timestamp",
             accessorFn: (row: any) =>
               timestampToTimezoneDate(
@@ -3038,6 +3088,7 @@ const useLogs = () => {
             align: "left",
             sortable: true,
             enableResizing: false,
+            size: 250,
             meta: {
               closable: false,
               showWrap: false,
@@ -3046,55 +3097,10 @@ const useLogs = () => {
             size: 225,
           });
         }
-
-        if (searchObj.data.stream.selectedFields.length == 0) {
-          searchObj.data.resultGrid.columns.push({
-            id: "source",
-            accessorFn: (row: any) => JSON.stringify(row),
-            cell: (info: any) => info.getValue(),
-            header: "source",
-            sortable: true,
-            enableResizing: false,
-            meta: {
-              closable: false,
-              showWrap: false,
-              wrapContent: false,
-            },
-          });
-        }
-      } else {
-        // searchObj.data.stream.selectedFields.forEach((field: any) => {
-        if (searchObj.data.hasSearchDataTimestampField == true) {
-          searchObj.data.resultGrid.columns.unshift({
-            name: "@timestamp",
-            accessorFn: (row: any) =>
-              timestampToTimezoneDate(
-                row[store.state.zoConfig.timestamp_column] / 1000,
-                store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
-              ),
-            prop: (row: any) =>
-              timestampToTimezoneDate(
-                row[store.state.zoConfig.timestamp_column] / 1000,
-                store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
-              ),
-            label: t("search.timestamp") + ` (${store.state.timezone})`,
-            header: t("search.timestamp") + ` (${store.state.timezone})`,
-            align: "left",
-            sortable: true,
-            enableResizing: true,
-            size: "250px",
-            meta: {
-              closable: false,
-              showWrap: false,
-              wrapContent: false,
-            },
-          });
-        }
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             searchObj.data.resultGrid.columns.push({
+              name: field,
               id: field,
               accessorFn: (row: { [x: string]: any; source: any }) => {
                 return byString(row, field);
@@ -3102,7 +3108,7 @@ const useLogs = () => {
               header: field,
               sortable: true,
               enableResizing: true,
-              size: "250px",
+              size: 250,
               meta: {
                 closable: true,
                 showWrap: true,
