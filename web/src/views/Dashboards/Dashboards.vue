@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="text-bold q-px-md q-pt-sm">
-          {{ t("dashboard.folderLabel") }}
+          {{ t("dashboard.folderLabel") }} 
         </div>
         <div class="dashboards-tabs">
           <q-tabs
@@ -85,7 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
+
+
               content-class="tab_content full-width"
+              class="test-class"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
             >
               <div class="folder-item full-width row justify-between no-wrap">
@@ -99,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     no-caps
                     icon="more_vert"
-                    style="cursor: pointer; justify-self: end"
+                    style="cursor: pointer; justify-self: end ;height:0.5rem;"
                     size="sm"
                     data-test="dashboard-more-icon"
                   >
@@ -136,14 +139,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn>
                 </div>
               </div>
+              <q-separator />
             </q-tab>
+         
           </q-tabs>
           <div
             class="row justify-center full-width q-px-xs q-pb-xs"
-            style="position: sticky; bottom: 0px"
+            style="position: sticky; bottom: 0px;"
           >
             <q-btn
-              class="text-bold no-border full-width"
+              
+              class="text-bold  no-border full-width"
               padding="sm lg"
               color="secondary"
               no-caps
@@ -781,7 +787,13 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
 .dashboards-tabs {
+  .test-class{
+   min-height: 1.5rem; 
+  margin-bottom: 6px; 
+  border-bottom: 1px lightgray dotted;
+}
   .folder-item {
     display: flex;
     justify-content: space-between;
@@ -796,11 +808,11 @@ export default defineComponent({
       }
     }
 
-    .folder-name {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    // .folder-name {
+    //   white-space: nowrap;
+    //   overflow: hidden;
+    //   text-overflow: ellipsis;
+    // }
 
     .hover-actions {
       display: none;
