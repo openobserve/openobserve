@@ -157,7 +157,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, toRef } from "vue";
+import { defineComponent, ref, computed, toRef, watch } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
@@ -183,12 +183,6 @@ export default defineComponent({
     const searchTerm = ref("");
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
-
-    console.log("filteredSchemaOptions", filteredSchemaOptions.value);
-    console.log(
-      "props.schemaOptions",
-      props.dashboardPanelData.meta.filterValue,
-    );
 
     const filteredListOptions = computed(() => {
       return props.dashboardPanelData.meta.filterValue
@@ -235,6 +229,15 @@ export default defineComponent({
     const removeColumnName = () => {
       props.condition.column = "";
     };
+
+    watch(
+      () => props.condition.column,
+      (newColumn, oldColumn) => {
+        if (newColumn !== oldColumn) {
+          props.condition.values = [];
+        }
+      },
+    );
 
     return {
       operators,
