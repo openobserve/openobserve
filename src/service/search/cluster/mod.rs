@@ -128,8 +128,7 @@ pub async fn search(
         && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] search: is_agg_query {} is_inverted_index {}",
-        !req.aggs.is_empty(),
+        "[trace_id {trace_id}] search: is_inverted_index {}",
         is_inverted_index
     );
 
@@ -159,7 +158,7 @@ pub async fn search(
     // then filter the file list based on the inverted index.
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if is_inverted_index && req.aggs.is_empty() {
+    if is_inverted_index {
         (file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
         log::info!(
@@ -707,19 +706,6 @@ async fn merge_grpc_result(
                 .collect::<Vec<_>>();
             value.extend(batch);
         }
-        // handle aggs
-        for agg in resp.aggs {
-            if !agg.hits.is_empty() {
-                let buf = Cursor::new(agg.hits);
-                let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                let batch = reader
-                    .into_iter()
-                    .map(std::result::Result::unwrap)
-                    .collect::<Vec<_>>();
-                let value = batches.entry(format!("agg_{}", agg.name)).or_default();
-                value.extend(batch);
-            }
-        }
     }
 
     // convert select field to schema::Field
@@ -738,12 +724,8 @@ async fn merge_grpc_result(
     // merge all batches
     let mut merge_batches = HashMap::new();
     for (name, batch) in batches {
-        let (merge_sql, select_fields) = if name == "query" {
-            (sql.origin_sql.clone(), select_fields.clone())
-        } else {
-            let agg_name = name.strip_prefix("agg_").unwrap();
-            (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
-        };
+        let merge_sql = sql.origin_sql.clone();
+        let select_fields = select_fields.clone();
 
         #[cfg(feature = "enterprise")]
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -1036,14 +1018,11 @@ async fn get_file_list_by_inverted_index(
 
     idx_req.stream_type = StreamType::Index.to_string();
     idx_req.query.as_mut().unwrap().sql = query;
-    idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
     idx_req.query.as_mut().unwrap().from = 0;
     idx_req.query.as_mut().unwrap().size = QUERY_WITH_NO_LIMIT;
     idx_req.query.as_mut().unwrap().uses_zo_fn = false;
     idx_req.query.as_mut().unwrap().track_total_hits = false;
-    idx_req.query.as_mut().unwrap().query_context = "".to_string();
     idx_req.query.as_mut().unwrap().query_fn = "".to_string();
-    idx_req.aggs.clear();
 
     let idx_resp: search::Response = http::search(idx_req).await?;
     // get deleted file

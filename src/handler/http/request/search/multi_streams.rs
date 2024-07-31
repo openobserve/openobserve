@@ -61,9 +61,6 @@ use crate::{
             "end_time": 1675185660872049i64,
             "from": 0,
             "size": 10
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '30 second') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
     })),
     responses(
@@ -87,18 +84,6 @@ use crate::{
                     "stream": "stderr"
                 }
             ],
-            "aggs": {
-                "agg1": [
-                    {
-                        "key": "2023-01-15 14:00:00",
-                        "num": 345940
-                    },
-                    {
-                        "key": "2023-01-15 19:00:00",
-                        "num": 384026
-                    }
-                ]
-            },
             "total": 27179431,
             "from": 0,
             "size": 1,
@@ -328,7 +313,6 @@ pub async fn search_multi(
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.append(&mut res.columns);
                 multi_res.hits.append(&mut res.hits);
-                multi_res.aggs.extend(res.aggs.into_iter());
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
@@ -691,16 +675,13 @@ pub async fn around_multi(
                 start_time: around_start_time,
                 end_time: around_key,
                 sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
-                sql_mode: "".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
             clusters: clusters.clone(),
@@ -766,16 +747,13 @@ pub async fn around_multi(
                 start_time: around_key,
                 end_time: around_end_time,
                 sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
-                sql_mode: "".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
-                query_context: None,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
             clusters: clusters.clone(),
