@@ -15,6 +15,7 @@
 
 use std::cmp::max;
 
+use cache::result_utils::is_aggregate_query;
 use chrono::Duration;
 use config::{
     get_config, ider,
