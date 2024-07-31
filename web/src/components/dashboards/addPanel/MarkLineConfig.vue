@@ -61,7 +61,7 @@
             dense
             style="width: 100%"
             outlined
-            class="showLabelOnTop"
+            class="q-py-sm showLabelOnTop"
             stack-label
             emit-value
             :data-test="`dashboard-config-markline-type-${index}`"
@@ -71,7 +71,7 @@
             label="Label"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="q-py-sm showLabelOnTop"
             stack-label
             filled
             dense
@@ -89,7 +89,7 @@
             label="Value"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="q-py-sm showLabelOnTop"
             stack-label
             filled
             dense
@@ -134,8 +134,8 @@ export default defineComponent({
       { label: "median", value: "median" },
       { label: "min", value: "min" },
       { label: "max", value: "max" },
-      { label: "xAxis", value: "xAxis" },
-      { label: "yAxis", value: "yAxis" },
+      { label: "X-Axis", value: "xAxis" },
+      { label: "Y-Axis", value: "yAxis" },
     ];
 
     const dashboardPanelDataPageKey = inject(
@@ -156,7 +156,7 @@ export default defineComponent({
     const addNeMarkLine = () => {
       dashboardPanelData.data.config.mark_line.push({
         name: "",
-        type: "average",
+        type: "yAxis",
         value: "",
       });
     };
