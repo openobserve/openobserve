@@ -18,7 +18,7 @@ import { useI18n } from "vue-i18n";
 import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, remove } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 
 import {
   useLocalLogFilterField,
@@ -123,7 +123,7 @@ const defaultObject = {
       showPagination: true,
     },
     scrollInfo: {},
-    flagWrapContent: false,
+    flagWrapContent: true,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
     clusters: [],
@@ -3037,13 +3037,13 @@ const useLogs = () => {
             header: t("search.timestamp") + ` (${store.state.timezone})`,
             align: "left",
             sortable: true,
-            enableResizing: true,
-            size: "250px",
+            enableResizing: false,
             meta: {
               closable: false,
               showWrap: false,
               wrapContent: false,
             },
+            size: 225,
           });
         }
 
@@ -3054,7 +3054,7 @@ const useLogs = () => {
             cell: (info: any) => info.getValue(),
             header: "source",
             sortable: true,
-            enableResizing: true,
+            enableResizing: false,
             meta: {
               closable: false,
               showWrap: false,
@@ -3108,6 +3108,7 @@ const useLogs = () => {
                 showWrap: true,
                 wrapContent: false,
               },
+              size: 250,
             });
           }
         }

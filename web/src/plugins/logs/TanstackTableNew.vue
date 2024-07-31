@@ -7,10 +7,6 @@
           ...columnSizeVars,
           width: !columnOrder.includes('source')
             ? table.getCenterTotalSize() + 'px'
-            : wrap
-            ? width
-              ? width - 12 + 'px'
-              : '100%'
             : '100%',
         }"
       >
@@ -27,10 +23,7 @@
               'tw-cursor-move': table.getState().columnOrder.length > 1,
             }"
             :style="{
-              width:
-                columnOrder.includes('source') && wrap
-                  ? width - 12 + 'px'
-                  : tableRowSize + 'px',
+              width: tableRowSize + 'px',
             }"
             tag="tr"
             @start="(event) => handleDragStart(event)"
@@ -47,8 +40,12 @@
               <div
                 v-if="header.column.getCanResize()"
                 @dblclick="header.column.resetSize()"
-                @mousedown.self="header.getResizeHandler()?.($event)"
-                @touchstart.self="header.getResizeHandler()?.($event)"
+                @mousedown.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
+                @touchstart.self.prevent.stop="
+                  header.getResizeHandler()?.($event)
+                "
                 :class="[
                   'resizer',
                   header.column.getIsResizing() ? 'isResizing' : '',
@@ -131,39 +128,13 @@
               </div>
             </th>
           </vue-draggable>
-
-          <tr v-if="loading" class="tw-w-full">
-            <td
-              :colspan="columnOrder.length"
-              class="text-bold"
-              style="opacity: 0.7"
-            >
-              <div
-                class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
-              >
-                <q-spinner-hourglass size="20px" />
-                {{ t("confirmDialog.loading") }}
-              </div>
-            </td>
-          </tr>
-          <tr v-if="!loading && errMsg != ''" class="tw-w-full">
-            <td
-              :colspan="columnOrder.length"
-              class="text-bold"
-              style="opacity: 0.7"
-            >
-              <div class="text-subtitle2 text-weight-bold bg-warning">
-                <q-icon size="xs" name="warning" class="q-mr-xs" />
-                {{ errMsg }}
-              </div>
-            </td>
-          </tr>
         </thead>
         <tbody ref="tableBodyRef" class="tw-relative">
           <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
             <tr
               :style="{
                 transform: `translateY(${virtualRow.start}px)`,
+                width: '100%',
               }"
               :data-index="virtualRow.index"
               :ref="(node: any) => rowVirtualizer.measureElement(node)"
@@ -172,9 +143,7 @@
                 store.state.theme === 'dark'
                   ? 'w-border-gray-800'
                   : 'w-border-gray-100',
-                columnOrder.includes('source') && !wrap
-                  ? 'tw-table-row'
-                  : 'tw-flex',
+                columnOrder.includes('source') ? 'tw-table-row' : 'tw-flex',
                 !formattedRows[virtualRow.index].getIsExpanded() &&
                   'tw-border-b',
               ]"
@@ -189,18 +158,13 @@
                   width:
                     cell.column.columnDef.id !== 'source'
                       ? cell.column.getSize() + 'px'
-                      : wrap
-                      ? width - 225 - 12 + 'px'
                       : 'auto',
                   height: wrap ? '100%' : '26px',
                 }"
                 :class="[
-                  columnOrder.includes('source') && !wrap
-                    ? 'tw-table-cell'
-                    : 'tw-block',
-                  !wrap &&
+                  columnOrder.includes('source') ? 'tw-table-cell' : 'tw-block',
+                  (!wrap || cell.column.columnDef.id === 'timestamp') &&
                     'tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap',
-                  wrap && ' tw-break-words',
                 ]"
               >
                 <q-btn
@@ -222,6 +186,34 @@
                   :props="cell.getContext()"
                 />
               </td>
+
+              <table class="tw-w-full">
+                <tr
+                  v-if="formattedRows[virtualRow.index].getIsExpanded()"
+                  class="tw-border-t"
+                  :class="[
+                    store.state.theme === 'dark'
+                      ? 'w-border-gray-800'
+                      : 'w-border-gray-100',
+                  ]"
+                >
+                  <td colspan="4">
+                    <json-preview
+                      :value="rows[virtualRow.index]"
+                      show-copy-button
+                      class="tw-border-b tw-py-1"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'w-border-gray-800'
+                          : 'w-border-gray-100'
+                      "
+                      @copy="copyLogToClipboard"
+                      @add-field-to-table="addFieldToTable"
+                      @add-search-term="addSearchTerm"
+                    />
+                  </td>
+                </tr>
+              </table>
             </tr>
           </template>
         </tbody>
@@ -258,18 +250,6 @@ const props = defineProps({
   wrap: {
     type: Boolean,
     default: false,
-  },
-  width: {
-    type: Number,
-    default: 56,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  errMsg: {
-    type: String,
-    default: "",
   },
 });
 
@@ -321,7 +301,7 @@ const table = useVueTable({
     return props.rows || [];
   },
   get columns() {
-    return props.columns as ColumnDef<unknown, any>[];
+    return props.columns as ColumnDef<any>[];
   },
   state: {
     get sorting() {
@@ -534,3 +514,229 @@ td {
   background: #565656;
 }
 </style>
+
+<!-- <template>
+    <div ref="parentRef" class="tw-overflow-x-auto">
+      <table class="tw-min-w-full tw-divide-gray-200">
+        <thead class="tw-bg-gray-50">
+          <tr>
+            <th v-for="header in headers" :key="header.column.id" scope="col">
+              {{ header.column.columnDef.header }}
+            </th>
+          </tr>
+        </thead>
+        <tbody class="tw-bg-white tw-divide-gray-200">
+          <tr v-for="virtualRow in virtualRows" :key="virtualRow.key">
+            <td
+              v-for="cell in rowsModel[virtualRow.index].getVisibleCells()"
+              :key="cell.id"
+              class="tw-px-2 tw-py-1"
+            >
+              <FlexRender
+                :render="cell.column.columnDef.cell"
+                :props="cell.getContext()"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </template>
+  
+  <script setup lang="ts">
+  import { useVirtualizer } from "@tanstack/vue-virtual";
+  import {
+    FlexRender,
+    ColumnDef,
+    SortingState,
+    useVueTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    createColumnHelper,
+  } from "@tanstack/vue-table";
+  import {
+    defineProps,
+    ref,
+    computed,
+    onBeforeMount,
+    watch,
+    reactive,
+  } from "vue";
+  import rowsJson from "@/utils/test_logs.json";
+  
+  const props = defineProps({
+    rows: {
+      type: Array,
+      required: true,
+    },
+    columns: {
+      type: Array,
+      required: true,
+    },
+  });
+  
+  // const tableColumns = [
+  //   {
+  //     header: "Name",
+  //     accessorKey: "name",
+  //     id: "name",
+  //   },
+  //   {
+  //     header: "Age",
+  //     accessorKey: "age",
+  //     id: "age",
+  //   },
+  //   {
+  //     header: "Address",
+  //     accessorKey: "address",
+  //     id: "address",
+  //   },
+  // ];
+  
+  // const tableRows = [
+  //   {
+  //     name: "John Doe",
+  //     age: 28,
+  //     address: "123 Main St",
+  //   },
+  //   {
+  //     name: "Jane Smith",
+  //     age: 34,
+  //     address: "456 Maple Ave",
+  //   },
+  // ];
+  
+  const columnHelper = createColumnHelper();
+  
+  const initialColumns = [
+    columnHelper.accessor("_timestamp", {
+      header: "timestamp (Asia/Calcutta)",
+      cell: (info) => info.getValue(),
+    }),
+    columnHelper.accessor("source", {
+      header: "source",
+      cell: (info) => info.getValue(),
+    }),
+  ];
+  
+  const tableRows = ref<any[]>(rowsJson.slice(10));
+  
+  const tableColumns = reactive<{ [key: string]: string }[]>([...initialColumns]);
+  
+  onBeforeMount(() => {
+    console.log("rows and columns");
+    // getRows();
+    // getColumns();
+  });
+  
+  // watch(
+  //   () => props.rows,
+  //   () => {
+  //     tableRows.value = [];
+  //     getRows();
+  //   }
+  // );
+  
+  // watch(
+  //   () => props.columns,
+  //   () => {
+  //     tableColumns = [];
+  //     getColumns();
+  //     console.log("columns >>>>>>>>>>>>>>>>", tableColumns);
+  //     if (!tableColumns.length) {
+  //       tableColumns = [...initialColumns];
+  //     }
+  //   }
+  // );
+  
+  const getRows = () => {
+    tableRows.value = rowsJson.slice(10) || [];
+    // tableRows.value = (rowsJson.slice(5000) || []).map((row: any) => {
+    //   const _row: { [key: string]: string } = {};
+    //   props.columns.forEach((column: any) => {
+    //     _row[column.name === "@timestamp" ? "_timestamp" : column.name] =
+    //       column.field(row);
+    //   });
+    //   return _row;
+    // });
+  };
+  
+  // const getColumns = () => {
+  //   tableColumns = (props.columns || []).map((column: any) => {
+  //     return {
+  //       header: column.label,
+  //       id: column.name === "@timestamp" ? "_timestamp" : column.name,
+  //       accessorKey: column.name === "@timestamp" ? "_timestamp" : column.name,
+  //     };
+  //   });
+  
+  //   console.log("tableColumns", tableColumns, table.getHeaderGroups());
+  // };
+  
+  const table = useVueTable({
+    columns: tableColumns,
+    data: tableRows.value,
+    getCoreRowModel: getCoreRowModel(),
+    debugTable: true,
+    debugHeaders: true,
+    debugColumns: true,
+  });
+  
+  const state = ref({
+    ...table.initialState,
+    pagination: {
+      pageIndex: 0,
+      pageSize: 15,
+    },
+  });
+  
+  // const setState = (updater) => {
+  //   console.log("updater", updater);
+  //   state.value = updater instanceof Function ? updater(state.value) : updater;
+  // };
+  
+  // console.log("state", state.value);
+  
+  // //Use the table.setOptions API to merge our fully controlled state onto the table instance
+  // table.setOptions((prev) => ({
+  //   ...prev, //preserve any other options that we have set up above
+  //   get state() {
+  //     return state.value;
+  //   },
+  //   onStateChange: setState, //any state changes will be pushed up to our own state management
+  // }));
+  
+  const parentRef = ref<HTMLElement | null>(null);
+  
+  const headers = ref(table.getHeaderGroups()[0]?.headers);
+  
+  const rowsModel = ref(table.getRowModel()?.rows);
+  
+  const rowVirtualizerOptions = computed(() => {
+    return {
+      count: tableRows.value.length,
+      estimateSize: () => 29, //estimate row height for accurate scrollbar dragging
+      getScrollElement: () => parentRef.value,
+      //measure dynamic row height, except in firefox because it measures table border height incorrectly
+      measureElement:
+        typeof window !== "undefined" &&
+        navigator.userAgent.indexOf("Firefox") === -1
+          ? (element) => element?.getBoundingClientRect().height
+          : undefined,
+      overscan: 5,
+    };
+  });
+  
+  const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
+  
+  const virtualRows = computed(() => {
+    return rowVirtualizer.value.getVirtualItems();
+  });
+  
+  console.log("virtual rows", virtualRows.value.length);
+  </script>
+  
+  <style>
+  /* Import Tailwind CSS */
+  @import "tailwindcss/tailwind.css";
+  </style> -->

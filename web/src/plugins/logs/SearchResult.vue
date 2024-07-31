@@ -399,8 +399,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-virtual-scroll> -->
       <tenstack-table
+        ref="searchTableRef"
         :columns="searchObj.data.resultGrid.columns"
         :rows="searchObj.data.queryResults.hits"
+        :wrap="searchObj.meta.toggleSourceWrap"
+        :width="getTableWidth"
+        :err-msg="searchObj.data.missingStreamMessage"
+        :loading="searchObj.loading"
         class="col-12"
         @copy="copyLogToClipboard"
         @add-field-to-table="addFieldToTable"
@@ -458,6 +463,7 @@ import {
   onUpdated,
   onRenderTracked,
   defineAsyncComponent,
+  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -555,7 +561,7 @@ export default defineComponent({
       }
     },
     closeColumn(col: any) {
-      const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
+      const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.id);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
       const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
@@ -737,6 +743,22 @@ export default defineComponent({
       router.push(query);
     };
 
+    const getTableWidth = computed(() => {
+      console.log("recalculate");
+      const leftSidebarMenu = 56;
+      const fieldList =
+        (window.innerWidth - leftSidebarMenu) *
+        (searchObj.config.splitterModel / 100);
+      return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
+    });
+
+    watch(
+      () => searchObj.config.splitterModel,
+      (newValue, oldValue) => {
+        console.log(`splitterModel changed from ${oldValue} to ${newValue}`);
+      },
+    );
+
     return {
       t,
       store,
@@ -769,6 +791,7 @@ export default defineComponent({
       refreshPartitionPagination,
       disableMoreErrorDetails,
       redirectToTraces,
+      getTableWidth,
     };
   },
   computed: {
