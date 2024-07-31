@@ -137,6 +137,8 @@ pub enum AggFunction {
     Sum,
     #[serde(rename = "count")]
     Count,
+    #[serde(rename = "median")]
+    Median,
     #[serde(rename = "p50")]
     P50,
     #[serde(rename = "p75")]
@@ -157,6 +159,7 @@ impl std::fmt::Display for AggFunction {
             AggFunction::Max => write!(f, "max"),
             AggFunction::Sum => write!(f, "sum"),
             AggFunction::Count => write!(f, "count"),
+            AggFunction::Median => write!(f, "median"),
             AggFunction::P50 => write!(f, "p50"),
             AggFunction::P75 => write!(f, "p75"),
             AggFunction::P90 => write!(f, "p90"),
@@ -175,6 +178,7 @@ impl TryFrom<&str> for AggFunction {
             "max" => AggFunction::Max,
             "sum" => AggFunction::Sum,
             "count" => AggFunction::Count,
+            "median" => AggFunction::Median,
             "p50" => AggFunction::P50,
             "p75" => AggFunction::P75,
             "p90" => AggFunction::P90,
