@@ -6,11 +6,11 @@ import { parseArgs } from "util";
 
 const randomDashboardName = 'Dashboard_' + Math.random().toString(36).substr(2, 9);
 
-test.describe.configure({ mode: "parallel" });
+// test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: 'networkidle' });
-     await page.getByText('Login as internal user').click();
+ //    await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -69,6 +69,7 @@ test.describe("dashboard UI testcases", () => {
     //   console.log("--logData--", logData);
     // });
     test.beforeEach(async ({ page }) => {
+        console.log("running before each");
         await login(page);
 
         // just to make sure org is set

@@ -3,12 +3,12 @@ import logData from "../cypress/fixtures/log.json";
 import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 
-test.describe.configure({ mode: "parallel" });
+// test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"]);
     await page.waitForTimeout(1000);
-    await page.getByText('Login as internal user').click();
+ //   await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]); 
@@ -59,6 +59,8 @@ test.describe(" visualize UI testcases", () => {
     //   console.log("--logData--", logData);
     // });
     test.beforeEach(async ({ page }) => {
+      console.log("running before each");
+
         await login(page);
         await page.waitForTimeout(5000);
 
