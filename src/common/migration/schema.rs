@@ -21,6 +21,8 @@ use infra::{
     dist_lock, scheduler,
 };
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::add_init_ofga_tuples;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -248,6 +250,10 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
 
     let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
 
+    // OFGA migration is also needed here
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
+
     if let Err(e) = migrate_alert_template_names().await {
         dist_lock::unlock(&locker).await?;
         return Err(e);
@@ -343,14 +349,7 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
     }
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
-        match update_tuples(write_tuples, vec![]).await {
-            Ok(_) => {
-                log::info!("[Report:Migration]: Reports updated to the openfga");
-            }
-            Err(_) => {
-                log::error!("[Report:Migration]: Error updating report to the openfga");
-            }
-        }
+        add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
 }
@@ -391,14 +390,7 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
     }
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
-        match update_tuples(write_tuples, vec![]).await {
-            Ok(_) => {
-                log::info!("[Template:Migration]: Templates updated to the openfga");
-            }
-            Err(_) => {
-                log::error!("[Template:Migration]: Error updating template to the openfga");
-            }
-        }
+        add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
 }
@@ -454,14 +446,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
     }
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
-        match update_tuples(write_tuples, vec![]).await {
-            Ok(_) => {
-                log::info!("[Destination:Migration]: Destinations updated to the openfga");
-            }
-            Err(_) => {
-                log::error!("[Destination:Migration]: Error updating destination to the openfga");
-            }
-        }
+        add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
 }
@@ -536,14 +521,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
-        match update_tuples(write_tuples, vec![]).await {
-            Ok(_) => {
-                log::info!("[Alert:Migration]: Alerts updated to the openfga");
-            }
-            Err(_) => {
-                log::error!("[Alert:Migration]: Error updating alert to the openfga");
-            }
-        }
+        add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
 }
