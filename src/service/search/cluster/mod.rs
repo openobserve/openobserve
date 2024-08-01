@@ -74,6 +74,7 @@ pub async fn search(
     let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
+    log::info!("[trace_id {trace_id}] is_final_phase: {}", is_final_phase);
     let stream_type = StreamType::from(req.stream_type.as_str());
     if req.timeout == 0 {
         req.timeout = cfg.limit.query_timeout as i64;
@@ -680,7 +681,7 @@ async fn merge_grpc_result(
     trace_id: &str,
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
-    _is_final_phase: bool,
+    is_final_phase: bool,
 ) -> Result<(Vec<RecordBatch>, ScanStats, bool)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
@@ -760,6 +761,11 @@ async fn merge_grpc_result(
             batches = new_batches;
         }
         schema_latest = schema.clone();
+    }
+
+    // only final phase need merge partitions
+    if !is_final_phase {
+        return Ok((batches, scan_stats, is_partial));
     }
 
     #[cfg(feature = "enterprise")]
