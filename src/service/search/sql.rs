@@ -65,12 +65,6 @@ static RE_MATCH_ALL_RAW_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 
-pub static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
-});
-pub static RE_FIELD_FN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
-
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
     pub origin_sql: String,

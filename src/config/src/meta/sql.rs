@@ -294,7 +294,7 @@ impl<'a> TryFrom<Order<'a>> for (String, bool) {
 
     fn try_from(order: Order) -> Result<Self, Self::Error> {
         match &order.0.expr {
-            SqlExpr::Identifier(id) => Ok((id.to_string(), !order.0.asc.unwrap_or(true))),
+            SqlExpr::Identifier(id) => Ok((id.value.to_string(), !order.0.asc.unwrap_or(true))),
             expr => Err(anyhow::anyhow!(
                 "We only support identifier for order by, got {expr}"
             )),
@@ -307,7 +307,7 @@ impl<'a> TryFrom<Group<'a>> for String {
 
     fn try_from(g: Group) -> Result<Self, Self::Error> {
         match &g.0 {
-            SqlExpr::Identifier(id) => Ok(id.to_string()),
+            SqlExpr::Identifier(id) => Ok(id.value.to_string()),
             expr => Err(anyhow::anyhow!(
                 "We only support identifier for group by, got {expr}"
             )),

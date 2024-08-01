@@ -61,7 +61,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
 
-    // hits 
+    // hits
     if !merge_batches.is_empty() {
         let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();

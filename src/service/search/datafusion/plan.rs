@@ -21,70 +21,32 @@ use datafusion::physical_plan::{
     ExecutionPlan, Partitioning,
 };
 
+type PlanResult = (
+    Option<Arc<dyn ExecutionPlan>>,
+    Option<Vec<Vec<RecordBatch>>>,
+    bool,
+);
+
+const DISTRIBUTED_PLAN_NAMES: [&str; 3] = [
+    "CoalescePartitionsExec",
+    "RepartitionExec",
+    "SortPreservingMergeExec",
+];
+
 pub fn get_partial_plan(
     plan: &Arc<dyn ExecutionPlan>,
 ) -> Result<Option<Arc<dyn ExecutionPlan>>, datafusion::error::DataFusionError> {
-    if plan.children().is_empty() {
+    let children = plan.children();
+    if children.is_empty() {
         return Ok(None);
     }
-    if plan.children().len() > 1 {
-        return Err(datafusion::error::DataFusionError::NotImplemented(format!(
-            "ExecutionPlan with multiple children"
-        )));
+    if children.len() > 1 {
+        return Err(datafusion::error::DataFusionError::NotImplemented(
+            "ExecutionPlan with multiple children".to_string(),
+        ));
     }
-    if let Some(cplan) = plan.children().into_iter().next() {
-        println!("get_partial_plan: {:?}", cplan.name());
-        for name in ["HashJoinExec", "CrossJoinExec"] {
-            if cplan.name() == name {
-                return Err(datafusion::error::DataFusionError::NotImplemented(
-                    name.to_string(),
-                ));
-            }
-        }
-        for name in [
-            "CoalescePartitionsExec",
-            "RepartitionExec",
-            "SortPreservingMergeExec",
-        ] {
-            if cplan.name() == "RepartitionExec" {
-                let plan = cplan.as_any().downcast_ref::<RepartitionExec>().unwrap();
-                if let Partitioning::RoundRobinBatch(_) = plan.partitioning() {
-                    return Ok(None);
-                }
-            } else if cplan.name() == name {
-                let child = *cplan.children().first().unwrap();
-                if child.name() == "ParquetExec" {
-                    return Ok(None);
-                }
-                if let Some(v) = get_partial_plan(child)? {
-                    return Ok(Some(v));
-                } else {
-                    if cplan.name() == "SortPreservingMergeExec" {
-                        return Ok(Some(cplan.clone()));
-                    }
-                    return Ok(Some(child.clone()));
-                }
-            }
-        }
-        return get_partial_plan(cplan);
-    }
-    Ok(Some(plan.clone()))
-}
 
-pub fn get_final_plan(
-    plan: &Arc<dyn ExecutionPlan>,
-    data: Vec<Vec<RecordBatch>>,
-) -> Result<(Option<Arc<dyn ExecutionPlan>>, bool), datafusion::error::DataFusionError> {
-    if plan.children().is_empty() {
-        return Ok((Some(plan.clone()), false));
-    }
-    if plan.children().len() > 1 {
-        return Err(datafusion::error::DataFusionError::NotImplemented(format!(
-            "ExecutionPlan with multiple children"
-        )));
-    }
-    let mut found_dist = false;
-    let mut cplan = plan.children()[0].clone();
+    let cplan = children.first().unwrap();
     for name in ["HashJoinExec", "CrossJoinExec"] {
         if cplan.name() == name {
             return Err(datafusion::error::DataFusionError::NotImplemented(
@@ -92,13 +54,62 @@ pub fn get_final_plan(
             ));
         }
     }
-    if cplan.name() == "CoalescePartitionsExec" {
+
+    if cplan.name() == "RepartitionExec" {
+        let plan = cplan.as_any().downcast_ref::<RepartitionExec>().unwrap();
+        if let Partitioning::RoundRobinBatch(_) = plan.partitioning() {
+            return Ok(None);
+        }
+    } else if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
         let child = *cplan.children().first().unwrap();
-        if let Some(_) = get_partial_plan(child)? {
-            if let (Some(v), dist) = get_final_plan(&cplan, data)? {
+        if child.name() == "ParquetExec" {
+            return Ok(None);
+        }
+        if let Some(v) = get_partial_plan(child)? {
+            return Ok(Some(v));
+        } else {
+            if cplan.name() == "SortPreservingMergeExec" {
+                return Ok(Some((*cplan).clone()));
+            }
+            return Ok(Some(child.clone()));
+        }
+    }
+    get_partial_plan(cplan)
+}
+
+pub fn get_final_plan(
+    plan: &Arc<dyn ExecutionPlan>,
+    data: Vec<Vec<RecordBatch>>,
+) -> Result<PlanResult, datafusion::error::DataFusionError> {
+    let children = plan.children();
+    if children.is_empty() {
+        return Ok((Some(plan.clone()), Some(data), false));
+    }
+    if children.len() > 1 {
+        return Err(datafusion::error::DataFusionError::NotImplemented(
+            "ExecutionPlan with multiple children".to_string(),
+        ));
+    }
+    let mut return_data = None;
+    let mut found_dist = false;
+    let mut cplan = (*children.first().unwrap()).clone();
+    for name in ["HashJoinExec", "CrossJoinExec"] {
+        if cplan.name() == name {
+            return Err(datafusion::error::DataFusionError::NotImplemented(
+                name.to_string(),
+            ));
+        }
+    }
+
+    if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
+        let child = *cplan.children().first().unwrap();
+        if get_partial_plan(child)?.is_some() {
+            if let (Some(v), data, dist) = get_final_plan(&cplan, data)? {
                 cplan = v;
                 if dist {
                     found_dist = true;
+                } else {
+                    return_data = data;
                 }
             }
         } else {
@@ -110,50 +121,17 @@ pub fn get_final_plan(
                 .unwrap();
             found_dist = true;
         }
-    } else if cplan.name() == "RepartitionExec" {
-        let child = *cplan.children().first().unwrap();
-        if let Some(_) = get_partial_plan(child)? {
-            if let (Some(v), dist) = get_final_plan(&cplan, data)? {
-                cplan = v;
-                if dist {
-                    found_dist = true;
-                }
-            }
-        } else {
-            cplan = cplan
-                .clone()
-                .with_new_children(vec![Arc::new(
-                    MemoryExec::try_new(&data, cplan.schema(), None).unwrap(),
-                )])
-                .unwrap();
-            found_dist = true;
-        }
-    } else if cplan.name() == "SortPreservingMergeExec" {
-        let child = *cplan.children().first().unwrap();
-        if let Some(_) = get_partial_plan(child)? {
-            if let (Some(v), dist) = get_final_plan(&cplan, data)? {
-                cplan = v;
-                if dist {
-                    found_dist = true;
-                }
-            }
-        } else {
-            cplan = cplan
-                .clone()
-                .with_new_children(vec![Arc::new(
-                    MemoryExec::try_new(&data, cplan.schema(), None).unwrap(),
-                )])
-                .unwrap();
-            found_dist = true;
-        }
-    } else if let (Some(v), dist) = get_final_plan(&cplan, data)? {
+    } else if let (Some(v), data, dist) = get_final_plan(&cplan, data)? {
         cplan = v;
         if dist {
             found_dist = true;
+        } else {
+            return_data = data;
         }
     }
     Ok((
         Some(plan.clone().with_new_children(vec![cplan]).unwrap()),
+        return_data,
         found_dist,
     ))
 }
