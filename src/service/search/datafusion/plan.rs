@@ -54,7 +54,8 @@ pub fn get_partial_plan(
         if let Partitioning::RoundRobinBatch(_) = plan.partitioning() {
             return Ok(None);
         }
-    } else if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
+    }
+    if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
         let child = *cplan.children().first().unwrap();
         if child.name() == "ParquetExec" {
             return Ok(None);
