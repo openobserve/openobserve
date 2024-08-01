@@ -10,7 +10,7 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: 'networkidle' });
-    //  await page.getByText('Login as internal user').click();
+     await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -42,7 +42,7 @@ async function waitForDashboardPage(page) {
     await page.waitForTimeout(500)
 }
 
-test.describe("Logs UI testcases", () => {
+test.describe(" VRL UI testcases", () => {
     // let logData;
     function removeUTFCharacters(text) {
         // console.log(text, "tex");
@@ -199,17 +199,17 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] img').click();
 
 
-        await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').fill('.percenteage1 ,err = .kubernetes_annotations_kubectl_kubernetes_io_default_container * .kubernetes_container_hash / 100 \n');
+        await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').fill('.percenteage1 ,err = .kubernetes_annotations_kubectl_kubernetes_io_default_container * .kubernetes_container_hash / 100\ .percenteage2 ,err = .kubernetes_annotations_kubectl_kubernetes_io_default_container / .kubernetes_container_hash * 100 \n');
+
+        await page.waitForTimeout(3000);
 
        await page.locator('[data-test="dashboard-apply"]').click();
 
         // await expect(page.getByText('drag_indicatortext_fields percenteage1')).toBeVisible;
         // await expect(page.getByText('drag_indicatortext_fields percenteage2')).toBeVisible;
-        // await page.waitForTimeout(20000);
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-percenteage1"] [data-test="dashboard-add-y-data"]').click();
 
-      //  await page.locator('[data-test="field-list-item-logs-e2e_automate-percenteage1"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-b-item-kubernetes_annotations_kubectl_kubernetes_io_default_container-remove"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-percenteage2"] [data-test="dashboard-add-b-data"]').click();
@@ -239,10 +239,12 @@ test.describe("Logs UI testcases", () => {
         await page.getByText('arrow_rightQueryAutoPromQLCustom SQL').click();
         await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] img').click();
 
-        await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').fill('.prcentage , err=.histogram *.kubernetes_annotations_kubectl_kubernetes_io_default_container/ 100');
-        await page.locator('[data-test="dashboard-apply"]').click();
+        await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').fill('.percentage , err=.histogram *.kubernetes_annotations_kubectl_kubernetes_io_default_container/ 100');
+        await page.waitForTimeout(3000);
 
-        await page.locator('[data-test="field-list-item-logs-e2e_automate-prcentage"] [data-test="dashboard-add-b-data"]').click();
+       await page.locator('[data-test="dashboard-apply"]').click();
+
+        await page.locator('[data-test="field-list-item-logs-e2e_automate-percentage"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('VRL_Dahboard');
@@ -275,7 +277,8 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').fill('.percentage , err = .histogram*.kubernetes_container_hash/100');
 
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.locator('[data-test="chart-renderer"] canvas').click
+        await page.waitForTimeout(2000);
+      //  await page.locator('[data-test="chart-renderer"] canvas').click
         await page.locator('[data-test="field-list-item-logs-e2e_automate-percentage"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-customSql"]').click();
@@ -555,7 +558,7 @@ test('should update the VRL function in the function editor when a different fun
     await waitForDashboardPage(page);
 
     // Add a new dashboard
-    const randomDashboardName = 'Test Dashboard'; // Replace with a method to generate a random name if necessary
+    const randomDashboardName = 'Test Dashboard'; 
     await page.locator('[data-test="dashboard-add"]').click();
     await page.locator('[data-test="add-dashboard-name"]').click();
     await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
@@ -611,5 +614,71 @@ test('should update the VRL function in the function editor when a different fun
     await page.locator('[data-test="dashboard-delete-panel"]').click();
     await page.locator('[data-test="confirm-button"]').click();
 });
+
+
+test('should display the VRL function field when changing the chart type', async ({ page }) => {
+    // Navigate to dashboards page
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+
+    // Add a new panel
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+    await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
+    await page.getByText('e2e_automate').click();
+    
+    // Set up Y-axis data
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
+
+    // Change to custom SQL and add VRL function
+    await page.getByText('arrow_rightQueryAutoPromQLCustom SQL').click();
+    await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] img').click();
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines > .view-line').click();
+    await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').fill('.vrl=100');
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    // Set date and time range
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    // Add additional Y-axis data
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    // Verify VRL function field visibility after changing chart types
+    await page.locator('[data-test="selected-chart-area-item"]').click();
+    await expect(page.locator('[data-test="dashboard-b-item-vrl"]')).toBeVisible();
+
+    await page.locator('.q-list > div:nth-child(2)').click();
+    await expect(page.locator('[data-test="dashboard-b-item-vrl"]')).toBeVisible();
+
+    await page.locator('div:nth-child(4)').first().click();
+    await expect(page.locator('[data-test="dashboard-b-item-vrl"]')).toBeVisible();
+
+    await page.locator('[data-test="selected-chart-scatter-item"]').click();
+    await expect(page.locator('[data-test="dashboard-b-item-vrl"]')).toBeVisible();
+
+    await page.locator('[data-test="selected-chart-h-stacked-item"]').click();
+    await expect(page.locator('[data-test="dashboard-b-item-vrl"]')).toBeVisible();
+
+    // Verify VRL function content is correct
+    const vrlFunctionContent = await page.locator('[data-test="dashboard-vrl-function-editor"]').getByLabel('Editor content;Press Alt+F1').inputValue();
+    expect(vrlFunctionContent).toBe('.vrl=100');
+
+    // Save the dashboard panel
+    await page.locator('[data-test="dashboard-panel-name"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').fill('VRL_Dashboard');
+    await page.locator('[data-test="dashboard-panel-save"]').click();
+
+});
+
+
 
 })
