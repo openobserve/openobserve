@@ -45,9 +45,9 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         upgrade_092_093().await?;
     }
 
-    let v01010 = Version::from("0.10.9").unwrap();
-    if old_ver < v01010 {
-        upgrade_0109_01010().await?;
+    let v0109 = Version::from("0.10.9").unwrap();
+    if old_ver < v0109 {
+        upgrade_0108_0109().await?;
     }
 
     Ok(())
@@ -70,7 +70,7 @@ async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn upgrade_0109_01010() -> Result<(), anyhow::Error> {
+async fn upgrade_0108_0109() -> Result<(), anyhow::Error> {
     migrate_resource_names().await?;
 
     Ok(())
