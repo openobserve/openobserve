@@ -311,7 +311,7 @@ pub async fn search_multi(
                 multi_res.file_count += res.file_count;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
-                multi_res.columns.append(&mut res.columns);
+                multi_res.columns.extend(res.columns);
                 multi_res.hits.extend(res.hits);
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
