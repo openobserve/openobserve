@@ -360,8 +360,8 @@ pub async fn search_multi(
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
             return std::cmp::Ordering::Equal;
         }
-        let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
-        let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_res))
