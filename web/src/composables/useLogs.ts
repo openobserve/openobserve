@@ -1694,8 +1694,16 @@ const useLogs = () => {
               const parsedSQL: any = fnParsedSQL();
               searchObj.data.queryResults.aggs = [];
 
-              const partitions =
-                searchObj.data.queryResults.partitionDetail.partitions;
+              const partitions = JSON.parse(
+                JSON.stringify(
+                  searchObj.data.queryResults.partitionDetail.partitions
+                )
+              );
+
+              // is _timestamp orderby ASC then reverse the partition array
+              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+                partitions.reverse();
+              }
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
@@ -1703,17 +1711,6 @@ const useLogs = () => {
                 setTimeout(async () => {
                   console.log("settimeout");
                   await generateHistogramData();
-
-                  // let regeratePaginationFlag = false;
-                  // if (
-                  //   searchObj.data.queryResults.aggs.length !=
-                  //   searchObj.meta.resultGrid.rowsPerPage
-                  // ) {
-                  //   regeratePaginationFlag = true;
-                  // }
-                  // if total records in partition is greate than recordsPerPage then we need to update pagination
-                  // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-                  // refreshPartitionPagination(regeratePaginationFlag);
                   refreshPartitionPagination(true);
                 }, 100);
               }
@@ -1794,6 +1791,22 @@ const useLogs = () => {
       notificationMsg.value = "";
     }
   };
+
+  function isTimestampASC(orderby: any) {
+    if (orderby) {
+      for (const order of orderby) {
+        if (
+          order.expr &&
+          order.expr.column === store.state.zoConfig.timestamp_column
+        ) {
+          if (order.type && order.type === "ASC") {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
 
   function hasAggregation(columns: any) {
     if (columns) {
