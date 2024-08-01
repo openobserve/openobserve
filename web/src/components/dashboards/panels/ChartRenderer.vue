@@ -279,7 +279,8 @@ export default defineComponent({
         legendOption.selected = params.selected;
 
         // set options with selected object
-        chart?.setOption({ legend: [legendOption] });
+        console.log('echart: setOptions (legendOption)', { legend: [legendOption] });
+        // chart?.setOption({ legend: [legendOption] });
       }
     };
 
@@ -469,8 +470,9 @@ export default defineComponent({
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
         try {
-          chart?.setOption(options, true);
-          chart?.setOption({ animation: true });
+          console.log('echart: setOptions (theme change)', options);
+          // chart?.setOption(options, true);
+          // chart?.setOption({ animation: true });
         } catch (e) {
           emit("error", e);
         }
@@ -494,7 +496,8 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, true);
+        console.log('echart: setOptions (onMounted)', props?.data?.options || {})
+        // chart?.setOption(props?.data?.options || {}, true);
         chartInitialSetUp();
       } catch (e) {
         emit("error", e);
@@ -556,7 +559,8 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(props?.data?.options || {}, true);
+            console.log('echart: setOptions (options change)', props?.data?.options || {});
+            // chart?.setOption(props?.data?.options || {}, true);
           } catch (error) {}
 
           // we need that toolbox datazoom button initally selected
