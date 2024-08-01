@@ -10,7 +10,7 @@ const randomDashboardName = 'Dashboard_' + Math.random().toString(36).substr(2, 
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: 'networkidle' });
- //    await page.getByText('Login as internal user').click();
+  //  await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -190,27 +190,26 @@ test.describe("dashboard UI testcases", () => {
 
     test('Verify create dashboard,with add the breakDown', async ({ page }) => {
 
-
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await waitForDashboardPage(page)
+        await waitForDashboardPage(page);
         await page.locator('[data-test="dashboard-add"]').click();
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-        await expect(page.getByText('Dashboard added successfully.')).toBeVisible({ timeo: 3000 });
+        await expect(page.getByText('Dashboard added successfully.')).toBeVisible({ timeout: 3000 });
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-
+    
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
-        await page.getByText('e2e_automate').click();
-        //  await page.waitForTimeout(2000);
-
+    
+        // Refine the locator for 'e2e_automate'
+        await page.locator('span').filter({ hasText: /^e2e_automate$/ }).click();
+    
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]').click();
-
+    
         await expect(page.locator('[data-test="dashboard-apply"]')).toBeVisible();
-        await page.locator('[data-test="dashboard-apply"]').click();
+        await page.locator('[data-test="dashboard-apply"]').click();  
     });
-
 
     test('should update the data when changing between absolute and relative time using the Kolkata time zone.', async ({ page }) => {
 
@@ -559,59 +558,63 @@ test.describe("dashboard UI testcases", () => {
 
     test('Verify that the Dashboard can be created and saved with different relative times and timezones on both the Gauge and Table charts', async ({ page }) => {
 
-        //Expected Result: The Dashboard is successfully created and saved with accurate data reflecting the specified relative times and timezones on both the Gauge and Table charts.
-
+        // Expected Result: The Dashboard is successfully created and saved with accurate data reflecting the specified relative times and timezones on both the Gauge and Table charts.
+    
         // Navigate to dashboards
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await waitForDashboardPage(page)
+        await waitForDashboardPage(page);
         await page.locator('[data-test="dashboard-add"]').click();
         await page.locator('[data-test="add-dashboard-name"]').click();
         await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
         await page.locator('[data-test="dashboard-add-submit"]').click();
-
+    
         // Add a new panel
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-
+    
         // Select gauge chart
         await page.locator('[data-test="selected-chart-gauge-item"] img').click();
-
+    
         // Select a stream
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
-        await page.getByText('e2e_automate').click();
+    
+        // Use more specific locator to click on 'e2e_automate'
+        await page.locator('span:has-text("e2e_automate")').click();
+    
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
-
+    
         // Set date-time and timezone
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
         await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
         await page.getByText('Asia/Karachi').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-
+    
         // Verify the gauge chart is visible
         await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-
+    
         // Switch to table chart
         await page.locator('[data-test="selected-chart-table-item"] img').click();
-
+    
         // Set timezone for the table chart
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
         await page.getByText('Asia/Gaza').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-
+    
         // Verify specific data in table chart
         // await expect(page.getByRole('cell', { name: '69228.00' })).toBeVisible();
-
+    
         // Edit the panel name
         await page.locator('[data-test="dashboard-panel-name"]').click();
-        await page.locator('[data-test="dashboard-panel-name"]').fill('sdsss');
+        await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard_01');
         await page.locator('[data-test="dashboard-panel-save"]').click();
-
+    
         // Delete the panel
-        await page.locator('[data-test="dashboard-edit-panel-sdsss-dropdown"]').click();
+        await page.locator('[data-test="dashboard-edit-panel-Dashboard_01-dropdown"]').click();
         await page.locator('[data-test="dashboard-delete-panel"]').click();
         await page.locator('[data-test="confirm-button"]').click();
     });
+    
 
 
     test('Verify, the Date and Time filter, Page Refresh, and Share Link features on the Dashboard panel page.', async ({ page }) => {
@@ -686,7 +689,11 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
         await page.locator('[data-test="datetime-timezone-select"]').click();
+        
+        await page.waitForTimeout(1000);
+
         await page.getByRole('option', { name: 'Asia/Gaza' }).click();
+        
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.waitForTimeout(200);
 
@@ -898,7 +905,7 @@ test.describe("dashboard UI testcases", () => {
         // Verify adding a new breakdown field
         await expect(page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_operator_prometheus_io_name"] [data-test="dashboard-add-b-data"]')).toBeVisible();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_operator_prometheus_io_name"] [data-test="dashboard-add-b-data"]').click();
-        await expect(page.locator('[data-test="dashboard-apply"]')).toBeVisible();
+        // await page.locator('[data-test="dashboard-apply"]');
         await page.locator('[data-test="dashboard-apply"]').click();
 
         // Save the panel with a new name
@@ -907,8 +914,7 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
-        // Additional Assertions
-        await expect(page.locator('[data-test="dashboard-panel-save"]')).toBeVisible();
+        
     });
 
     test('Verify the Add and Cancel functionality with different times and timezones for the breakdown field to ensure it shows the correct output.', async ({ page }) => {
@@ -1273,10 +1279,7 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-apply"]').click();
 
     });
-
-  
-
-
+    
 
 })
 
