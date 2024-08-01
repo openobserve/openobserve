@@ -40,18 +40,13 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
-use crate::{
-    common::meta::stream::StreamParams,
-    service::search::{self, match_source},
-};
+use crate::{common::meta::stream::StreamParams, service::search::match_source};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
 ];
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
-static RE_ONLY_GROUPBY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 pub static RE_SELECT_WILDCARD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
@@ -136,42 +131,6 @@ impl Sql {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
         }
         origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
-        // replace table for subquery
-        if meta.subquery.is_some() {
-            meta.subquery = Some(
-                re.replace_all(&meta.subquery.clone().unwrap(), " FROM tbl ")
-                    .to_string(),
-            );
-        }
-
-        // remove subquery in from clause
-        if meta.subquery.is_some() {
-            origin_sql =
-                search::datafusion::rewrite::replace_data_source_to_tbl(origin_sql.as_str())?;
-        }
-
-        if meta.subquery.is_some() {
-            // Hack select in subquery for _timestamp, add _timestamp to select clause
-            let re = Regex::new(r"(?i)\b(avg|median|count|min|max|sum|group_concat)\b").unwrap();
-            let has_aggregate_function = re.is_match(meta.subquery.as_ref().unwrap());
-            if !has_aggregate_function && !RE_ONLY_GROUPBY.is_match(meta.subquery.as_ref().unwrap())
-            {
-                let caps = RE_SELECT_FROM
-                    .captures(meta.subquery.as_ref().unwrap())
-                    .unwrap();
-                let cap_str = caps.get(1).unwrap().as_str();
-                if !cap_str.contains(&cfg.common.column_timestamp) {
-                    meta.subquery = Some(meta.subquery.as_ref().unwrap().replace(
-                        cap_str,
-                        &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                    ));
-                }
-            } else {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Subquery sql current not support aggregate function".to_string(),
-                )));
-            }
-        }
 
         // Hack select for _timestamp, add _timestamp to select clause
         let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
@@ -222,10 +181,6 @@ impl Sql {
         };
 
         let mut rewrite_time_range_sql = origin_sql.clone();
-        if meta.subquery.is_some() {
-            rewrite_time_range_sql = meta.subquery.clone().unwrap();
-        }
-
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -266,13 +221,8 @@ impl Sql {
             }
         }
 
-        if meta.subquery.is_some() {
-            meta.subquery = Some(rewrite_time_range_sql);
-        } else {
-            origin_sql = rewrite_time_range_sql;
-        }
-
         // Hack offset limit and sort by for sql
+        origin_sql = rewrite_time_range_sql;
         if meta.limit == 0 && req_query.size > QUERY_WITH_NO_LIMIT {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
