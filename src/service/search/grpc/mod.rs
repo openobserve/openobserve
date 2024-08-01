@@ -176,15 +176,10 @@ pub async fn search(
             results = new_batches;
         }
     }
-
-    // Explain the sql
-    let result = arrow::util::pretty::pretty_format_batches(&results)?;
-    log::info!("[trace_id {trace_id}] grpc merged results: \n{result}");
+    log::info!("[trace_id {trace_id}] in node merge task finish");
 
     // clear session data
     datafusion::storage::file_list::clear(&trace_id);
-
-    log::info!("[trace_id {trace_id}] in node merge task finish");
 
     // final result
     let mut hits_total = 0;
