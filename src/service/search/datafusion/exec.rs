@@ -170,7 +170,13 @@ async fn exec_query(
 
     let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
         Some(plan) => plan,
-        None => physical_plan.clone(),
+        None => {
+            if physical_plan.name() == "ProjectionExec" {
+                (*physical_plan.children().first().unwrap()).clone()
+            } else {
+                physical_plan.clone()
+            }
+        }
     };
     let plan = datafusion::physical_plan::displayable(partial_paln.as_ref())
         .set_show_schema(false)
@@ -259,17 +265,12 @@ pub async fn merge_partitions(
     println!("+---------------------------+----------+");
     println!("{}", plan);
 
-    let final_plan = match get_final_plan(&physical_plan, batches) {
-        Ok((Some(plan), batches, v)) => {
+    let final_plan = match get_final_plan(&physical_plan, &batches) {
+        Ok((Some(plan), v)) => {
             if v {
                 plan
             } else {
-                let Some(batches) = batches else {
-                    return Err(datafusion::error::DataFusionError::Execution(
-                        "Failed to get final plan: batches is empty".to_string(),
-                    ));
-                };
-                get_without_dist_plan(&plan, batches, ctx.state().config().batch_size())
+                get_without_dist_plan(&plan, &batches, ctx.state().config().batch_size())
             }
         }
         _ => physical_plan.clone(),
@@ -468,6 +469,7 @@ pub fn create_session_config(
         "datafusion.execution.listing_table_ignore_subdirectory",
         false,
     );
+    config = config.set_str("datafusion.sql_parser.dialect", "postgres");
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
