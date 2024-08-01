@@ -8,7 +8,7 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"]);
     await page.waitForTimeout(1000);
-   // await page.getByText('Login as internal user').click();
+    await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]); 
@@ -32,7 +32,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
         .first()
         .click({ force: true });
 };
-test.describe("Logs UI testcases", () => {
+test.describe(" visualize UI testcases", () => {
     // let logData;
     function removeUTFCharacters(text) {
         // console.log(text, "tex");
@@ -125,10 +125,9 @@ test.describe("Logs UI testcases", () => {
 
     test('Verify that the default chart type and default X,Y axis are set to automatic field after clicking the Visualize button.', async ({ page }) => {
         await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-        //await page.waitForTimeout(4000);
        await page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
       await page.locator('[data-test="logs-logs-toggle"]').click();
-          await page.waitForTimeout(4000);
+          await page.waitForTimeout(1000);
         await page.locator('[data-test="logs-visualize-toggle"]').click();
         await expect(page.locator('.q-list > div:nth-child(3)')).toBeVisible();
         await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
@@ -391,7 +390,7 @@ test('Verify that data is vanish after page refresh.', async ({ page }) => {
   await expect(page.locator('.view-line').first()).toBeEmpty();
 });
 
-test('1Verify chart behavior with large datasets and complex SQL queries', async ({ page }) => {
+test('Verify chart behavior with large datasets and complex SQL queries', async ({ page }) => {
   // Focus on the text editor and replace existing text with the SQL query
   const textEditor = page.locator('.view-line').first();
   await textEditor.click();
