@@ -242,7 +242,10 @@
                 ].getVisibleCells()"
                 :key="cell.id"
                 :data-test="
-                  'log-table-column-' + virtualRow.index + '-' + cell.id
+                  'log-table-column-' +
+                  virtualRow.index +
+                  '-' +
+                  cell.column.columnDef.id
                 "
                 class="tw-py-1 tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
                 :style="{
