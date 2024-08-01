@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import logData from "../../ui-testing/cypress/fixtures/log.json";
+import logData from "../cypress/fixtures/log.json";
 import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import { parseArgs } from "util";
@@ -10,7 +10,7 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: 'networkidle' });
-     await page.getByText('Login as internal user').click();
+  //   await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]);
