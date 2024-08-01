@@ -42,7 +42,7 @@ async function waitForDashboardPage(page) {
     await page.waitForTimeout(500)
 }
 
-test.describe("Logs UI testcases", () => {
+test.describe("dashboard UI testcases", () => {
     // let logData;
     function removeUTFCharacters(text) {
         // console.log(text, "tex");
@@ -370,24 +370,21 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-x-item-_timestamp-remove"]').click();
         await page.locator('[data-test="dashboard-customSql"]').click();
 
-        //  await page.locator('.view-line').click();
-        //   await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
-        //  await page.getByText('arrow_rightQueryAutoPromQLCustom SQL').click();
+        // Focus on the first line of the editor
+        await page.locator('.view-line').first().click();
 
-        //  await page.locator('.view-line').first().
-        await page.dblclick('.view-line');
-        await page.keyboard.press('End'); // Move to the end of the first
-        await page.keyboard.press('Enter'); // Move to the next line
-        await page.keyboard.type('SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1"  FROM "e2e_automate"  GROUP BY x_axis_1, breakdown_1');
+        // Fill the custom SQL query
+        await page.keyboard.type('SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1');
         await page.waitForTimeout(400);
 
-
+        await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-x_axis_1"] [data-test="dashboard-add-x-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-y_axis_1"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-breakdown_1"] [data-test="dashboard-add-b-data"]').click();
 
+        await page.waitForTimeout(200);
 
-        await expect(page.locator('[data-test="dashboard-apply"]'))//.toBeVisible();
+        await page.locator('[data-test="dashboard-apply"]')//.toBeVisible();
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
         await page.locator('[data-test="date-time-relative-3-h-btn"]').click();
@@ -559,7 +556,7 @@ test.describe("Logs UI testcases", () => {
             }
         });
         const page1Promise = page.waitForEvent('popup');
-        await page.getByText('Testttt').click();
+        await page.getByText('Test').click(); //Testttt
         const page1 = await page1Promise;
         await expect(page1.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
     });
@@ -1051,7 +1048,7 @@ test.describe("Logs UI testcases", () => {
 
 
     test('Verify that the breakdown field should update using Drag and Drop, +B, and Cancel this field.', async ({ page }) => {
-    
+
         // Navigate to dashboards
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1275,7 +1272,7 @@ test.describe("Logs UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash1');
         await page.locator('[data-test="dashboard-panel-save"]').click();
-     // await loactor.waitForNavigation({ timeout: 30000 });
+        // await loactor.waitForNavigation({ timeout: 30000 });
 
         //await page.click('["class="q-icon notranslate material-icons q-btn-dropdown__arrow q-btn-dropdown__arrow-container"]');
         // await page.locator('[data-test="dashboard-edit-panel-Dash1_Filter-dropdown"]').click();         // Delete panel code
