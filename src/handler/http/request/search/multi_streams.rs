@@ -354,13 +354,14 @@ pub async fn search_multi(
         }
     }
 
+    let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
-        if a.get("_timestamp").is_none() || b.get("_timestamp").is_none() {
+        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
             return std::cmp::Ordering::Equal;
         }
-        let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
-        let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_res))
