@@ -4,6 +4,7 @@
       <table
         class="tw-w-full tw-table-auto"
         :style="{
+          minWidth: '100%',
           ...columnSizeVars,
           width: !columnOrder.includes('source')
             ? table.getCenterTotalSize() + 'px'
@@ -31,6 +32,7 @@
                 columnOrder.includes('source') && wrap
                   ? width - 12 + 'px'
                   : tableRowSize + 'px',
+              minWidth: '100%',
             }"
             tag="tr"
             @start="(event) => handleDragStart(event)"
@@ -166,6 +168,7 @@
             <tr
               :style="{
                 transform: `translateY(${virtualRow.start}px)`,
+                minWidth: '100%',
               }"
               :data-index="virtualRow.index"
               :ref="(node: any) => rowVirtualizer.measureElement(node)"
