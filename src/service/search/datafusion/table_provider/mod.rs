@@ -347,11 +347,6 @@ impl TableProvider for NewListingTable {
             }
         }
         let projection_exec = ProjectionExec::try_new(exprs, parquet_exec)?;
-        let display_plan = datafusion::physical_plan::displayable(&projection_exec)
-            .set_show_schema(false)
-            .indent(false)
-            .to_string();
-        println!("projection_exec: {}", display_plan);
         Ok(Arc::new(projection_exec))
     }
 

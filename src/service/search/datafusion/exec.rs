@@ -240,7 +240,7 @@ pub async fn merge_partitions(
         log::info!("Merge sql: {sql}");
     }
 
-    let memtable = Arc::new(EmptyTable::new(schema.clone()).with_partitions(cfg.limit.cpu_num));
+    let memtable = Arc::new(EmptyTable::new(schema).with_partitions(cfg.limit.cpu_num));
     ctx.register_table("tbl", memtable)?;
 
     let plan = ctx.state().create_logical_plan(sql).await?;
@@ -626,7 +626,6 @@ pub async fn register_table(
     // only sort by timestamp desc
     let sort_by_timestamp_desc =
         sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
-    println!("sort_key: {:?}", sort_key);
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),

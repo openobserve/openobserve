@@ -169,7 +169,6 @@ pub async fn search(
                 Arc::new(Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).unwrap());
         }
         if need_format {
-            println!("schema: {:?}", schema);
             let mut new_batches = Vec::new();
             for batch in results {
                 new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
