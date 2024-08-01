@@ -466,6 +466,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
         let keys: Vec<&str> = key.split('/').collect();
         let alert_name = keys[keys.len() - 1];
         let mut need_update = false;
+        let mut create = false;
         let mut alert: Alert = match json::from_slice(&val) {
             Ok(alert) => alert,
             Err(_) => {
@@ -480,6 +481,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
                 get_ownership_tuple(keys[0], "alerts", &alert.name, &mut write_tuples);
             }
             need_update = true;
+            create = true;
         }
 
         let mut destinations = vec![];
@@ -497,12 +499,19 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
             // updating the destinations of the alert.
             alert.destinations = destinations;
             // First create an alert copy with formatted alert name
-            match db::alerts::set(keys[0], StreamType::from(keys[1]), keys[2], &alert, true).await {
+            match db::alerts::set(keys[0], StreamType::from(keys[1]), keys[2], &alert, create).await
+            {
                 // Delete alert with unsupported alert name
                 Ok(_) => {
-                    if let Err(e) =
-                        db::alerts::delete(keys[0], StreamType::from(keys[1]), keys[2], alert_name)
-                            .await
+                    if create
+                        && db::alerts::delete(
+                            keys[0],
+                            StreamType::from(keys[1]),
+                            keys[2],
+                            alert_name,
+                        )
+                        .await
+                        .is_err()
                     {
                         log::error!(
                             "[Alert:Migration]: Error deleting alerts with unsupported alert name: {alert_name}"
