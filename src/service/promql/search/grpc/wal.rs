@@ -190,6 +190,7 @@ pub(crate) async fn create_context(
         stream_name,
         &[],
         FileType::PARQUET,
+        hashbrown::HashMap::default(),
         false,
         &[],
         None,
