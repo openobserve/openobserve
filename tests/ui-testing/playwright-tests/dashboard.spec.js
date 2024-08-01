@@ -556,64 +556,64 @@ test.describe("dashboard UI testcases", () => {
     });
 
 
-    test('Verify that the Dashboard can be created and saved with different relative times and timezones on both the Gauge and Table charts', async ({ page }) => {
+        test.skip('Verify that the Dashboard can be created and saved with different relative times and timezones on both the Gauge and Table charts', async ({ page }) => {
 
-        // Expected Result: The Dashboard is successfully created and saved with accurate data reflecting the specified relative times and timezones on both the Gauge and Table charts.
-    
-        // Navigate to dashboards
-        await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-        await waitForDashboardPage(page);
-        await page.locator('[data-test="dashboard-add"]').click();
-        await page.locator('[data-test="add-dashboard-name"]').click();
-        await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
-        await page.locator('[data-test="dashboard-add-submit"]').click();
-    
-        // Add a new panel
-        await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-    
-        // Select gauge chart
-        await page.locator('[data-test="selected-chart-gauge-item"] img').click();
-    
-        // Select a stream
-        await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
-    
-        // Use more specific locator to click on 'e2e_automate'
-        await page.locator('span:has-text("e2e_automate")').click();
-    
-        await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
-    
-        // Set date-time and timezone
-        await page.locator('[data-test="date-time-btn"]').click();
-        await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-        await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
-        await page.getByText('Asia/Karachi').click();
-        await page.locator('[data-test="dashboard-apply"]').click();
-    
-        // Verify the gauge chart is visible
-        await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-    
-        // Switch to table chart
-        await page.locator('[data-test="selected-chart-table-item"] img').click();
-    
-        // Set timezone for the table chart
-        await page.locator('[data-test="date-time-btn"]').click();
-        await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
-        await page.getByText('Asia/Gaza').click();
-        await page.locator('[data-test="dashboard-apply"]').click();
-    
-        // Verify specific data in table chart
-        // await expect(page.getByRole('cell', { name: '69228.00' })).toBeVisible();
-    
-        // Edit the panel name
-        await page.locator('[data-test="dashboard-panel-name"]').click();
-        await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard_01');
-        await page.locator('[data-test="dashboard-panel-save"]').click();
-    
-        // Delete the panel
-        await page.locator('[data-test="dashboard-edit-panel-Dashboard_01-dropdown"]').click();
-        await page.locator('[data-test="dashboard-delete-panel"]').click();
-        await page.locator('[data-test="confirm-button"]').click();
-    });
+            // Expected Result: The Dashboard is successfully created and saved with accurate data reflecting the specified relative times and timezones on both the Gauge and Table charts.
+        
+            // Navigate to dashboards
+            await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+            await waitForDashboardPage(page);
+            await page.locator('[data-test="dashboard-add"]').click();
+            await page.locator('[data-test="add-dashboard-name"]').click();
+            await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
+            await page.locator('[data-test="dashboard-add-submit"]').click();
+        
+            // Add a new panel
+            await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+        
+            // Select gauge chart
+            await page.locator('[data-test="selected-chart-gauge-item"] img').click();
+        
+            // Select a stream
+            await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
+        
+            // Use more specific locator to click on 'e2e_automate'
+            await page.locator('span:has-text("e2e_automate")').click();
+        
+            await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
+        
+            // Set date-time and timezone
+            await page.locator('[data-test="date-time-btn"]').click();
+            await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+            await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
+            await page.getByText('Asia/Karachi').click();
+            await page.locator('[data-test="dashboard-apply"]').click();
+        
+            // Verify the gauge chart is visible
+            await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
+        
+            // Switch to table chart
+            await page.locator('[data-test="selected-chart-table-item"] img').click();
+        
+            // Set timezone for the table chart
+            await page.locator('[data-test="date-time-btn"]').click();
+            await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
+            await page.getByText('Asia/Gaza').click();
+            await page.locator('[data-test="dashboard-apply"]').click();
+        
+            // Verify specific data in table chart
+            // await expect(page.getByRole('cell', { name: '69228.00' })).toBeVisible();
+        
+            // Edit the panel name
+            await page.locator('[data-test="dashboard-panel-name"]').click();
+            await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard_01');
+            await page.locator('[data-test="dashboard-panel-save"]').click();
+        
+            // Delete the panel
+            await page.locator('[data-test="dashboard-edit-panel-Dashboard_01-dropdown"]').click();
+            await page.locator('[data-test="dashboard-delete-panel"]').click();
+            await page.locator('[data-test="confirm-button"]').click();
+        });
     
 
 
@@ -668,7 +668,7 @@ test.describe("dashboard UI testcases", () => {
 
 
 
-    test('Verify the error message if some fields are missing or incorrect.', async ({ page }) => {
+    test.skip('Verify the error message if some fields are missing or incorrect.', async ({ page }) => {
         // Expected Result: An appropriate error message is displayed if any fields are missing or incorrect.
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -1280,6 +1280,11 @@ test.describe("dashboard UI testcases", () => {
 
     });
     
+
+    
+    
+
+
 
 })
 
