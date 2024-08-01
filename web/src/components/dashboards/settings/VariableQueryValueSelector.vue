@@ -108,7 +108,7 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-      }
+      },
     );
 
     // isAllSelected should be true if all options are selected and false otherwise
@@ -123,7 +123,7 @@ export default defineComponent({
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value
+          (option: any) => option.value,
         );
       } else {
         selectedValue.value = [];
@@ -137,7 +137,7 @@ export default defineComponent({
 
     // Display the selected value
     const displayValue = computed(() => {
-      if (selectedValue.value) {
+      if (selectedValue.value || selectedValue.value == "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
             const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");

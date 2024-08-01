@@ -439,7 +439,7 @@ export default defineComponent({
                     label:
                       value.zo_sql_key !== ""
                         ? value.zo_sql_key.toString()
-                        : "<blank>",
+                        : "&ltblank&gt",
                     value: value.zo_sql_key.toString(),
                   }));
 
