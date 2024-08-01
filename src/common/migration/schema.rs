@@ -14,14 +14,33 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::Utc;
-use config::utils::json;
+use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 use infra::{
     db::{self as infra_db, NO_NEED_WATCH},
     dist_lock, scheduler,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::infra::config::O2_CONFIG, openfga::authorizer::authz::update_tuples,
+};
+use version_compare::Version;
+
+use crate::{
+    common::{
+        meta::{
+            alerts::{destinations::Destination, templates::Template, Alert},
+            dashboards::reports::Report,
+        },
+        utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
+    },
+    service::db,
+};
 
 const SCHEMA_MIGRATION_KEY: &str = "/migration/schema_versions/status";
+const META_MIGRATION_VERSION_KEY: &str = "/migration/meta/version";
 
 pub async fn run() -> Result<(), anyhow::Error> {
     match upgrade_schema_row_per_version().await {
@@ -213,4 +232,318 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
         }
         Err(_) => Ok(true),
     }
+}
+
+/// Migrate alerts, reports, templates, destination names with ofga compatible format
+pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
+    match need_meta_resource_name_migration().await {
+        true => {
+            log::info!("Starting migration of unsupported resource names");
+        }
+        false => {
+            log::info!("Resource name migration already done");
+            return Ok(());
+        }
+    }
+
+    let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
+
+    if let Err(e) = migrate_alert_template_names().await {
+        dist_lock::unlock(&locker).await?;
+        return Err(e);
+    }
+    if let Err(e) = migrate_alert_destination_names().await {
+        dist_lock::unlock(&locker).await?;
+        return Err(e);
+    }
+    if let Err(e) = migrate_alert_names().await {
+        dist_lock::unlock(&locker).await?;
+        return Err(e);
+    }
+    if let Err(e) = migrate_report_names().await {
+        dist_lock::unlock(&locker).await?;
+        return Err(e);
+    }
+
+    // set migration status
+    let db = infra_db::get_db().await;
+    if let Err(e) = db
+        .put(
+            META_MIGRATION_VERSION_KEY,
+            "v0.0.1".to_string().into(),
+            NO_NEED_WATCH,
+            None,
+        )
+        .await
+    {
+        // unlock the lock
+        dist_lock::unlock(&locker).await?;
+        return Err(e.into());
+    }
+
+    // unlock the lock
+    dist_lock::unlock(&locker).await?;
+    Ok(())
+}
+
+async fn need_meta_resource_name_migration() -> bool {
+    let db = infra_db::get_db().await;
+    match db.get(META_MIGRATION_VERSION_KEY).await {
+        std::result::Result::Ok(val) => {
+            let val_str = std::str::from_utf8(&val).unwrap();
+            let old_meta_migration_ver =
+                Version::from(val_str).unwrap_or(Version::from("v0.0.0").unwrap());
+            if old_meta_migration_ver < Version::from("v0.0.1").unwrap() {
+                true
+            } else {
+                false
+            }
+        }
+        Err(_) => true,
+    }
+}
+
+async fn migrate_report_names() -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    log::info!("[Report:Migration]: Migrating reports");
+    let db_key_prefix = "/reports/".to_string();
+    log::info!("[Report:Migration]: Listing all reports");
+    let data = db.list(&db_key_prefix).await?;
+    #[cfg(feature = "enterprise")]
+    let mut write_tuples = vec![];
+    for (key, val) in data {
+        let db_key = key;
+        let key = db_key.strip_prefix(&db_key_prefix).unwrap();
+        log::info!("[Report:Migration]: Start migrating report: {}", key);
+        let keys: Vec<&str> = key.split('/').collect();
+        let report_name = keys[keys.len() - 1];
+        if is_ofga_unsupported(report_name) && keys.len() == 2 {
+            let mut report: Report = json::from_slice(&val).unwrap();
+            report.name = into_ofga_supported_format(report_name);
+            #[cfg(feature = "enterprise")]
+            get_ownership_tuple(keys[0], "reports", &report.name, &mut write_tuples);
+            // First create an report copy with formatted report name
+            match db::dashboards::reports::set(keys[0], &mut report, true).await {
+                // Delete report with unsupported report name
+                Ok(_) => {
+                    if let Err(e) = db::dashboards::reports::delete(keys[0], report_name).await {
+                        log::error!(
+                            "[Report:Migration]: Error deleting report with unsupported report name: {report_name}"
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "[Report:Migration]: error updating unsupported report name {report_name}"
+                    );
+                }
+            }
+        }
+        log::info!("[Report:Migration]: Done migrating report: {}", key);
+    }
+    #[cfg(feature = "enterprise")]
+    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+        match update_tuples(write_tuples, vec![]).await {
+            Ok(_) => {
+                log::info!("[Report:Migration]: Reports updated to the openfga");
+            }
+            Err(_) => {
+                log::error!("[Report:Migration]: Error updating report to the openfga");
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    log::info!("[Template:Migration]: Migrating templates");
+    let db_key_prefix = "/templates/".to_string();
+    log::info!("[Template:Migration]: Listing all templates");
+    let data = db.list(&db_key_prefix).await?;
+    #[cfg(feature = "enterprise")]
+    let mut write_tuples = vec![];
+    for (key, val) in data {
+        let db_key = key;
+        let key = db_key.strip_prefix(&db_key_prefix).unwrap();
+        log::info!("[Template:Migration]: Start migrating template: {}", key);
+        let keys: Vec<&str> = key.split('/').collect();
+        let temp_name = keys[keys.len() - 1];
+        if is_ofga_unsupported(temp_name) && keys.len() == 2 {
+            let mut temp: Template = json::from_slice(&val).unwrap();
+            temp.name = into_ofga_supported_format(temp_name);
+            #[cfg(feature = "enterprise")]
+            get_ownership_tuple(keys[0], "templates", &temp.name, &mut write_tuples);
+            // First create an alert copy with formatted template name
+            match db::alerts::templates::set(keys[0], &mut temp).await {
+                // Don't delete template with unsupported template name
+                // Destinations can contain these unsupported templates, so don't delete them.
+                // User needs to manually change the destination and delete the old one.
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "[Template:Migration]: error updating unsupported template name {temp_name}"
+                    );
+                }
+            }
+        }
+        log::info!("[Template:Migration]: Done migrating template: {}", key);
+    }
+    #[cfg(feature = "enterprise")]
+    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+        match update_tuples(write_tuples, vec![]).await {
+            Ok(_) => {
+                log::info!("[Template:Migration]: Templates updated to the openfga");
+            }
+            Err(_) => {
+                log::error!("[Template:Migration]: Error updating template to the openfga");
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    log::info!("[Destination:Migration]: Migrating destinations");
+    let db_key_prefix = "/destinations/".to_string();
+    log::info!("[Destination:Migration]: Listing all destinations");
+    let data = db.list(&db_key_prefix).await?;
+    #[cfg(feature = "enterprise")]
+    let mut write_tuples = vec![];
+    for (key, val) in data {
+        let db_key = key;
+        let key = db_key.strip_prefix(&db_key_prefix).unwrap();
+        log::info!(
+            "[Destination:Migration]: Start migrating destination: {}",
+            key
+        );
+        let keys: Vec<&str> = key.split('/').collect();
+        let dest_name = keys[keys.len() - 1];
+        let mut dest: Destination = json::from_slice(&val).unwrap();
+        let mut need_update = false;
+        if is_ofga_unsupported(dest_name) && keys.len() == 2 {
+            dest.name = into_ofga_supported_format(dest_name);
+            #[cfg(feature = "enterprise")]
+            get_ownership_tuple(keys[0], "destinations", &dest.name, &mut write_tuples);
+            need_update = true;
+        }
+        if is_ofga_unsupported(&dest.template) {
+            dest.template = into_ofga_supported_format(&dest.template);
+            need_update = true;
+        }
+
+        if need_update {
+            // Create a new destination copy with formatted destination name
+            match db::alerts::destinations::set(keys[0], &dest).await {
+                // Don't delete destination with unsupported destination name
+                // Alerts can contain these unsupported destinations, so don't delete them.
+                // User needs to manually change the destination and delete the old one.
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "[Destination:Migration]: Error updating unsupported destination name {dest_name}"
+                    );
+                }
+            }
+        }
+        log::info!(
+            "[Destination:Migration]: Done migrating destination: {}",
+            key
+        );
+    }
+    #[cfg(feature = "enterprise")]
+    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+        match update_tuples(write_tuples, vec![]).await {
+            Ok(_) => {
+                log::info!("[Destination:Migration]: Destinations updated to the openfga");
+            }
+            Err(_) => {
+                log::error!("[Destination:Migration]: Error updating destination to the openfga");
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn migrate_alert_names() -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    log::info!("[Alert:Migration]: Migrating alerts");
+    let db_key_prefix = "/alerts/".to_string();
+    log::info!("[Alert:Migration]: Listing all alerts");
+    let data = db.list(&db_key_prefix).await?;
+    #[cfg(feature = "enterprise")]
+    let mut write_tuples = vec![];
+    for (key, val) in data {
+        let db_key = key;
+        let key = db_key.strip_prefix(&db_key_prefix).unwrap();
+        log::info!("[Alert:Migration]: Start migrating alert: {}", key);
+        let keys: Vec<&str> = key.split('/').collect();
+        let alert_name = keys[keys.len() - 1];
+        let mut need_update = false;
+        let mut alert: Alert = match json::from_slice(&val) {
+            Ok(alert) => alert,
+            Err(_) => {
+                log::error!("[Alert:Migration]: Failed to deserialize alert {alert_name}");
+                continue;
+            }
+        };
+        if is_ofga_unsupported(alert_name) && keys.len() == 4 {
+            alert.name = into_ofga_supported_format(alert_name);
+            #[cfg(feature = "enterprise")]
+            {
+                get_ownership_tuple(keys[0], "alerts", &alert.name, &mut write_tuples);
+            }
+            need_update = true;
+        }
+
+        let mut destinations = vec![];
+        for dest in alert.destinations.iter() {
+            if is_ofga_unsupported(dest) {
+                need_update = true;
+            }
+            destinations.push(into_ofga_supported_format(dest));
+        }
+
+        if need_update {
+            // Format the associated destinations as well. In case there were some errors while
+            // formatting destination names in the last migration, this destinations list contain
+            // wrong destination names which don't exist. This needs to be manually resolved by
+            // updating the destinations of the alert.
+            alert.destinations = destinations;
+            // First create an alert copy with formatted alert name
+            match db::alerts::set(keys[0], StreamType::from(keys[1]), keys[2], &alert, true).await {
+                // Delete alert with unsupported alert name
+                Ok(_) => {
+                    if let Err(e) =
+                        db::alerts::delete(keys[0], StreamType::from(keys[1]), keys[2], alert_name)
+                            .await
+                    {
+                        log::error!(
+                            "[Alert:Migration]: Error deleting alerts with unsupported alert name: {alert_name}"
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "[Alert:Migration]: Error updating unsupported alert name {alert_name}"
+                    );
+                }
+            }
+        }
+        log::info!("[Alert:Migration]: Done migrating alert: {}", key);
+    }
+
+    #[cfg(feature = "enterprise")]
+    if !write_tuples.is_empty() && O2_CONFIG.openfga.enabled {
+        match update_tuples(write_tuples, vec![]).await {
+            Ok(_) => {
+                log::info!("[Alert:Migration]: Alerts updated to the openfga");
+            }
+            Err(_) => {
+                log::error!("[Alert:Migration]: Error updating alert to the openfga");
+            }
+        }
+    }
+    Ok(())
 }

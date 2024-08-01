@@ -36,6 +36,14 @@ use crate::common::{
 
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[:#?\s]").unwrap());
 
+pub fn into_ofga_supported_format(name: &str) -> String {
+    RE_OFGA_UNSUPPORTED_NAME.replace_all(name, "_").to_string()
+}
+
+pub fn is_ofga_unsupported(name: &str) -> bool {
+    RE_OFGA_UNSUPPORTED_NAME.is_match(name)
+}
+
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
     let hash = PASSWORD_HASH.get(&key);

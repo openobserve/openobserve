@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use schema::migrate_resource_names;
 use version_compare::Version;
 
 pub mod dashboards;
@@ -44,6 +45,11 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         upgrade_092_093().await?;
     }
 
+    let v01010 = Version::from("0.10.9").unwrap();
+    if old_ver < v01010 {
+        upgrade_0109_01010().await?;
+    }
+
     Ok(())
 }
 
@@ -60,6 +66,12 @@ async fn upgrade_052_053() -> Result<(), anyhow::Error> {
 async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     // migration schema
     schema::run().await?;
+
+    Ok(())
+}
+
+async fn upgrade_0109_01010() -> Result<(), anyhow::Error> {
+    migrate_resource_names().await?;
 
     Ok(())
 }
