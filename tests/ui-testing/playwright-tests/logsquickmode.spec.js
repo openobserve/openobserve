@@ -127,6 +127,7 @@ test.describe("Logs Quickmode testcases", () => {
         force: true,
       });
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.waitForTimeout(2000);
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
@@ -159,6 +160,7 @@ test.describe("Logs Quickmode testcases", () => {
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
+    await page.waitForTimeout(2000);
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
@@ -319,6 +321,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
+      await page.waitForTimeout(2000);
       await expect(
         page
           .locator('[data-test="log-table-column-0-source"]')
