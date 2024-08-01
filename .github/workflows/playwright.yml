@@ -84,7 +84,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
+          ["logspage.spec.js", "sanity.spec.js", "alerts.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "pipeline.spec.js", "schema.spec.js", "dashboardtype.spec.js", "multiselect-stream.spec.js"]
        
     steps:
       - name: Download artifacts
@@ -97,7 +97,7 @@ jobs:
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve &
 
       - name: Wait for start
-        run: sleep 10
+        run: sleep 15
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -112,10 +112,10 @@ jobs:
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
-          echo "ZO_ROOT_USER_PASSWORD"=${ZO_ROOT_USER_PASSWORD} >> .env
-          echo "ZO_BASE_URL"=${ZO_BASE_URL} >> .env
-          echo "INGESTION_URL"=${INGESTION_URL} >> .env
-          echo "ORGNAME"=${ORGNAME} >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
       - uses: actions/upload-artifact@v4
@@ -124,6 +124,3 @@ jobs:
             name: playwright-report
             path: playwright-report/
             retention-days: 30
-
-
- 
