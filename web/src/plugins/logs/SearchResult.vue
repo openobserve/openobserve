@@ -406,7 +406,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="getTableWidth"
         :err-msg="searchObj.data.missingStreamMessage"
         :loading="searchObj.loading"
+        :functionErrorMsg="searchObj.data.functionError"
         class="col-12"
+        :style="{
+          height: !searchObj.meta.showHistogram
+            ? 'calc(100% - 40px)'
+            : 'calc(100% - 140px)',
+        }"
         @copy="copyLogToClipboard"
         @add-field-to-table="addFieldToTable"
         @add-search-term="addSearchTerm"

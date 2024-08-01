@@ -1,97 +1,96 @@
 <template>
-  <div>
-    <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
-      <table
-        class="tw-w-full tw-table-auto"
-        :style="{
-          minWidth: '100%',
-          ...columnSizeVars,
-          width: !columnOrder.includes('source')
-            ? table.getCenterTotalSize() + 'px'
-            : wrap
-            ? width
-              ? width - 12 + 'px'
-              : '100%'
-            : '100%',
-        }"
-      >
-        <thead class="tw-sticky tw-top-0">
-          <vue-draggable
-            v-model="columnOrder"
-            v-for="headerGroup in table.getHeaderGroups()"
-            :key="headerGroup.id"
-            :element="'table'"
-            :animation="200"
-            :sort="!isResizingHeader || !columnOrder.includes('source')"
-            handle=".table-head"
-            :class="{
-              'tw-cursor-move': table.getState().columnOrder.length > 1,
-            }"
-            :style="{
-              width:
-                columnOrder.includes('source') && wrap
-                  ? width - 12 + 'px'
-                  : tableRowSize + 'px',
-              minWidth: '100%',
-            }"
-            tag="tr"
-            @start="(event) => handleDragStart(event)"
-            @end="(event) => handleDragEnd(event)"
-            class="tw-flex items-center"
+  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
+    <table
+      data-test="logs-search-result-logs-table"
+      class="tw-w-full tw-table-auto"
+      :style="{
+        minWidth: '100%',
+        minHeight: '100%',
+        ...columnSizeVars,
+        width: !columnOrder.includes('source')
+          ? table.getCenterTotalSize() + 'px'
+          : wrap
+          ? width
+            ? width - 12 + 'px'
+            : '100%'
+          : '100%',
+      }"
+    >
+      <thead class="tw-sticky tw-top-0 tw-z-50">
+        <vue-draggable
+          v-model="columnOrder"
+          v-for="headerGroup in table.getHeaderGroups()"
+          :key="headerGroup.id"
+          :element="'table'"
+          :animation="200"
+          :sort="!isResizingHeader || !columnOrder.includes('source')"
+          handle=".table-head"
+          :class="{
+            'tw-cursor-move': table.getState().columnOrder.length > 1,
+          }"
+          :style="{
+            width:
+              columnOrder.includes('source') && wrap
+                ? width - 12 + 'px'
+                : tableRowSize + 'px',
+            minWidth: '100%',
+          }"
+          tag="tr"
+          @start="(event) => handleDragStart(event)"
+          @end="(event) => handleDragEnd(event)"
+          class="tw-flex items-center"
+        >
+          <th
+            v-for="header in headerGroup.headers"
+            :key="header.id"
+            :id="header.id"
+            class="tw-px-2 tw-relative table-head tw-text-ellipsis"
+            :style="{ width: header.getSize() + 'px' }"
+            :data-test="`log-search-result-table-th-${header.id}`"
           >
-            <th
-              v-for="header in headerGroup.headers"
-              :key="header.id"
-              :id="header.id"
-              class="tw-px-2 tw-relative table-head tw-text-ellipsis"
-              :style="{ width: header.getSize() + 'px' }"
+            <div
+              v-if="header.column.getCanResize()"
+              @dblclick="header.column.resetSize()"
+              @mousedown.self.prevent.stop="header.getResizeHandler()?.($event)"
+              @touchstart.self.prevent.stop="
+                header.getResizeHandler()?.($event)
+              "
+              :class="[
+                'resizer',
+                header.column.getIsResizing() ? 'isResizing' : '',
+              ]"
+              :style="{}"
+              class="tw-right-0"
+            />
+
+            <div
+              v-if="!header.isPlaceholder"
+              :class="[
+                'text-left',
+                header.column.getCanSort() ? 'cursor-pointer select-none' : '',
+              ]"
+              @click="
+                getSortingHandler(
+                  $event,
+                  header.column.getToggleSortingHandler()
+                )
+              "
+              class="tw-overflow-hidden tw-text-ellipsis"
             >
-              <div
-                v-if="header.column.getCanResize()"
-                @dblclick="header.column.resetSize()"
-                @mousedown.self.prevent.stop="
-                  header.getResizeHandler()?.($event)
-                "
-                @touchstart.self.prevent.stop="
-                  header.getResizeHandler()?.($event)
-                "
-                :class="[
-                  'resizer',
-                  header.column.getIsResizing() ? 'isResizing' : '',
-                ]"
-                :style="{}"
-                class="tw-right-0"
+              <FlexRender
+                :render="header.column.columnDef.header"
+                :props="header.getContext()"
               />
 
               <div
-                v-if="!header.isPlaceholder"
-                :class="[
-                  'text-left',
-                  header.column.getCanSort()
-                    ? 'cursor-pointer select-none'
-                    : '',
-                ]"
-                @click="
-                  getSortingHandler(
-                    $event,
-                    header.column.getToggleSortingHandler()
-                  )
+                :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
+                class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-bg-white tw-px-2 column-actions"
+                :class="
+                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
-                class="tw-overflow-hidden tw-text-ellipsis"
+                v-if="(header.column.columnDef.meta as any).closable || (header.column.columnDef.meta as any).showWrap"
               >
-                <FlexRender
-                  :render="header.column.columnDef.header"
-                  :props="header.getContext()"
-                />
-
-                <div
-                  class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-bg-white tw-px-2 column-actions"
-                  :class="
-                    store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                  "
-                  v-if="(header.column.columnDef.meta as any).closable || (header.column.columnDef.meta as any).showWrap"
-                >
-                  <!-- <span
+                <!-- <span
                         v-if="(header.column.columnDef.meta as any).showWrap"
                         style="font-weight: normal"
                         :class="
@@ -116,135 +115,187 @@
                         dense
                       /> -->
 
-                  <q-icon
-                    v-if="(header.column.columnDef.meta as any).closable"
-                    :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                    name="cancel"
-                    class="q-ma-none close-icon cursor-pointer"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-grey-7'
-                    "
-                    :title="t('common.close')"
-                    size="18px"
-                    @click="closeColumn(header.column.columnDef)"
-                  >
-                  </q-icon>
-                </div>
+                <q-icon
+                  v-if="(header.column.columnDef.meta as any).closable"
+                  :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                  name="cancel"
+                  class="q-ma-none close-icon cursor-pointer"
+                  :class="
+                    store.state.theme === 'dark' ? 'text-white' : 'text-grey-7'
+                  "
+                  :title="t('common.close')"
+                  size="18px"
+                  @click="closeColumn(header.column.columnDef)"
+                >
+                </q-icon>
               </div>
-            </th>
-          </vue-draggable>
+            </div>
+          </th>
+        </vue-draggable>
 
-          <tr v-if="loading" class="tw-w-full">
+        <tr v-if="loading" class="tw-w-full">
+          <td
+            :colspan="columnOrder.length"
+            class="text-bold"
+            style="opacity: 0.7"
+          >
+            <div
+              class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
+            >
+              <q-spinner-hourglass size="20px" />
+              {{ t("confirmDialog.loading") }}
+            </div>
+          </td>
+        </tr>
+        <tr v-if="!loading && errMsg != ''" class="tw-w-full">
+          <td
+            :colspan="columnOrder.length"
+            class="text-bold"
+            style="opacity: 0.7"
+          >
+            <div class="text-subtitle2 text-weight-bold bg-warning">
+              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              {{ errMsg }}
+            </div>
+          </td>
+        </tr>
+      </thead>
+      <tr
+        data-test="log-search-result-function-error"
+        v-if="functionErrorMsg != ''"
+      >
+        <td
+          :colspan="columnOrder.length"
+          class="text-bold"
+          style="opacity: 0.6"
+        >
+          <div class="text-subtitle2 text-weight-bold bg-warning">
+            <q-btn
+              :icon="
+                expandedRowIndices.includes(-1)
+                  ? 'expand_more'
+                  : 'chevron_right'
+              "
+              dense
+              size="xs"
+              flat
+              class="q-mr-xs"
+              data-test="table-row-expand-menu"
+              @click.stop="expandRow(-1)"
+            ></q-btn
+            ><b>
+              <q-icon name="warning" size="15px"></q-icon>
+              {{ t("search.functionErrorLabel") }}</b
+            >
+          </div>
+        </td>
+      </tr>
+      <tr v-if="expandedRowIndices.includes(-1)">
+        <td
+          :colspan="columnOrder.length"
+          class="bg-warning"
+          style="opacity: 0.7"
+        >
+          <pre>{{ functionErrorMsg }}</pre>
+        </td>
+      </tr>
+      <tbody ref="tableBodyRef" class="tw-relative">
+        <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
+          <tr
+            :data-test="`logs-search-result-detail-${
+              (tableRows[virtualRow.index] as any).timestamp
+            }`"
+            :style="{
+              transform: `translateY(${virtualRow.start}px)`,
+              minWidth: '100%',
+            }"
+            :data-index="virtualRow.index"
+            :ref="(node: any) => rowVirtualizer.measureElement(node)"
+            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b"
+            :class="[
+              store.state.theme === 'dark'
+                ? 'w-border-gray-800'
+                : 'w-border-gray-100',
+              columnOrder.includes('source') && !wrap
+                ? 'tw-table-row'
+                : 'tw-flex',
+            ]"
+          >
             <td
+              v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
               :colspan="columnOrder.length"
-              class="text-bold"
-              style="opacity: 0.7"
+              :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
             >
-              <div
-                class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
-              >
-                <q-spinner-hourglass size="20px" />
-                {{ t("confirmDialog.loading") }}
-              </div>
+              <json-preview
+                :value="tableRows[virtualRow.index - 1] as any"
+                show-copy-button
+                class="tw-py-1"
+                @copy="copyLogToClipboard"
+                @add-field-to-table="addFieldToTable"
+                @add-search-term="addSearchTerm"
+              />
             </td>
-          </tr>
-          <tr v-if="!loading && errMsg != ''" class="tw-w-full">
-            <td
-              :colspan="columnOrder.length"
-              class="text-bold"
-              style="opacity: 0.7"
-            >
-              <div class="text-subtitle2 text-weight-bold bg-warning">
-                <q-icon size="xs" name="warning" class="q-mr-xs" />
-                {{ errMsg }}
-              </div>
-            </td>
-          </tr>
-        </thead>
-        <tbody ref="tableBodyRef" class="tw-relative">
-          <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
-            <tr
-              :style="{
-                transform: `translateY(${virtualRow.start}px)`,
-                minWidth: '100%',
-              }"
-              :data-index="virtualRow.index"
-              :ref="(node: any) => rowVirtualizer.measureElement(node)"
-              class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b"
-              :class="[
-                store.state.theme === 'dark'
-                  ? 'w-border-gray-800'
-                  : 'w-border-gray-100',
-                columnOrder.includes('source') && !wrap
-                  ? 'tw-table-row'
-                  : 'tw-flex',
-              ]"
-            >
+            <template v-else>
               <td
-                v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
-                :colspan="columnOrder.length"
+                v-for="(cell, cellIndex) in formattedRows[
+                  virtualRow.index
+                ].getVisibleCells()"
+                :key="cell.id"
+                :data-test="
+                  'log-table-column-' + virtualRow.index + '-' + cell.id
+                "
+                class="tw-py-1 tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
+                :style="{
+                  width:
+                    cell.column.columnDef.id !== 'source'
+                      ? cell.column.getSize() + 'px'
+                      : wrap
+                      ? width - 225 - 12 + 'px'
+                      : 'auto',
+                  height: wrap ? '100%' : '26px',
+                }"
+                :class="[
+                  columnOrder.includes('source') && !wrap
+                    ? 'tw-table-cell'
+                    : 'tw-block',
+                  !wrap &&
+                    'tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap',
+                  wrap && ' tw-break-words',
+                ]"
               >
-                <json-preview
-                  :value="tableRows[virtualRow.index - 1] as any"
-                  show-copy-button
-                  class="tw-py-1"
+                <q-btn
+                  v-if="cellIndex == 0"
+                  :icon="
+                    formattedRows[virtualRow.index].getIsExpanded()
+                      ? 'expand_more'
+                      : 'chevron_right'
+                  "
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  data-test="table-row-expand-menu"
+                  @click="expandRow(virtualRow.index)"
+                ></q-btn>
+
+                <cell-actions
+                  v-if="(cell.column.columnDef.meta as any)?.closable && (cell.row.original as any)[cell.column.id]"
+                  :column="cell.column"
+                  :row="cell.row.original as any"
                   @copy="copyLogToClipboard"
-                  @add-field-to-table="addFieldToTable"
                   @add-search-term="addSearchTerm"
+                  @add-field-to-table="addFieldToTable"
+                />
+                <FlexRender
+                  :render="cell.column.columnDef.cell"
+                  :props="cell.getContext()"
                 />
               </td>
-              <template v-else>
-                <td
-                  v-for="(cell, cellIndex) in formattedRows[
-                    virtualRow.index
-                  ].getVisibleCells()"
-                  :key="cell.id"
-                  class="tw-py-1 tw-px-2 tw-items-center tw-justify-start"
-                  :style="{
-                    width:
-                      cell.column.columnDef.id !== 'source'
-                        ? cell.column.getSize() + 'px'
-                        : wrap
-                        ? width - 225 - 12 + 'px'
-                        : 'auto',
-                    height: wrap ? '100%' : '26px',
-                  }"
-                  :class="[
-                    columnOrder.includes('source') && !wrap
-                      ? 'tw-table-cell'
-                      : 'tw-block',
-                    !wrap &&
-                      'tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap',
-                    wrap && ' tw-break-words',
-                  ]"
-                >
-                  <q-btn
-                    v-if="cellIndex == 0"
-                    :icon="
-                      formattedRows[virtualRow.index].getIsExpanded()
-                        ? 'expand_more'
-                        : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    data-test="table-row-expand-menu"
-                    @click="expandRow(virtualRow.index)"
-                  ></q-btn>
-                  <FlexRender
-                    :render="cell.column.columnDef.cell"
-                    :props="cell.getContext()"
-                  />
-                </td>
-              </template>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
+            </template>
+          </tr>
+        </template>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -263,6 +314,7 @@ import JsonPreview from "./JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 
 const props = defineProps({
   rows: {
@@ -286,6 +338,10 @@ const props = defineProps({
     default: false,
   },
   errMsg: {
+    type: String,
+    default: "",
+  },
+  functionErrorMsg: {
     type: String,
     default: "",
   },
@@ -580,5 +636,17 @@ td {
 .q-table--dark .thead-sticky tr > *,
 .q-table--dark .tfoot-sticky tr > * {
   background: #565656;
+}
+
+.table-cell {
+  .table-cell-actions {
+    visibility: hidden !important;
+  }
+
+  &:hover {
+    .table-cell-actions {
+      visibility: visible !important;
+    }
+  }
 }
 </style>
