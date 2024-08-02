@@ -190,7 +190,7 @@ export default defineComponent({
         } else {
           value = it.multiSelect
             ? "(" + "$" + "{" + it.name + "}" + ")"
-            : "'" + "$" + it.name + "'";
+            :  "$" + it.name ;
         }
 
         return {
