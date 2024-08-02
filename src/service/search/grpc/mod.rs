@@ -151,6 +151,9 @@ pub async fn search(
         let mut new_fields = HashSet::new();
         let mut need_format = false;
         for batch in results.iter() {
+            if batch.num_rows() == 0 {
+                continue;
+            }
             if batch.schema().fields() != schema.fields() {
                 need_format = true;
             }
@@ -170,6 +173,9 @@ pub async fn search(
         if need_format {
             let mut new_batches = Vec::new();
             for batch in results {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
                 new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
             }
             results = new_batches;

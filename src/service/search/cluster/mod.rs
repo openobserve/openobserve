@@ -730,13 +730,18 @@ async fn merge_grpc_result(
             .collect::<HashSet<_>>();
         let mut new_fields = HashSet::new();
         let mut need_format = false;
-        for field in select_fields {
-            if !schema_fields.contains(field.name()) {
-                new_fields.insert(field.clone());
-                need_format = true;
+        if select_wildcard {
+            for field in select_fields {
+                if !schema_fields.contains(field.name()) {
+                    new_fields.insert(field.clone());
+                    need_format = true;
+                }
             }
         }
         for batch in batches.iter() {
+            if batch.num_rows() == 0 {
+                continue;
+            }
             if batch.schema().fields() != schema.fields() {
                 need_format = true;
             }
@@ -756,6 +761,9 @@ async fn merge_grpc_result(
         if need_format {
             let mut new_batches = Vec::new();
             for batch in batches {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
                 new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
             }
             batches = new_batches;
