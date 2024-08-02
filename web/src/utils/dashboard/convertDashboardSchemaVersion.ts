@@ -160,7 +160,6 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 5;
     }
-    default:
   }
 
   // return converted data
