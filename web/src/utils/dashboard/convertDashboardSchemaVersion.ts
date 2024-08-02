@@ -84,7 +84,6 @@ export function convertDashboardSchemaVersion(data: any) {
 
       // remove layouts key from data
       delete data.layouts;
-      break;
     }
     case 2: {
       // layout width migration from 12 col number to 48 col number
@@ -106,7 +105,6 @@ export function convertDashboardSchemaVersion(data: any) {
 
       // update the version
       data.version = 3;
-      break;
     }
     case 3: {
       data.tabs.forEach((tabItem: any) => {
@@ -126,7 +124,6 @@ export function convertDashboardSchemaVersion(data: any) {
       });
       // update the version
       data.version = 4;
-      break;
     }
     case 4: {
       data.tabs.forEach((tabItem: any) => {
@@ -162,7 +159,6 @@ export function convertDashboardSchemaVersion(data: any) {
       });
       // update the version
       data.version = 5;
-      break;
     }
     default:
   }
