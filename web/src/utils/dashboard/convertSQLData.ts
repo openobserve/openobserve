@@ -665,6 +665,7 @@ export const convertSQLData = async (
                     data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
                     null,
                 ),
+                large: true,
               };
               return seriesObj;
             });

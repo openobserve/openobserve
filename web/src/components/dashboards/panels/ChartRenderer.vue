@@ -280,7 +280,7 @@ export default defineComponent({
 
         // set options with selected object
         console.log('echart: setOptions (legendOption)', { legend: [legendOption] });
-        // chart?.setOption({ legend: [legendOption] });
+        chart?.setOption({ legend: [legendOption] });
       }
     };
 
@@ -471,8 +471,8 @@ export default defineComponent({
         options.animation = false;
         try {
           console.log('echart: setOptions (theme change)', options);
-          // chart?.setOption(options, true);
-          // chart?.setOption({ animation: true });
+          chart?.setOption(options, true);
+          chart?.setOption({ animation: true });
         } catch (e) {
           emit("error", e);
         }
@@ -497,7 +497,7 @@ export default defineComponent({
           });
         }
         console.log('echart: setOptions (onMounted)', props?.data?.options || {})
-        // chart?.setOption(props?.data?.options || {}, true);
+        chart?.setOption(props?.data?.options || {}, true);
         chartInitialSetUp();
       } catch (e) {
         emit("error", e);
@@ -560,7 +560,7 @@ export default defineComponent({
           chart?.resize();
           try {
             console.log('echart: setOptions (options change)', props?.data?.options || {});
-            // chart?.setOption(props?.data?.options || {}, true);
+            chart?.setOption(props?.data?.options || {}, true);
           } catch (error) {}
 
           // we need that toolbox datazoom button initally selected
