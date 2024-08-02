@@ -236,6 +236,7 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
 
 /// Migrate alerts, reports, templates, destination names with ofga compatible format
 pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
+    let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
     match need_meta_resource_name_migration().await {
         true => {
             log::info!("Starting migration of unsupported resource names");
@@ -245,12 +246,6 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
             return Ok(());
         }
     }
-
-    let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
-
-    // OFGA migration is also needed here
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
 
     if let Err(e) = migrate_alert_template_names().await {
         dist_lock::unlock(&locker).await?;
