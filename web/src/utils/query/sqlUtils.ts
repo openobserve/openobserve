@@ -259,8 +259,6 @@ function extractFilters(parsedAst: any) {
         };
       } else if (
         condition.operator == "=" ||
-        condition.operator == "<>" ||
-        condition.operator == "!=" ||
         condition.operator == "<" ||
         condition.operator == ">" ||
         condition.operator == "<=" ||
@@ -271,7 +269,17 @@ function extractFilters(parsedAst: any) {
           values: [],
           column: condition?.left?.column,
           operator: condition?.operator,
-          value: condition?.right?.value,
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "!=" || condition.operator == "<>") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "<>",
+          value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
           filterType: "condition",
         };
@@ -286,6 +294,16 @@ function extractFilters(parsedAst: any) {
           values: values,
           column: condition?.left?.column ?? "",
           operator: null,
+          value: null,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "null") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Is Null",
           value: null,
           logicalOperator: "AND",
           filterType: "condition",
