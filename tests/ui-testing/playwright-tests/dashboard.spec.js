@@ -10,7 +10,7 @@ const randomDashboardName = 'Dashboard_' + Math.random().toString(36).substr(2, 
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: 'networkidle' });
-  //  await page.getByText('Login as internal user').click();
+    //  await page.getByText('Login as internal user').click();
     await page
         .locator('[data-cy="login-user-id"]')
         .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -142,7 +142,7 @@ test.describe("dashboard UI testcases", () => {
 
     })
 
-    test('Verify create New Dashboard ', async ({ page }) => {   
+    test('should create a new dashboar', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -154,7 +154,7 @@ test.describe("dashboard UI testcases", () => {
 
     });
 
-    test('Verify that Delete the dashboard', async ({ page }) => {
+    test('should delete the dashboard', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -168,10 +168,9 @@ test.describe("dashboard UI testcases", () => {
         await page.getByRole('row', { name: `01 ${randomDashboardName}` }).locator('[data-test="dashboard-delete"]').click();
         await page.locator('[data-test="confirm-button"]').click();
 
-
     });
 
-    test('Verify the Duplicate the Dashboard', async ({ page }) => {
+    test('should create a duplicate of the dashboard', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -188,7 +187,7 @@ test.describe("dashboard UI testcases", () => {
 
     });
 
-    test('Verify create dashboard,with add the breakDown', async ({ page }) => {
+    test('should create a dashboard and add the breakdown', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page);
@@ -198,20 +197,20 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-add-submit"]').click();
         await expect(page.getByText('Dashboard added successfully.')).toBeVisible({ timeout: 3000 });
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-    
+
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
-    
+
         // Refine the locator for 'e2e_automate'
         await page.locator('span').filter({ hasText: /^e2e_automate$/ }).click();
-    
+
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]').click();
-    
+
         await expect(page.locator('[data-test="dashboard-apply"]')).toBeVisible();
-        await page.locator('[data-test="dashboard-apply"]').click();  
+        await page.locator('[data-test="dashboard-apply"]').click();
     });
 
-    test('should update the data when changing between absolute and relative time using the Kolkata time zone.', async ({ page }) => {
+    test('should update the data when changing the time between both absolute and relative time using the Kolkata time zone.', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -251,7 +250,7 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-apply"]').click();
     });
 
-    test('should update the chart when entering a custom SQL query.', async ({ page }) => {
+    test('should update the chart with the results of a custom SQL query', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -270,7 +269,7 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-query-editor"]').getByLabel('Editor content;Press Alt+F1').fill('SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1');
 
         // Fill the custom SQL query
-       await page.keyboard.type('SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1');
+        await page.keyboard.type('SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1');
         await page.waitForTimeout(400);
 
         await page.locator('[data-test="dashboard-apply"]').click();
@@ -292,8 +291,7 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-save"]').click();
     });
 
-    test('Verify, The Chart should update when changing the chart type', async ({ page }) => {
-
+    test('should display the correct and updated chart when changing the chart type', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -337,7 +335,7 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="confirm-button"]').click();
     });
 
-    test('Verify, navigating to another dashboard is performed using the DrillDown feature..', async ({ page }) => {    // Folder select as a " Default"vfrom this test cases
+    test('should navigate to another dashboard using the DrillDown feature.', async ({ page }) => {    // Folder select as a " Default"vfrom this test cases
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -351,8 +349,6 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
 
-
-        // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_docker_id"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_app_kubernetes_io_component"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_app_kubernetes_io_instance"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_app_kubernetes_io_managed_by"] [data-test="dashboard-add-y-data"]').click();
@@ -362,7 +358,6 @@ test.describe("dashboard UI testcases", () => {
 
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.waitForTimeout(200);
-
 
         await page.locator('[data-test="dashboard-sidebar"]').click();
         await page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').click();
@@ -396,7 +391,7 @@ test.describe("dashboard UI testcases", () => {
     });
 
 
-    test.skip('Verify ,the specified URL should be created using the DrillDown feature.', async ({ page }) => {
+    test.skip('should create the specified URL using the DrillDown feature', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -406,17 +401,12 @@ test.describe("dashboard UI testcases", () => {
 
         await page.locator('[data-test="dashboard-add-submit"]').click();
 
-        // await page.locator('[data-test="dashboard-add-dialog"]').getByText('arrow_drop_down').click();
-        // await page.getByRole('option', { name: 'default' }).locator('div').nth(2).click();
-        // await page.locator('[data-test="dashboard-add-submit"]').click();
-        // await expect(page.getByText('Dashboard added successfully.')).toBeVisible();
         await page.waitForTimeout(200);
 
         await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
         ``
-        // await page.locator('[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-x-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="date-time-btn"]').click();
@@ -457,7 +447,7 @@ test.describe("dashboard UI testcases", () => {
         await expect(page1.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
     });
 
-    test.skip('Verify the confirmation popup message for unsaved changes appears when clicking the Discard button.', async ({ page }) => {
+    test.skip('should display a confirmation popup message for unsaved changes when clicking the Discard button', async ({ page }) => {
         //Excepted : popup massge appear and redirect to the All Dasboarrd page.  
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -497,7 +487,7 @@ test.describe("dashboard UI testcases", () => {
     });
 
 
-    test('Verify,the filtered data dynamically updates when applying the dynamic filter on dashboard.', async ({ page }) => {
+    test('should dynamically update the filtered data when applying the dynamic filter on the dashboard', async ({ page }) => {
 
         // Excepted :  The dynamic filter should work correctly and display the appropriate data on the dashboard.
 
@@ -512,9 +502,6 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
         await page.getByText('e2e_automate').click();
 
-
-        //  await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]').click();
-
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="date-time-btn"]').click();
@@ -522,9 +509,6 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.waitForTimeout(100);
 
-        // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]').click();
-        // await page.locator('[data-test="dashboard-apply"]').click();
-        //  await page.waitForTimeout(3000);
         await page.locator('[data-test="dashboard-variable-adhoc-add-selector"]').click();
         await page.locator('[data-test="dashboard-variable-adhoc-name-selector"]').click();
         await page.locator('[data-test="dashboard-variable-adhoc-name-selector"]').fill('kubernetes_container_hash');
@@ -535,89 +519,83 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
+        await page.waitForTimeout(2000);
 
-        // await page.locator('[[data-test="dashboard-edit-panel-Tetstt-dropdown"]').click();          
-        // await page.locator('[data-test="dashboard-edit-panel"]').click();
-        // await page.locator('[data-test="date-time-btn"]').click();
-        // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-        // await page.locator('[data-test="dashboard-apply"]').click();
-        // await page.waitForTimeout(4000);
+        await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
+        await page.locator('[data-test="dashboard-edit-panel"]').click();
+        await page.locator('[data-test="date-time-btn"]').click();
+        await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+        await page.locator('[data-test="dashboard-apply"]').click();
 
-        // await page.locator('[data-test="dashboard-panel-save"]').click();
-        // await page.locator('[data-test="dashboard-edit-panel-Tetstt-dropdown"]').click();
-        // await page.waitForTimeout(2000);
+        await page.locator('[data-test="dashboard-panel-save"]').click();
+        await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
+        await page.waitForTimeout(2000);
 
-        // await page.locator('[data-test="dashboard-delete-panel"]').click();
-        // await expect(page.getByText('Delete PanelAre you sure you')).toBeVisible();
-        // await page.waitForTimeout(3000);
+        await page.locator('[data-test="dashboard-delete-panel"]').click();
+        await expect(page.getByText('Are you sure you want to delete this Panel?')).toBeVisible();
 
-        // await page.locator('[data-test="confirm-button"]').click();
-        // await expect(page.getByText('Panel deleted successfully')).toBeVisible();
+        await page.locator('[data-test="confirm-button"]').click();
     });
 
 
-        test.skip('Verify that the Dashboard can be created and saved with different relative times and timezones on both the Gauge and Table charts', async ({ page }) => {
+    test.skip('should create and save the dashboard with different relative times and timezones on both the Gauge and Table charts', async ({ page }) => {
 
-            // Expected Result: The Dashboard is successfully created and saved with accurate data reflecting the specified relative times and timezones on both the Gauge and Table charts.
-        
-            // Navigate to dashboards
-            await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-            await waitForDashboardPage(page);
-            await page.locator('[data-test="dashboard-add"]').click();
-            await page.locator('[data-test="add-dashboard-name"]').click();
-            await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
-            await page.locator('[data-test="dashboard-add-submit"]').click();
-        
-            // Add a new panel
-            await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-        
-            // Select gauge chart
-            await page.locator('[data-test="selected-chart-gauge-item"] img').click();
-        
-            // Select a stream
-            await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
-        
-            // Use more specific locator to click on 'e2e_automate'
-            await page.locator('span:has-text("e2e_automate")').click();
-        
-            await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
-        
-            // Set date-time and timezone
-            await page.locator('[data-test="date-time-btn"]').click();
-            await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-            await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
-            await page.getByText('Asia/Karachi').click();
-            await page.locator('[data-test="dashboard-apply"]').click();
-        
-            // Verify the gauge chart is visible
-            await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-        
-            // Switch to table chart
-            await page.locator('[data-test="selected-chart-table-item"] img').click();
-        
-            // Set timezone for the table chart
-            await page.locator('[data-test="date-time-btn"]').click();
-            await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
-            await page.getByText('Asia/Gaza').click();
-            await page.locator('[data-test="dashboard-apply"]').click();
-        
-            // Verify specific data in table chart
-            // await expect(page.getByRole('cell', { name: '69228.00' })).toBeVisible();
-        
-            // Edit the panel name
-            await page.locator('[data-test="dashboard-panel-name"]').click();
-            await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard_01');
-            await page.locator('[data-test="dashboard-panel-save"]').click();
-        
-            // Delete the panel
-            await page.locator('[data-test="dashboard-edit-panel-Dashboard_01-dropdown"]').click();
-            await page.locator('[data-test="dashboard-delete-panel"]').click();
-            await page.locator('[data-test="confirm-button"]').click();
-        });
-    
+        // Expected Result: The Dashboard is successfully created and saved with accurate data reflecting the specified relative times and timezones on both the Gauge and Table charts.
+
+        // Navigate to dashboards
+        await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+        await waitForDashboardPage(page);
+        await page.locator('[data-test="dashboard-add"]').click();
+        await page.locator('[data-test="add-dashboard-name"]').click();
+        await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
+        await page.locator('[data-test="dashboard-add-submit"]').click();
+
+        // Add a new panel
+        await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+
+        // Select gauge chart
+        await page.locator('[data-test="selected-chart-gauge-item"] img').click();
+
+        // Select a stream
+        await page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
+
+        // Use more specific locator to click on 'e2e_automate'
+        await page.locator('span:has-text("e2e_automate")').click();
+
+        await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
+
+        // Set date-time and timezone
+        await page.locator('[data-test="date-time-btn"]').click();
+        await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+        await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
+        await page.getByText('Asia/Karachi').click();
+        await page.locator('[data-test="dashboard-apply"]').click();
+
+        // Verify the gauge chart is visible
+        await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
+
+        // Switch to table chart
+        await page.locator('[data-test="selected-chart-table-item"] img').click();
+
+        // Set timezone for the table chart
+        await page.locator('[data-test="date-time-btn"]').click();
+        await page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
+        await page.getByText('Asia/Gaza').click();
+        await page.locator('[data-test="dashboard-apply"]').click();
+
+        // Edit the panel name
+        await page.locator('[data-test="dashboard-panel-name"]').click();
+        await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard_01');
+        await page.locator('[data-test="dashboard-panel-save"]').click();
+
+        // Delete the panel
+        await page.locator('[data-test="dashboard-edit-panel-Dashboard_01-dropdown"]').click();
+        await page.locator('[data-test="dashboard-delete-panel"]').click();
+        await page.locator('[data-test="confirm-button"]').click();
+    });
 
 
-    test('Verify, the Date and Time filter, Page Refresh, and Share Link features on the Dashboard panel page.', async ({ page }) => {
+    test('should have the Date and Time filter, Page Refresh, and Share Link features working correctly on the Dashboard panel page', async ({ page }) => {
 
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -636,11 +614,7 @@ test.describe("dashboard UI testcases", () => {
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
-        // await page.locator('[data-test="date-time-btn"]').click();
 
-        //  await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-x-data"]').click();
-        // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
-        // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]').click();
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
@@ -649,7 +623,6 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
         await page.locator('[data-test="dashboard-panel-save"]').click();
-        // await expect(page.locator('[data-test="chart-renderer"] div')).toBeVisible();
         await page.waitForTimeout(200);
 
         await page.locator('[data-test="date-time-btn"]').click();
@@ -666,9 +639,8 @@ test.describe("dashboard UI testcases", () => {
     });
 
 
+    test.skip('should display an error message when some fields are missing or incorrect', async ({ page }) => {
 
-
-    test.skip('Verify the error message if some fields are missing or incorrect.', async ({ page }) => {
         // Expected Result: An appropriate error message is displayed if any fields are missing or incorrect.
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -689,11 +661,11 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
         await page.locator('[data-test="datetime-timezone-select"]').click();
-        
+
         await page.waitForTimeout(1000);
 
         await page.getByRole('option', { name: 'Asia/Gaza' }).click();
-        
+
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.waitForTimeout(200);
 
@@ -701,25 +673,20 @@ test.describe("dashboard UI testcases", () => {
 
         await expect(page.getByText('There are some errors, please fix them and try again')).toBeVisible();
 
-        //   await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash_Error');
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
-        // await page.waitForTimeout(200)
-        // await page.waitForSelector('[data-test="click-data-test-value"]');
-        //   await page.waitForURL('**/dashboards');
+        await page.waitForTimeout(200)
 
-
-        // await page.locator('[data-test="dashboard-edit-panel-Dash_Error_Filter-dropdown"]').click();
-        // await page.locator('[data-test="dashboard-delete-panel"]').click();
-        // await page.waitForTimeout(200);
-        // await expect(page.getByText('Are you sure you want to')).toBeVisible({ timeout: 30000 });;
-        // await page.locator('[data-test="confirm-button"]').click();
+        // Delete the panel
+        await page.locator('[data-test="dashboard-edit-panel-Dash_Error-dropdown"]').click();
+        await page.locator('[data-test="dashboard-delete-panel"]').click();
+        await page.locator('[data-test="confirm-button"]').click();
     });
 
 
-    test('Verify filter functionality with different operators on dashboard field', async ({ page }) => {
+    test('should apply various filter operators to the dashboard field and display the correct results', async ({ page }) => {
         // Navigate to dashboards section
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -750,10 +717,6 @@ test.describe("dashboard UI testcases", () => {
         await page.getByRole('button', { name: '10', exact: true }).click();
         await page.locator('[data-test="datetime-timezone-select"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        //  await page.waitForTimeout(2000);
-
-        // Verify chart rendering
-        //  await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         // Apply "Is Null" filter
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_host"] [data-test="dashboard-add-filter-data"]').click();
@@ -763,8 +726,6 @@ test.describe("dashboard UI testcases", () => {
         await page.getByRole('option', { name: 'Is Null' }).click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.waitForTimeout(200);
-        //   await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-        // await expect(page.locator('[data-test="chart-renderer"] canvas')).toHaveCSS('display', 'block');
 
         // Apply "=" filter
         await page.locator('[data-test="dashboard-filter-item-kubernetes_host"]').click();
@@ -773,7 +734,6 @@ test.describe("dashboard UI testcases", () => {
         await page.getByLabel('Value').click();
         await page.getByLabel('Value').fill('kubernetes_docker_Id');
         await page.locator('[data-test="dashboard-apply"]').click();
-        //  await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         // Apply "Is Not Null" filter
         await page.locator('[data-test="no-data"]').click();
@@ -788,7 +748,6 @@ test.describe("dashboard UI testcases", () => {
         await page.getByText('Is Not Null').click();
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.waitForTimeout(100);
-        //   await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         //   Apply "<>" filter
         //  await page.locator('[data-test="chart-renderer"] canvas').click({ position: { x: 445, y: 15 } });
@@ -799,8 +758,6 @@ test.describe("dashboard UI testcases", () => {
         //     await page.locator('[data-test="dashboard-filter-condition-panel"]').getByText('arrow_drop_down').click();
         //     await page.getByRole('option', { name: '<>' }).click();
         //     await page.locator('[data-test="dashboard-apply"]').click();
-        //     await page.waitForTimeout(100);
-        // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
 
         // Save and delete the panel
         //   await page.locator('[data-test="chart-renderer"] canvas').click({ position: { x: 445, y: 16 } });
@@ -809,11 +766,14 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash1_Filter');
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
+
+        await page.locator('[data-test="dashboard-edit-panel-Dash1_Filter-dropdown"]').click();
+        await page.locator('[data-test="dashboard-delete-panel"]').click();
+        await page.locator('[data-test="confirm-button"]').click();
+
     });
 
-
-
-    test('Verify error message when required field is missing', async ({ page }) => {
+    test('should display an error message when a required field is missing', async ({ page }) => {
         // Navigate to dashboards section
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -864,9 +824,9 @@ test.describe("dashboard UI testcases", () => {
     });
 
 
-  // Breakdown test cases
+    // Breakdown test cases
 
-    test('Verify that the breakdown field should update using Drag and Drop, +B, and Cancel this field.', async ({ page }) => {
+    test('should add the breakdown field to the dashboard using Drag and Drop and +B, and allow the user to cancel the action', async ({ page }) => {
 
         // Navigate to dashboards
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -899,8 +859,6 @@ test.describe("dashboard UI testcases", () => {
         // Verify the breakdown field removal
         await page.locator('[data-test="dashboard-b-item-kubernetes_labels_app_kubernetes_io_component-remove"]');
 
-        // await page.locator('[data-test="dashboard-b-item-kubernetes_labels_app_kubernetes_io_component-remove"]').click();
-        // await page.locator('[data-test="dashboard-apply"]').click();
 
         // Verify adding a new breakdown field
         await expect(page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_operator_prometheus_io_name"] [data-test="dashboard-add-b-data"]')).toBeVisible();
@@ -914,11 +872,15 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-apply"]').click();
         await page.locator('[data-test="dashboard-panel-save"]').click();
 
-        
+        // Delete the panel and confirm
+        await page.locator('[data-test="dashboard-edit-panel-Dash_01-dropdown"]').click();
+        await page.locator('[data-test="dashboard-delete-panel"]').click();
+        await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+        await page.locator('[data-test="confirm-button"]').click();
+
     });
 
-    test('Verify the Add and Cancel functionality with different times and timezones for the breakdown field to ensure it shows the correct output.', async ({ page }) => {
-
+    test('should add and cancel the breakdown field with different times and timezones and ensure it displays the correct output', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -937,9 +899,6 @@ test.describe("dashboard UI testcases", () => {
 
         await page.locator('[data-test="date-time-btn"]').click();
         await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-        // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
-
-        // await page.getByText('2024-06-28 03:00:00').click(); 
 
         await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
@@ -952,38 +911,17 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash_Breakdown');
         await page.locator('[data-test="dashboard-panel-save"]').click();
+        await page.waitForTimeout(1000);
 
-        // await page.hover('[data-test="hover-data-test-dashboard-panel-fullscreen-btn"]');
-        //  await page.locator('[data-test="dashboard-panel-fullscreen-btn"]').click();
+        // Delete the panel and confirm
+        await page.locator('[data-test="dashboard-edit-panel-Dash_Breakdown-dropdown"]').click();
+        await page.locator('[data-test="dashboard-delete-panel"]').click();
+        await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+        await page.locator('[data-test="confirm-button"]').click();
 
-        // Hover over the element to make the fullscreen button visible
-        // await page.waitForTimeout(3000);
-        // await page.locator('[data-test="hover-data-test-dashboard-panel-fullscreen-btn"]').hover();
-
-        // // Click the fullscreen button after it becomes visible
-        // await page.locator('[data-test="dashboard-panel-fullscreen-btn"]').click();
-
-
-        // await expect(page.locator('[data-test="dashboard-viewpanel-panel-schema-renderer"] canvas')).toBeVisible();
-        // await page.locator('[data-test="dashboard-viewpanel-close-btn"]').click();
-        // await page.locator('[data-test="dashboard-edit-panel-Dash_Breakdown-dropdown"]').click();
-        // await page.locator('[data-test="dashboard-edit-panel"]').click();
-
-        // await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]').click();
-        // await page.locator('[data-test="dashboard-apply"]').click();
-        // await page.locator('[data-test="date-time-btn"]').click();
-        // await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-        // await page.locator('[data-test="dashboard-panel-save"]').click();
-        // await page.waitForTimeout(1000);
-
-        // await page.locator('[data-test="dashboard-edit-panel-Dash_Breakdown-dropdown"]').click();
-        // await page.locator('[data-test="dashboard-delete-panel"]').click();
-        // await expect(page.getByText('Are you sure you want to')).toBeVisible();
-        // await page.locator('[data-test="confirm-button"]').click();
-        // await expect(page.getByText('Panel deleted successfully')).toBeVisible();
     });
 
-    test('Verify that when changing the chart type, the existing added fields in the Bropdown are correctly populated according to the newly selected chart type.', async ({ page }) => {
+    test('should update the breakdown field correctly to match the existing one according to the chart type when changing the chart type.', async ({ page }) => {
         // The existing added fields in the dropdown should adjust correctly according to the new chart type select
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -1056,18 +994,16 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-save"]').click();
         await page.waitForTimeout(200);
 
-        // Delete the dashboard panel
-        // await page.locator('[data-test="dashboard-panel-name"]').click();
-        // await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
-        // await page.locator('[data-test="dashboard-panel-save"]').click();
-        await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
-        await page.locator('[data-test="dashboard-delete-panel"]').click();
-        await page.locator('[data-test="confirm-button"]').click();
+       // Delete the panel and confirm
+       await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
+       await page.locator('[data-test="dashboard-delete-panel"]').click();
+       await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+       await page.locator('[data-test="confirm-button"]').click();
 
     });
 
 
-    test('Verify that the panel is created successfully after adding a breakdown.', async ({ page }) => {
+    test('should create the panel successfully after adding a breakdown', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1090,17 +1026,15 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dash1');
         await page.locator('[data-test="dashboard-panel-save"]').click();
-        // await loactor.waitForNavigation({ timeout: 30000 });
 
-        //await page.click('["class="q-icon notranslate material-icons q-btn-dropdown__arrow q-btn-dropdown__arrow-container"]');
-        // await page.locator('[data-test="dashboard-edit-panel-Dash1_Filter-dropdown"]').click();         // Delete panel code
-        // await page.locator('[data-test="dashboard-delete-panel"]').click();
-        // await expect(page.getByText('Are you sure you want to')).toBeVisible();
-        // await page.locator('[data-test="confirm-button"]').click();
-        // await expect(page.getByText('Panel deleted successfully')).toBeVisible();
+       // Delete the panel and confirm
+       await page.locator('[data-test="dashboard-edit-panel-Dash1-dropdown"]').click();
+       await page.locator('[data-test="dashboard-delete-panel"]').click();
+       await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+       await page.locator('[data-test="confirm-button"]').click();
     });
 
-    test('Verify that the selections are cleared after adding a breakdown, clicking Apply, and refreshing the page.', async ({ page }) => {
+    test('should clear the selections after adding a breakdown and refreshing the page.', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1123,7 +1057,10 @@ test.describe("dashboard UI testcases", () => {
         await page.getByRole('button', { name: '16', exact: true }).click();
         await page.locator('[data-test="chart-renderer"] div').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        await page.waitForTimeout(100);
+
+        await page.reload();
+        await page.waitForTimeout(1000);
+
 
         page.once('dialog', dialog => {
             console.log(`Dialog message: ${dialog.message()}`);
@@ -1131,10 +1068,10 @@ test.describe("dashboard UI testcases", () => {
         });
         // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
         //  await page.waitForTimeout(1000);
-        // await expect(page.locator('[data-test="no-data"]')).toBeVisible();
+        await expect(page.locator('[data-test="no-data"]')).toBeVisible();
     });
 
-    test('Verify changing relative and absolute time with different timezones after adding breakdown and required fields.', async ({ page }) => {
+    test('should display the correct output when changing relative and absolute times with different timezones after adding a breakdown', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1174,10 +1111,16 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-panel-name"]').click();
         await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
         await page.locator('[data-test="dashboard-panel-save"]').click();
+
+          // Delete the panel and confirm
+       await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
+       await page.locator('[data-test="dashboard-delete-panel"]').click();
+       await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+       await page.locator('[data-test="confirm-button"]').click();
+    
     });
 
-    test('Verify adding Breakdown and other field, then discarding changes to ensure the page redirects to the list of dashboard pages.', async ({ page }) => {
-
+    test('should redirect to the list of dashboard pages when discarding changes', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1200,12 +1143,11 @@ test.describe("dashboard UI testcases", () => {
             dialog.dismiss().catch(() => { });
         });
         await page.locator('[data-test="dashboard-panel-discard"]').click();
-        //   await page.waitForTimeout(3000);
 
         // await expect(page.getByText('Start by adding your first')).toBeVisible();
     });
 
-    test('Verify adding the breakdown and applying the Sort by filter, then add fields to the X and Y axes and check if the data is plotted.', async ({ page }) => {
+    test('should plot the data when adding a "Sort by" filter, a breakdown, and other required fields', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1242,17 +1184,20 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-b-item-kubernetes_container_name"]').click();
         await page.locator('[data-test="dashboard-sort-by-item-desc"]').click();
         await page.locator('[data-test="dashboard-apply"]').click();
-        page.once('dialog', dialog => {
-            console.log(`Dialog message: ${dialog.message()}`);
-            dialog.dismiss().catch(() => { });
-        });
-        await page.locator('[data-test="dashboard-panel-discard"]').click();
+
+        await page.locator('[data-test="dashboard-panel-name"]').click();
+        await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
+        await page.locator('[data-test="dashboard-panel-save"]').click();
+
+          // Delete the panel and confirm
+       await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
+       await page.locator('[data-test="dashboard-delete-panel"]').click();
+       await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+       await page.locator('[data-test="confirm-button"]').click();
     });
 
 
-    test('Ensure that string and numeric values are correctly handled and displayed when no value replacement occurs.', async ({ page }) => {
-
-
+    test('should correctly handle and display string and numeric values when no value replacement occurs', async ({ page }) => {
 
         await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
         await waitForDashboardPage(page)
@@ -1278,11 +1223,21 @@ test.describe("dashboard UI testcases", () => {
         await page.locator('[data-test="dashboard-config-no-value-replacement"]').fill('NA');
         await page.locator('[data-test="dashboard-apply"]').click();
 
-    });
-    
+        await page.locator('[data-test="dashboard-panel-name"]').click();
+        await page.locator('[data-test="dashboard-panel-name"]').fill('Dashboard');
+        await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    
-    
+          // Delete the panel and confirm
+       await page.locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]').click();
+       await page.locator('[data-test="dashboard-delete-panel"]').click();
+       await expect(page.getByText('Are you sure you want to')).toHaveText('Are you sure you want to delete this Panel?');
+       await page.locator('[data-test="confirm-button"]').click();
+
+    });
+
+
+
+
 
 
 
