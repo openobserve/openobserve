@@ -243,80 +243,136 @@ function extractFields(parsedAst: any, timeField: string) {
   return fields;
 }
 
-// Function to extract conditions from the WHERE clause
-function extractConditions(parsedAst: any) {
-  const conditions: any = [];
+function extractFilters(parsedAst: any) {
+  function parseCondition(condition: any) {
+    console.log(condition, "condition");
 
-  function traverseCondition(node: any) {
-    if (node.type === "binary_expr") {
-      const condition = {
-        column: "",
-        operator: node.operator,
-        value: "",
-      };
+    if (condition.type === "binary_expr") {
+      if (condition.operator == "OR" || condition.operator == "AND") {
+        const left: any = parseCondition(condition.left);
+        const right: any = parseCondition(condition.right);
 
-      if (node.left.type === "column_ref") {
-        condition.column = node.left.column;
-      }
-
-      if (
-        node.right.type === "string" ||
-        node.right.type === "number" ||
-        node.right.type === "single_quote_string"
-      ) {
-        condition.value = node.right.value;
-      } else if (node.right.type === "column_ref") {
-        condition.value = node.right.column;
-      } else if (node.right.type === "expr_list") {
-        condition.value = node.right.value.map(
-          (item: any) => item.value || item.column
+        return {
+          filterType: "group",
+          logicalOperator: condition.operator,
+          conditions: [left, right],
+        };
+      } else if (condition.operator == "=") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "=",
+          value: condition?.right?.value,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition.operator == "IN") {
+        // create values array based on right side of condition
+        const values = condition.right.value.map(
+          (value: any) => `${value?.value}`,
         );
-      } else if (node.right.type === "null") {
-        condition.operator += " NULL";
-      }
 
-      conditions.push(condition);
-    } else if (node.type === "unary_expr" && node.operator === "NOT") {
-      const condition = {
-        column: "",
-        operator: "NOT",
-        value: "",
+        return {
+          type: "list",
+          values: values,
+          column: condition?.left?.column ?? "",
+          operator: null,
+          value: null,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      }
+    }
+  }
+
+  function convertWhereToFilter(where: any) {
+    if (!where)
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
       };
-
-      if (node.expr.type === "binary_expr") {
-        condition.operator = `NOT ${node.expr.operator}`;
-        if (node.expr.left.type === "column_ref") {
-          condition.column = node.expr.left.column;
-        }
-        if (
-          node.expr.right.type === "string" ||
-          node.expr.right.type === "number" ||
-          node.expr.right.type === "single_quote_string"
-        ) {
-          condition.value = node.expr.right.value;
-        } else if (node.expr.right.type === "column_ref") {
-          condition.value = node.expr.right.column;
-        }
-      }
-
-      conditions.push(condition);
-    }
-
-    if (node.left && node.left.type === "binary_expr") {
-      traverseCondition(node.left);
-    }
-
-    if (node.right && node.right.type === "binary_expr") {
-      traverseCondition(node.right);
-    }
+    return parseCondition(where);
   }
 
-  if (parsedAst.where) {
-    traverseCondition(parsedAst.where);
-  }
-
-  return conditions;
+  return convertWhereToFilter(parsedAst.where);
 }
+
+// // Function to extract conditions from the WHERE clause
+// function extractConditions(parsedAst: any) {
+//   const conditions: any = [];
+
+//   function traverseCondition(node: any) {
+//     if (node.type === "binary_expr") {
+//       const condition = {
+//         column: "",
+//         operator: node.operator,
+//         value: "",
+//       };
+
+//       if (node.left.type === "column_ref") {
+//         condition.column = node.left.column;
+//       }
+
+//       if (
+//         node.right.type === "string" ||
+//         node.right.type === "number" ||
+//         node.right.type === "single_quote_string"
+//       ) {
+//         condition.value = node.right.value;
+//       } else if (node.right.type === "column_ref") {
+//         condition.value = node.right.column;
+//       } else if (node.right.type === "expr_list") {
+//         condition.value = node.right.value.map(
+//           (item: any) => item.value || item.column
+//         );
+//       } else if (node.right.type === "null") {
+//         condition.operator += " NULL";
+//       }
+
+//       conditions.push(condition);
+//     } else if (node.type === "unary_expr" && node.operator === "NOT") {
+//       const condition = {
+//         column: "",
+//         operator: "NOT",
+//         value: "",
+//       };
+
+//       if (node.expr.type === "binary_expr") {
+//         condition.operator = `NOT ${node.expr.operator}`;
+//         if (node.expr.left.type === "column_ref") {
+//           condition.column = node.expr.left.column;
+//         }
+//         if (
+//           node.expr.right.type === "string" ||
+//           node.expr.right.type === "number" ||
+//           node.expr.right.type === "single_quote_string"
+//         ) {
+//           condition.value = node.expr.right.value;
+//         } else if (node.expr.right.type === "column_ref") {
+//           condition.value = node.expr.right.column;
+//         }
+//       }
+
+//       conditions.push(condition);
+//     }
+
+//     if (node.left && node.left.type === "binary_expr") {
+//       traverseCondition(node.left);
+//     }
+
+//     if (node.right && node.right.type === "binary_expr") {
+//       traverseCondition(node.right);
+//     }
+//   }
+
+//   if (parsedAst.where) {
+//     traverseCondition(parsedAst.where);
+//   }
+
+//   return conditions;
+// }
 
 // Function to extract the table name
 function extractTableName(parsedAst: any) {
@@ -325,7 +381,7 @@ function extractTableName(parsedAst: any) {
 
 export const getFieldsFromQuery = async (
   query: any,
-  timeField: string = "_timestamp"
+  timeField: string = "_timestamp",
 ) => {
   try {
     await importSqlParser();
@@ -333,18 +389,22 @@ export const getFieldsFromQuery = async (
     const ast: any = parser.astify(query);
 
     const streamName = extractTableName(ast) ?? null;
-    const fields = extractFields(ast, timeField);
-    const conditions = extractConditions(ast);
+    let fields = extractFields(ast, timeField);
+    let filters = extractFilters(ast);
 
-    // filter fields and conditions
-    const filteredFields = fields.filter((field: any) => field.column);
-    const filteredConditions = conditions.filter(
-      (condition: any) => condition.column
-    );
+    console.log(filters, "filters");
+
+    // remove wrong fields and filters
+    fields = fields.filter((field: any) => field.column);
+    // filters = filters.filter((filter: any) => filter.column);
 
     return {
-      fields: filteredFields,
-      conditions: filteredConditions,
+      fields: fields,
+      filters: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [filters],
+      },
       streamName,
     };
   } catch (error) {
@@ -361,7 +421,11 @@ export const getFieldsFromQuery = async (
           aggregationFunction: "count",
         },
       ],
-      conditions: [],
+      filters: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      },
       streamName: null,
     };
   }
@@ -393,75 +457,75 @@ export const buildSqlQuery = (
   return query;
 };
 
-export const getValidConditionObj = (condition: any) => {
-  switch (condition.operator) {
-    case "in": {
-      condition.type = "list";
-      condition.values = condition.value;
-      condition.operator = "IN";
-      condition.operator = null;
-      condition.value = null;
-      break;
-    }
-    case "not in": {
-      // currently not supported
-      break;
-    }
-    case "is null": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Is Null";
-      condition.value = null;
+// export const getValidConditionObj = (condition: any) => {
+//   switch (condition.operator) {
+//     case "in": {
+//       condition.type = "list";
+//       condition.values = condition.value;
+//       condition.operator = "IN";
+//       condition.operator = null;
+//       condition.value = null;
+//       break;
+//     }
+//     case "not in": {
+//       // currently not supported
+//       break;
+//     }
+//     case "is null": {
+//       condition.type = "condition";
+//       condition.values = [];
+//       condition.operator = "Is Null";
+//       condition.value = null;
 
-      break;
-    }
-    case "is not null": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Is Not Null";
-      condition.value = null;
-      break;
-    }
-    case "like": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Contains";
-      // remove % from the start and end
-      condition.value = condition?.value?.replace(/^%|%$/g, "");
-      break;
-    }
-    case "not like": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "Not Contains";
-      // remove % from the start and end
-      condition.value = condition?.value?.replace(/^%|%$/g, "");
-      break;
-    }
-    case "<>":
-    case "!=": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.operator = "<>";
-      condition.value = `'${condition.value}'`;
-      break;
-    }
-    case "=":
-    case "<":
-    case ">":
-    case "<=":
-    case ">=": {
-      condition.type = "condition";
-      condition.values = [];
-      condition.value = `'${condition.value}'`;
-      break;
-    }
-    default:
-      break;
-  }
+//       break;
+//     }
+//     case "is not null": {
+//       condition.type = "condition";
+//       condition.values = [];
+//       condition.operator = "Is Not Null";
+//       condition.value = null;
+//       break;
+//     }
+//     case "like": {
+//       condition.type = "condition";
+//       condition.values = [];
+//       condition.operator = "Contains";
+//       // remove % from the start and end
+//       condition.value = condition?.value?.replace(/^%|%$/g, "");
+//       break;
+//     }
+//     case "not like": {
+//       condition.type = "condition";
+//       condition.values = [];
+//       condition.operator = "Not Contains";
+//       // remove % from the start and end
+//       condition.value = condition?.value?.replace(/^%|%$/g, "");
+//       break;
+//     }
+//     case "<>":
+//     case "!=": {
+//       condition.type = "condition";
+//       condition.values = [];
+//       condition.operator = "<>";
+//       condition.value = `'${condition.value}'`;
+//       break;
+//     }
+//     case "=":
+//     case "<":
+//     case ">":
+//     case "<=":
+//     case ">=": {
+//       condition.type = "condition";
+//       condition.values = [];
+//       condition.value = `'${condition.value}'`;
+//       break;
+//     }
+//     default:
+//       break;
+//   }
 
-  return condition;
-};
+//   return condition;
+// };
 
 export const changeHistogramInterval = async (
   query: any,

@@ -1117,10 +1117,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
       start_time: new Date(
-        dashboardPanelData.meta.dateTime["start_time"].toISOString(),
+        dashboardPanelData?.meta?.dateTime["start_time"]?.toISOString(),
       ).getTime(),
       end_time: new Date(
-        dashboardPanelData.meta.dateTime["end_time"].toISOString(),
+        dashboardPanelData?.meta?.dateTime["end_time"]?.toISOString(),
       ).getTime(),
       fields: [name],
       size: 100,

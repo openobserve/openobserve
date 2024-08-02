@@ -952,7 +952,7 @@ export default defineComponent({
         );
       }
 
-      const { fields, conditions, streamName } = await getFieldsFromQuery(
+      const { fields, filters, streamName } = await getFieldsFromQuery(
         logsQuery ?? "",
         store.state.zoConfig.timestamp_column ?? "_timestamp",
       );
@@ -996,15 +996,18 @@ export default defineComponent({
         dashboardPanelData.data.type = "table";
       }
 
-      // set conditions
-      conditions.forEach((condition) => {
-        condition.operator = condition.operator.toLowerCase();
+      // set filters
+      // conditions.forEach((condition) => {
+      //   condition.operator = condition.operator.toLowerCase();
 
-        // get valid condition object
-        condition = getValidConditionObj(condition);
+      //   // get valid condition object
+      //   condition = getValidConditionObj(condition);
 
-        dashboardPanelData.data.queries[0].fields.filter.push(condition);
-      });
+      //   dashboardPanelData.data.queries[0].fields.filter.push(condition);
+      // });
+
+      // set filters
+      dashboardPanelData.data.queries[0].fields.filter = filters;
     };
 
     // watch for changes in the visualize toggle
