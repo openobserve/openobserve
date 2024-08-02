@@ -113,6 +113,7 @@ test.describe("Schema testcases", () => {
     await page.waitForTimeout(2000);
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.waitForTimeout(1000);
     await page.getByText(/^arrow_drop_down_all:.*$/).click();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
@@ -135,7 +136,7 @@ test.describe("Schema testcases", () => {
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.getByText('{ arrow_drop_down_timestamp:').click();
+    await page.getByText('arrow_drop_down_timestamp:').click();
  
   })
 
