@@ -37,7 +37,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, inject } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
 import Group from "./Group.vue";
@@ -52,8 +52,14 @@ export default defineComponent({
   props: ["dashboardData"],
 
   setup(props) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+
     const { dashboardPanelData, removeFilterItem, loadFilterItem } =
-      useDashboardPanelData();
+      useDashboardPanelData(dashboardPanelDataPageKey);
+
     const { t } = useI18n();
     const showAddMenu = ref(false);
 
