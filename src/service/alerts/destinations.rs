@@ -63,10 +63,12 @@ pub async fn save(
         destination.name = name.to_string();
     }
     destination.name = destination.name.trim().to_string();
-    // Replace the characters not supported by ofga with '_'
-    destination.name = RE_OFGA_UNSUPPORTED_NAME
-        .replace_all(&destination.name, "_")
-        .to_string();
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&destination.name) {
+        return Err(anyhow::anyhow!(
+            "Alert destination name cannot contain ':', '#', '?' and space characters"
+        ));
+    }
     if destination.name.is_empty() {
         return Err((
             http::StatusCode::BAD_REQUEST,

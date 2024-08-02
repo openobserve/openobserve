@@ -37,10 +37,12 @@ pub async fn save(
         template.name = name.to_owned();
     }
     template.name = template.name.trim().to_string();
-    // Replace the characters not supported by ofga with '_'
-    template.name = RE_OFGA_UNSUPPORTED_NAME
-        .replace_all(&template.name, "_")
-        .to_string();
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&template.name) {
+        return Err(anyhow::anyhow!(
+            "Alert template name cannot contain ':', '#', '?' and space characters"
+        ));
+    }
     if template.name.is_empty() {
         return Err(anyhow::anyhow!("Alert template name is required"));
     }

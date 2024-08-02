@@ -36,7 +36,9 @@ use crate::{
                 ReportFrequencyType, ReportTimerangeType,
             },
         },
-        utils::auth::{remove_ownership, set_ownership, RE_OFGA_UNSUPPORTED_NAME},
+        utils::auth::{
+            is_ofga_unsupported, remove_ownership, set_ownership, RE_OFGA_UNSUPPORTED_NAME,
+        },
     },
     service::db,
 };
@@ -67,10 +69,13 @@ pub async fn save(
     if !name.is_empty() {
         report.name = name.to_string();
     }
-    // Replace the characters not supported by ofga with '_'
-    report.name = RE_OFGA_UNSUPPORTED_NAME
-        .replace_all(&report.name, "_")
-        .to_string();
+
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&report.name) {
+        return Err(anyhow::anyhow!(
+            "Report name cannot contain ':', '#', '?' and space characters"
+        ));
+    }
     if report.name.is_empty() {
         return Err(anyhow::anyhow!("Report name is required"));
     }
