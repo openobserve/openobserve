@@ -21,13 +21,11 @@ use infra::{
     dist_lock, scheduler,
 };
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::add_init_ofga_tuples;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::O2_CONFIG, openfga::authorizer::authz::update_tuples,
-};
 use version_compare::Version;
 
 use crate::{
@@ -334,13 +332,13 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
                 Ok(_) => {
                     if let Err(e) = db::dashboards::reports::delete(keys[0], report_name).await {
                         log::error!(
-                            "[Report:Migration]: Error deleting report with unsupported report name: {report_name}"
+                            "[Report:Migration]: Error deleting report with unsupported report name: {report_name}: {e}"
                         );
                     }
                 }
                 Err(e) => {
                     log::error!(
-                        "[Report:Migration]: error updating unsupported report name {report_name}"
+                        "[Report:Migration]: error updating unsupported report name {report_name}: {e}"
                     );
                 }
             }
@@ -375,13 +373,17 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
             get_ownership_tuple(keys[0], "templates", &temp.name, &mut write_tuples);
             // First create an alert copy with formatted template name
             match db::alerts::templates::set(keys[0], &mut temp).await {
-                // Don't delete template with unsupported template name
-                // Destinations can contain these unsupported templates, so don't delete them.
-                // User needs to manually change the destination and delete the old one.
-                Ok(_) => {}
+                // Delete template with unsupported template name
+                Ok(_) => {
+                    if let Err(e) = db::alerts::templates::delete(keys[0], temp_name).await {
+                        log::error!(
+                            "[Template:Migration]: Error deleting unsupported template name {temp_name}: {e}"
+                        );
+                    }
+                }
                 Err(e) => {
                     log::error!(
-                        "[Template:Migration]: error updating unsupported template name {temp_name}"
+                        "[Template:Migration]: Error updating unsupported template name {temp_name}: {e}"
                     );
                 }
             }
@@ -414,11 +416,13 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
         let dest_name = keys[keys.len() - 1];
         let mut dest: Destination = json::from_slice(&val).unwrap();
         let mut need_update = false;
+        let mut create = false;
         if is_ofga_unsupported(dest_name) && keys.len() == 2 {
             dest.name = into_ofga_supported_format(dest_name);
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "destinations", &dest.name, &mut write_tuples);
             need_update = true;
+            create = true;
         }
         if is_ofga_unsupported(&dest.template) {
             dest.template = into_ofga_supported_format(&dest.template);
@@ -428,13 +432,20 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
         if need_update {
             // Create a new destination copy with formatted destination name
             match db::alerts::destinations::set(keys[0], &dest).await {
-                // Don't delete destination with unsupported destination name
-                // Alerts can contain these unsupported destinations, so don't delete them.
-                // User needs to manually change the destination and delete the old one.
-                Ok(_) => {}
+                // Delete destination with unsupported destination name
+                Ok(_) => {
+                    // New destination created, delete the old one
+                    if create {
+                        if let Err(e) = db::alerts::destinations::delete(keys[0], dest_name).await {
+                            log::error!(
+                                "Destination:Migration]: Error updating unsupported destination name {dest_name}: {e}"
+                            );
+                        }
+                    }
+                }
                 Err(e) => {
                     log::error!(
-                        "[Destination:Migration]: Error updating unsupported destination name {dest_name}"
+                        "[Destination:Migration]: Error updating unsupported destination name {dest_name}: {e}"
                     );
                 }
             }
@@ -520,7 +531,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
                 }
                 Err(e) => {
                     log::error!(
-                        "[Alert:Migration]: Error updating unsupported alert name {alert_name}"
+                        "[Alert:Migration]: Error updating unsupported alert name {alert_name}: {e}"
                     );
                 }
             }

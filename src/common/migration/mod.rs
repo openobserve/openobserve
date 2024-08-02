@@ -25,6 +25,7 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     let old_ver = Version::from(old_ver).unwrap();
     let new_ver = Version::from(new_ver).unwrap();
     let zero = Version::from("v0.0.0").unwrap();
+    log::info!("old_ver: {:#?}", old_ver);
     if old_ver == zero {
         // new install
         return Ok(());
@@ -45,8 +46,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         upgrade_092_093().await?;
     }
 
+    log::info!("before checking migration version");
     let v0109 = Version::from("0.10.9").unwrap();
     if old_ver < v0109 {
+        log::info!("here in the check");
         upgrade_0108_0109().await?;
     }
 
