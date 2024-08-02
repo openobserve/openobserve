@@ -184,11 +184,10 @@ test.describe("Logs Quickmode testcases", () => {
       .first()
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.waitForTimeout(2000)
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
     ).toBeVisible();
-
-
   });
 
   test("should adding/removing interesting field removes it from editor and results too", async ({
@@ -204,6 +203,96 @@ test.describe("Logs Quickmode testcases", () => {
       )
       .first()
       .click();
+    await page.locator('[data-cy="index-field-search-input"]').clear();
+    await page
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("level");
+    await page.waitForTimeout(2000);
+    await page
+      .locator(
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
+      )
+      .last()
+      .click({
+        force: true,
+      });
+    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page
+      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await expect(
+      page
+        .locator('[data-test="log-table-column-0-source"]')
+        .locator('text=_timestamp')
+    ).toBeVisible();
+    await page
+      .locator(
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
+      )
+      .last()
+      .click({
+        force: true,
+      });
+    await expect(
+      page.locator('[data-test="logs-search-bar-query-editor"]')
+    ).not.toHaveText(/level/);
+    await page
+      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .click();
+    await expect(
+      page.locator('[data-test="log-table-column-1-source"]')
+    ).not.toHaveText(/source/);
+  });
+
+  test("should display order by in sql mode by default even after page reload", async ({
+    page,
+  }) => {
+    await page
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("job");
+    await page.waitForTimeout(2000);
+    await page
+      .locator(
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+      )
+      .last()
+      .click({
+        force: true,
+      });
+      
+    const searchUrl = '**/api/default/_search?type=logs&search_type=UI&use_cache=true';
+
+    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page
+      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await page.reload();
+    
+    await page.waitForResponse(searchUrl);
+
+    await page.waitForResponse(searchUrl);
+
+    await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
+
+    await page.waitForTimeout(2000);
+
+    await expect(
+      page
+        .locator('[data-test="logs-search-bar-query-editor"]')
+        .locator(
+          'text=job FROM "e2e_automate" ORDER BY _timestamp DESC'
+        )
+    ).toBeVisible();
+  });
+
+  test("should display results without adding timestamp in quick mode", async ({
+    page,
+  }) => {
+  
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
