@@ -44,7 +44,7 @@ pub mod users;
 
 const MAX_KEY_LENGTH: usize = 100;
 
-static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_:]+").unwrap());
+static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 // format partition key
 pub fn format_partition_key(input: &str) -> String {
