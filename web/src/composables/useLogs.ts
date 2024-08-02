@@ -3113,11 +3113,17 @@ const useLogs = () => {
           // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
         } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
           // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
-          startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+          startTimeDate.setMinutes(
+            parseInt(
+              searchObj.meta.resultGrid.chartInterval.replace(" minute", "")
+            ),
+            0
+          ); // Round to the nearest whole minute
         } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
           startTimeDate.setUTCMinutes(0, 0); // Round to the nearest whole minute
         } else {
-          startTimeDate.setUTCHours(0, 0, 0, 0); // Round to the nearest whole minute
+          startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+          startTimeDate.setUTCHours(0, 0, 0); // Round to the nearest whole minute
         }
 
         const startTime = startTimeDate.getTime() * 1000;
@@ -3132,12 +3138,13 @@ const useLogs = () => {
             zo_sql_num: 0,
           });
         }
+        console.log(JSON.parse(JSON.stringify(results)));
 
         const dataMap = new Map(results.map((item) => [item.zo_sql_key, item]));
         searchObj.data.queryResults.aggs.forEach((item) => {
           // console.log("item",item)
           if (dataMap.has(item.zo_sql_key)) {
-            dataMap.get(item.zo_sql_key).zo_sql_num = item.zo_sql_num;
+            dataMap.get(item.zo_sql_key).zo_sql_num += item.zo_sql_num;
           }
         });
 
