@@ -97,6 +97,7 @@ const defaultObject = {
     logsVisualizeToggle: "logs",
     refreshInterval: <number>0,
     refreshIntervalLabel: "Off",
+    refreshHistogram: false,
     showFields: true,
     showQuery: true,
     showHistogram: true,
@@ -1670,7 +1671,7 @@ const useLogs = () => {
 
         if (
           (searchObj.data.queryResults.aggs == undefined &&
-            searchObj.data.resultGrid.currentPage == 1 &&
+            searchObj.meta.refreshHistogram == true &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1680,8 +1681,9 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
             searchObj.data.stream.selectedStream.length <= 1 &&
-            searchObj.data.resultGrid.currentPage == 1)
+            searchObj.meta.refreshHistogram == true)
         ) {
+          searchObj.meta.refreshHistogram = false;
           if (searchObj.data.queryResults.hits.length > 0) {
             if (searchObj.data.stream.selectedStream.length > 1) {
               searchObj.data.histogram = {
@@ -3482,6 +3484,7 @@ const useLogs = () => {
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
+      searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
       // searchObj.data.histogram.chartParams.title = ""
