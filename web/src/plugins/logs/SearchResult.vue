@@ -498,7 +498,7 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
-    TenstackTable,
+    TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
   },
   emits: [
     "update:scroll",

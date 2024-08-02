@@ -154,9 +154,9 @@ test.describe("Logs Quickmode testcases", () => {
   });
 
   test("should display error on entering random text in histogram mode when quick mode is on", async ({ page }) => {
+    await page.waitForResponse("**/api/default/_search**");
     // Click on the Monaco Editor to focus it
     await page.click('[data-test="logs-search-bar-query-editor"]');
-
     // Type into the Monaco Editor
     await page.keyboard.type("oooo");
     await page.waitForTimeout(1000)
@@ -184,6 +184,7 @@ test.describe("Logs Quickmode testcases", () => {
       .first()
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
     ).toBeVisible();
@@ -269,7 +270,7 @@ test.describe("Logs Quickmode testcases", () => {
         force: true,
       });
     await page.reload();
-    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
