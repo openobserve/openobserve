@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::cluster::LOCAL_NODE;
 use schema::migrate_resource_names;
 use version_compare::Version;
 
@@ -25,7 +26,6 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     let old_ver = Version::from(old_ver).unwrap();
     let new_ver = Version::from(new_ver).unwrap();
     let zero = Version::from("v0.0.0").unwrap();
-    log::info!("old_ver: {:#?}", old_ver);
     if old_ver == zero {
         // new install
         return Ok(());
@@ -46,10 +46,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         upgrade_092_093().await?;
     }
 
-    log::info!("before checking migration version");
     let v0109 = Version::from("v0.10.9").unwrap();
-    if old_ver < v0109 {
-        log::info!("here in the check");
+    // The below migration requires ofga init ready, but on Router node,
+    // we don't initialize ofga, hence the migration should not run on router
+    if old_ver < v0109 && !LOCAL_NODE.is_router() {
         upgrade_0108_0109().await?;
     }
 

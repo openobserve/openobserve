@@ -297,11 +297,7 @@ async fn need_meta_resource_name_migration() -> bool {
             let val_str = std::str::from_utf8(&val).unwrap();
             let old_meta_migration_ver =
                 Version::from(val_str).unwrap_or(Version::from("v0.0.0").unwrap());
-            if old_meta_migration_ver < Version::from("v0.0.1").unwrap() {
-                true
-            } else {
-                false
-            }
+            old_meta_migration_ver < Version::from("v0.0.1").unwrap()
         }
         Err(_) => true,
     }
@@ -327,7 +323,7 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "reports", &report.name, &mut write_tuples);
             // First create an report copy with formatted report name
-            match db::dashboards::reports::set(keys[0], &mut report, true).await {
+            match db::dashboards::reports::set(keys[0], &report, true).await {
                 // Delete report with unsupported report name
                 Ok(_) => {
                     if let Err(e) = db::dashboards::reports::delete(keys[0], report_name).await {
