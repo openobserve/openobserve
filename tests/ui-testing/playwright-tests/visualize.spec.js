@@ -3,7 +3,7 @@ import logData from "../cypress/fixtures/log.json";
 import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 
-// test.describe.configure({ mode: "parallel" });
+ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);

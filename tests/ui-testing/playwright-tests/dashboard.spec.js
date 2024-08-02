@@ -6,7 +6,7 @@ import { parseArgs } from "util";
 
 const randomDashboardName = 'Dashboard_' + Math.random().toString(36).substr(2, 9);
 
-// test.describe.configure({ mode: "parallel" });
+test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: 'networkidle' });
