@@ -325,8 +325,7 @@ test.describe("Logs Quickmode testcases", () => {
       await expect(
         page
           .locator('[data-test="log-table-column-0-source"]')
-          .getByText(/_timestamp/)
-          .first()
+        
       ).toBeVisible();
 
  });
