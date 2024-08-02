@@ -17,15 +17,9 @@ use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use datafusion::physical_plan::{
-    coalesce_batches::CoalesceBatchesExec, memory::MemoryExec, repartition::RepartitionExec,
-    ExecutionPlan, Partitioning,
+    coalesce_batches::CoalesceBatchesExec, empty::EmptyExec, memory::MemoryExec,
+    repartition::RepartitionExec, ExecutionPlan, Partitioning,
 };
-
-type PlanResult = (
-    Option<Arc<dyn ExecutionPlan>>,
-    Option<Vec<Vec<RecordBatch>>>,
-    bool,
-);
 
 const DISTRIBUTED_PLAN_NAMES: [&str; 3] = [
     "CoalescePartitionsExec",
@@ -60,7 +54,8 @@ pub fn get_partial_plan(
         if let Partitioning::RoundRobinBatch(_) = plan.partitioning() {
             return Ok(None);
         }
-    } else if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
+    }
+    if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
         let child = *cplan.children().first().unwrap();
         if child.name() == "ParquetExec" {
             return Ok(None);
@@ -79,18 +74,17 @@ pub fn get_partial_plan(
 
 pub fn get_final_plan(
     plan: &Arc<dyn ExecutionPlan>,
-    data: Vec<Vec<RecordBatch>>,
-) -> Result<PlanResult, datafusion::error::DataFusionError> {
+    data: &[Vec<RecordBatch>],
+) -> Result<(Option<Arc<dyn ExecutionPlan>>, bool), datafusion::error::DataFusionError> {
     let children = plan.children();
     if children.is_empty() {
-        return Ok((Some(plan.clone()), Some(data), false));
+        return Ok((Some(plan.clone()), false));
     }
     if children.len() > 1 {
         return Err(datafusion::error::DataFusionError::NotImplemented(
             "ExecutionPlan with multiple children".to_string(),
         ));
     }
-    let mut return_data = None;
     let mut found_dist = false;
     let mut cplan = (*children.first().unwrap()).clone();
     for name in ["HashJoinExec", "CrossJoinExec"] {
@@ -104,46 +98,52 @@ pub fn get_final_plan(
     if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {
         let child = *cplan.children().first().unwrap();
         if get_partial_plan(child)?.is_some() {
-            if let (Some(v), data, dist) = get_final_plan(&cplan, data)? {
+            if let (Some(v), dist) = get_final_plan(&cplan, data)? {
                 cplan = v;
                 if dist {
                     found_dist = true;
-                } else {
-                    return_data = data;
                 }
             }
         } else {
             cplan = cplan
                 .clone()
                 .with_new_children(vec![Arc::new(
-                    MemoryExec::try_new(&data, cplan.schema(), None).unwrap(),
+                    MemoryExec::try_new(data, cplan.schema(), None).unwrap(),
                 )])
                 .unwrap();
             found_dist = true;
         }
-    } else if let (Some(v), data, dist) = get_final_plan(&cplan, data)? {
+    } else if let (Some(v), dist) = get_final_plan(&cplan, data)? {
         cplan = v;
         if dist {
             found_dist = true;
-        } else {
-            return_data = data;
         }
     }
     Ok((
         Some(plan.clone().with_new_children(vec![cplan]).unwrap()),
-        return_data,
         found_dist,
     ))
 }
 
 pub fn get_without_dist_plan(
     plan: &Arc<dyn ExecutionPlan>,
-    data: Vec<Vec<RecordBatch>>,
+    data: &[Vec<RecordBatch>],
     batch_size: usize,
 ) -> Arc<dyn ExecutionPlan> {
-    let memory_exec = MemoryExec::try_new(&data, plan.schema(), None).unwrap();
+    if data.is_empty() {
+        return Arc::new(EmptyExec::new(plan.schema()));
+    }
+    let schema = if plan.name() == "ProjectionExec" {
+        data.first().unwrap().first().unwrap().schema()
+    } else {
+        plan.schema()
+    };
+    let memory_exec = MemoryExec::try_new(data, schema, None).unwrap();
     let coalesce_exec = CoalesceBatchesExec::new(Arc::new(memory_exec), batch_size);
-    plan.clone()
-        .with_new_children(vec![Arc::new(coalesce_exec)])
-        .unwrap()
+    let coalesce_exec = Arc::new(coalesce_exec);
+    if plan.name() == "ProjectionExec" {
+        coalesce_exec
+    } else {
+        plan.clone().with_new_children(vec![coalesce_exec]).unwrap()
+    }
 }
