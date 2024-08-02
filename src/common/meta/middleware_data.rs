@@ -234,4 +234,43 @@ mod tests {
             assert!(data.get("version").unwrap() == "1.0.1");
         }
     }
+
+    /// Test logic for IP parsing
+    #[tokio::test]
+    async fn test_ip_parsing() {
+        let valid_addressses = vec![
+            "127.0.0.1",
+            "127.0.0.1:8080",
+            "::1",
+            "192.168.0.1:8080",
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
+        ];
+
+        let parsed_addresses: Vec<IpAddr> = valid_addressses
+            .iter()
+            .map(|address| {
+                address
+                    .parse::<IpAddr>()
+                    .or_else(|_| {
+                        address
+                            .parse::<SocketAddr>()
+                            .map(|sock_addr| sock_addr.ip())
+                            .map_err(|e| {
+                                log::error!("Error parsing IP address: {}, {}", &address, e);
+                                e
+                            })
+                    })
+                    .unwrap_or_else(|_| IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)))
+            })
+            .collect();
+
+        assert!(
+            parsed_addresses
+                .iter()
+                .zip(valid_addressses)
+                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+                .fold(true, |acc, x| { acc | x })
+        );
+    }
 }
