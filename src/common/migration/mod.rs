@@ -47,7 +47,7 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     }
 
     log::info!("before checking migration version");
-    let v0109 = Version::from("0.10.9").unwrap();
+    let v0109 = Version::from("v0.10.9").unwrap();
     if old_ver < v0109 {
         log::info!("here in the check");
         upgrade_0108_0109().await?;
