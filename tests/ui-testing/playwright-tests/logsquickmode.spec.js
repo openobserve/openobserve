@@ -184,10 +184,11 @@ test.describe("Logs Quickmode testcases", () => {
       .first()
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
-    await page.waitForTimeout(2000)
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
     ).toBeVisible();
+    
+   
   });
 
   test("should adding/removing interesting field removes it from editor and results too", async ({
@@ -261,9 +262,6 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-      
-    const searchUrl = '**/api/default/_search?type=logs&search_type=UI&use_cache=true';
-
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
@@ -271,15 +269,7 @@ test.describe("Logs Quickmode testcases", () => {
         force: true,
       });
     await page.reload();
-    
-    await page.waitForResponse(searchUrl);
-
-    await page.waitForResponse(searchUrl);
-
-    await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
-
     await page.waitForTimeout(2000);
-
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
