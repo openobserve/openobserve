@@ -235,7 +235,7 @@ const searchAggData = reactive({
 
 let histogramResults: any = [];
 let histogramMappedData: any = [];
-const intervalMap = {
+const intervalMap: any = {
   "10 second": 10 * 1000 * 1000,
   "15 second": 15 * 1000 * 1000,
   "30 second": 30 * 1000 * 1000,
@@ -1828,7 +1828,7 @@ const useLogs = () => {
     ) {
       histogramResults = [];
       histogramMappedData = [];
-      const intervalMs: string = intervalMap[searchObj.meta.resultGrid.chartInterval];
+      const intervalMs: any = intervalMap[searchObj.meta.resultGrid.chartInterval];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
@@ -1861,7 +1861,7 @@ const useLogs = () => {
 
       const startTime = startTimeDate.getTime() * 1000;
       for (
-        let currentTime = startTime;
+        let currentTime: any = startTime;
         currentTime < searchObj.data.customDownloadQueryObj.query.end_time;
         currentTime += intervalMs
       ) {
