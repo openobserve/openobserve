@@ -1668,6 +1668,50 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     updateQueryValue();
   };
 
+  const getColumnType = (column: string) => {
+    console.log("---------------column", column);
+    console.log(
+      "---dashboard",
+      dashboardPanelData.meta.stream.selectedStreamFields,
+    );
+
+    const field = dashboardPanelData.meta.stream.selectedStreamFields.find(
+      (field: any) => field?.name === column,
+    );
+    console.log("field", field);
+    return field ? field.type : null;
+  };
+
+  const formatValue = (value: any, column: string) => {
+    if (value == null) {
+      console.log("Value is null or undefined, returning as is");
+      return value;
+    }
+    console.log("formatValue", value, column);
+    const columnType = getColumnType(column);
+    console.log("columnType", columnType);
+
+    if (columnType === "Utf8") {
+      // Check if the value already has quotes
+      if (value.startsWith("'") && value.endsWith("'")) {
+        console.log("value if utf8", value);
+        return value;
+      } else {
+        console.log("value if not utf8", value);
+        return `'${value}'`;
+      }
+    } else if (columnType === "Int64") {
+      // Remove quotes if they exist
+      if (value.startsWith("'") && value.endsWith("'")) {
+        console.log("value if int64", value.substring(1, value.length - 1));
+        return value.substring(1, value.length - 1);
+      } else {
+        console.log("value if not int64", value);
+        return value;
+      }
+    }
+    return value;
+  };
   const buildWhereClause = (filterData: any) => {
     const buildCondition = (condition: any) => {
       if (condition.filterType === "group") {
@@ -1689,7 +1733,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         return groupConditions.length ? `(${groupQuery})` : "";
       } else if (condition.type === "list" && condition.values?.length > 0) {
         return `${condition.column} IN (${condition.values
-          .map((value: any) => `'${value}'`)
+          .map((value: any) => formatValue(value, condition.column))
           .join(", ")})`;
       } else if (condition.type === "condition" && condition.operator != null) {
         let selectFilter = "";
@@ -1704,7 +1748,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               break;
           }
         } else if (condition.operator === "match_all") {
-          selectFilter += `match_all(${condition.value})`;
+          selectFilter += `match_all('${condition.value}')`;
         } else if (condition.value != null && condition.value !== "") {
           selectFilter += `${condition.column} `;
           switch (condition.operator) {
@@ -1714,16 +1758,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             case ">":
             case "<=":
             case ">=":
-              selectFilter += `${condition.operator} ${condition.value}`;
+              selectFilter += `${condition.operator} ${formatValue(condition.value, condition.column)}`;
               break;
             case "Contains":
-              selectFilter += `LIKE '%${condition.value}%'`;
+              selectFilter += `LIKE '%${formatValue(condition.value, condition.column)}%'`;
               break;
             case "Not Contains":
-              selectFilter += `NOT LIKE '%${condition.value}%'`;
+              selectFilter += `NOT LIKE '%${formatValue(condition.value, condition.column)}%'`;
               break;
             default:
-              selectFilter += `${condition.operator} ${condition.value}`;
+              selectFilter += `${condition.operator} ${formatValue(condition.value, condition.column)}`;
               break;
           }
         }
