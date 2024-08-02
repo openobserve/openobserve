@@ -94,7 +94,7 @@ pub async fn search(
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(req_node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] service:search:cluster:run: no querier node online");
