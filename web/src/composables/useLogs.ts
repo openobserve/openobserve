@@ -1828,7 +1828,7 @@ const useLogs = () => {
     ) {
       histogramResults = [];
       histogramMappedData = [];
-      const intervalMs = intervalMap[searchObj.meta.resultGrid.chartInterval];
+      const intervalMs: string = intervalMap[searchObj.meta.resultGrid.chartInterval];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
