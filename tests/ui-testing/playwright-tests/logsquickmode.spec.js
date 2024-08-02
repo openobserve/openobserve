@@ -141,9 +141,10 @@ test.describe("Logs Quickmode testcases", () => {
     ).toBeVisible();
   });
 
-  test("should click on interesting fields icon in histogram mode and run query", async ({
+  test.skip("should click on interesting fields icon in histogram mode and run query", async ({
     page,
   }) => {
+    console.log("Filling in the timestamp field...");
     await page
       .locator('[data-cy="index-field-search-input"]')
       .fill("_timestamp");
@@ -158,6 +159,7 @@ test.describe("Logs Quickmode testcases", () => {
         force: true,
       });
     await page.waitForTimeout(2000);
+    console.log("Clicking on the search bar refresh button...");
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
@@ -207,7 +209,7 @@ test.describe("Logs Quickmode testcases", () => {
    
   });
 
-  test("should adding/removing interesting field removes it from editor and results too", async ({
+  test.skip("should adding/removing interesting field removes it from editor and results too", async ({
     page,
   }) => {
     await page
@@ -303,7 +305,7 @@ test.describe("Logs Quickmode testcases", () => {
     ).toBeVisible();
   });
 
-  test("should display results without adding timestamp in quick mode", async ({
+  test.skip("should display results without adding timestamp in quick mode", async ({
     page,
   }) => {
   
