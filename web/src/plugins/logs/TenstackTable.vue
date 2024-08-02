@@ -10,10 +10,10 @@
         width: !columnOrder.includes('source')
           ? table.getCenterTotalSize() + 'px'
           : wrap
-          ? width
-            ? width - 12 + 'px'
-            : '100%'
-          : '100%',
+            ? width
+              ? width - 12 + 'px'
+              : '100%'
+            : '100%',
       }"
     >
       <thead class="tw-sticky tw-top-0 tw-z-50">
@@ -72,7 +72,7 @@
               @click="
                 getSortingHandler(
                   $event,
-                  header.column.getToggleSortingHandler()
+                  header.column.getToggleSortingHandler(),
                 )
               "
               class="tw-overflow-hidden tw-text-ellipsis"
@@ -88,7 +88,10 @@
                 :class="
                   store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
-                v-if="(header.column.columnDef.meta as any).closable || (header.column.columnDef.meta as any).showWrap"
+                v-if="
+                  (header.column.columnDef.meta as any).closable ||
+                  (header.column.columnDef.meta as any).showWrap
+                "
               >
                 <!-- <span
                         v-if="(header.column.columnDef.meta as any).showWrap"
@@ -203,7 +206,9 @@
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
             :data-test="`logs-search-result-detail-${
-              (tableRows[virtualRow.index] as any).timestamp
+              (tableRows[virtualRow.index] as any)[
+                store.state.zoConfig.timestamp_column || '_timestamp'
+              ]
             }`"
             :style="{
               transform: `translateY(${virtualRow.start}px)`,
@@ -222,7 +227,10 @@
             ]"
           >
             <td
-              v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
+              v-if="
+                (formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+              "
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
             >
@@ -253,8 +261,8 @@
                     cell.column.columnDef.id !== 'source'
                       ? cell.column.getSize() + 'px'
                       : wrap
-                      ? width - 225 - 12 + 'px'
-                      : 'auto',
+                        ? width - 225 - 12 + 'px'
+                        : 'auto',
                   height: wrap ? '100%' : '26px',
                 }"
                 :class="[
@@ -282,7 +290,10 @@
                 ></q-btn>
 
                 <cell-actions
-                  v-if="(cell.column.columnDef.meta as any)?.closable && (cell.row.original as any)[cell.column.id]"
+                  v-if="
+                    (cell.column.columnDef.meta as any)?.closable &&
+                    (cell.row.original as any)[cell.column.id]
+                  "
                   :column="cell.column"
                   :row="cell.row.original as any"
                   @copy="copyLogToClipboard"
@@ -390,7 +401,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 watch(
@@ -400,7 +411,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const table = useVueTable({
@@ -461,12 +472,12 @@ watch(
   () => headers.value,
   (newVal) => {
     isResizingHeader.value = newVal.some((header) =>
-      header.column.getIsResizing()
+      header.column.getIsResizing(),
     );
   },
   {
     deep: true,
-  }
+  },
 );
 
 const parentRef = ref<HTMLElement | null>(null);
@@ -506,7 +517,7 @@ const closeColumn = (data: any) => {
 };
 
 const handleDragStart = (event: any) => {
-  if (columnOrder.value[event.oldIndex] === "timestamp") {
+  if (columnOrder.value[event.oldIndex] === "@timestamp") {
     isResizingHeader.value = true;
   } else {
     isResizingHeader.value = false;
@@ -515,8 +526,8 @@ const handleDragStart = (event: any) => {
 
 const handleDragEnd = async (event: any) => {
   if (
-    columnOrder.value.includes("timestamp") &&
-    columnOrder.value[0] !== "timestamp"
+    columnOrder.value.includes("@timestamp") &&
+    columnOrder.value[0] !== "@timestamp"
   ) {
     await nextTick();
     const newItem = columnOrder.value[event.newIndex];
@@ -532,7 +543,7 @@ const expandedRowIndices = ref<number[]>([]);
 const expandRow = async (index: number) => {
   if (expandedRowIndices.value.includes(index)) {
     expandedRowIndices.value = expandedRowIndices.value.filter(
-      (i) => i !== index
+      (i) => i !== index,
     );
     tableRows.value.splice(index + 1, 1);
   } else {
