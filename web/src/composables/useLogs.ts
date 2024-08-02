@@ -233,6 +233,19 @@ const searchAggData = reactive({
   hasAggregation: false,
 });
 
+let histogramResults: any = [];
+let histogramMappedData: any = [];
+const intervalMap = {
+  "10 second": 10 * 1000 * 1000,
+  "15 second": 15 * 1000 * 1000,
+  "30 second": 30 * 1000 * 1000,
+  "1 minute": 60 * 1000 * 1000,
+  "5 minute": 5 * 60 * 1000 * 1000,
+  "30 minute": 30 * 60 * 1000 * 1000,
+  "1 hour": 60 * 60 * 1000 * 1000,
+  "1 day": 24 * 60 * 60 * 1000 * 1000,
+};
+
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
@@ -1704,12 +1717,12 @@ const useLogs = () => {
               if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
                 partitions.reverse();
               }
+              await generateHistogramSkeleton();
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
                 setTimeout(async () => {
-                  console.log("settimeout");
                   await generateHistogramData();
                   refreshPartitionPagination(true);
                 }, 100);
@@ -1806,6 +1819,59 @@ const useLogs = () => {
       }
     }
     return false;
+  }
+
+  function generateHistogramSkeleton() {
+    if (
+      searchObj.data.queryResults.hasOwnProperty("aggs") &&
+      searchObj.data.queryResults.aggs
+    ) {
+      histogramResults = [];
+      histogramMappedData = [];
+      const intervalMs = intervalMap[searchObj.meta.resultGrid.chartInterval];
+      if (!intervalMs) {
+        throw new Error("Invalid interval");
+      }
+
+      let date = new Date();
+      const startTimeDate = new Date(
+        searchObj.data.customDownloadQueryObj.query.start_time / 1000
+      ); // Convert microseconds to milliseconds
+      if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
+        startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 10, 0); // Round to the nearest whole minute
+      } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {
+        startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+        // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+      } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
+        // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+        startTimeDate.setMinutes(
+          parseInt(
+            searchObj.meta.resultGrid.chartInterval.replace(" minute", "")
+          ),
+          0
+        ); // Round to the nearest whole minute
+      } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
+        startTimeDate.setHours(startTimeDate.getHours() + 1);
+        startTimeDate.setUTCMinutes(0, 0); // Round to the nearest whole minute
+      } else {
+        startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+        startTimeDate.setUTCHours(0, 0, 0); // Round to the nearest whole minute
+        startTimeDate.setDate(startTimeDate.getDate() + 1);
+      }
+
+      const startTime = startTimeDate.getTime() * 1000;
+      for (
+        let currentTime = startTime;
+        currentTime < searchObj.data.customDownloadQueryObj.query.end_time;
+        currentTime += intervalMs
+      ) {
+        date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
+        histogramResults.push({
+          zo_sql_key: date.toISOString().slice(0, 19),
+          zo_sql_num: 0,
+        });
+      }
+    }
   }
 
   function hasAggregation(columns: any) {
@@ -3079,76 +3145,23 @@ const useLogs = () => {
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
       ) {
-        const intervalMap = {
-          "10 second": 10 * 1000 * 1000,
-          "15 second": 15 * 1000 * 1000,
-          "30 second": 30 * 1000 * 1000,
-          "1 minute": 60 * 1000 * 1000,
-          "5 minute": 5 * 60 * 1000 * 1000,
-          "30 minute": 30 * 60 * 1000 * 1000,
-          "1 hour": 60 * 60 * 1000 * 1000,
-          "1 day": 24 * 60 * 60 * 1000 * 1000,
-        };
-        console.log(
-          "searchObj.data.customDownloadQueryObj.query.start_time",
-          searchObj.data.customDownloadQueryObj.query.start_time
+        histogramMappedData = new Map(
+          histogramResults.map((item: any) => [
+            item.zo_sql_key,
+            JSON.parse(JSON.stringify(item)),
+          ])
         );
 
-        const intervalMs = intervalMap[searchObj.meta.resultGrid.chartInterval];
-        if (!intervalMs) {
-          throw new Error("Invalid interval");
-        }
-
-        const results: any = [];
-        let date = new Date();
-        const startTimeDate = new Date(
-          searchObj.data.customDownloadQueryObj.query.start_time / 1000
-        ); // Convert microseconds to milliseconds
-        if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
-          startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
-        } else if (
-          searchObj.meta.resultGrid.chartInterval.includes("1 minute")
-        ) {
-          startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
-          // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
-        } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
-          // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
-          startTimeDate.setMinutes(
-            parseInt(
-              searchObj.meta.resultGrid.chartInterval.replace(" minute", "")
-            ),
-            0
-          ); // Round to the nearest whole minute
-        } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
-          startTimeDate.setUTCMinutes(0, 0); // Round to the nearest whole minute
-        } else {
-          startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
-          startTimeDate.setUTCHours(0, 0, 0); // Round to the nearest whole minute
-        }
-
-        const startTime = startTimeDate.getTime() * 1000;
-        for (
-          let currentTime = startTime;
-          currentTime <= searchObj.data.customDownloadQueryObj.query.end_time;
-          currentTime += intervalMs
-        ) {
-          date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
-          results.push({
-            zo_sql_key: date.toISOString().slice(0, 19),
-            zo_sql_num: 0,
-          });
-        }
-        console.log(JSON.parse(JSON.stringify(results)));
-
-        const dataMap = new Map(results.map((item) => [item.zo_sql_key, item]));
-        searchObj.data.queryResults.aggs.forEach((item) => {
-          // console.log("item",item)
-          if (dataMap.has(item.zo_sql_key)) {
-            dataMap.get(item.zo_sql_key).zo_sql_num += item.zo_sql_num;
+        searchObj.data.queryResults.aggs.forEach((item: any) => {
+          if (histogramMappedData.has(item.zo_sql_key)) {
+            histogramMappedData.get(item.zo_sql_key).zo_sql_num +=
+              item.zo_sql_num;
+          } else {
+            histogramMappedData.set(item.zo_sql_key, item);
           }
         });
 
-        const mergedData: any = Array.from(dataMap.values());
+        const mergedData: any = Array.from(histogramMappedData.values());
 
         mergedData.map(
           (bucket: {
@@ -3330,6 +3343,7 @@ const useLogs = () => {
           }
           //extract fields from query response
           extractFields();
+          generateHistogramSkeleton();
           generateHistogramData();
           //update grid columns
           updateGridColumns();
