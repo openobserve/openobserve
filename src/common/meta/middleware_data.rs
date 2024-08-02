@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, net::IpAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use actix_web::{
     body::MessageBody,
@@ -109,13 +113,18 @@ impl RumExtraData {
 
             user_agent_hashmap.insert("ip".into(), ip_address.into());
 
-            let ip: IpAddr = match ip_address.split(':').next().unwrap().parse() {
-                Ok(ip) => ip,
-                Err(e) => {
-                    log::error!("Error parsing IP address: {}, {}", ip_address, e);
-                    IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))
-                }
-            };
+            let ip = ip_address
+                .parse::<IpAddr>()
+                .or_else(|_| {
+                    ip_address
+                        .parse::<SocketAddr>()
+                        .map(|sock_addr| sock_addr.ip())
+                        .map_err(|e| {
+                            log::error!("Error parsing IP address: {}, {}", &ip_address, e);
+                            e
+                        })
+                })
+                .unwrap_or_else(|_| IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)));
 
             let geo_info = if let Some(client) = &(*maxminddb_client) {
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
