@@ -721,7 +721,7 @@ async fn merge_grpc_result(
     // format recordbatch with same schema
     let mut schema_latest = Arc::new(sql.schema.clone());
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-    if !batches.is_empty() && select_wildcard {
+    if !batches.is_empty() {
         let mut schema = batches[0].schema();
         let schema_fields = schema
             .fields()
@@ -737,7 +737,7 @@ async fn merge_grpc_result(
             }
         }
         for batch in batches.iter() {
-            if batch.schema().fields().len() != schema_fields.len() {
+            if batch.schema().fields() != schema.fields() {
                 need_format = true;
             }
             for field in batch.schema().fields() {
@@ -760,7 +760,10 @@ async fn merge_grpc_result(
             }
             batches = new_batches;
         }
-        schema_latest = schema.clone();
+        // reset schema_latest only when select wildcard
+        if select_wildcard {
+            schema_latest = schema.clone();
+        }
     }
 
     // only final phase need merge partitions

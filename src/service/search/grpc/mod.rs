@@ -33,7 +33,7 @@ use proto::cluster_rpc;
 use tracing::Instrument;
 
 use super::datafusion;
-use crate::service::{db, search::sql::RE_SELECT_WILDCARD};
+use crate::service::db;
 mod storage;
 mod wal;
 
@@ -141,8 +141,7 @@ pub async fn search(
     }
 
     // format recordbatch with same schema
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-    if !results.is_empty() && select_wildcard {
+    if !results.is_empty() {
         let mut schema = results[0].schema();
         let schema_fields = schema
             .fields()
@@ -152,7 +151,7 @@ pub async fn search(
         let mut new_fields = HashSet::new();
         let mut need_format = false;
         for batch in results.iter() {
-            if batch.schema().fields().len() != schema_fields.len() {
+            if batch.schema().fields() != schema.fields() {
                 need_format = true;
             }
             for field in batch.schema().fields() {
