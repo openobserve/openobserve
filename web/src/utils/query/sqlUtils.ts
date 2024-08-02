@@ -22,7 +22,7 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
       dummyQuery,
       label.name,
       label.value,
-      label.operator
+      label.operator,
     );
   }
 
@@ -65,7 +65,7 @@ export const addLabelToSQlQuery = async (
   originalQuery: any,
   label: any,
   value: any,
-  operator: any
+  operator: any,
 ) => {
   await importSqlParser();
 
@@ -174,7 +174,7 @@ export const getStreamFromQuery = async (query: any) => {
 
 export const isGivenFieldInOrderBy = async (
   sqlQuery: string,
-  fieldAlias: string
+  fieldAlias: string,
 ) => {
   await importSqlParser();
   const ast: any = parser.astify(sqlQuery);
@@ -218,7 +218,7 @@ function extractFields(parsedAst: any, timeField: string) {
 
   // Check if all fields are selected and remove the `*` entry
   const allFieldsSelected = parsedAst.columns.some(
-    (column: any) => column.expr && column.expr.column === "*"
+    (column: any) => column.expr && column.expr.column === "*",
   );
 
   if (allFieldsSelected) {
@@ -233,7 +233,7 @@ function extractFields(parsedAst: any, timeField: string) {
         column: timeField,
         alias: "y_axis_1",
         aggregationFunction: "count",
-      }
+      },
     );
 
     // Filter out the `*` entry from fields
@@ -257,12 +257,20 @@ function extractFilters(parsedAst: any) {
           logicalOperator: condition.operator,
           conditions: [left, right],
         };
-      } else if (condition.operator == "=") {
+      } else if (
+        condition.operator == "=" ||
+        condition.operator == "<>" ||
+        condition.operator == "!=" ||
+        condition.operator == "<" ||
+        condition.operator == ">" ||
+        condition.operator == "<=" ||
+        condition.operator == ">="
+      ) {
         return {
           type: "condition",
           values: [],
           column: condition?.left?.column,
-          operator: "=",
+          operator: condition?.operator,
           value: condition?.right?.value,
           logicalOperator: "AND",
           filterType: "condition",
@@ -434,7 +442,7 @@ export const getFieldsFromQuery = async (
 export const buildSqlQuery = (
   tableName: string,
   fields: any,
-  whereClause: string
+  whereClause: string,
 ) => {
   let query = "SELECT ";
 
