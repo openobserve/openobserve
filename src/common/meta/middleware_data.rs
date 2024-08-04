@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-};
+use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
 use actix_web::{
     body::MessageBody,
@@ -30,7 +26,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
-use crate::{common::infra::config::MAXMIND_DB_CLIENT, USER_AGENT_REGEX_FILE};
+use crate::{
+    common::{infra::config::MAXMIND_DB_CLIENT, utils::http::parse_ip_addr},
+    USER_AGENT_REGEX_FILE,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GeoInfoData<'a> {
@@ -113,18 +112,11 @@ impl RumExtraData {
 
             user_agent_hashmap.insert("ip".into(), ip_address.into());
 
-            let ip = ip_address
-                .parse::<IpAddr>()
-                .or_else(|_| {
-                    ip_address
-                        .parse::<SocketAddr>()
-                        .map(|sock_addr| sock_addr.ip())
-                        .map_err(|e| {
-                            log::error!("Error parsing IP address: {}, {}", &ip_address, e);
-                            e
-                        })
-                })
-                .unwrap_or_else(|_| IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)));
+            let ip = match parse_ip_addr(ip_address) {
+                Ok((ip, _)) => ip,
+                // Default to ipv4 loopback address
+                Err(_) => IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+            };
 
             let geo_info = if let Some(client) = &(*maxminddb_client) {
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
@@ -233,44 +225,5 @@ mod tests {
             assert!(data.get("service").unwrap() == "web-application");
             assert!(data.get("version").unwrap() == "1.0.1");
         }
-    }
-
-    /// Test logic for IP parsing
-    #[tokio::test]
-    async fn test_ip_parsing() {
-        let valid_addressses = vec![
-            "127.0.0.1",
-            "127.0.0.1:8080",
-            "::1",
-            "192.168.0.1:8080",
-            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
-            "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
-        ];
-
-        let parsed_addresses: Vec<IpAddr> = valid_addressses
-            .iter()
-            .map(|address| {
-                address
-                    .parse::<IpAddr>()
-                    .or_else(|_| {
-                        address
-                            .parse::<SocketAddr>()
-                            .map(|sock_addr| sock_addr.ip())
-                            .map_err(|e| {
-                                log::error!("Error parsing IP address: {}, {}", &address, e);
-                                e
-                            })
-                    })
-                    .unwrap_or_else(|_| IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)))
-            })
-            .collect();
-
-        assert!(
-            parsed_addresses
-                .iter()
-                .zip(valid_addressses)
-                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
-                .fold(true, |acc, x| { acc | x })
-        );
     }
 }
