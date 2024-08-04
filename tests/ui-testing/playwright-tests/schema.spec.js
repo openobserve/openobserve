@@ -90,6 +90,8 @@ test.describe("Schema testcases", () => {
     });
 
     test('stream schema settings updated to be displayed under logs', async ({ page }) => {
+        page.on('console', msg => console.log(msg.text()));
+        
         await page.locator('[data-test="menu-link-\\/streams-item"]').click();
         await page.getByPlaceholder('Search Stream').click();
         await page.getByPlaceholder('Search Stream').fill('e2e_automate');
