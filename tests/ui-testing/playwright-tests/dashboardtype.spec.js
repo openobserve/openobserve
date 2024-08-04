@@ -128,7 +128,7 @@ test.describe("dashboard testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-d-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(5000)
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 803,
