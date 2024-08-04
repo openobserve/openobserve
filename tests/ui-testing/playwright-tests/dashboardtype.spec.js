@@ -132,12 +132,7 @@ test.describe("dashboard testcases", () => {
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(5000)
-    await page.locator('[data-test="chart-renderer"] canvas').click({
-      position: {
-        x: 803,
-        y: 67
-      }
-    });
+    await page.locator('[data-test="chart-renderer"] canvas').click();
 
     await page.waitForSelector('[data-test="chart-renderer"]');
     const chartBoundingBox = await page.locator('[data-test="chart-renderer"]').boundingBox();
