@@ -102,6 +102,14 @@ test.describe("dashboard testcases", () => {
 
   test('should create, compare area type chart image and delete dashboard', async ({ page }) => {
     page.on('console', msg => console.log(msg.text()));
+    page.on('response', async (resp) => {
+      if (resp.url().includes('api/default/')) {
+        console.log('url      -> ', resp.url());
+        console.log('code     -> ', resp.status());
+        console.log('payload  -> ', resp.request().postData());
+        console.log('response -> ', await resp.text());
+      }
+    });
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await page.waitForTimeout(2000)
