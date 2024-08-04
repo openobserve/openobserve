@@ -2742,6 +2742,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-proto"
+version = "40.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a38d1e3d26fcb5a7de58b068d4f6a2eff20663a6d10ad1b45c6222505409003"
+dependencies = [
+ "arrow",
+ "chrono",
+ "datafusion",
+ "datafusion-common",
+ "datafusion-expr",
+ "datafusion-proto-common",
+ "object_store",
+ "prost 0.12.6",
+]
+
+[[package]]
+name = "datafusion-proto-common"
+version = "40.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cad4529d59ebcc88f9d717b3b83cab01b7b6adee3f9944deab966be1886414a3"
+dependencies = [
+ "arrow",
+ "chrono",
+ "datafusion-common",
+ "object_store",
+ "prost 0.12.6",
+]
+
+[[package]]
 name = "datafusion-sql"
 version = "40.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5195,6 +5224,7 @@ dependencies = [
  "dashmap",
  "datafusion",
  "datafusion-expr",
+ "datafusion-proto",
  "enrichment",
  "env_logger",
  "etcd-client",
@@ -5985,10 +6015,14 @@ dependencies = [
 name = "proto"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "datafusion",
+ "datafusion-proto",
  "prost 0.12.6",
  "prost-build",
  "serde",
  "serde_json",
+ "tokio",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
 ]
