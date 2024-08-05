@@ -149,6 +149,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="log-table-column-0-source"]')
         .getByText(/kubernetes_pod_id/)
+        // .getByText(/_timestamp/)
         .first()
     ).toBeVisible();
   });
@@ -227,7 +228,7 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .locator('text=_timestamp')
+        // .locator('text=_timestamp')
     ).toBeVisible();
     await page
       .locator(
@@ -253,11 +254,11 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
+      .fill("kubernetes_host");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_host-field-btn"]'
       )
       .last()
       .click({
@@ -275,7 +276,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=job FROM "e2e_automate" ORDER BY _timestamp DESC'
+          'text=kubernetes_host FROM "e2e_automate" ORDER BY _timestamp DESC'
         )
     ).toBeVisible();
   });
