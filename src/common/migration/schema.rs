@@ -243,6 +243,7 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
         }
         false => {
             log::info!("Resource name migration already done");
+            dist_lock::unlock(&locker).await?;
             return Ok(());
         }
     }
