@@ -200,11 +200,12 @@
           </q-list>
         </q-btn-dropdown>
 
-        <span class="q-pl-xs">
+        <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
           <span
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'"
+            :data-test="`log-expand-detail-key-${key}-text`"
             >{{ key }}:</span
-          ><span class="q-pl-xs"
+          ><span class="q-pl-xs" :data-test="`log-expand-detail-value-${value}`"
             ><template v-if="index < Object.keys(value).length - 1"
               >{{ value[key] }},</template
             >
