@@ -1,8 +1,6 @@
 import { test, expect } from "@playwright/test";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
-import { parseArgs } from "util";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -634,8 +632,9 @@ test.describe("dashboard UI testcases", () => {
     await page
       .locator('[data-test="dashboard-drilldown-url-textarea"]')
       .fill(
-        "https://alpha1.dev.zinclabs.dev/web/dashboards/add_panel?dashboard=7208792649849905562&panelId=Panel_ID4468610&folder=7206186521999716065&tab=default"
+        `${ZO_BASE_URL}/web/dashboards/add_panel?dashboard=7208792649849905562&panelId=Panel_ID4468610&folder=7206186521999716065&tab=default`
       );
+
     await page
       .locator('[data-test="dashboard-drilldown-open-in-new-tab"] div')
       .nth(2)
@@ -715,13 +714,15 @@ test.describe("dashboard UI testcases", () => {
     ).toBeVisible({ timeout: 30000 });
 
     await page.goto(
-      "https://alpha1.dev.zinclabs.dev/web/dashboards/add_panel?dashboard=7216685250963839834&folder=default&tab=default"
+      `${ZO_BASE_URL}/web/dashboards/add_panel?dashboard=7216685250963839834&folder=default&tab=default`
     );
+
     await page.goto(
-      "https://alpha1.dev.zinclabs.dev/web/dashboards/view?org_identifier=default&dashboard=7216685250963839834&folder=default&tab=default"
+      `${ZO_BASE_URL}/web/dashboards/view?org_identifier=default&dashboard=7216685250963839834&folder=default&tab=default`
     );
+
     await page.goto(
-      "https://alpha1.dev.zinclabs.dev/web/dashboards/view?org_identifier=default&dashboard=7216685250963839834&folder=default&tab=default&refresh=Off&period=15m&var-Dynamic+filters=%255B%255D&print=false"
+      `${ZO_BASE_URL}/web/dashboards/view?org_identifier=default&dashboard=7216685250963839834&folder=default&tab=default&refresh=Off&period=15m&var-Dynamic+filters=%255B%255D&print=false`
     );
 
     //  await expect(page.getByText('Defaultchevron_leftchevron_rightadd')).toBeVisible({ timeout: 30000 });
