@@ -131,7 +131,7 @@ test.describe("Logs Quickmode testcases", () => {
     ).toBeVisible();
   });
 
-  test.skip("should click on interesting fields icon in histogram mode and run query", async ({
+  test("should click on interesting fields icon in histogram mode and run query", async ({
     page,
   }) => {
     console.log("Filling in the timestamp field...");
@@ -199,7 +199,7 @@ test.describe("Logs Quickmode testcases", () => {
 
   });
 
-  test.skip("should adding/removing interesting field removes it from editor and results too", async ({
+  test("should adding/removing interesting field removes it from editor and results too", async ({
     page,
   }) => {
     await page
@@ -295,7 +295,7 @@ test.describe("Logs Quickmode testcases", () => {
     ).toBeVisible();
   });
 
-  test.skip("should display results without adding timestamp in quick mode", async ({
+  test("should display results without adding timestamp in quick mode", async ({
     page,
   }) => {
 
