@@ -417,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add-field-to-table="addFieldToTable"
         @add-search-term="addSearchTerm"
         @close-column="closeColumn"
+        @click:data-row="expandRowDetail"
       />
       <q-dialog
         data-test="logs-search-result-detail-dialog"

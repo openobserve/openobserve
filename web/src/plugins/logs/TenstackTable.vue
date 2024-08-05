@@ -184,7 +184,7 @@
               flat
               class="q-mr-xs"
               data-test="table-row-expand-menu"
-              @click.stop="expandRow(-1)"
+              @click.self.stop="expandRow(-1)"
             ></q-btn
             ><b>
               <q-icon name="warning" size="15px"></q-icon>
@@ -202,7 +202,11 @@
           <pre>{{ functionErrorMsg }}</pre>
         </td>
       </tr>
-      <tbody ref="tableBodyRef" class="tw-relative">
+      <tbody
+        data-test="logs-search-result-table-body"
+        ref="tableBodyRef"
+        class="tw-relative"
+      >
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
             :data-test="`logs-search-result-detail-${
@@ -225,6 +229,9 @@
                 ? 'tw-table-row'
                 : 'tw-flex',
             ]"
+            @click="
+              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
+            "
           >
             <td
               v-if="
@@ -286,7 +293,7 @@
                   flat
                   class="q-mr-xs"
                   data-test="table-row-expand-menu"
-                  @click="expandRow(virtualRow.index)"
+                  @click.capture.stop="expandRow(virtualRow.index)"
                 ></q-btn>
 
                 <cell-actions
@@ -368,6 +375,7 @@ const emits = defineEmits([
   "addSearchTerm",
   "addFieldToTable",
   "closeColumn",
+  "click:dataRow",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -541,11 +549,14 @@ const handleDragEnd = async (event: any) => {
 const expandedRowIndices = ref<number[]>([]);
 
 const expandRow = async (index: number) => {
+  let isCollapseOperation = false;
+
   if (expandedRowIndices.value.includes(index)) {
     expandedRowIndices.value = expandedRowIndices.value.filter(
       (i) => i !== index,
     );
     tableRows.value.splice(index + 1, 1);
+    isCollapseOperation = true;
   } else {
     expandedRowIndices.value.push(index);
     tableRows.value.splice(index + 1, 0, {
@@ -554,8 +565,37 @@ const expandRow = async (index: number) => {
     });
   }
 
+  expandedRowIndices.value = expandedRowIndices.value.sort();
+
   formattedRows.value[index].toggleExpanded();
   tableRows.value = [...tableRows.value];
+
+  await nextTick();
+
+  if (isCollapseOperation)
+    expandedRowIndices.value.forEach((expandedIndex) => {
+      if (expandedIndex !== -1) {
+        formattedRows.value[expandedIndex].toggleExpanded();
+      }
+    });
+};
+
+const calculateActualIndex = (index: number): number => {
+  let actualIndex = index;
+  expandedRowIndices.value.forEach((expandedIndex) => {
+    if (expandedIndex !== -1 && expandedIndex < index) {
+      actualIndex -= 1;
+    }
+  });
+  return actualIndex;
+};
+
+const handleDataRowClick = (row: any, index: number) => {
+  const actualIndex = calculateActualIndex(index);
+
+  if (actualIndex !== -1) {
+    emits("click:dataRow", row, actualIndex);
+  }
 };
 </script>
 <style scoped lang="scss">
