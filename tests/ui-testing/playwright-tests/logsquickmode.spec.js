@@ -105,23 +105,20 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await page.waitForTimeout(2000);
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
-        .getByText(/_timestamp/)
+        .getByText(/job/)
         .first()
     ).toBeVisible();
   });
@@ -137,14 +134,13 @@ test.describe("Logs Quickmode testcases", () => {
     console.log("Filling in the timestamp field...");
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
-      .last()
+      .first()
       .click({
         force: true,
       });
@@ -183,17 +179,18 @@ test.describe("Logs Quickmode testcases", () => {
     page,
   }) => {
     await page
-      .locator(".field-container")
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("job");
+    await page.waitForTimeout(2000);
+    await page
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=_timestamp FROM "e2e_automate" ORDER BY _timestamp DESC')
+      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=job FROM "e2e_automate" ORDER BY _timestamp DESC')
     ).toBeVisible();
 
 
@@ -204,25 +201,22 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("kubernetes_pod_id");
+      .fill("level");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
       )
       .last()
       .click({
@@ -241,11 +235,11 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .locator('text=kubernetes_pod_id')
+        .locator('text=_timestamp')
     ).toBeVisible();
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
       )
       .last()
       .click({
@@ -253,13 +247,13 @@ test.describe("Logs Quickmode testcases", () => {
       });
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]')
-    ).not.toHaveText(/kubernetes_pod_id/);
+    ).not.toHaveText(/level/);
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
     await expect(
-      page.locator('[data-test="log-table-column-0-source"]')
-    ).not.toHaveText(/kubernetes_pod_id/);
+      page.locator('[data-test="log-table-column-1-source"]')
+    ).not.toHaveText(/source/);
   });
 
   test("should display order by in sql mode by default even after page reload", async ({
@@ -267,12 +261,11 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
       .last()
       .click({
@@ -290,7 +283,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=SELECT _timestamp FROM "e2e_automate" ORDER BY _timestamp DESC'
+          'text=job FROM "e2e_automate" ORDER BY _timestamp DESC'
         )
     ).toBeVisible();
   });
@@ -322,9 +315,7 @@ test.describe("Logs Quickmode testcases", () => {
     await page.waitForTimeout(2000);
     await expect(
       page
-        .locator('[data-test="log-table-column-0-source"]')
-
-    ).toBeVisible();
-
+        .locator('[data-test="log-search-result-table-th-source"]')
+    ).toHaveText(/source/);
   });
 });
