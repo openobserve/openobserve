@@ -87,11 +87,14 @@ jobs:
           ["dashboardtype.spec.js"]
        
     steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
       - name: Display structure of downloaded files
-        run: ls -R
+        run: ls -la .
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
@@ -101,9 +104,6 @@ jobs:
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
-
-      - name: Clone the current repo
-        uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
