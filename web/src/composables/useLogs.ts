@@ -812,7 +812,7 @@ const useLogs = () => {
           //replace backticks with \" for sql_mode
           query = query.replace(/`/g, '"');
           searchObj.data.queryResults.hits = [];
-          searchObj.data.queryResults.total = 0;
+
         }
 
         req.query.sql = query;
@@ -1210,7 +1210,8 @@ const useLogs = () => {
                 }
                 // });
               } else {
-                // searchObj.data.queryResults.total = res.data.records;
+                searchObj.data.queryResults.total = 0;
+                // delete searchObj.data.histogram.chartParams.title;
               
                 // generateHistogramData();
                 const partitions = res.data.partitions;
@@ -1495,7 +1496,6 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-      searchObj.data.queryResults.total = 0;
       // searchObj.data.histogram.chartParams.title = "";
       console.log("=================== Start Debug ===================");
       searchObjDebug["queryDataStartTime"] = performance.now();
@@ -2376,6 +2376,14 @@ const useLogs = () => {
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
               res.data.result_cache_ratio;
+            queryReq.query.start_time =
+              searchObj.data.queryResults.partitionDetail.paginations[
+                searchObj.data.resultGrid.currentPage - 1
+              ][0].startTime;
+            queryReq.query.end_time =
+              searchObj.data.queryResults.partitionDetail.paginations[
+                searchObj.data.resultGrid.currentPage - 1
+              ][0].endTime;
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
