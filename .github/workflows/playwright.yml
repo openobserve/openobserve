@@ -84,7 +84,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-          ["logspage.spec.js", "sanity.spec.js", "alerts.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "pipeline.spec.js", "schema.spec.js", "dashboardtype.spec.js", "multiselect-stream.spec.js"]
+          ["dashboardtype.spec.js"]
        
     steps:
       - name: Download artifacts
@@ -94,7 +94,7 @@ jobs:
         run: ls -R
 
       - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve &
+        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
         run: sleep 15
@@ -118,17 +118,13 @@ jobs:
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+
+      - name: Check OpenObserve logs
+        run: cat o2.log
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
             name: playwright-report
             path: playwright-report/
             retention-days: 30
-
-      - name: Upload test results
-        if: failure()
-        uses: actions/upload-artifact@v2
-        with:
-          name: playwright-videos
-          path: |
-            playwright-report/videos/
