@@ -62,7 +62,7 @@ pub async fn check_cache(
 
     // skip the queries with no timestamp column
     let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
-    if is_aggregate && result_ts_col.is_none() {
+    if result_ts_col.is_none() && (is_aggregate || !parsed_sql.group_by.is_empty()) {
         return CachedQueryResponse::default();
     }
 
@@ -79,7 +79,11 @@ pub async fn check_cache(
     }
 
     // Hack select for _timestamp
-    if !is_aggregate && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
+    if !is_aggregate
+        && parsed_sql.group_by.is_empty()
+        && parsed_sql.order_by.is_empty()
+        && !origin_sql.contains('*')
+    {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
         if !cap_str.contains(&cfg.common.column_timestamp) {

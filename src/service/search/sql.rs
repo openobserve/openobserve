@@ -134,7 +134,11 @@ impl Sql {
 
         // Hack select for _timestamp, add _timestamp to select clause
         let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-        if !is_aggregate && meta.order_by.is_empty() && !origin_sql.contains('*') {
+        if !is_aggregate
+            && meta.group_by.is_empty()
+            && meta.order_by.is_empty()
+            && !origin_sql.contains('*')
+        {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(&cfg.common.column_timestamp) {
