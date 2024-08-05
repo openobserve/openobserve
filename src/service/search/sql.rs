@@ -142,9 +142,10 @@ impl Sql {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(&cfg.common.column_timestamp) {
-                origin_sql = origin_sql.replace(
+                origin_sql = origin_sql.replacen(
                     cap_str,
                     &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                    1,
                 );
             }
         }
