@@ -579,9 +579,9 @@ export default defineComponent({
     const deleteBatchStream = () => {
       isDeleting.value = true;
       const selectedItems = selected.value
-  const promises = [];
+  const promises : Promise<any>[] = [];
 
-  selectedItems.forEach((stream) => {
+  selectedItems.forEach((stream : any) => {
     promises.push(
       streamService.delete(
         store.state.selectedOrganization.identifier,
@@ -612,9 +612,9 @@ export default defineComponent({
 
       // Remove deleted streams from the list
       console.log(selectedItems,"after deleting streams")
-      selectedItems.forEach((stream) => {
+      selectedItems.forEach((stream : any) => {
         removeStream(stream.name, stream.stream_type);
-        selected.value = selected.value.filter((item) => item.name !== stream.name && item.stream_type !== stream.stream_type);
+        selected.value = selected.value.filter((item : any) => item.name !== stream.name && item.stream_type !== stream.stream_type);
       });
 
       getLogStream();
@@ -647,7 +647,7 @@ export default defineComponent({
       }
     });
     const  getSelectedString =  () => {
-        return selected.value.length === 0 ? '' : `${selected.value.length} record${selected.value.length > 1 ? 's' : ''} selected of ${rows.length}`
+        return selected.value.length === 0 ? '' : `${selected.value.length} record${selected.value.length > 1 ? 's' : ''} selected`
       }
 
 
@@ -727,7 +727,6 @@ export default defineComponent({
       confirmBatchDeleteAction,
       confirmDelete,
       confirmBatchDelete,
-      confirmBatchDeleteAction,
       schemaData,
       perPageOptions,
       selectedPerPage,
