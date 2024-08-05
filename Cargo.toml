@@ -164,8 +164,8 @@ url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
-vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "66667dd291482a440c5eb2032ef3cbfb7377b53b" }
-vrl = { version = "0.8.1", features = ["value", "compiler", "test"] }
+vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "70e61fc344b9db2f191cfba9ad58ee08e79d30b4" }
+vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }
 zstd.workspace = true
 config.workspace = true
 infra.workspace = true
