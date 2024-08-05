@@ -105,11 +105,11 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
       .first()
       .click();
@@ -118,7 +118,7 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
-        .getByText(/job/)
+        .getByText(/kubernetes_pod_id/)
         .first()
     ).toBeVisible();
   });
@@ -131,21 +131,16 @@ test.describe("Logs Quickmode testcases", () => {
   test("should click on interesting fields icon in histogram mode and run query", async ({
     page,
   }) => {
-    console.log("Filling in the timestamp field...");
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
       .first()
-      .click({
-        force: true,
-      });
-    await page.waitForTimeout(2000);
-    console.log("Clicking on the search bar refresh button...");
+      .click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
@@ -180,17 +175,17 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
       .first()
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=job FROM "e2e_automate" ORDER BY _timestamp DESC')
+      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC')
     ).toBeVisible();
 
 
@@ -201,45 +196,41 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
+      .fill("kubernetes_container_name");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_container_name-field-btn"]'
       )
       .first()
       .click();
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("level");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-level-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
       .last()
       .click({
         force: true,
       });
-
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
-    await page.waitForTimeout(2000);
-
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click({
         force: true,
       });
-    await page.waitForTimeout(2000);
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .locator('text=_timestamp')
+        .locator('text=kubernetes_pod_id')
     ).toBeVisible();
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-level-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
       .last()
       .click({
@@ -247,7 +238,7 @@ test.describe("Logs Quickmode testcases", () => {
       });
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]')
-    ).not.toHaveText(/level/);
+    ).not.toHaveText(/kubernetes_pod_id/);
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
@@ -261,11 +252,11 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
       .last()
       .click({
@@ -283,7 +274,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=job FROM "e2e_automate" ORDER BY _timestamp DESC'
+          'text=SELECT kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC'
         )
     ).toBeVisible();
   });
