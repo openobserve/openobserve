@@ -42,8 +42,6 @@ export const convertSQLData = async (
   resultMetaData: any,
   metadata: any,
 ) => {
-  console.time("convertSQLData-inner");
-
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -263,7 +261,6 @@ export const convertSQLData = async (
     panelSchema.config?.legends_position,
   );
 
-  console.time("convertSQLData:legendConfig");
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
     type: "scroll",
@@ -299,8 +296,6 @@ export const convertSQLData = async (
     },
   };
 
-  console.timeEnd("convertSQLData:legendConfig");
-
   // Additional logic to adjust the legend position
   if (legendPosition === "vertical") {
     legendConfig.left = null; // Remove left positioning
@@ -311,7 +306,6 @@ export const convertSQLData = async (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
-  console.time("convertSQLData:options");
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -458,9 +452,7 @@ export const convertSQLData = async (
       },
     },
     xAxis: [...xAxisKeys, ...breakDownKeys]?.map((key: any, index: number) => {
-      console.time("getAxisDataFromKey:" + key);
       const data = getAxisDataFromKey(key);
-      console.timeEnd("getAxisDataFromKey:" + key);
 
       //unique value index array
       const arr: any = [];
@@ -582,12 +574,10 @@ export const convertSQLData = async (
     },
     series: [],
   };
-  console.timeEnd("convertSQLData:options");
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
-  console.time("convertSQLData:series");
   switch (panelSchema.type) {
     case "area-stacked":
     case "line":
@@ -641,13 +631,11 @@ export const convertSQLData = async (
           ...new Set(missingValueData.map((obj: any) => obj[key1])),
         ].filter((it) => it);
 
-        console.time("stackedXAxisUniqueValue");
         options.series = yAxisKeys
           .map((yAxis: any) => {
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == yAxis,
             ).label;
-            console.time("yAxisName:" + yAxisName);
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               const data = missingValueData.filter(
@@ -671,7 +659,6 @@ export const convertSQLData = async (
             });
           })
           .flat();
-        console.timeEnd("stackedXAxisUniqueValue");
       } else if (panelSchema.type == "line" || panelSchema.type == "area") {
         //if x and y length is not 2 and 1 respectively then do following
         options.series = yAxisKeys?.map((key: any) => {
@@ -1375,10 +1362,8 @@ export const convertSQLData = async (
       break;
     }
   }
-  console.timeEnd("convertSQLData:series");
 
   // auto SQL: if x axis has time series
-  console.time("convertSQLData:timeSeries");
   if (
     panelSchema.type != "h-bar" &&
     panelSchema.type != "h-stacked" &&
@@ -1392,21 +1377,17 @@ export const convertSQLData = async (
     options.xAxis[0].data.length > 0
   ) {
     // auto SQL: if x axis has time series(aggregation function is histogram)
-    console.time("convertSQLData:timeSeries:field");
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         it.aggregationFunction == "histogram" &&
         it.column == store.state.zoConfig.timestamp_column,
     );
-    console.timeEnd("convertSQLData:timeSeries:field");
 
-    console.time("convertSQLData:timeSeries:timestampField");
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         !it.aggregationFunction &&
         it.column == store.state.zoConfig.timestamp_column,
     );
-    console.timeEnd("convertSQLData:timeSeries:timestampField");
 
     //if x axis has time series
     if (field || timestampField) {
@@ -1417,7 +1398,6 @@ export const convertSQLData = async (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      console.time("convertSQLData:timeSeries:toZonedTime");
       if (field) {
         options.xAxis[0].data = options.xAxis[0].data.map((it: any) => {
           return toZonedTime(
@@ -1514,11 +1494,9 @@ export const convertSQLData = async (
       //     "convertSQLData:timeSeries:toZonedTime:map:series:" + seriesObj?.name,
       //   );
       // });
-      console.timeEnd("convertSQLData:timeSeries:toZonedTime");
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
 
-      console.time("convertSQLData:timeSeries:formatter");
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
@@ -1579,9 +1557,7 @@ export const convertSQLData = async (
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
-      console.timeEnd("convertSQLData:timeSeries:formatter");
 
-      console.time("convertSQLData:timeSeries:axisPointer");
       options.tooltip.axisPointer = {
         type: "cross",
         label: {
@@ -1607,13 +1583,10 @@ export const convertSQLData = async (
           return formatDate(date).toString();
         },
       };
-      console.timeEnd("convertSQLData:timeSeries:axisPointer");
     }
   }
-  console.timeEnd("convertSQLData:timeSeries");
 
   //custom SQL: check if it is timeseries or not
-  console.time("convertSQLData:timeSeriescustomSQL");
   if (
     panelSchema.type != "h-bar" &&
     panelSchema.type != "h-stacked" &&
@@ -1745,11 +1718,9 @@ export const convertSQLData = async (
       };
     }
   }
-  console.timeEnd("convertSQLData:timeSeriescustomSQL");
 
   // stacked chart sort by y axis
   // ignore if time series chart
-  console.time("convertSQLData:stacked");
   if (
     ["stacked", "h-stacked", "area-stacked"].includes(panelSchema?.type) &&
     isTimeSeriesFlag == false
@@ -1794,11 +1765,9 @@ export const convertSQLData = async (
       });
     }
   }
-  console.timeEnd("convertSQLData:stacked");
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
-  console.time("legendWidth");
   if (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
@@ -1843,11 +1812,9 @@ export const convertSQLData = async (
     options.grid.right = legendWidth;
     options.legend.textStyle.width = legendWidth - 55;
   }
-  console.timeEnd("legendWidth");
 
   //check if is there any data else filter out axis or series data
   // for metric, gauge we does not have data field
-  console.time("convertSQLData:filter");
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
     if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
@@ -1856,12 +1823,10 @@ export const convertSQLData = async (
       options.yAxis = options.series.length ? options.yAxis : {};
     }
   }
-  console.timeEnd("convertSQLData:filter");
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
-  console.timeEnd("convertSQLData-inner");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },

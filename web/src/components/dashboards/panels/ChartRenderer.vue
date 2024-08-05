@@ -279,7 +279,6 @@ export default defineComponent({
         legendOption.selected = params.selected;
 
         // set options with selected object
-        console.log('echart: setOptions (legendOption)', { legend: [legendOption] });
         chart?.setOption({ legend: [legendOption] });
       }
     };
@@ -332,7 +331,7 @@ export default defineComponent({
               dataIndex,
               seriesIndex,
               props?.data?.extras?.panelId || -1,
-              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
+              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0],
             );
           }
         }
@@ -417,7 +416,7 @@ export default defineComponent({
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime
+              hoveredSeriesState?.value?.hoveredTime,
             );
           }
 
@@ -437,7 +436,7 @@ export default defineComponent({
         ) {
           restoreChart();
         }
-      }
+      },
     );
 
     watch(
@@ -447,7 +446,7 @@ export default defineComponent({
           type: "highlight",
           seriesName: hoveredSeriesState?.value?.hoveredSeriesName,
         });
-      }
+      },
     );
 
     watch(
@@ -470,7 +469,6 @@ export default defineComponent({
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
         try {
-          console.log('echart: setOptions (theme change)', options);
           chart?.setOption(options, true);
           chart?.setOption({ animation: true });
         } catch (e) {
@@ -478,7 +476,7 @@ export default defineComponent({
         }
 
         chartInitialSetUp();
-      }
+      },
     );
 
     onMounted(async () => {
@@ -496,7 +494,6 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        console.log('echart: setOptions (onMounted)', props?.data?.options || {})
         chart?.setOption(props?.data?.options || {}, true);
         chartInitialSetUp();
       } catch (e) {
@@ -559,7 +556,6 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            console.log('echart: setOptions (options change)', props?.data?.options || {});
             chart?.setOption(props?.data?.options || {}, true);
           } catch (error) {}
 
@@ -577,7 +573,7 @@ export default defineComponent({
           emit("error", e);
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef, hoveredSeriesState };
   },

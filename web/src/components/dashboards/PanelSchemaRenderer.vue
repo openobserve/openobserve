@@ -314,7 +314,6 @@ export default defineComponent({
         if (!errorDetail.value) {
           try {
             // passing chartpanelref to get width and height of DOM element
-            console.time("convertPanelData");
             panelData.value = await convertPanelData(
               panelSchema.value,
               data.value,
@@ -324,7 +323,6 @@ export default defineComponent({
               resultMetaData,
               metadata.value,
             );
-            console.timeEnd("convertPanelData");
 
             errorDetail.value = "";
           } catch (error: any) {
