@@ -22,7 +22,7 @@ use crate::{
             alerts::destinations::{Destination, DestinationType, DestinationWithTemplate},
             authz::Authz,
         },
-        utils::auth::{remove_ownership, set_ownership, RE_OFGA_UNSUPPORTED_NAME},
+        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::db,
 };
@@ -65,8 +65,11 @@ pub async fn save(
     destination.name = destination.name.trim().to_string();
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&destination.name) {
-        return Err(anyhow::anyhow!(
-            "Alert destination name cannot contain ':', '#', '?' and space characters"
+        return Err((
+            http::StatusCode::BAD_REQUEST,
+            anyhow::anyhow!(
+                "Alert destination name cannot contain ':', '#', '?' and space characters"
+            ),
         ));
     }
     if destination.name.is_empty() {

@@ -19,7 +19,7 @@ use crate::{
     common::{
         infra::config::ALERTS_DESTINATIONS,
         meta::{alerts::templates::Template, authz::Authz},
-        utils::auth::{remove_ownership, set_ownership, RE_OFGA_UNSUPPORTED_NAME},
+        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::db,
 };
