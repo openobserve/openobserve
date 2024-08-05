@@ -154,7 +154,7 @@ test.describe("Logs Quickmode testcases", () => {
   });
 
   test("should display error on entering random text in histogram mode when quick mode is on", async ({ page }) => {
-    await page.waitForResponse("**/api/default/_search**");
+    await page.waitForTimeout(2000)
     // Click on the Monaco Editor to focus it
     await page.click('[data-test="logs-search-bar-query-editor"]');
     // Type into the Monaco Editor
