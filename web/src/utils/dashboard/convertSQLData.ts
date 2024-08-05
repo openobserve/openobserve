@@ -1398,102 +1398,104 @@ export const convertSQLData = async (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      if (field) {
-        options.xAxis[0].data = options.xAxis[0].data.map((it: any) => {
-          return toZonedTime(
-            new Date(it + "Z").getTime(),
-            store.state.timezone,
-          );
-        });
-      } else if (timestampField) {
-        options.xAxis[0].data = options.xAxis[0].data.map((it: any) => {
-          return toZonedTime(
-            new Date(it).getTime() / 1000,
-            store.state.timezone,
-          );
-        });
-      }
+      // if (field) {
+      //   options.xAxis[0].data = options.xAxis[0].data.map((it: any) => {
+      //     return toZonedTime(
+      //       new Date(it + "Z").getTime(),
+      //       store.state.timezone,
+      //     );
+      //   });
+      // } else if (timestampField) {
+      //   options.xAxis[0].data = options.xAxis[0].data.map((it: any) => {
+      //     return toZonedTime(
+      //       new Date(it).getTime() / 1000,
+      //       store.state.timezone,
+      //     );
+      //   });
+      // }
 
       // console.time("convertSQLData:timeSeries:toZonedTime:map:series:");
       // options?.series?.forEach((seriesObj: any) => {
-      //   // if value field is not present in the data than use null
-      //   seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
-      //     return [options.xAxis[0].data[index], it ?? null];
-      //   });
-      // let timeStringCache : any= {};
-      // options?.series?.forEach((seriesObj: any) => {
-      //   console.time(
-      //     "convertSQLData:timeSeries:toZonedTime:map:series:" + seriesObj?.name,
-      //   );
-      //   // if value field is not present in the data than use null
-      //   if (field) {
-      //     seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
-      //       // console.time(
-      //       //   "convertSQLData:timeSeries:toZonedTime:map:seriesIf:" +
-      //       //     seriesObj?.name +
-      //       //     ":" +
-      //       //     index,
-      //       // );
-      //       const xKey = options.xAxis[0].data[index] + "Z";
-      //       let x;
-      //       if (timeStringCache[xKey]) {
-      //         x = timeStringCache[xKey];
-      //       } else {
-      //         x = toZonedTime(
-      //           new Date(options.xAxis[0].data[index] + "Z").getTime(),
-      //           store.state.timezone,
-      //         );
-      //         timeStringCache[xKey] = x;
-      //       }
-      //       // const x = toZonedTime(
-      //       //   new Date(options.xAxis[0].data[index] + "Z").getTime(),
-      //       //   store.state.timezone,
-      //       // );
-      //       // console.timeEnd(
-      //       //   "convertSQLData:timeSeries:toZonedTime:map:seriesIf:" +
-      //       //     seriesObj?.name +
-      //       //     ":" +
-      //       //     index,
-      //       // );
-
-      //       return [x, it ?? null];
-      //     });
-      //   } else if (timestampField) {
-      //     seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
-      //       // console.time(
-      //       //   "convertSQLData:timeSeries:toZonedTime:map:seriesElse:" +
-      //       //     seriesObj?.name +
-      //       //     ":" +
-      //       //     index,
-      //       // );
-      //       const xKey = options.xAxis[0].data[index].toString();
-      //       let x;
-      //       if (timeStringCache[xKey]) {
-      //         x = timeStringCache[xKey];
-      //       } else {
-      //         x = toZonedTime(
-      //           new Date(options.xAxis[0].data[index]).getTime() / 1000,
-      //           store.state.timezone,
-      //         );
-      //         timeStringCache[xKey] = x;
-      //       }
-      //       // const x = toZonedTime(
-      //       //   new Date(options.xAxis[0].data[index]).getTime() / 1000,
-      //       //   store.state.timezone,
-      //       // );
-      //       // console.timeEnd(
-      //       //   "convertSQLData:timeSeries:toZonedTime:map:seriesElse:" +
-      //       //     seriesObj?.name +
-      //       //     ":" +
-      //       //     index,
-      //       // );
-      //       return [x, it ?? null];
-      //     });
-      //   }
-      //   console.time(
-      //     "convertSQLData:timeSeries:toZonedTime:map:series:" + seriesObj?.name,
-      //   );
+      // if value field is not present in the data than use null
+      // seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+      //   return [options.xAxis[0].data[index], it ?? null];
       // });
+
+      let timeStringCache: any = {};
+      options?.series?.forEach((seriesObj: any) => {
+        // console.time(
+        //   "convertSQLData:timeSeries:toZonedTime:map:series:" + seriesObj?.name,
+        // );
+        // if value field is not present in the data than use null
+        if (field) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            // console.time(
+            //   "convertSQLData:timeSeries:toZonedTime:map:seriesIf:" +
+            //     seriesObj?.name +
+            //     ":" +
+            //     index,
+            // );
+            const xKey = options.xAxis[0].data[index] + "Z";
+            let x;
+            if (timeStringCache[xKey]) {
+              x = timeStringCache[xKey];
+            } else {
+              x = toZonedTime(
+                new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                store.state.timezone,
+              );
+              timeStringCache[xKey] = x;
+            }
+            // const x = toZonedTime(
+            //   new Date(options.xAxis[0].data[index] + "Z").getTime(),
+            //   store.state.timezone,
+            // );
+            // console.timeEnd(
+            //   "convertSQLData:timeSeries:toZonedTime:map:seriesIf:" +
+            //     seriesObj?.name +
+            //     ":" +
+            //     index,
+            // );
+
+            return [x, it ?? null];
+          });
+        } else if (timestampField) {
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            // console.time(
+            //   "convertSQLData:timeSeries:toZonedTime:map:seriesElse:" +
+            //     seriesObj?.name +
+            //     ":" +
+            //     index,
+            // );
+            const xKey = options.xAxis[0].data[index].toString();
+            let x;
+            if (timeStringCache[xKey]) {
+              x = timeStringCache[xKey];
+            } else {
+              x = toZonedTime(
+                new Date(options.xAxis[0].data[index]).getTime() / 1000,
+                store.state.timezone,
+              );
+              timeStringCache[xKey] = x;
+            }
+            // const x = toZonedTime(
+            //   new Date(options.xAxis[0].data[index]).getTime() / 1000,
+            //   store.state.timezone,
+            // );
+            // console.timeEnd(
+            //   "convertSQLData:timeSeries:toZonedTime:map:seriesElse:" +
+            //     seriesObj?.name +
+            //     ":" +
+            //     index,
+            // );
+            return [x, it ?? null];
+          });
+        }
+        // console.time(
+        //   "convertSQLData:timeSeries:toZonedTime:map:series:" + seriesObj?.name,
+        // );
+      });
+
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
 
