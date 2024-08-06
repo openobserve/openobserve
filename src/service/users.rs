@@ -498,9 +498,11 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     {
         log::info!("get_user_by_token: User found updating cache");
         if is_root_user(&user_from_db.email) {
-            USERS_RUM_TOKEN.insert(format!("{DEFAULT_ORG}/{token}"), user_from_db.clone());
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{DEFAULT_ORG}/{token}"), user_from_db.clone());
         }
-        USERS_RUM_TOKEN.insert(key, user_from_db.clone());
+        USERS_RUM_TOKEN.clone().insert(key, user_from_db.clone());
         Some(user_from_db)
     } else {
         log::info!(

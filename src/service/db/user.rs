@@ -50,10 +50,11 @@ pub async fn get_by_token(
     token: &str,
 ) -> Result<Option<User>, anyhow::Error> {
     let user = match org_id {
-        None => ROOT_USER.get("root").map(|v| v.clone()),
+        None => ROOT_USER.get("root").map(|v| v.value().clone()),
         Some(org_id) => USERS_RUM_TOKEN
+            .clone()
             .get(&format!("{org_id}/{token}"))
-            .map(|v| v.clone()),
+            .map(|v| v.value().clone()),
     };
 
     if let Some(user) = user {
@@ -122,7 +123,9 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
         );
 
         if let Some(rum_token) = &org.rum_token {
-            USERS_RUM_TOKEN.insert(format!("{}/{}", org.name.clone(), rum_token), user);
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{}/{}", org.name, rum_token), user);
         }
     }
     Ok(())
@@ -180,7 +183,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // Invalidate the entire RUM-TOKEN-CACHE
                 for (_, user) in USERS.clone() {
                     if user.email.eq(item_key) {
-                        USERS_RUM_TOKEN.remove(&format!(
+                        USERS_RUM_TOKEN.clone().remove(&format!(
                             "{}/{}",
                             user.org,
                             user.rum_token.as_ref().unwrap()
@@ -197,7 +200,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     };
                     USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
                     if let Some(rum_token) = &user.rum_token {
-                        USERS_RUM_TOKEN.insert(format!("{}/{}", user.org, rum_token), user);
+                        USERS_RUM_TOKEN
+                            .clone()
+                            .insert(format!("{}/{}", user.org, rum_token), user);
                     }
                 }
 
@@ -208,7 +213,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                     USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
                     if let Some(rum_token) = &user.rum_token {
-                        USERS_RUM_TOKEN.insert(format!("{}/{}", user.org, rum_token), user);
+                        USERS_RUM_TOKEN
+                            .clone()
+                            .insert(format!("{}/{}", user.org, rum_token), user);
                     }
                 }
             }
@@ -218,7 +225,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     if user.email.eq(item_key) {
                         USERS.remove(&format!("{}/{}", user.org, user.email));
                         // Invalidate the entire RUM-TOKEN-CACHE
-                        USERS_RUM_TOKEN.remove(&format!(
+                        USERS_RUM_TOKEN.clone().remove(&format!(
                             "{}/{}",
                             user.org,
                             user.rum_token.as_ref().unwrap()
@@ -248,7 +255,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             }
             USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
-                USERS_RUM_TOKEN.insert(format!("{}/{}", user.org, rum_token), user);
+                USERS_RUM_TOKEN
+                    .clone()
+                    .insert(format!("{}/{}", user.org, rum_token), user);
             }
         }
 
@@ -259,7 +268,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             }
             USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
-                USERS_RUM_TOKEN.insert(format!("{}/{}", user.org, rum_token), user);
+                USERS_RUM_TOKEN
+                    .clone()
+                    .insert(format!("{}/{}", user.org, rum_token), user);
             }
         }
     }
