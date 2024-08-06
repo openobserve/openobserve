@@ -1712,8 +1712,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
     return value;
   };
+
   const buildWhereClause = (filterData: any) => {
     const buildCondition = (condition: any) => {
+      console.log("condition", condition);
+
       if (condition.filterType === "group") {
         const groupConditions = condition.conditions
           .map(buildCondition)
@@ -1747,9 +1750,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               selectFilter += `IS NOT NULL`;
               break;
           }
+        } else if (condition.operator === "IN") {
+          if (
+            condition?.value?.startsWith("(") &&
+            condition?.value?.endsWith(")")
+          ) {
+            selectFilter += `${condition.column} ${condition.operator} ${condition.value}`;
+          } else {
+            console.log("condition.value--------- IN", condition.value);
+
+            selectFilter += `${condition.column} IN (${formatValue(condition.value, condition.column)})`;
+          }
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all('${condition.value}')`;
         } else if (condition.value != null && condition.value !== "") {
+          console.log("condition.value---------", condition.value);
+
           selectFilter += `${condition.column} `;
           switch (condition.operator) {
             case "=":
