@@ -243,10 +243,8 @@ function extractFields(parsedAst: any, timeField: string) {
   return fields;
 }
 
-function extractFilters(parsedAst: any) {
-  function parseCondition(condition: any) {
-    console.log(condition, "condition");
-
+function parseCondition(condition: any) {
+  try {
     if (condition.type === "binary_expr") {
       if (condition.operator == "OR" || condition.operator == "AND") {
         const left: any = parseCondition(condition.left);
@@ -300,7 +298,8 @@ function extractFilters(parsedAst: any) {
           logicalOperator: "AND",
           filterType: "condition",
         };
-      } else if (condition.operator == "null") {
+      } else if (condition.operator == "IS") {
+        // consider this as "IS NULL"
         return {
           type: "condition",
           values: [],
@@ -310,11 +309,63 @@ function extractFilters(parsedAst: any) {
           logicalOperator: "AND",
           filterType: "condition",
         };
+      } else if (condition.operator == "IS NOT") {
+        // consider this as "IS NOT NULL"
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Is Not Null",
+          value: null,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition?.operator == "LIKE") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Contains",
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      } else if (condition?.operator == "NOT LIKE") {
+        return {
+          type: "condition",
+          values: [],
+          column: condition?.left?.column,
+          operator: "Not Contains",
+          value: `'${condition?.right?.value}'`,
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
+      }
+    } else if (condition.type === "function") {
+      // match_all function
+      if (condition?.name?.name[0]?.value == "match_all") {
+        return {
+          type: "condition",
+          values: [],
+          column: "",
+          operator: "match_all",
+          value: condition?.args?.value[0]?.value ?? "",
+          logicalOperator: "AND",
+          filterType: "condition",
+        };
       }
     }
+  } catch (error) {
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
   }
+}
 
-  function convertWhereToFilter(where: any) {
+function convertWhereToFilter(where: any) {
+  try {
     if (!where) {
       return {
         filterType: "group",
@@ -323,9 +374,25 @@ function extractFilters(parsedAst: any) {
       };
     }
     return parseCondition(where);
+  } catch (error) {
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
   }
+}
 
-  return convertWhereToFilter(parsedAst.where);
+function extractFilters(parsedAst: any) {
+  try {
+    return convertWhereToFilter(parsedAst.where);
+  } catch (error) {
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+    };
+  }
 }
 
 // // Function to extract conditions from the WHERE clause
