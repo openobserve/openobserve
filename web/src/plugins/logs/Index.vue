@@ -286,11 +286,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
-import {
-  buildSqlQuery,
-  getFieldsFromQuery,
-  getValidConditionObj,
-} from "@/utils/query/sqlUtils";
+import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
@@ -995,16 +991,6 @@ export default defineComponent({
       else if (dashboardPanelData.data.queries[0].fields.x.length > 2) {
         dashboardPanelData.data.type = "table";
       }
-
-      // set filters
-      // conditions.forEach((condition) => {
-      //   condition.operator = condition.operator.toLowerCase();
-
-      //   // get valid condition object
-      //   condition = getValidConditionObj(condition);
-
-      //   dashboardPanelData.data.queries[0].fields.filter.push(condition);
-      // });
 
       // set filters
       dashboardPanelData.data.queries[0].fields.filter = filters;

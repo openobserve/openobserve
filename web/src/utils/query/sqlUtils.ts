@@ -313,12 +313,13 @@ function extractFilters(parsedAst: any) {
   }
 
   function convertWhereToFilter(where: any) {
-    if (!where)
+    if (!where) {
       return {
         filterType: "group",
         logicalOperator: "AND",
         conditions: [],
       };
+    }
     return parseCondition(where);
   }
 
@@ -416,21 +417,25 @@ export const getFieldsFromQuery = async (
 
     const streamName = extractTableName(ast) ?? null;
     let fields = extractFields(ast, timeField);
-    let filters = extractFilters(ast);
+    let filters: any = extractFilters(ast);
 
     console.log(filters, "filters");
 
     // remove wrong fields and filters
     fields = fields.filter((field: any) => field.column);
-    // filters = filters.filter((filter: any) => filter.column);
 
-    return {
-      fields: fields,
-      filters: {
+    // if type is condition
+    if (filters?.filterType === "condition") {
+      filters = {
         filterType: "group",
         logicalOperator: "AND",
         conditions: [filters],
-      },
+      };
+    }
+
+    return {
+      fields,
+      filters,
       streamName,
     };
   } catch (error) {
