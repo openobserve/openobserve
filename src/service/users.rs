@@ -242,6 +242,9 @@ pub async fn update_user(
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
                             || local_user.role.eq(&UserRole::Root)))
+                    // if the User Role is Root, we do not change the Role
+                    // Admins Role can still be mutable.
+                    && !local_user.role.eq(&UserRole::Root)
                 {
                     old_role = Some(new_user.role);
                     new_user.role = user.role.unwrap();
