@@ -170,7 +170,6 @@ impl TreeNodeRewriter for UpdateOffsetExec {
         &mut self,
         node: Self::Node,
     ) -> Result<Transformed<Self::Node>, datafusion::error::DataFusionError> {
-        let name = node.name().to_string();
         if let Some(node) = node.as_any().downcast_ref::<GlobalLimitExec>() {
             if let Some(fetch) = node.fetch() {
                 if fetch > self.limit {
@@ -189,7 +188,7 @@ impl TreeNodeRewriter for UpdateOffsetExec {
                 false,
                 TreeNodeRecursion::Stop,
             ))
-        } else if name == "ProjectionExec" {
+        } else if node.name() == "ProjectionExec" {
             Ok(Transformed::new(node, false, TreeNodeRecursion::Continue))
         } else {
             Ok(Transformed::new(node, false, TreeNodeRecursion::Stop))
