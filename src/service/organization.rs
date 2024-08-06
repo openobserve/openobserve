@@ -151,7 +151,7 @@ async fn update_passcode_inner(
 
         // Invalidate the local cache
         let org_to_update = &existing_org[0];
-        USERS_RUM_TOKEN.clone().remove(&format!(
+        USERS_RUM_TOKEN.remove(&format!(
             "{}/{}",
             org_to_update.name,
             org_to_update.rum_token.as_deref().unwrap_or_default()
@@ -165,7 +165,7 @@ async fn update_passcode_inner(
         let existing_org = orgs.first().unwrap().clone();
 
         let org_to_update = &existing_org;
-        USERS_RUM_TOKEN.clone().remove(&format!(
+        USERS_RUM_TOKEN.remove(&format!(
             "{}/{}",
             org_to_update.name,
             org_to_update.rum_token.as_deref().unwrap_or_default()
