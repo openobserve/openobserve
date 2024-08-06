@@ -7,7 +7,8 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-    await page.getByText('Login as internal user').click();
+
+  //  await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -114,16 +115,20 @@ test.describe(" visualize UI testcases", () => {
 
 
   test('should allow adding a VRL function in the visualization chart ', async ({ page }) => {
-    await page1.getByLabel('Expand "kubernetes_annotations_kubernetes_io_psp"').click();
-    await page1.locator('[data-test="logs-search-subfield-add-kubernetes_annotations_kubernetes_io_psp-eks\\.privileged"] [data-test="log-search-subfield-list-equal-kubernetes_annotations_kubernetes_io_psp-field-btn"]').click();
-    await page1.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page1.locator('[data-test="logs-visualize-toggle"]').click();
-    await page1.locator('#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line').click();
-    await page1.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.vrl12=123');
-    await page1.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await expect(page1.getByText('drag_indicatortext_fields vrl12')).toBeVisible();
-    await page1.locator('[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]').click();
-    await page1.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+   // await page.getByLabel('Expand "kubernetes_annotations_kubernetes_io_psp"').click();
+
+   await page.locator('[data-test="date-time-btn"]').click();
+   await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
+
+   // await page.locator('[data-test="logs-search-subfield-add-kubernetes_annotations_kubernetes_io_psp-eks\\.privileged"] [data-test="log-search-subfield-list-equal-kubernetes_annotations_kubernetes_io_psp-field-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.vrl12=123');
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await expect(page.getByText('drag_indicatortext_fields vrl12')).toBeVisible();
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
 
