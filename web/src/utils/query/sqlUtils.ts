@@ -25,6 +25,7 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
       label.operator,
     );
   }
+  console.log("dummyQuery-------", dummyQuery);
 
   const astOfOriginalQuery: any = parser.astify(originalQuery);
   const astOfDummy: any = parser.astify(dummyQuery);
@@ -86,6 +87,10 @@ export const addLabelToSQlQuery = async (
     case "Is Not Null":
       operator = "IS NOT NULL";
       break;
+    case "IN":
+      operator = "IN";
+      value = "(" + value + ")";
+      break;
   }
 
   // Construct condition based on operator
@@ -112,8 +117,8 @@ export const addLabelToSQlQuery = async (
             column: label,
           },
           right: {
-            type: "string",
-            value: value,
+            type: operator === "IN" ? "expr_list" : "string",
+            value: operator === "IN" ? value.slice(1, -1).split(",") : value,
           },
         };
 
