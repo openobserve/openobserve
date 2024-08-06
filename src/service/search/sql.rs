@@ -413,6 +413,13 @@ impl Sql {
                 if !index_fields.contains(&key.to_string()) {
                     continue;
                 }
+                let value = value
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .collect::<Vec<_>>();
+                if value.is_empty() {
+                    continue;
+                }
                 let entry = index_terms
                     .entry(key.to_string())
                     .or_insert_with(HashSet::new);
