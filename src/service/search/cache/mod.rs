@@ -22,7 +22,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json},
+    utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -37,10 +37,7 @@ use crate::{
         utils::functions,
     },
     service::{
-        search::{
-            self as SearchService,
-            cache::{cacher::check_cache, result_utils::is_aggregate_query},
-        },
+        search::{self as SearchService, cache::cacher::check_cache},
         usage::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -70,15 +67,26 @@ pub async fn search(
             return Err(Error::Message(e.to_string()));
         }
     };
+
     let stream_name = &parsed_sql.source;
 
+    let mut req = in_req.clone();
+    let mut query_fn = req
+        .query
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
     let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&origin_sql);
+    let hashed_query = if let Some(vrl_function) = &query_fn {
+        h.sum64(&format!("{}{}", origin_sql, vrl_function))
+    } else {
+        h.sum64(&origin_sql)
+    };
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let mut req = in_req.clone();
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
@@ -93,7 +101,6 @@ pub async fn search(
             &rpc_req,
             &mut req,
             &mut origin_sql,
-            &parsed_sql,
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
@@ -127,7 +134,6 @@ pub async fn search(
     let mut res = if !should_exec_query {
         c_resp.cached_response
     } else {
-        let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
         if let Some(vrl_function) = &query_fn {
             if !vrl_function.trim().ends_with('.') {
                 query_fn = Some(format!("{} \n .", vrl_function));
@@ -221,7 +227,9 @@ pub async fn search(
             );
             c_resp.cached_response
         } else {
-            results[0].clone()
+            let mut reps = results[0].clone();
+            sort_response(c_resp.is_descending, &mut reps, &c_resp.ts_column);
+            reps
         }
     };
 
@@ -333,15 +341,7 @@ fn merge_response(
         }
         cache_response.hits.extend(res.hits.clone());
     }
-    if is_descending {
-        cache_response
-            .hits
-            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
-    } else {
-        cache_response
-            .hits
-            .sort_by_key(|a| get_ts_value(ts_column, a));
-    }
+    sort_response(is_descending, cache_response, ts_column);
 
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
@@ -354,6 +354,18 @@ fn merge_response(
     );
     cache_response.result_cache_ratio =
         (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+}
+
+fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_column: &str) {
+    if is_descending {
+        cache_response
+            .hits
+            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
+    } else {
+        cache_response
+            .hits
+            .sort_by_key(|a| get_ts_value(ts_column, a));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

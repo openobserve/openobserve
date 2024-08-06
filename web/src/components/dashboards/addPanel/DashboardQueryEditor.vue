@@ -98,7 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="`dashboard-panel-query-tab-add`"
         ></q-btn>
       </div>
-      <div>
+      <div style="display: flex; gap: 4px">
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="dashboardPanelData.layout.vrlFunctionToggle"
+          :icon="'img:' + getImageURL('images/common/function.svg')"
+          title="Toggle Function Editor"
+          class="float-left"
+          size="28px"
+          @update:model-value="onFunctionToggle"
+          :disable="promqlMode"
+        />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
@@ -112,28 +122,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-query"
   >
     <div class="column" style="width: 100%; height: 100%">
-      <div class="col" style="width: 100%">
-        <query-editor
-          ref="queryEditorRef"
-          class="monaco-editor"
-          v-model:query="currentQuery"
-          data-test="dashboard-panel-query-editor"
-          v-model:functions="dashboardPanelData.meta.stream.functions"
-          v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-          :keywords="
-            dashboardPanelData.data.queryType === 'promql'
-              ? autoCompletePromqlKeywords
-              : []
-          "
-          @update-query="updateQuery"
-          @run-query="searchData"
-          :readOnly="
-            !dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].customQuery
-          "
-          :language="dashboardPanelData.data.queryType"
-        ></query-editor>
+      <div class="col" style="width: 100%; height: 100%">
+        <div class="row" style="height: 100%">
+          <q-splitter
+            no-scroll
+            style="width: 100%; height: 100%"
+            v-model="splitterModel"
+            :limits="[
+              30,
+              promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
+                ? 100
+                : 70,
+            ]"
+            :disable="
+              promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
+            "
+          >
+            <template #before>
+              <SqlQueryEditor
+                ref="queryEditorRef"
+                class="monaco-editor"
+                style="width: 100%"
+                v-model:query="currentQuery"
+                data-test="dashboard-panel-query-editor"
+                v-model:functions="dashboardPanelData.meta.stream.functions"
+                v-model:fields="
+                  dashboardPanelData.meta.stream.selectedStreamFields
+                "
+                :keywords="
+                  dashboardPanelData.data.queryType === 'promql'
+                    ? autoCompletePromqlKeywords
+                    : []
+                "
+                @update-query="updateQuery"
+                @run-query="searchData"
+                :readOnly="
+                  !dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].customQuery
+                "
+                :language="dashboardPanelData.data.queryType"
+              ></SqlQueryEditor>
+            </template>
+            <template #after>
+              <div style="height: 100%; width: 100%">
+                <div style="height: calc(100% - 40px); width: 100%">
+                  <query-editor
+                    v-if="!promqlMode"
+                    data-test="dashboard-vrl-function-editor"
+                    style="width: 100%; height: 100%"
+                    ref="vrlFnEditorRef"
+                    editor-id="fnEditor"
+                    class="monaco-editor"
+                    v-model:query="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].vrlFunctionQuery
+                    "
+                    :class="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ]?.vrlFunctionQuery == '' && functionEditorPlaceholderFlag
+                        ? 'empty-function'
+                        : ''
+                    "
+                    language="ruby"
+                    @focus="functionEditorPlaceholderFlag = false"
+                    @blur="functionEditorPlaceholderFlag = true"
+                  />
+                </div>
+                <div style="height: 40px; width: 100%">
+                  <div style="display: flex; height: 40px">
+                    <q-select
+                      v-model="selectedFunction"
+                      label="Use Saved function"
+                      :options="functionOptions"
+                      data-test="dashboard-use-saved-vrl-function"
+                      input-debounce="0"
+                      behavior="menu"
+                      use-input
+                      filled
+                      borderless
+                      dense
+                      hide-selected
+                      menu-anchor="top left"
+                      fill-input
+                      @filter="filterFunctionOptions"
+                      option-label="name"
+                      option-value="function"
+                      @update:modelValue="onFunctionSelect"
+                      style="width: 100%"
+                    >
+                      <template #no-option>
+                        <q-item>
+                          <q-item-section>
+                            {{ t("search.noResult") }}</q-item-section
+                          >
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <q-btn
+                      no-caps
+                      padding="xs"
+                      class=""
+                      size="sm"
+                      flat
+                      icon="info_outline"
+                      data-test="dashboard-addpanel-config-drilldown-info"
+                    >
+                      <q-tooltip
+                        class="bg-grey-8"
+                        anchor="bottom middle"
+                        self="top right"
+                        max-width="250px"
+                      >
+                        To use extracted VRL fields in the chart, write a VRL
+                        function and click on the Apply button. The fields will
+                        be extracted, allowing you to use them to build the
+                        chart.
+                      </q-tooltip>
+                    </q-btn>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </q-splitter>
+        </div>
       </div>
       <div style="color: red; z-index: 100000" class="q-mx-sm col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
@@ -151,22 +265,31 @@ import {
   computed,
   onMounted,
   defineAsyncComponent,
+  nextTick,
+  onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import { inject } from "vue";
+import { onBeforeMount } from "vue";
+import { getImageURL } from "@/utils/zincutils";
+import useNotifications from "@/composables/useNotifications";
+import { useStore } from "vuex";
+import useFunctions from "@/composables/useFunctions";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
-    QueryEditor: defineAsyncComponent(() => import("../QueryEditor.vue")),
+    SqlQueryEditor: defineAsyncComponent(() => import("../QueryEditor.vue")),
     ConfirmDialog,
     QueryTypeSelector,
+    queryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue"),
+    ),
   },
   emits: ["searchdata"],
   methods: {
@@ -177,19 +300,95 @@ export default defineComponent({
   setup() {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
+    const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
+
+    const { getAllFunctions } = useFunctions();
+    const functionList = ref([]);
+    const functionOptions = ref([]);
+    const selectedFunction = ref("");
+
+    const getFunctions = async () => {
+      try {
+        if (store.state.organizationData.functions.length == 0) {
+          await getAllFunctions();
+        }
+
+        store.state.organizationData.functions.map((data: any) => {
+          const args: any = [];
+          for (let i = 0; i < parseInt(data.num_args); i++) {
+            args.push("'${1:value}'");
+          }
+
+          const itemObj: {
+            name: any;
+            args: string;
+          } = {
+            name: data.name,
+            args: "(" + args.join(",") + ")",
+          };
+
+          functionList.value.push({
+            name: data.name,
+            function: data.function,
+          });
+          // if (!data.stream_name) {
+          //   searchObj.data.stream.functions.push(itemObj);
+          // }
+        });
+        return;
+      } catch (e) {
+        showErrorNotification("Error while fetching functions");
+      }
+    };
+
+    const filterFunctionOptions = (val: string, update: any) => {
+      update(() => {
+        functionOptions.value = functionList.value.filter((fn: any) => {
+          return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+        });
+      });
+    };
+
+    const onFunctionSelect = (val: any) => {
+      // assign selected vrl function
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].vrlFunctionQuery = val.function;
+      // clear v-model
+      selectedFunction.value = "";
+
+      // show success message
+      showPositiveNotification(`${val.name} function applied successfully.`);
+    };
+
     const { dashboardPanelData, promqlMode, addQuery, removeQuery } =
       useDashboardPanelData(dashboardPanelDataPageKey);
+
+    const splitterModel = ref(
+      promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
+    );
+
+    watch(
+      () => splitterModel.value,
+      () => {
+        window.dispatchEvent(new Event("resize"));
+      },
+    );
     const confirmQueryModeChangeDialog = ref(false);
 
     const { autoCompleteData, autoCompletePromqlKeywords, getSuggestions } =
       usePromqlSuggestions();
 
     const queryEditorRef = ref(null);
+
+    const functionEditorPlaceholderFlag = ref(true);
+    const vrlFnEditorRef = ref(null);
 
     const addTab = () => {
       addQuery();
@@ -201,6 +400,17 @@ export default defineComponent({
         updatePromQLQuery(query, fields);
       }
     };
+
+    watch(
+      () => [promqlMode.value, dashboardPanelData.layout.vrlFunctionToggle],
+      () => {
+        if (promqlMode.value || !dashboardPanelData.layout.vrlFunctionToggle) {
+          splitterModel.value = 100;
+        } else {
+          splitterModel.value = 70;
+        }
+      },
+    );
 
     const removeTab = async (index) => {
       if (
@@ -244,11 +454,41 @@ export default defineComponent({
       () => dashboardPanelData.layout.showQueryBar,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
+
+    // this is only for VRLs
+    const resizeEventListener = async () => {
+      await nextTick();
+      vrlFnEditorRef?.value?.resetEditorLayout();
+    };
+
+    onMounted(async () => {
+      window.removeEventListener("resize", resizeEventListener);
+      window.addEventListener("resize", resizeEventListener);
+      getFunctions();
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("resize", resizeEventListener);
+    });
+    // End for VRL resize
 
     onMounted(() => {
       dashboardPanelData.meta.errors.queryErrors = [];
+      vrlFnEditorRef?.value?.resetEditorLayout();
+    });
+
+    onBeforeMount(() => {
+      if (
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery = "";
+      }
     });
 
     // on queryerror change dispatch resize event to resize monaco editor
@@ -256,7 +496,7 @@ export default defineComponent({
       () => dashboardPanelData.meta.errors.queryErrors,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     const updatePromQLQuery = async (event, value) => {
@@ -287,6 +527,24 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = [];
     };
 
+    const onFunctionToggle = (value, event) => {
+      event.stopPropagation();
+
+      // if value is false
+      if (!value) {
+        // hide function editor
+        splitterModel.value = 100;
+
+        // reset function query
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery = "";
+      }
+
+      // open query editor
+      dashboardPanelData.layout.showQueryBar = true;
+    };
+
     return {
       t,
       router,
@@ -304,6 +562,15 @@ export default defineComponent({
       getSuggestions,
       queryEditorRef,
       updateQuery,
+      functionEditorPlaceholderFlag,
+      vrlFnEditorRef,
+      splitterModel,
+      getImageURL,
+      onFunctionToggle,
+      functionOptions,
+      selectedFunction,
+      filterFunctionOptions,
+      onFunctionSelect,
     };
   },
 });
@@ -319,6 +586,12 @@ export default defineComponent({
 .q-ml-sm:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;
+}
+
+:deep(.empty-function .monaco-editor-background) {
+  background-image: url("../../../assets/images/common/vrl-function.png");
+  background-repeat: no-repeat;
+  background-size: 170px;
 }
 
 // .query-tabs-container {

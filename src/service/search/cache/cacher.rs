@@ -29,7 +29,7 @@ use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
     service::search::{
         cache::result_utils::{get_ts_value, round_down_to_nearest_minute},
-        sql::{generate_histogram_interval, SqlMode, RE_HISTOGRAM, RE_SELECT_FROM},
+        sql::{generate_histogram_interval, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
 
@@ -44,14 +44,12 @@ pub async fn check_cache(
     rpc_req: &proto::cluster_rpc::SearchRequest,
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
-    parsed_sql: &config::meta::sql::Sql,
     file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    // check sql_mode
 
     let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
         Ok(v) => v,
@@ -60,35 +58,38 @@ pub async fn check_cache(
             return CachedQueryResponse::default();
         }
     };
-    let sql_mode: SqlMode = meta.sql_mode;
 
     // skip the queries with no timestamp column
-    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
-    if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
+    let mut result_ts_col = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
+    if result_ts_col.is_none() && (is_aggregate || !meta.meta.group_by.is_empty()) {
         return CachedQueryResponse::default();
     }
 
     // skip the count queries & queries first order by is not _timestamp field
     let order_by = meta.meta.order_by;
-    if (sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits)
-        || (order_by.is_empty()
-            || (order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
-                && (result_ts_col.is_none()
-                    || (result_ts_col.is_some()
-                        && result_ts_col.as_ref().unwrap()
-                            != &order_by.first().as_ref().unwrap().0))))
+    if req.query.track_total_hits
+        || (!order_by.is_empty()
+            && order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
+            && (result_ts_col.is_none()
+                || (result_ts_col.is_some()
+                    && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
     {
         return CachedQueryResponse::default();
     }
 
     // Hack select for _timestamp
-    if !is_aggregate && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
+    if !is_aggregate
+        && meta.meta.group_by.is_empty()
+        && order_by.is_empty()
+        && !origin_sql.contains('*')
+    {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
         if !cap_str.contains(&cfg.common.column_timestamp) {
-            *origin_sql = origin_sql.replace(
+            *origin_sql = origin_sql.replacen(
                 cap_str,
                 &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                1,
             );
         }
         req.query.sql = origin_sql.clone();
@@ -109,12 +110,12 @@ pub async fn check_cache(
         }
 
         let meta_time_range_is_empty =
-            parsed_sql.time_range.is_none() || parsed_sql.time_range == Some((0, 0));
+            meta.meta.time_range.is_none() || meta.meta.time_range == Some((0, 0));
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
                 Some(req_time_range)
             } else {
-                parsed_sql.time_range
+                meta.meta.time_range
             };
         handle_historgram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
@@ -249,7 +250,16 @@ pub async fn get_cached_results(
 
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
-                        let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
+                        let mut cached_response: Response = match json::from_str::<Response>(&v){
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::error!(
+                                    "[trace_id {trace_id}] Error parsing cached response: {:?}",
+                                    e
+                                );
+                                return None;
+                            }
+                        };
                         let first_ts = get_ts_value(
                             &cache_req.ts_column,
                             cached_response.hits.first().unwrap(),

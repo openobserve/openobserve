@@ -637,10 +637,8 @@ pub(crate) async fn get_series(
             size: 1000,
             start_time: start,
             end_time: end,
-            sql_mode: "full".to_string(),
             ..Default::default()
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],
@@ -783,10 +781,8 @@ pub(crate) async fn get_label_values(
             size: 1000,
             start_time: start,
             end_time: end,
-            sql_mode: "full".to_string(),
             ..Default::default()
         },
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],

@@ -82,14 +82,12 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
 
         let query = config::meta::search::Query {
             sql,
-            sql_mode: "full".to_owned(),
             size: 100000000,
             ..Default::default()
         };
 
         let req = config::meta::search::Request {
             query,
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
@@ -141,14 +139,12 @@ async fn get_last_stats(
 
     let query = config::meta::search::Query {
         sql,
-        sql_mode: "full".to_owned(),
         size: 100000000,
         ..Default::default()
     };
 
     let req = config::meta::search::Request {
         query,
-        aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],

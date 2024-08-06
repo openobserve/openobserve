@@ -1,9 +1,12 @@
 name: "JS Licenses checker"
+
 on:
   push:
-    paths:
-      - "**/package-lock.json"
-      - "**/package.json"
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "*"
 
 jobs:
   js-license-check:
@@ -16,9 +19,20 @@ jobs:
         with:
           node-version: 20
       - name: Build frontend code
-        run: cd web && npm install && npm run build
+        run: |
+          results=$(git show --name-only HEAD | grep "package.*.json")
+          if [ -z "$result" ]; then
+            echo "No package.json or package-lock.json files changed. Skipping license check."
+            exit 0
+          fi
+          cd web && npm install && npm run build
       - name: Check licenses
         run: |
+          results=$(git show --name-only HEAD | grep "package.*.json")
+          if [ -z "$result" ]; then
+            echo "No package.json or package-lock.json files changed. Skipping license check."
+            exit 0
+          fi
           npm install -g license-checker
           cd web && npx -q --yes license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED"
         env:

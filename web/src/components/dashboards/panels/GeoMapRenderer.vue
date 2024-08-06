@@ -38,6 +38,101 @@ import "@/utils/dashboard/leaflet-echarts/index";
 // import {tileLayer as LtileLayer } from 'leaflet';
 import "leaflet/dist/leaflet.css";
 import * as echarts from "echarts/core";
+import {
+  BarChart,
+  LineChart,
+  CustomChart,
+  GaugeChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  SankeyChart,
+  TreeChart,
+  GraphChart,
+} from "echarts/charts";
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  ToolboxComponent,
+  DatasetComponent,
+  LegendComponent,
+  PolarComponent,
+  VisualMapComponent,
+  DataZoomComponent,
+} from "echarts/components";
+import { LabelLayout, UniversalTransition } from "echarts/features";
+import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
+import type {
+  BarSeriesOption,
+  LineSeriesOption,
+  CustomSeriesOption,
+  GaugeSeriesOption,
+  PieSeriesOption,
+  ScatterSeriesOption,
+  HeatmapSeriesOption,
+  SankeySeriesOption,
+  TreeSeriesOption,
+} from "echarts/charts";
+import type { ComposeOption } from "echarts/core";
+import type {
+  TitleComponentOption,
+  TooltipComponentOption,
+  GridComponentOption,
+  ToolboxComponentOption,
+  DatasetComponentOption,
+  LegendComponentOption,
+  PolarComponentOption,
+  VisualMapComponentOption,
+  DataZoomComponentOption,
+} from "echarts/components";
+
+type ECOption = ComposeOption<
+  | BarSeriesOption
+  | LineSeriesOption
+  | CustomSeriesOption
+  | GaugeSeriesOption
+  | PieSeriesOption
+  | ScatterSeriesOption
+  | HeatmapSeriesOption
+  | SankeySeriesOption
+  | TreeSeriesOption
+  | TitleComponentOption
+  | TooltipComponentOption
+  | GridComponentOption
+  | ToolboxComponentOption
+  | DatasetComponentOption
+  | LegendComponentOption
+  | PolarComponentOption
+  | VisualMapComponentOption
+  | DataZoomComponentOption
+>;
+
+echarts.use([
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  ToolboxComponent,
+  DatasetComponent,
+  LegendComponent,
+  PolarComponent,
+  VisualMapComponent,
+  DataZoomComponent,
+  BarChart,
+  LineChart,
+  CustomChart,
+  GaugeChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  SankeyChart,
+  TreeChart,
+  GraphChart,
+  LabelLayout,
+  UniversalTransition,
+  CanvasRenderer,
+  SVGRenderer,
+]);
 
 export default defineComponent({
   name: "GeoMapRenderer",
@@ -104,7 +199,7 @@ export default defineComponent({
             props.data.options?.lmap?.center[1],
             props.data.options?.lmap?.center[0],
           ],
-          props.data.options?.lmap?.zoom
+          props.data.options?.lmap?.zoom,
         );
       }
       // L.geoJson(mapData).addTo(lmap);
@@ -153,11 +248,11 @@ export default defineComponent({
               props.data.options?.lmap?.center[1],
               props.data.options?.lmap?.center[0],
             ],
-            props.data.options?.lmap?.zoom
+            props.data.options?.lmap?.zoom,
           );
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef };
   },

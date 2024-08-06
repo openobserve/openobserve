@@ -114,13 +114,14 @@ pub async fn save(
     // before saving alert check alert context attributes
     if alert.context_attributes.is_some() {
         let attrs = alert.context_attributes.as_ref().unwrap();
-        let mut new_attrs = HashMap::with_capacity(attrs.len());
+        let mut new_attrs = hashbrown::HashMap::with_capacity(attrs.len());
         for key in attrs.keys() {
             let new_key = key.trim().to_string();
             if !new_key.is_empty() {
                 new_attrs.insert(new_key, attrs.get(key).unwrap().to_string());
             }
         }
+        alert.context_attributes = Some(new_attrs);
     }
 
     // before saving alert check column type to decide numeric condition
@@ -451,16 +452,13 @@ impl QueryCondition {
                         .unwrap(),
                 end_time: now,
                 sort_by: None,
-                sql_mode: "full".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
-                query_context: None,
                 query_fn: None,
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
@@ -608,6 +606,7 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
         AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
         AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
+        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
         AggFunction::P50 => format!("approx_percentile_cont(\"{}\", 0.5)", agg.having.column),
         AggFunction::P75 => format!("approx_percentile_cont(\"{}\", 0.75)", agg.having.column),
         AggFunction::P90 => format!("approx_percentile_cont(\"{}\", 0.9)", agg.having.column),

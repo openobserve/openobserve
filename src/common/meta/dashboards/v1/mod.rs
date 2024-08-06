@@ -103,6 +103,7 @@ pub enum AggregationFunc {
     Min,
     Max,
     Avg,
+    Median,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

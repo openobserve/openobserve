@@ -208,7 +208,7 @@ function extractFields(parsedAst: any, timeField: string) {
       // histogram field
       field.column = column?.expr?.args?.value[0]?.column ?? timeField;
       field.aggregationFunction =
-        column?.expr?.name?.toLowerCase() ?? "histogram";
+        column?.expr?.name[0]?.value?.toLowerCase() ?? "histogram";
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;

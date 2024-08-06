@@ -142,17 +142,12 @@ test.describe("Sanity testcases", () => {
     }
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
-      )
-      .last()
-      .click({
-        force: true,
-      });
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+      ).first().click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
       page

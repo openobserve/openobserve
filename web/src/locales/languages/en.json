@@ -361,7 +361,9 @@
     "delete": "Delete",
     "deleteIndex": "Delete Stream",
     "confirmDeleteHead": "Delete Stream",
+    "confirmBatchDeleteHead":"Delete Streams",
     "confirmDeleteMsg": "Are you sure that you want to delete this Stream?",
+    "confirmBatchDeleteMsg":"Are you sure that you want to delete selected streams?",
     "cancel": "Cancel",
     "ok": "Ok",
     "docsCount": "Docs Count",
@@ -882,6 +884,7 @@
     "status": "Status",
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
-    "refreshQuery": "Refresh Query"
+    "refreshQuery": "Refresh Query",
+    "queryType": "Query Type"
   }
 }

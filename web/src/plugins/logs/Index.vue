@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
             style="width: 100%"
-            v-if="searchObj.meta.logsVisualizeToggle == 'logs'"
+            v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -245,7 +245,10 @@ color="primary" size="md" />
               </template>
             </q-splitter>
           </div>
-          <div else :style="`height: calc(100vh - ${splitterModel}vh - 40px);`">
+          <div
+            v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
+            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+          >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
@@ -512,6 +515,7 @@ export default defineComponent({
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
+        searchObj.meta.refreshHistogram = true;
 
         const isStreamChanged =
           queryParams.stream_type !== searchObj.data.stream.streamType ||
@@ -549,6 +553,7 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         // searchObj.loading = true;
         searchObj.meta.pageType = "logs";
+        searchObj.meta.refreshHistogram = true;
         if (
           config.isEnterprise == "true" &&
           store.state.zoConfig.super_cluster_enabled
@@ -895,6 +900,28 @@ export default defineComponent({
       return true;
     };
 
+    watch(
+      () => [
+        searchObj.data.tempFunctionContent,
+        searchObj.meta.logsVisualizeToggle,
+      ],
+      () => {
+        if (
+          searchObj.meta.logsVisualizeToggle == "visualize" &&
+          searchObj.meta.toggleFunction &&
+          searchObj.data.tempFunctionContent
+        ) {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+        } else {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].vrlFunctionQuery = "";
+        }
+      },
+    );
+
     const setFieldsAndConditions = async () => {
       let logsQuery = searchObj.data.query ?? "";
 
@@ -969,23 +996,16 @@ export default defineComponent({
     watch(
       () => [searchObj.meta.logsVisualizeToggle],
       async () => {
+        // emit resize event
+        // this will rerender/call resize method of already rendered chart to resize
+        window.dispatchEvent(new Event("resize"));
+
         if (searchObj.meta.logsVisualizeToggle == "visualize") {
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          // hide VRL function editor
-          searchObj.config.fnSplitterModel = 99.5;
-
           // set fields and conditions
           await setFieldsAndConditions();
-        } else {
-          // else check if VRL function toggle is true or false
-          // based on that set the splitter model
-          if (searchObj.meta.toggleFunction == false) {
-            searchObj.config.fnSplitterModel = 99.5;
-          } else {
-            searchObj.config.fnSplitterModel = 60;
-          }
         }
       }
     );

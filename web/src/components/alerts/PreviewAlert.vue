@@ -1,8 +1,11 @@
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
     <div style="height: 200px" data-test="alert-preview-chart">
+      <p class="sql-preview" v-if="selectedTab === 'sql'">
+        Preview is not available in SQL mode
+      </p>
       <PanelSchemaRenderer
-        v-if="chartData"
+        v-else-if="chartData"
         :height="6"
         :width="6"
         :panelSchema="chartData"
@@ -146,7 +149,10 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
-  const startTime = endTime - relativeTime * 60 * 1000000;
+  let new_relative_time = 5;
+  if (relativeTime < 5) { new_relative_time = relativeTime };
+
+  const startTime = endTime - new_relative_time * 60 * 1000000;
 
   dashboardPanelData.meta.dateTime = {
     start_time: new Date(startTime),
@@ -216,4 +222,11 @@ const refreshData = () => {
 defineExpose({ refreshData });
 </script>
 
-<style scoped></style>
+<style scoped>
+.sql-preview{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 5vh;
+}
+</style>

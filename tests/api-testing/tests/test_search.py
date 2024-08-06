@@ -116,16 +116,13 @@ def test_e2e_validhistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-             "sql": 'select * from "stream_pytest_data" WHERE code=200',
+            "sql": "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from stream_pytest_data WHERE code=200 GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
             "size": 0,
             "quick_mode": True,
             "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
     }
 
@@ -139,7 +136,7 @@ def test_e2e_validhistogram(create_session, base_url):
 
 
 def test_e2e_histogramwithlimit(create_session, base_url):
-    """Running an E2E test for invalid query -history with limit  list."""
+    """Running an E2E test for query with limit  list."""
 
     session = create_session
     url = base_url
@@ -156,9 +153,6 @@ def test_e2e_histogramwithlimit(create_session, base_url):
             "size": 0,
             "quick_mode": True,
             "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
     }
 
@@ -167,7 +161,7 @@ def test_e2e_histogramwithlimit(create_session, base_url):
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allsearch.status_code == 500
+        resp_get_allsearch.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
@@ -210,16 +204,13 @@ def test_e2e_matchallindexhistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all(\'provide_credentials\')',
+            "sql": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from stream_pytest_data WHERE match_all(\'provide_credentials\') GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
             "size": 0,
             "quick_mode": True,
             "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
 } 
 
@@ -243,16 +234,13 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\')',
+            "sql": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from stream_pytest_data WHERE match_all_raw_ignore_case('provide_credentials') GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
             "size": 0,
             "quick_mode": True,
             "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
 } 
 
@@ -260,7 +248,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
 
 
 # def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
-    """Running an E2E test for valid match all histogram query."""
+    """Running an E2E test for invalid match all histogram query."""
 
     session = create_session
     url = base_url
@@ -270,16 +258,13 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": 'select * from "stream_pytest_data" WHERE match_all_raw_ignore_case()',
+            "sql": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from stream_pytest_data WHERE match_all_raw_ignore_case() GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
             "size": 0,
             "quick_mode": True,
             "track_total_hits": True
-        },
-        "aggs": {
-            "histogram": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
 } 
 
