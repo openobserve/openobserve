@@ -474,42 +474,38 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let rum_tokens = USERS_RUM_TOKEN.clone();
-    let root_user = rum_tokens.get(&format!("{DEFAULT_ORG}/{token}"));
-    if let Some(user) = root_user {
+    let key = format!("{DEFAULT_ORG}/{token}");
+    if let Some(user) = rum_tokens.get(&key) {
         return Some(user.value().clone());
     }
 
     let key = format!("{org_id}/{token}");
-    let cached_user = rum_tokens
-        .get(&key)
-        .map(|loc_user| loc_user.value().clone());
+    if let Some(user) = rum_tokens.get(&key) {
+        return Some(user.value().clone());
+    }
 
-    match cached_user {
-        Some(user) => Some(user),
-        None => {
-            log::info!("get_user_by_token: User not found in cache, fetching from db");
-            if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
-                .await
-                .ok()
-                .flatten()
-            {
-                log::info!("get_user_by_token: User found updating cache");
-                if is_root_user(&user_from_db.email) {
-                    USERS_RUM_TOKEN
-                        .clone()
-                        .insert(format!("{DEFAULT_ORG}/{token}"), user_from_db.clone());
-                }
-                USERS_RUM_TOKEN.clone().insert(key, user_from_db.clone());
-                Some(user_from_db)
-            } else {
-                log::info!(
-                    "get_user_by_token: User not found even in db {} {}",
-                    org_id,
-                    token
-                );
-                None
-            }
+    // need to drop the reference to rum_tokens to avoid deadlock of dashmap
+    drop(rum_tokens);
+
+    log::info!("get_user_by_token: User not found in cache, fetching from db");
+    if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
+        .await
+        .ok()
+        .flatten()
+    {
+        log::info!("get_user_by_token: User found updating cache");
+        if is_root_user(&user_from_db.email) {
+            USERS_RUM_TOKEN.insert(format!("{DEFAULT_ORG}/{token}"), user_from_db.clone());
         }
+        USERS_RUM_TOKEN.insert(key, user_from_db.clone());
+        Some(user_from_db)
+    } else {
+        log::info!(
+            "get_user_by_token: User not found even in db {} {}",
+            org_id,
+            token
+        );
+        None
     }
 }
 
