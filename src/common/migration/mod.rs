@@ -31,6 +31,11 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         return Ok(());
     }
     if old_ver >= new_ver {
+        log::info!(
+            "old version {} is equal to new version {}",
+            old_ver,
+            new_ver
+        );
         return Ok(());
     }
 
