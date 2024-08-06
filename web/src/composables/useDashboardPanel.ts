@@ -1692,6 +1692,39 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     console.log("columnType", columnType);
 
     if (columnType === "Utf8") {
+      // Escape single quotes by doubling them
+      const escapedValue = value.replace(/'/g, "''");
+      // Check if the value already has quotes
+      if (escapedValue.startsWith("'") && escapedValue.endsWith("'")) {
+        console.log("value if utf8", escapedValue);
+        return escapedValue;
+      } else {
+        console.log("value if not utf8", escapedValue);
+        return `'${escapedValue}'`;
+      }
+    } else if (columnType === "Int64") {
+      // Remove quotes if they exist
+      if (value.startsWith("'") && value.endsWith("'")) {
+        console.log("value if int64", value.substring(1, value.length - 1));
+        return value.substring(1, value.length - 1);
+      } else {
+        console.log("value if not int64", value);
+        return value;
+      }
+    }
+    return value;
+  };
+
+  const formatINValue = (value: any, column: string) => {
+    if (value == null) {
+      console.log("Value is null or undefined, returning as is");
+      return value;
+    }
+    console.log("formatValue", value, column);
+    const columnType = getColumnType(column);
+    console.log("columnType", columnType);
+
+    if (columnType === "Utf8") {
       // Check if the value already has quotes
       if (value.startsWith("'") && value.endsWith("'")) {
         console.log("value if utf8", value);
@@ -1759,7 +1792,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           } else {
             console.log("condition.value--------- IN", condition.value);
 
-            selectFilter += `${condition.column} IN (${formatValue(condition.value, condition.column)})`;
+            selectFilter += `${condition.column} IN (${formatINValue(condition.value, condition.column)})`;
           }
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all('${condition.value}')`;
