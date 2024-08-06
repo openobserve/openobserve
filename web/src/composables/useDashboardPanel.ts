@@ -2249,6 +2249,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].config.limit,
+      dashboardPanelData.meta.stream.selectedStreamFields,
     ],
     () => {
       // only continue if current mode is auto query generation
