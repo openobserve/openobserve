@@ -1173,7 +1173,7 @@ export default defineComponent({
     },
 
     onSubmit() {
-      if (!this.getParser(this.formData.query_condition.sql)) {
+      if (!this.formData.is_real_time && this.formData.query_condition.type == 'sql' && !this.getParser(this.formData.query_condition.sql)) {
         this.q.notify({
           type: "negative",
           message: "Selecting all Columns in SQL query is not allowed.",
