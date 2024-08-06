@@ -31,11 +31,6 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
         return Ok(());
     }
     if old_ver >= new_ver {
-        log::info!(
-            "old version {} is equal to new version {}",
-            old_ver,
-            new_ver
-        );
         return Ok(());
     }
 
@@ -49,13 +44,6 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     let v093 = Version::from("v0.9.3").unwrap();
     if old_ver < v093 {
         upgrade_092_093().await?;
-    }
-
-    let v0109 = Version::from("v0.10.9").unwrap();
-    // The below migration requires ofga init ready, but on Router node,
-    // we don't initialize ofga, hence the migration should not run on router
-    if old_ver < v0109 && !LOCAL_NODE.is_router() {
-        upgrade_0108_0109().await?;
     }
 
     Ok(())
@@ -78,8 +66,11 @@ async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn upgrade_0108_0109() -> Result<(), anyhow::Error> {
-    migrate_resource_names().await?;
-
+pub async fn upgrade_resource_names() -> Result<(), anyhow::Error> {
+    // The below migration requires ofga init ready, but on Router node,
+    // we don't initialize ofga, hence the migration should not run on router
+    if !LOCAL_NODE.is_router() {
+        migrate_resource_names().await?;
+    }
     Ok(())
 }
