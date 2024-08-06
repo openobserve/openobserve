@@ -158,7 +158,7 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should display result text and pagination", async ({ page }) => {
-    await page.getByText("Showing 1 to 250").click();
+    await page.getByText("Showing 1 to 100").click();
     await page
       .getByText("fast_rewind12345fast_forward250arrow_drop_down")
       .click();
