@@ -1777,10 +1777,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               selectFilter += `${condition.operator} ${formatValue(condition.value, condition.column)}`;
               break;
             case "Contains":
-              selectFilter += `LIKE '%${formatValue(condition.value, condition.column)}%'`;
+              selectFilter += `LIKE '%${condition.value}%'`;
               break;
             case "Not Contains":
-              selectFilter += `NOT LIKE '%${formatValue(condition.value, condition.column)}%'`;
+              selectFilter += `NOT LIKE '%${condition.value}%'`;
               break;
             default:
               selectFilter += `${condition.operator} ${formatValue(condition.value, condition.column)}`;
