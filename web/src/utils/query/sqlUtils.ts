@@ -252,9 +252,11 @@ function extractFilters(parsedAst: any) {
         const left: any = parseCondition(condition.left);
         const right: any = parseCondition(condition.right);
 
+        // set current logical operator to the right side
+        right.logicalOperator = condition.operator ?? "AND";
         return {
           filterType: "group",
-          logicalOperator: condition.operator,
+          logicalOperator: "AND",
           conditions: [left, right],
         };
       } else if (
