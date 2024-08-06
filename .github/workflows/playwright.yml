@@ -101,6 +101,7 @@ jobs:
             "dashboards/dashboardtype.spec.js",
             "dashboards/dashboard.spec.js",
             "dashboards/visualize.spec.js",
+            "vrl.spec.js",
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
             "dashboards/dashboard-transpose.spec.js",
