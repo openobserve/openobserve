@@ -210,7 +210,11 @@ pub async fn update_user(
                         is_updated = true;
                     } else {
                         message =
-                            "Existing/old password mismatch, please provide valid existing password"
+                            "Existing/old password mismatch, please provide valid existing password";
+                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                            http::StatusCode::BAD_REQUEST.into(),
+                            message.to_string(),
+                        )));
                     }
                 } else if self_update && user.old_password.is_none() {
                     message = "Please provide existing password"
