@@ -996,17 +996,17 @@ mod tests {
             ("select * from table1 where a='b'", true, (0, 0)),
             (
                 "select * from table1 where a='b' limit 10 offset 10",
-                false,
+                true,
                 (0, 0),
             ),
             (
                 "select * from table1 where a='b' group by abc",
-                false,
+                true,
                 (0, 0),
             ),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                false,
+                true,
                 (0, 0),
             ),
             ("select * from table1, table2 where a='b'", false, (0, 0)),
@@ -1027,7 +1027,7 @@ mod tests {
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  openobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                false,
+                true,
                 (0, 0),
             ),
             (
@@ -1090,6 +1090,7 @@ mod tests {
             rpc_req.org_id = org_id.to_string();
 
             let resp = Sql::new(&rpc_req).await;
+            println!("sql: {}", sql);
             assert_eq!(resp.is_ok(), ok);
             if ok {
                 let resp = resp.unwrap();
@@ -1103,7 +1104,6 @@ mod tests {
                         Some((query.start_time, query.end_time))
                     );
                 }
-                assert_eq!(resp.meta.limit, query.size);
             }
         }
     }

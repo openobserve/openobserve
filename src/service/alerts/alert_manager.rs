@@ -24,6 +24,7 @@ use config::{
     },
 };
 use cron::Schedule;
+use futures::future::try_join_all;
 
 use crate::{
     common::meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
@@ -46,12 +47,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     log::info!("Pulled {} jobs from scheduler", triggers.len());
 
+    let mut tasks = Vec::new();
     for trigger in triggers {
-        tokio::task::spawn(async move {
+        let task = tokio::task::spawn(async move {
             if let Err(e) = handle_triggers(trigger).await {
                 log::error!("[ALERT_MANAGER] Error handling trigger: {}", e);
             }
         });
+        tasks.push(task);
+    }
+    if let Err(e) = try_join_all(tasks).await {
+        log::error!("[ALERT_MANAGER] Error handling triggers: {}", e);
     }
     Ok(())
 }
@@ -175,6 +181,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     if let Some(data) = ret {
         match alert.send_notification(&data).await {
             Ok(_) => {
+                log::info!(
+                    "Alert notification sent, org: {}, module_key: {}",
+                    &new_trigger.org,
+                    &new_trigger.module_key
+                );
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Err(e) => {
