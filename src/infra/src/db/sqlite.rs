@@ -201,8 +201,15 @@ impl super::Db for SqliteDb {
         .await
         {
             Ok(v) => v,
-            Err(_) => {
-                return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+                } else {
+                    return Err(Error::from(DbError::DBOperError(
+                        e.to_string(),
+                        key.to_string(),
+                    )));
+                }
             }
         };
         Ok(Bytes::from(value))
