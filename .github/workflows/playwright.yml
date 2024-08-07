@@ -120,6 +120,7 @@ jobs:
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
       - name: Check OpenObserve logs
+        if: always()
         run: cat o2.log
 
       - uses: actions/upload-artifact@v4
