@@ -113,23 +113,86 @@ test.describe(" visualize UI testcases", () => {
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
+  test("should allow adding a VRL function in the visualization chart ", async ({
+    page,
+  }) => {
+    // await page.getByLabel('Expand "kubernetes_annotations_kubernetes_io_psp"').click();
 
-  test('should allow adding a VRL function in the visualization chart ', async ({ page }) => {
-   // await page.getByLabel('Expand "kubernetes_annotations_kubernetes_io_psp"').click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
 
-   await page.locator('[data-test="date-time-btn"]').click();
-   await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
-
-   // await page.locator('[data-test="logs-search-subfield-add-kubernetes_annotations_kubernetes_io_psp-eks\\.privileged"] [data-test="log-search-subfield-list-equal-kubernetes_annotations_kubernetes_io_psp-field-btn"]').click();
+    // await page.locator('[data-test="logs-search-subfield-add-kubernetes_annotations_kubernetes_io_psp-eks\\.privileged"] [data-test="log-search-subfield-list-equal-kubernetes_annotations_kubernetes_io_psp-field-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line').click();
-    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.vrl12=123');
+    await page
+      .locator(
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
+      .click();
+    await page
+      .locator("#fnEditor")
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".vrl12=123");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await expect(page.getByText('drag_indicatortext_fields vrl12')).toBeVisible();
-    await page.locator('[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]').click();
+    await expect(
+      page.getByText("drag_indicatortext_fields vrl12")
+    ).toBeVisible();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrl12"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
-
-})
+  test("test", async ({ page }) => {
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page
+      .locator(
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
+      .click();
+    await page
+      .locator("#fnEditor")
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".vrlsanity=100");
+    await page
+      .locator('[data-test="logs-search-bar-function-dropdown"] button')
+      .filter({ hasText: "save" })
+      .click();
+    await page.locator('[data-test="saved-function-name-input"]').click();
+    await page
+      .locator('[data-test="saved-function-name-input"]')
+      .fill("VRLsanity");
+    await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
+    await expect(page.getByText("Function saved successfully")).toBeVisible();
+    await page
+      .locator('[data-test="logs-search-bar-reset-filters-btn"]')
+      .click();
+    await page
+      .locator("div")
+      .filter({ hasText: /^\.vrlsanity=100$/ })
+      .nth(3)
+      .click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page
+      .locator('[data-test="logs-search-bar-function-dropdown"]')
+      .getByLabel("Expand")
+      .click();
+    await page.getByText("VRLsanity").click();
+    await expect(page.getByText("VRLsanity function applied")).toBeVisible();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas')
+    ).toBeVisible();
+  });
+});
