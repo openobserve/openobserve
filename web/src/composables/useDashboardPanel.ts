@@ -1675,9 +1675,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.meta.stream.selectedStreamFields,
     );
 
-    const field = dashboardPanelData.meta.stream.selectedStreamFields.find(
-      (field: any) => field?.name === column,
-    );
+    const field = [
+      ...dashboardPanelData.meta.stream.selectedStreamFields,
+      ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+    ].find((field: any) => field?.name === column);
     console.log("field", field);
     return field ? field.type : null;
   };
