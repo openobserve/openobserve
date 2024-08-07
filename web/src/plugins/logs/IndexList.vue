@@ -977,11 +977,16 @@ export default defineComponent({
                 }
               }
             })
+            .catch((err: any) => {
+              fieldValues.value[name]["isLoading"] = false;
+            })
             .finally(() => {
               if (countTotal == 0) fieldValues.value[name]["isLoading"] = false;
             });
         });
       } catch (err) {
+        fieldValues.value[name]["isLoading"] = false;
+
         console.log(err);
         $q.notify({
           type: "negative",
