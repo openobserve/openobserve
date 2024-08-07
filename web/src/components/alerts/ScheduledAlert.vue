@@ -1010,9 +1010,7 @@ defineExpose({
   .monaco-editor {
     width: 500px !important;
     height: 100px !important;
-    border: 1px solid ;
-   --vscode-focusBorder: slate !important;
-
+    border: 1px solid $border-color;
   }
 
   .q-btn {
