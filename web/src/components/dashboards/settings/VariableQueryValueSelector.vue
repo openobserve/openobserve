@@ -145,6 +145,8 @@ export default defineComponent({
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (props.variableItem.options.length == 0) {
             return "(No Data Found)";
+          } else if (selectedValue.value.map((x) => x).includes("")) {
+            return "<blank>";
           } else {
             return selectedValue.value.join(", ");
           }
