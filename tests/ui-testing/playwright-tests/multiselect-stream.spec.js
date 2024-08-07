@@ -166,14 +166,16 @@ await page.waitForTimeout(1000);
         force: true,
       });
     await page
-      .locator(".q-pl-sm > .q-btn > .q-btn__content")
+      .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
       .click({ force: true });
     await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
       force: true,
     });
+    await page.waitForTimeout(1000);
     await expect(page.locator(".q-notification__message")).toContainText(
       "Live mode is enabled"
     );
+    await page.waitForTimeout(5000);
     await page
       .locator(".q-pl-sm > .q-btn > .q-btn__content")
       .click({ force: true });
