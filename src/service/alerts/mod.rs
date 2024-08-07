@@ -446,7 +446,7 @@ impl QueryCondition {
             query: config::meta::search::Query {
                 sql: sql.clone(),
                 from: 0,
-                size: 100,
+                size: std::cmp::max(100, alert.trigger_condition.threshold),
                 start_time: now
                     - Duration::try_minutes(alert.trigger_condition.period)
                         .unwrap()
@@ -473,8 +473,12 @@ impl QueryCondition {
                 .await
             {
                 Ok(v) => v,
-                Err(_) => {
-                    return Ok(None);
+                Err(e) => {
+                    if let infra::errors::Error::ErrorCode(e) = e {
+                        return Err(anyhow::anyhow!("{}", e.get_message()));
+                    } else {
+                        return Err(anyhow::anyhow!("{}", e));
+                    }
                 }
             };
         if resp.total < alert.trigger_condition.threshold as usize {
