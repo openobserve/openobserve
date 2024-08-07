@@ -1117,10 +1117,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
       start_time: new Date(
-        dashboardPanelData?.meta?.dateTime["start_time"]?.toISOString(),
+        dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
       ).getTime(),
       end_time: new Date(
-        dashboardPanelData?.meta?.dateTime["end_time"]?.toISOString(),
+        dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
       ).getTime(),
       fields: [name],
       size: 100,
@@ -1717,35 +1717,50 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return value;
   };
 
-  const formatINValue = (value: any, column: string) => {
-    if (value == null) {
-      console.log("Value is null or undefined, returning as is");
-      return value;
-    }
-    console.log("formatValue", value, column);
-    const columnType = getColumnType(column);
-    console.log("columnType", columnType);
+  const escapeSingleQuotes = (value: any) => {
+    return value.replace(/'/g, "''");
+  };
 
-    if (columnType === "Utf8") {
-      // Check if the value already has quotes
-      if (value.startsWith("'") && value.endsWith("'")) {
-        console.log("value if utf8", value);
-        return value;
-      } else {
-        console.log("value if not utf8", value);
-        return `'${value}'`;
-      }
-    } else if (columnType === "Int64") {
-      // Remove quotes if they exist
-      if (value.startsWith("'") && value.endsWith("'")) {
-        console.log("value if int64", value.substring(1, value.length - 1));
-        return value.substring(1, value.length - 1);
-      } else {
-        console.log("value if not int64", value);
-        return value;
+  const parseLine = (input: any) => {
+    if (input == null) {
+      console.log("Value is null or undefined, returning as is");
+      return input;
+    }
+    input = input.trim();
+
+    const regex = /'([^']*?)'|"([^"]*?)"|([^,()]+)/g;
+
+    const result = [];
+
+    let match;
+    while ((match = regex.exec(input)) !== null) {
+      const value = match[1] || match[2] || match[3];
+      const trimmedValue = value.trim();
+      if (trimmedValue) {
+        result.push(trimmedValue);
       }
     }
-    return value;
+
+    return result;
+  };
+
+  const formatINValue = (value: any) => {
+    console.log("formatINValue", value);
+    //if variable is present dont want to use parseLine
+    if (value?.includes("$")) {
+      // if ((${aa})) remove unnecessary ()
+      // if (${aa}) dont remove ()
+      if (value.startsWith("(") && value.endsWith(")")) {
+        return value.substring(1, value.length - 1);
+      }
+      return value;
+    } else {
+      return parseLine(value)
+        ?.map((it: any) => {
+          return `'${escapeSingleQuotes(it)}'`;
+        })
+        .join(", ");
+    }
   };
 
   const buildWhereClause = (filterData: any) => {
@@ -1786,16 +1801,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               break;
           }
         } else if (condition.operator === "IN") {
-          if (
-            condition?.value?.startsWith("(") &&
-            condition?.value?.endsWith(")")
-          ) {
-            selectFilter += `${condition.column} ${condition.operator} ${condition.value}`;
-          } else {
-            console.log("condition.value--------- IN", condition.value);
-
-            selectFilter += `${condition.column} IN (${formatINValue(condition.value, condition.column)})`;
-          }
+          selectFilter += `${condition.column} IN (${formatINValue(condition.value)})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all('${condition.value}')`;
         } else if (condition.value != null && condition.value !== "") {
