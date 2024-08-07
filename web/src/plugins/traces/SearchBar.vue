@@ -164,6 +164,7 @@ import {
   nextTick,
   defineAsyncComponent,
   onBeforeUnmount,
+  onActivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -247,6 +248,22 @@ export default defineComponent({
       await importSqlParser();
     });
 
+    onActivated(async () => {
+      await nextTick();
+      if (searchObj.data.datetime.type === "relative") {
+        dateTimeRef.value.setRelativeTime(
+          searchObj.data.datetime.relativeTimePeriod
+        );
+
+        dateTimeRef.value.refresh();
+      } else {
+        dateTimeRef.value.setAbsoluteTime(
+          searchObj.data.datetime.startTime,
+          searchObj.data.datetime.endTime
+        );
+      }
+    });
+
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
       searchObj.meta.refreshIntervalLabel = item.label;
@@ -315,6 +332,8 @@ export default defineComponent({
     };
 
     const updateDateTime = async (value: object) => {
+      if (router.currentRoute.value.name !== "traces") return;
+
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,

@@ -44,6 +44,8 @@ const organizationObj = {
   folders: [],
   organizationSettings: {
     scrape_interval: 15,
+    trace_id_field_name: "traceId",
+    span_id_field_name: "spanId",
   },
   isDataIngested: false,
 };

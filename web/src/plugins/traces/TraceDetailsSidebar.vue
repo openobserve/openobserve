@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="closeSidebar"
     ></q-btn>
   </div>
-  <div class="q-pb-sm q-pt-xs flex flex-wrap">
+  <div class="q-pb-sm q-pt-xs flex flex-wrap trace-details-toolbar-container">
     <div
       :title="span.operation_name"
       class="q-px-sm q-pb-none ellipsis non-selectable"
@@ -53,6 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-grey-7">Duration: </span>
       <span>{{ getDuration }}</span>
     </div>
+
+    <q-btn
+      class="q-mx-xs view-span-logs-btn"
+      size="10px"
+      icon="search"
+      dense
+      padding="xs sm"
+      no-caps
+      :title="t('traces.viewLogs')"
+      @click.stop="viewSpanLogs"
+    >
+      View Logs</q-btn
+    >
   </div>
   <q-tabs
     v-model="activeTab"
@@ -319,6 +332,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
+import useTraces from "@/composables/useTraces";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -328,7 +342,7 @@ export default defineComponent({
       default: () => null,
     },
   },
-  emits: ["close"],
+  emits: ["close", "view-logs"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
@@ -344,6 +358,7 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 0,
     });
+    const { buildQueryDetails, navigateToLogs } = useTraces();
 
     watch(
       () => props.span,
@@ -351,11 +366,14 @@ export default defineComponent({
         tags.value = {};
         processes.value = {};
         spanDetails.value = getFormattedSpanDetails();
-      }
+      },
+      {
+        deep: true,
+      },
     );
 
     const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration)
+      formatTimeWithSuffix(props.span.duration),
     );
 
     onBeforeMount(() => {
@@ -370,12 +388,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -397,12 +415,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -420,7 +438,7 @@ export default defineComponent({
 
     const getExceptionEvents = computed(() => {
       return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception"
+        (event: any) => event.name === "exception",
       );
     });
 
@@ -455,14 +473,14 @@ export default defineComponent({
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000
+            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
           ),
-          "MMM DD, YYYY HH:mm:ss.SSS Z"
+          "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
-      spanDetails.events = JSON.parse(props.span.events).map(
-        (event: any) => event
+      spanDetails.events = JSON.parse(props.span.events || "[]").map(
+        (event: any) => event,
       );
 
       return spanDetails;
@@ -484,6 +502,8 @@ export default defineComponent({
     watch(
       () => props.span,
       () => {
+        tags.value = {};
+        processes.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
             tags.value[key] = props.span[key];
@@ -499,7 +519,7 @@ export default defineComponent({
       {
         deep: true,
         immediate: true,
-      }
+      },
     );
     function formatStackTrace(trace: any) {
       // Split the trace into lines
@@ -519,6 +539,11 @@ export default defineComponent({
       return formattedLines.join("\n");
     }
 
+    const viewSpanLogs = () => {
+      const queryDetails = buildQueryDetails(props.span);
+      navigateToLogs(queryDetails);
+    };
+
     return {
       t,
       activeTab,
@@ -535,6 +560,7 @@ export default defineComponent({
       getExceptionEvents,
       exceptionEventColumns,
       getDuration,
+      viewSpanLogs,
     };
   },
 });
@@ -712,7 +738,7 @@ export default defineComponent({
   }
 }
 .span_details_tab-panels {
-  height: calc(100% - 102px);
+  height: calc(100% - 104px);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -736,6 +762,20 @@ export default defineComponent({
 .span_details_tab-panels {
   .q-tab-panel {
     padding: 8px 0 8px 8px;
+  }
+}
+
+.view-span-logs-btn {
+  .q-btn__content {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+
+    .q-icon {
+      margin-right: 2px !important;
+      font-size: 14px;
+      margin-bottom: 1px;
+    }
   }
 }
 </style>

@@ -54,16 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-item>
       </q-virtual-scroll>
-      <q-dialog
-        v-model="searchObj.meta.showTraceDetails"
-        position="right"
-        full-height
-        full-width
-        maximized
-        @hide="closeTraceDetails"
-      >
-        <trace-details @shareLink="shareLink" />
-      </q-dialog>
     </div>
   </div>
 </template>
@@ -77,16 +67,13 @@ import { useI18n } from "vue-i18n";
 import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
-import TraceDetails from "./TraceDetails.vue";
 import { convertTraceData } from "@/utils/traces/convertTraceData";
 import TraceBlock from "./TraceBlock.vue";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
-    TraceDetails,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue")
     ),
@@ -98,7 +85,6 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
-    "shareLink",
   ],
   methods: {
     closeColumn(col: any) {
@@ -151,7 +137,6 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
 
-    const showTraceDetails = ref(false);
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const totalHeight = ref(0);
 
@@ -180,17 +165,16 @@ export default defineComponent({
     };
 
     const expandRowDetail = (props: any) => {
-      searchObj.data.traceDetails.selectedTrace = props;
       router.push({
-        name: "traces",
+        name: "traceDetails",
         query: {
-          ...router.currentRoute.value.query,
+          stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
+          from: props.trace_start_time - 10000000,
+          to: props.trace_end_time + 10000000,
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      setTimeout(() => {
-        searchObj.meta.showTraceDetails = true;
-      }, 100);
 
       emit("get:traceDetails", props);
     };
@@ -222,7 +206,7 @@ export default defineComponent({
     };
 
     const closeTraceDetails = () => {
-      const query = cloneDeep(router.currentRoute.value.query);
+      const query = JSON.parse(JSON.stringify(router.currentRoute.value.query));
       delete query.trace_id;
       if (query.span_id) delete query.span_id;
 
@@ -242,15 +226,6 @@ export default defineComponent({
       expandRowDetail(searchObj.data.queryResults.hits[data.dataIndex]);
     };
 
-    const shareLink = () => {
-      if (!searchObj.data.traceDetails.selectedTrace) return;
-      const trace = searchObj.data.traceDetails.selectedTrace as any;
-      emit("shareLink", {
-        from: trace.trace_start_time - 60000000,
-        to: trace.trace_end_time + 60000000,
-      });
-    };
-
     return {
       t,
       store,
@@ -267,10 +242,7 @@ export default defineComponent({
       totalHeight,
       reDrawChart,
       getImageURL,
-      showTraceDetails,
-      closeTraceDetails,
       onChartClick,
-      shareLink,
     };
   },
 });

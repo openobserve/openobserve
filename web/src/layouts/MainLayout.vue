@@ -107,7 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <ThemeSwitcher></ThemeSwitcher>
-        <template v-if="config.isCloud !== 'true' && !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')">
+        <template
+          v-if="
+            config.isCloud !== 'true' &&
+            !store.state.zoConfig?.custom_hide_menus
+              ?.split(',')
+              ?.includes('openapi')
+          "
+        >
           <q-btn
             class="q-ml-xs no-border"
             size="13px"
@@ -888,6 +895,10 @@ export default defineComponent({
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
+          span_id_field_name:
+            orgSettings?.data?.data?.span_id_field_name ?? "spanId",
+          trace_id_field_name:
+            orgSettings?.data?.data?.trace_id_field_name ?? "traceId",
         });
       } catch (error) {}
       return;

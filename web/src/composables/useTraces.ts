@@ -14,7 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
-import { useLocalTraceFilterField } from "@/utils/zincutils";
+import {
+  b64EncodeStandard,
+  b64EncodeUnicode,
+  useLocalTraceFilterField,
+} from "@/utils/zincutils";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { copyToClipboard, useQuasar } from "quasar";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -69,6 +76,7 @@ const defaultObject = {
     },
     scrollInfo: {},
     serviceColors: {} as any,
+    redirectedFromLogs: false,
   },
   data: {
     query: "",
@@ -121,13 +129,18 @@ const defaultObject = {
       histogramHide: false,
     },
     traceDetails: {
-      selectedTrace: null,
+      selectedTrace: null as {
+        trace_id: string;
+        trace_start_time: number;
+        trace_end_time: number;
+      } | null,
       traceId: "",
       spanList: [],
       loading: false,
       selectedSpanId: "" as String | null,
       expandedSpans: [] as String[],
       showSpanDetails: false,
+      selectedLogStreams: [] as String[],
     },
   },
 };
@@ -135,6 +148,10 @@ const defaultObject = {
 const searchObj = reactive(Object.assign({}, defaultObject));
 
 const useTraces = () => {
+  const store = useStore();
+  const router = useRouter();
+  const $q = useQuasar();
+
   const resetSearchObj = () => {
     // delete searchObj.data;
     searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -169,7 +186,128 @@ const useTraces = () => {
     useLocalTraceFilterField(selectedFields);
   };
 
-  return { searchObj, resetSearchObj, updatedLocalLogFilterField };
+  function getUrlQueryParams(getShareLink: boolean = false) {
+    const date = searchObj.data.datetime;
+    const query: any = {};
+
+    query["stream"] = searchObj.data.stream.selectedStream.value;
+
+    if (date.type === "relative" && !getShareLink) {
+      query["period"] = date.relativeTimePeriod;
+    } else {
+      query["from"] = date.startTime;
+      query["to"] = date.endTime;
+    }
+
+    query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
+
+    query["filter_type"] = searchObj.meta.filterType;
+
+    query["org_identifier"] = store.state.selectedOrganization.identifier;
+
+    query["trace_id"] = router.currentRoute.value.query.trace_id;
+
+    if (router.currentRoute.value.query.span_id)
+      query["span_id"] = router.currentRoute.value.query.span_id;
+
+    return query;
+  }
+
+  const copyTracesUrl = (
+    customTimeRange: { from: string; to: string } | null = null,
+  ) => {
+    const queryParams = getUrlQueryParams(true);
+
+    if (customTimeRange) {
+      queryParams.from = customTimeRange.from;
+      queryParams.to = customTimeRange.to;
+    }
+
+    const queryString = Object.entries(queryParams)
+      .map(
+        ([key, value]: any) =>
+          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+      )
+      .join("&");
+
+    let shareURL = window.location.origin + window.location.pathname;
+
+    if (queryString != "") {
+      shareURL += "?" + queryString;
+    }
+
+    copyToClipboard(shareURL)
+      .then(() => {
+        $q.notify({
+          type: "positive",
+          message: "Link Copied Successfully!",
+          timeout: 5000,
+        });
+      })
+      .catch(() => {
+        $q.notify({
+          type: "negative",
+          message: "Error while copy link.",
+          timeout: 5000,
+        });
+      });
+  };
+
+  // Function to build query details for navigation
+  const buildQueryDetails = (span: any, isSpan: boolean = true) => {
+    const spanIdField =
+      store.state.organizationData?.organizationSettings?.span_id_field_name;
+    const traceIdField =
+      store.state.organizationData?.organizationSettings?.trace_id_field_name;
+    const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
+
+    let query: string = isSpan
+      ? `${spanIdField}='${span.spanId || span.span_id}' ${
+          traceId ? `AND ${traceIdField}='${traceId}'` : ""
+        }`
+      : `${traceIdField}='${traceId}'`;
+
+    if (query) query = b64EncodeStandard(query) as string;
+
+    return {
+      stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
+      from: span.startTimeMs * 1000 - 60000000,
+      to: span.endTimeMs * 1000 + 60000000,
+      refresh: 0,
+      query,
+      orgIdentifier: store.state.selectedOrganization.identifier,
+    };
+  };
+
+  // Function to navigate to logs with the provided query details
+  const navigateToLogs = (queryDetails: any) => {
+    router.push({
+      path: "/logs",
+      query: {
+        stream_type: "logs",
+        stream: queryDetails.stream,
+        from: queryDetails.from,
+        to: queryDetails.to,
+        refresh: queryDetails.refresh,
+        sql_mode: "false",
+        query: queryDetails.query,
+        org_identifier: queryDetails.orgIdentifier,
+        show_histogram: "true",
+        type: "trace_explorer",
+        quick_mode: "false",
+      },
+    });
+  };
+
+  return {
+    searchObj,
+    resetSearchObj,
+    updatedLocalLogFilterField,
+    getUrlQueryParams,
+    copyTracesUrl,
+    buildQueryDetails,
+    navigateToLogs,
+  };
 };
 
 export default useTraces;
