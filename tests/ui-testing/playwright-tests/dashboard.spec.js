@@ -269,7 +269,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -308,9 +308,8 @@ test.describe("dashboard UI testcases", () => {
       .first()
       .click();
 
-    await page.getByRole("button", { name: "7", exact: true }).click();
-
-    await page.getByRole("button", { name: "8", exact: true }).click();
+    await page.getByRole("button", { name: "7" }).last().click();
+    await page.getByRole("button", { name: "8" }).last().click();
 
     await page.locator('[data-test="dashboard-apply"]').click();
   });
@@ -405,7 +404,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -479,8 +478,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
-
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_app_kubernetes_io_component"] [data-test="dashboard-add-b-data"]'
@@ -681,7 +679,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     //  await page.locator('[data-test="field-list-item-logs-e2e_automate-_timestamp"] [data-test="dashboard-add-x-data"]').click();
     await page
@@ -750,7 +748,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -918,7 +916,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1054,7 +1052,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     // Add panel fields
     await page
@@ -1076,9 +1074,9 @@ test.describe("dashboard UI testcases", () => {
       .first()
       .click();
 
-    await page.getByRole("button", { name: "7", exact: true }).click();
+    await page.getByRole("button", { name: "7" }).last().click();
     await page.waitForTimeout(100);
-    await page.getByRole("button", { name: "10", exact: true }).click();
+    await page.getByRole("button", { name: "10" }).last().click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
@@ -1271,7 +1269,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     // Add fields to the chart
     await page
@@ -1553,7 +1551,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1605,7 +1603,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1625,8 +1623,8 @@ test.describe("dashboard UI testcases", () => {
       .first()
       .click();
 
-    await page.getByRole("button", { name: "9", exact: true }).click();
-    await page.getByRole("button", { name: "16", exact: true }).click();
+    await page.getByRole("button", { name: "9" }).last().click();
+    await page.getByRole("button", { name: "16" }).last().click();
     await page.locator('[data-test="chart-renderer"] div').click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
@@ -1662,7 +1660,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1696,8 +1694,8 @@ test.describe("dashboard UI testcases", () => {
       .first()
       .click();
 
-    await page.getByRole("button", { name: "8", exact: true }).click();
-    await page.getByRole("button", { name: "16", exact: true }).click();
+    await page.getByRole("button", { name: "8" }).last().click();
+    await page.getByRole("button", { name: "16" }).last().click();
 
     await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
@@ -1741,7 +1739,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1784,7 +1782,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1864,7 +1862,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
