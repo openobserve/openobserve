@@ -140,15 +140,13 @@ export default defineComponent({
       if (selectedValue.value || selectedValue.value == "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
-            const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");
+            const firstTwoValues = selectedValue.value.slice(0, 2).map((it: any) => it === "" ? "<blank>" : it).join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (props.variableItem.options.length == 0) {
             return "(No Data Found)";
-          } else if (selectedValue.value.map((x) => x).includes("")) {
-            return "<blank>";
           } else {
-            return selectedValue.value.join(", ");
+            return selectedValue.value.map((it: any) => it === "" ? "<blank>" : it).join(", ");
           }
         } else if (selectedValue.value == "") {
           return "<blank>";
