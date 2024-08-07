@@ -115,7 +115,7 @@ const defaultObject = {
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 250,
+      rowsPerPage: 100,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -142,6 +142,7 @@ const defaultObject = {
     missingStreamMessage: "",
     additionalErrorMsg: "",
     savedViewFilterFields: "",
+    hasSearchDataTimestampField: false,
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -811,7 +812,7 @@ const useLogs = () => {
           //replace backticks with \" for sql_mode
           query = query.replace(/`/g, '"');
           searchObj.data.queryResults.hits = [];
-          searchObj.data.queryResults.total = 0;
+
         }
 
         req.query.sql = query;
@@ -1209,7 +1210,8 @@ const useLogs = () => {
                 }
                 // });
               } else {
-                // searchObj.data.queryResults.total = res.data.records;
+                searchObj.data.queryResults.total = 0;
+                // delete searchObj.data.histogram.chartParams.title;
               
                 // generateHistogramData();
                 const partitions = res.data.partitions;
@@ -1494,7 +1496,6 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-      searchObj.data.queryResults.total = 0;
       // searchObj.data.histogram.chartParams.title = "";
       console.log("=================== Start Debug ===================");
       searchObjDebug["queryDataStartTime"] = performance.now();
@@ -2375,6 +2376,14 @@ const useLogs = () => {
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
               res.data.result_cache_ratio;
+            queryReq.query.start_time =
+              searchObj.data.queryResults.partitionDetail.paginations[
+                searchObj.data.resultGrid.currentPage - 1
+              ][0].startTime;
+            queryReq.query.end_time =
+              searchObj.data.queryResults.partitionDetail.paginations[
+                searchObj.data.resultGrid.currentPage - 1
+              ][0].endTime;
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
             // }
@@ -2819,6 +2828,7 @@ const useLogs = () => {
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
 
+            searchObj.data.hasSearchDataTimestampField = false;
             // check for user defined schema is false then only consider checking new fields from result set
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&
@@ -2851,6 +2861,9 @@ const useLogs = () => {
 
               // Object.keys(recordwithMaxAttribute).forEach((key) => {
               for (const key of Object.keys(recordwithMaxAttribute)) {
+                if(key == store.state.zoConfig.timestamp_column) {
+                  searchObj.data.hasSearchDataTimestampField = true;
+                }
                 if (
                   !schemaFields.includes(key) &&
                   !commonSchemaFields.includes(key) &&
@@ -3007,27 +3020,28 @@ const useLogs = () => {
         }
       } else {
         // searchObj.data.stream.selectedFields.forEach((field: any) => {
+          if(searchObj.data.hasSearchDataTimestampField ==true) {
+          searchObj.data.resultGrid.columns.unshift({
+            name: "@timestamp",
+            field: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS"
+              ),
+            prop: (row: any) =>
+              timestampToTimezoneDate(
+                row[store.state.zoConfig.timestamp_column] / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS"
+              ),
+            label: t("search.timestamp") + ` (${store.state.timezone})`,
+            align: "left",
+            sortable: true,
+          });
+        }
         for (const field of searchObj.data.stream.selectedFields) {
-          if (field == store.state.zoConfig.timestamp_column) {
-            searchObj.data.resultGrid.columns.unshift({
-              name: "@timestamp",
-              field: (row: any) =>
-                timestampToTimezoneDate(
-                  row[store.state.zoConfig.timestamp_column] / 1000,
-                  store.state.timezone,
-                  "yyyy-MM-dd HH:mm:ss.SSS"
-                ),
-              prop: (row: any) =>
-                timestampToTimezoneDate(
-                  row[store.state.zoConfig.timestamp_column] / 1000,
-                  store.state.timezone,
-                  "yyyy-MM-dd HH:mm:ss.SSS"
-                ),
-              label: t("search.timestamp") + ` (${store.state.timezone})`,
-              align: "left",
-              sortable: true,
-            });
-          } else {
+          if (field != store.state.zoConfig.timestamp_column) {
             searchObj.data.resultGrid.columns.push({
               name: field,
               field: (row: { [x: string]: any; source: any }) => {

@@ -142,17 +142,12 @@ test.describe("Sanity testcases", () => {
     }
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
-      )
-      .last()
-      .click({
-        force: true,
-      });
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
+      ).first().click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
       page
@@ -163,9 +158,9 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should display result text and pagination", async ({ page }) => {
-    await page.getByText("Showing 1 to 250").click();
+    await page.getByText("Showing 1 to 100").click();
     await page
-      .getByText("fast_rewind12345fast_forward250arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
       .click();
   });
 
@@ -271,7 +266,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
     await page
-      .getByText("fast_rewind12345fast_forward250arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
       .click();
   });
 
@@ -575,7 +570,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward250arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
       .click();
   });
 
@@ -599,7 +594,7 @@ test.describe("Sanity testcases", () => {
 
   test("should display pagination for schema", async ({ page }) => {
     await page
-      .getByText("fast_rewind12345fast_forward250arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
       .click();
     await page.getByText("fast_rewind1/2fast_forward").click();
     await page
@@ -622,7 +617,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward250arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
       .click();
   });
 
@@ -638,7 +633,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-1-\\@timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward250arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
       .click();
   });
 
