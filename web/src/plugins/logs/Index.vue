@@ -538,6 +538,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier &&
           searchObj.loading == false
         ) {
+          searchObj.loading = true;
           loadLogsData();
         } else if (!searchObj.loading) updateStreams();
 
@@ -568,6 +569,7 @@ export default defineComponent({
           resetSearchObj();
           resetStreamData();
           restoreUrlQueryParams();
+          searchObj.loading = true;
           loadLogsData();
         }
         if (config.isCloud == "true") {
