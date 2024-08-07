@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Math.max(
                 1,
                 searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0
+                  ?.length || 0,
               )
             "
             :input="false"
@@ -232,7 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </tr>
             <tr
               v-if="
-                searchObj.loading == false && searchObj.data.missingStreamMessage != ''
+                searchObj.loading == false &&
+                searchObj.data.missingStreamMessage != ''
               "
             >
               <td
@@ -365,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.prevent.stop="
                     copyLogToClipboard(
                       column.prop(row, column.name).toString(),
-                      false
+                      false,
                     )
                   "
                   title="Copy"
@@ -410,6 +411,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
+                @view-trace="
+                  redirectToTraces(searchObj.data.queryResults.hits[index])
+                "
               />
             </td>
           </q-tr>
@@ -444,6 +448,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
+          @view-trace="
+            redirectToTraces(
+              searchObj.data.queryResults.hits[
+                searchObj.meta.resultGrid.navigation.currentRowIndex
+              ]
+            )
+          "
         />
       </q-dialog>
     </div>
@@ -472,6 +483,7 @@ import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "SearchResult",
@@ -482,7 +494,7 @@ export default defineComponent({
     NotEqualIcon,
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
   },
@@ -515,7 +527,7 @@ export default defineComponent({
           this.searchObj.data.resultGrid.currentPage <=
           Math.round(
             this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage
+              this.searchObj.meta.resultGrid.rowsPerPage,
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
@@ -534,7 +546,7 @@ export default defineComponent({
         if (
           this.pageNumberInput >
           Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length
+            this.searchObj.data.queryResults.partitionDetail.paginations.length,
           )
         ) {
           this.$q.notify({
@@ -557,7 +569,7 @@ export default defineComponent({
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
       const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name
+        col.name,
       );
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
@@ -590,6 +602,7 @@ export default defineComponent({
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100, 250, 500];
     const disableMoreErrorDetails = ref(false);
+    const router = useRouter();
 
     const {
       searchObj,
@@ -626,7 +639,7 @@ export default defineComponent({
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams
+          searchObj.data.histogram.chartParams,
         );
         // plotChart.value.forceReLayout();
       }
@@ -653,7 +666,7 @@ export default defineComponent({
       const newIndex = getRowIndex(
         isNext,
         isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
+        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };
@@ -680,7 +693,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== fieldName
+            (v: any) => v !== fieldName,
           );
       } else {
         searchObj.data.stream.selectedFields.push(fieldName);
@@ -699,8 +712,39 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        })
+        }),
       );
+    };
+
+    const redirectToTraces = (log: any) => {
+      // 15 mins +- from the log timestamp
+      const from = log[store.state.zoConfig.timestamp_column] - 900000000;
+      const to = log[store.state.zoConfig.timestamp_column] + 900000000;
+      const refresh = 0;
+
+      const query: any = {
+        name: "traceDetails",
+        query: {
+          stream: searchObj.meta.selectedTraceStream,
+          from,
+          to,
+          refresh,
+          org_identifier: store.state.selectedOrganization.identifier,
+          trace_id:
+            log[
+              store.state.organizationData.organizationSettings
+                .trace_id_field_name
+            ],
+          reload: "true",
+        },
+      };
+
+      query["span_id"] =
+        log[
+          store.state.organizationData.organizationSettings.span_id_field_name
+        ];
+
+      router.push(query);
     };
 
     return {
@@ -734,6 +778,7 @@ export default defineComponent({
       pageNumberInput,
       refreshPartitionPagination,
       disableMoreErrorDetails,
+      redirectToTraces,
     };
   },
   computed: {
@@ -998,8 +1043,14 @@ export default defineComponent({
 <style lang="scss">
 .search-list {
   .copy-log-btn {
-    .q-btn .q-icon {
+    .q-icon {
       font-size: 12px !important;
+    }
+  }
+
+  .view-trace-btn {
+    .q-icon {
+      font-size: 13px !important;
     }
   }
 
