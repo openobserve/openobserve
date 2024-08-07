@@ -1942,6 +1942,7 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loading = true;
+                searchObj.meta.refreshHistogram = true;
                 await extractFields();
                 await getQueryData();
                 store.dispatch("setSavedViewFlag", false);
