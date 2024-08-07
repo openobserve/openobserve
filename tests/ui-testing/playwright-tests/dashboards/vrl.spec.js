@@ -204,8 +204,9 @@ test.describe(" VRL UI testcases", () => {
   test("should be able to successfully add multiple VRL functions.", async ({
     page,
   }) => {
-
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -286,23 +287,27 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
   });
 
   test("The chart should be successfully saved by adding the VRL function.", async ({
     page,
   }) => {
-
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -369,22 +374,24 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
   });
 
   test("The VRL function query should not vanish after changing from custom SQL mode to auto mode.", async ({
     page,
   }) => {
-
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -461,8 +468,9 @@ test.describe(" VRL UI testcases", () => {
   test("should display an error message when changing the VRL function if the existing VRL function is not updated or changed", async ({
     page,
   }) => {
-
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -481,7 +489,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByText("e2e_automate").click(); ///////////
 
     await page
       .locator(
@@ -571,22 +579,27 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
   });
 
   test("should display an error message if an invalid VRL function is added.", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -650,18 +663,20 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').fill("VRL");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
   });
 
   test("function should not disappear when changing the chart type.", async ({
@@ -750,8 +765,9 @@ test.describe(" VRL UI testcases", () => {
   test("should not show an error if the VRL is null on the older panel.", async ({
     page,
   }) => {
-
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -802,7 +818,6 @@ test.describe(" VRL UI testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
-
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("VRL");
     await page.locator('[data-test="dashboard-panel-save"]').click();
@@ -813,24 +828,25 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
-
-
   });
 
-  test("should display the VRL filed in table chart", async ({ page }) => {  
-
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
-
+  test("should display the VRL field in table chart", async ({ page }) => {
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -898,22 +914,27 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
   });
 
-  test("should able to select the VRL from saved Function list ", async ({   
+  test("should able to select the VRL from saved Function list ", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -982,23 +1003,27 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
-
   });
 
   test("should update the VRL function in the function editor when a different function is selected from the saved function list", async ({
     page,
-  }) => {      
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+  }) => {
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
@@ -1088,22 +1113,24 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
-  });  
+  });
 
   test("should display the VRL function field when changing the chart type", async ({
     page,
   }) => {
-
     // const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
 
     // Navigate to dashboards page
@@ -1155,7 +1182,7 @@ test.describe(" VRL UI testcases", () => {
       .locator('[data-test="dashboard-vrl-function-editor"]')
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl=100");
-      await page.waitForTimeout(1000)
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="dashboard-apply"]').click();
 
     // Set date and time range
@@ -1194,13 +1221,16 @@ test.describe(" VRL UI testcases", () => {
 
     await page.locator('[data-test="selected-chart-h-stacked-item"]').click();
 
-    await page.locator('[data-test="dashboard-y-item-kubernetes_container_name-remove"]').click();
+    await page
+      .locator(
+        '[data-test="dashboard-y-item-kubernetes_container_name-remove"]'
+      )
+      .click();
 
     await expect(
       page.locator('[data-test="dashboard-b-item-vrl"]')
     ).toBeVisible();
-     // await page.locator('[data-test="dashboard-x-item-kubernetes_container_name-remove"]').click();
-
+    // await page.locator('[data-test="dashboard-x-item-kubernetes_container_name-remove"]').click();
 
     // Verify VRL function content is correct
     const vrlFunctionContent = await page
@@ -1217,20 +1247,23 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
     await page.waitForTimeout(1000);
-  
+
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
-
   });
-    
+
   test.skip("1should display the VRL field in the table chart", async ({
     page,
   }) => {
@@ -1318,23 +1351,32 @@ test.describe(" VRL UI testcases", () => {
 
     await page.locator('[data-test="dashboard-panel-name"]').fill("VRL");
     await page.locator('[data-test="dashboard-panel-save"]').click();
-
   });
 
   test("111should not show an error when filtering data using an absolute time zone after applying a VRL function", async ({
     page,
   }) => {
-    const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
-  
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
+
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-add"]').click();
     await page.locator('[data-test="add-dashboard-name"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').fill(randomDashboardName);
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
     await page.locator('[data-test="dashboard-add-submit"]').click();
-  
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-    await page.locator("label").filter({ hasText: "Streamarrow_drop_down" }).locator("i").click();
+
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Streamarrow_drop_down" })
+      .locator("i")
+      .click();
     await page.getByText("e2e_automate").click();
     await page
       .locator(
@@ -1349,8 +1391,11 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
-  
-    await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
+
+    await page
+      .locator('[data-test="logs-search-bar-show-query-toggle-btn"] div')
+      .nth(2)
+      .click();
     await page
       .locator(
         "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
@@ -1363,42 +1408,51 @@ test.describe(" VRL UI testcases", () => {
         ".vrl,err=.kubernetes_annotations_kubectl_kubernetes_io_default_containe*.kubernetes_annotations_kubernetes_io_psp/100"
       );
     await page.waitForTimeout(1000);
-  
+
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(200);
-  
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-  
+
     await expect(page.locator('[data-test="date-time-btn"]')).toBeVisible();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-absolute-tab"]').click();
-    await page.locator("button").filter({ hasText: "chevron_left" }).first().click();
+    await page
+      .locator("button")
+      .filter({ hasText: "chevron_left" })
+      .first()
+      .click();
     await page.getByRole("button", { name: "7", exact: true }).click();
     await page.getByRole("button", { name: "8", exact: true }).click();
     await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
     await page.getByText("Asia/Dubai").click();
     await page.locator('[data-test="dashboard-apply"]').click();
-  
-    await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
+
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas')
+    ).toBeVisible();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("VRL_Dash");
     await page.locator('[data-test="dashboard-panel-save"]').click();
     await page.waitForTimeout(200);
-  
+
     await page.locator('[data-test="dashboard-back-btn"]').click();
-  
+
     // Debugging step to verify the dashboard name
     console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(`//tr[.//td[text()="${randomDashboardName}"]]`);
-    const dashboardDeleteButton = dashboardNameLocator.locator('[data-test="dashboard-delete"]');
-  
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
     await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
   });
-
-})
+});
