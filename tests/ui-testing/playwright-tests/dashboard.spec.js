@@ -269,7 +269,7 @@ test.describe("dashboard UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole('option', { name: 'e2e_automate' }).click();
 
     await page
       .locator(
@@ -308,9 +308,8 @@ test.describe("dashboard UI testcases", () => {
       .first()
       .click();
 
-    await page.getByRole("button", { name: "7", exact: true }).click();
-
-    await page.getByRole("button", { name: "8", exact: true }).click();
+    await page.getByRole("button", { name: "7" }).last().click();
+    await page.getByRole("button", { name: "8" }).last().click();
 
     await page.locator('[data-test="dashboard-apply"]').click();
   });
