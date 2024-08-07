@@ -661,7 +661,7 @@ const useLogs = () => {
 
       if (searchObj.data.stream.selectedStreamFields.length == 0) {
         const streamData: any = getStreams(
-          searchObj.data.stream.selectedStream,
+          searchObj.data.stream.streamType,
           true,
           true
         );
