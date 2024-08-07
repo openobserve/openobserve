@@ -27,38 +27,42 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
   }
   console.log("dummyQuery-------", dummyQuery);
 
-  const astOfOriginalQuery: any = parser.astify(originalQuery);
-  const astOfDummy: any = parser.astify(dummyQuery);
+  try {
+    const astOfOriginalQuery: any = parser.astify(originalQuery);
+    const astOfDummy: any = parser.astify(dummyQuery);
 
-  // if ast already has a where clause
-  if (astOfOriginalQuery.where) {
-    const newWhereClause = {
-      type: "binary_expr",
-      operator: "AND",
-      left: {
-        ...astOfOriginalQuery.where,
-        parentheses: true,
-      },
-      right: {
-        ...astOfDummy.where,
-        parentheses: true,
-      },
-    };
-    const newAst = {
-      ...astOfOriginalQuery,
-      where: newWhereClause,
-    };
-    const sql = parser.sqlify(newAst);
-    const quotedSql = sql.replace(/`/g, '"');
-    return quotedSql;
-  } else {
-    const newAst = {
-      ...astOfOriginalQuery,
-      where: astOfDummy.where,
-    };
-    const sql = parser.sqlify(newAst);
-    const quotedSql = sql.replace(/`/g, '"');
-    return quotedSql;
+    // if ast already has a where clause
+    if (astOfOriginalQuery.where) {
+      const newWhereClause = {
+        type: "binary_expr",
+        operator: "AND",
+        left: {
+          ...astOfOriginalQuery.where,
+          parentheses: true,
+        },
+        right: {
+          ...astOfDummy.where,
+          parentheses: true,
+        },
+      };
+      const newAst = {
+        ...astOfOriginalQuery,
+        where: newWhereClause,
+      };
+      const sql = parser.sqlify(newAst);
+      const quotedSql = sql.replace(/`/g, '"');
+      return quotedSql;
+    } else {
+      const newAst = {
+        ...astOfOriginalQuery,
+        where: astOfDummy.where,
+      };
+      const sql = parser.sqlify(newAst);
+      const quotedSql = sql.replace(/`/g, '"');
+      return quotedSql;
+    }
+  } catch (error: any) {
+    console.error("There was an error generating query:", error);
   }
 };
 
@@ -69,6 +73,8 @@ export const addLabelToSQlQuery = async (
   operator: any,
 ) => {
   await importSqlParser();
+
+  // const addQuotes
 
   let condition: any;
 
@@ -89,7 +95,29 @@ export const addLabelToSQlQuery = async (
       break;
     case "IN":
       operator = "IN";
-      value = "(" + value + ")";
+      // add brackets if not present in "IN" conditions
+      value =
+        value && value.startsWith("(") && value.endsWith(")")
+          ? value
+          : "(" + value + ")";
+      break;
+    case "=":
+    case "<>":
+    case "!=":
+    case "<":
+    case ">":
+    case "<=":
+    case ">=":
+      // If value starts and ends with quote, remove it
+      value =
+        value &&
+        value.length > 1 &&
+        value.startsWith("'") &&
+        value.endsWith("'")
+          ? value.substring(1, value.length - 1)
+          : value;
+      // escape single quotes by doubling them
+      value = value && value.length > 0 ? value.replace(/'/g, "''") : value;
       break;
   }
 
