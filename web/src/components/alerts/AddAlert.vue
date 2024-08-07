@@ -189,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :conditions="formData.query_condition.conditions"
                 :alertData="formData"
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                :vrlFunctionError="vrlFunctionError"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
@@ -600,6 +601,8 @@ export default defineComponent({
     const previewAlertRef: any = ref(null);
 
     let parser: any = null;
+
+    const vrlFunctionError = ref("");
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -1108,6 +1111,10 @@ export default defineComponent({
 
       query.query.sql = formData.value.query_condition.sql;
 
+      query.query.query_fn = b64EncodeUnicode(
+        formData.value.query_condition.vrl_function,
+      );
+
       validateSqlQueryPromise.value = new Promise((resolve, reject) => {
         searchService
           .search({
@@ -1115,8 +1122,14 @@ export default defineComponent({
             query,
             page_type: "logs",
           })
-          .then(() => {
+          .then((res: any) => {
             sqlQueryErrorMsg.value = "";
+
+            if (res.data.function_error) {
+              vrlFunctionError.value = res.data.function_error;
+              reject("");
+            } else vrlFunctionError.value = "";
+
             resolve("");
           })
           .catch((err: any) => {
@@ -1133,6 +1146,7 @@ export default defineComponent({
                 timeout: 3000,
               });
 
+            vrlFunctionError.value = "";
             reject("");
           });
       });
@@ -1196,6 +1210,7 @@ export default defineComponent({
       validateSqlQueryPromise,
       isValidResourceName,
       sqlQueryErrorMsg,
+      vrlFunctionError,
     };
   },
 
