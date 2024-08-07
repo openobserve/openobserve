@@ -120,16 +120,29 @@ export default defineComponent({
     };
 
     const removeGroupFromNested = (groupIndex: number) => {
-      // Recursively remove all conditions in the nested group
-      const nestedGroup = props.group.conditions[groupIndex];
-      if (nestedGroup && nestedGroup.filterType === "group") {
-        nestedGroup.conditions.forEach((condition: any, idx: number) => {
-          if (condition.filterType === "group") {
-            removeGroupFromNested(idx);
-          }
-        });
-      }
-      props.group.conditions.splice(groupIndex, 1);
+      console.log(
+        "Remove group from nested called with groupIndex:",
+        groupIndex,
+      );
+
+      const removeGroup = (conditions: any[], index: number) => {
+        const nestedGroup = conditions[index];
+        if (nestedGroup && nestedGroup.filterType === "group") {
+          console.log("Nested group found:", nestedGroup);
+          // Create a copy of the conditions array to avoid modifying it while iterating
+          const nestedConditions = [...nestedGroup.conditions];
+          nestedConditions.forEach((condition: any, idx: number) => {
+            if (condition.filterType === "group") {
+              console.log("Recursively calling removeGroup with idx:", idx);
+              removeGroup(nestedGroup.conditions, idx);
+            }
+          });
+        }
+        console.log("Removing group from conditions with index:", index);
+        conditions.splice(index, 1);
+      };
+
+      removeGroup(props.group.conditions, groupIndex);
     };
 
     const addConditionToGroup = (group: any) => {
