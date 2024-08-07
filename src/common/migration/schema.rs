@@ -18,7 +18,9 @@ use config::{meta::stream::StreamType, utils::json};
 use datafusion::arrow::datatypes::Schema;
 use infra::{
     db::{self as infra_db, NO_NEED_WATCH},
-    dist_lock, scheduler,
+    dist_lock,
+    errors::{DbError, Error},
+    scheduler,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
@@ -26,10 +28,10 @@ use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use o2_enterprise::enterprise::openfga::add_init_ofga_tuples;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
-use version_compare::Version;
 
 use crate::{
     common::{
+        infra::config::VERSION,
         meta::{
             alerts::{destinations::Destination, templates::Template, Alert},
             dashboards::reports::Report,
@@ -238,13 +240,18 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
 pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
     let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
     match need_meta_resource_name_migration().await {
-        true => {
+        Ok(true) => {
             log::info!("Starting migration of unsupported resource names");
         }
-        false => {
+        Ok(false) => {
             log::info!("Resource name migration already done");
             dist_lock::unlock(&locker).await?;
             return Ok(());
+        }
+        Err(e) => {
+            log::error!("Error when checking migration version");
+            dist_lock::unlock(&locker).await?;
+            return Err(e);
         }
     }
 
@@ -270,7 +277,7 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
     if let Err(e) = db
         .put(
             META_MIGRATION_VERSION_KEY,
-            "v0.0.1".to_string().into(),
+            VERSION.to_string().into(),
             NO_NEED_WATCH,
             None,
         )
@@ -286,16 +293,20 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn need_meta_resource_name_migration() -> bool {
+async fn need_meta_resource_name_migration() -> Result<bool, anyhow::Error> {
     let db = infra_db::get_db().await;
     match db.get(META_MIGRATION_VERSION_KEY).await {
-        std::result::Result::Ok(val) => {
-            let val_str = std::str::from_utf8(&val).unwrap();
-            let old_meta_migration_ver =
-                Version::from(val_str).unwrap_or(Version::from("v0.0.0").unwrap());
-            old_meta_migration_ver < Version::from("v0.0.1").unwrap()
+        std::result::Result::Ok(_val) => {
+            // Key is present meaning the migration is done
+            Ok(false)
         }
-        Err(_) => true,
+        Err(e) => {
+            if let Error::DbError(DbError::KeyNotExists(_)) = e {
+                Ok(true)
+            } else {
+                Err(anyhow::anyhow!("Error checking migration version: {e}"))
+            }
+        }
     }
 }
 
