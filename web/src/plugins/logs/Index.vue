@@ -1202,9 +1202,15 @@ export default defineComponent({
           // this.handleRunQuery();
           this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
             (res: any) => {
-              this.searchResultRef.reDrawChart();
-            }
-          );
+              this.searchObj.loadingHistogram = true; 
+                 this.refreshTimezone();
+                 this.searchResultRef.reDrawChart();
+              this.searchObj.loadingHistogram = false;         
+
+            }          
+            ).catch((err: any) => {
+            console.log(err,"err in updating chart");
+          })
         }
       }
       this.updateUrlQueryParams();
