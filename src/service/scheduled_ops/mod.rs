@@ -192,7 +192,8 @@ impl QueryCondition {
             regions: vec![],
             clusters: vec![],
             timeout: 0,
-            search_type: Some(SearchEventType::Alerts),
+            search_type: Some(SearchEventType::Alerts), /* TODO(taiming): both alerts and
+                                                         * derived_stream */
         };
         let trace_id = ider::uuid();
         let resp = match SearchService::search(

@@ -175,7 +175,7 @@ use crate::{common::meta, handler::http::request};
             meta::scheduled_ops::AggFunction,
             meta::scheduled_ops::QueryType,
             meta::scheduled_ops::TriggerCondition,
-            meta::scheduled_ops::AlertFrequencyType,
+            meta::scheduled_ops::FrequencyType,
             meta::scheduled_ops::QueryCondition,
             meta::scheduled_ops::destinations::Destination,
             meta::scheduled_ops::destinations::DestinationWithTemplate,

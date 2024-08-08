@@ -31,7 +31,7 @@ use crate::{
         meta::{
             authz::Authz,
             scheduled_ops::{
-                derived_streams::DerivedStreamMeta, AlertFrequencyType, Operator, QueryType,
+                derived_streams::DerivedStreamMeta, FrequencyType, Operator, QueryType,
             },
             stream::StreamParams,
         },
@@ -116,7 +116,7 @@ pub async fn save(
     // End input validation
 
     // 2. update the frequency
-    if derived_stream.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+    if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
         // Check the cron expression
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
@@ -143,8 +143,10 @@ pub async fn save(
         org: derived_stream.source.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
         module_key: derived_stream.get_schedule_key(pipeline_name),
-        next_run_at: chrono::Utc::now().timestamp_micros(),
-        is_realtime: derived_stream.is_real_time,
+        next_run_at: chrono::Utc::now().timestamp_micros(), /* TODO(taiming): change this to the
+                                                             * future */
+        is_realtime: derived_stream.is_real_time, /* TODO(taiming): maybe default this to false
+                                                   * for now */
         is_silenced: false,
         ..Default::default()
     };

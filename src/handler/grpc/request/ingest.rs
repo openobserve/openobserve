@@ -15,15 +15,10 @@
 
 use async_trait::async_trait;
 use config::utils::json;
-use proto::cluster_rpc::{
-    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType, StreamType,
-};
+use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
 use tonic::{Request, Response, Status};
 
-use crate::{
-    common::meta::ingestion::IngestionRequest as LogIngestionReuqest,
-    service::ingestion::create_log_ingestion_req,
-};
+use crate::service::ingestion::create_log_ingestion_req;
 
 #[derive(Debug, Default)]
 pub struct InternalIngestServer;
@@ -45,14 +40,9 @@ impl Ingest for InternalIngestServer {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = actix_web::web::Bytes::from(in_data.data);
                 let ingestion_req = create_log_ingestion_req(log_ingestion_type, &data);
-                _ = crate::service::logs::ingest::ingest(
-                    &org_id,
-                    &stream_name,
-                    ingestion_req,
-                    "",
-                    None,
-                )
-                .await;
+                crate::service::logs::ingest::ingest(&org_id, &stream_name, ingestion_req, "", None)
+                    .await
+                    .map_or_else(|e| Err(e), |_| Ok(()))
             }
             Ok(StreamType::EnrichmentTables) => {
                 let json_records: Vec<json::Map<String, json::Value>> =
@@ -61,38 +51,43 @@ impl Ingest for InternalIngestServer {
                             json::from_slice(&in_data.data).unwrap();
                         vec![json_records]
                     });
-                _ = crate::service::enrichment_table::save_enrichment_data(
+                crate::service::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,
                     true,
                 )
-                .await?;
+                .await
+                .map_or_else(
+                    |e| {
+                        Err(anyhow::anyhow!(
+                            "Internal gPRC ingestion service errors saving enrichment data: {}",
+                            e.to_string()
+                        ))
+                    },
+                    |_| Ok(()),
+                )
             }
-            _ => todo!("Future enhancement"),
+            _ => Err(anyhow::anyhow!(
+                "Internal gPRC ingestion service currently only supports Logs and EnrichmentTables",
+            )),
         };
 
-        let reply = IngestionResponse {
-            status_code: 200,
-            message: "OK".to_string(),
-        };
-        Ok(Response::new(reply))
-
-        // match resp {
-        //     Ok(_) => {
-        //         let reply = IngestionResponse {
-        //             status_code: 200,
-        //             message: "OK".to_string(),
-        //         };
-        //         Ok(Response::new(reply))
-        //     }
-        //     Err(err) => {
-        //         let reply = IngestionResponse {
-        //             status_code: 500,
-        //             message: err.to_string(),
-        //         };
-        //         Ok(Response::new(reply))
-        //     }
-        // }
+        match resp {
+            Ok(_) => {
+                let reply = IngestionResponse {
+                    status_code: 200,
+                    message: "OK".to_string(),
+                };
+                Ok(Response::new(reply))
+            }
+            Err(err) => {
+                let reply = IngestionResponse {
+                    status_code: 500,
+                    message: err.to_string(),
+                };
+                Ok(Response::new(reply))
+            }
+        }
     }
 }

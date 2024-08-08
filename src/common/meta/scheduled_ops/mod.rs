@@ -34,13 +34,13 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub cron: String, // Cron Expression
     #[serde(default)]
-    pub frequency_type: AlertFrequencyType,
+    pub frequency_type: FrequencyType,
     #[serde(default)]
     pub silence: i64, // silence for 10 minutes after fire an alert
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
-pub enum AlertFrequencyType {
+pub enum FrequencyType {
     #[serde(rename = "cron")]
     Cron,
     #[serde(rename = "minutes")]

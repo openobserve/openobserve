@@ -28,7 +28,7 @@ use cron::Schedule;
 use futures::future::try_join_all;
 
 use crate::{
-    common::meta::{dashboards::reports::ReportFrequencyType, scheduled_ops::AlertFrequencyType},
+    common::meta::{dashboards::reports::ReportFrequencyType, scheduled_ops::FrequencyType},
     service::{db, usage::publish_triggers_usage},
 };
 
@@ -163,7 +163,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 .unwrap();
         }
         new_trigger.is_silenced = true;
-    } else if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+    } else if alert.trigger_condition.frequency_type == FrequencyType::Cron {
         let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
         // tz_offset is in minutes
         let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
@@ -488,6 +488,16 @@ async fn handle_derived_stream_triggers(
             .unwrap();
         new_trigger.is_silenced = true;
     }
+    // else if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+    //     let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+    //     // tz_offset is in minutes
+    //     let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
+    //     new_trigger.next_run_at = schedule
+    //         .upcoming(tz_offset)
+    //         .next()
+    //         .unwrap()
+    //         .timestamp_micros();
+    // }
 
     // QUESTION(taiming): is it necessary to create another gPRC service for this ingestion
     // or use service/logs/ingest.rs::ingest directly?
