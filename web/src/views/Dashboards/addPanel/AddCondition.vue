@@ -220,7 +220,11 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
 
     const computedLabel = (condition: any) => {
-      return props.condition.column;
+      if (condition.operator === "match_all") {
+        return condition.operator + "("  + condition.value + ")";
+      } else {
+        return props.condition.column;
+      }
     };
 
     const emitLogicalOperatorChange = (newOperator: string) => {
