@@ -996,6 +996,8 @@ pub struct Compact {
         help = "Clean the jobs which are finished more than this time"
     )]
     pub job_clean_wait_time: i64,
+    #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
+    pub pending_jobs_metric_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1137,16 +1139,16 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_REPLICAS",
         default = 3,
-        help = "the copies of a given message to store in the NATS cluster. 
-        Can not be modified after bucket is initialized. 
+        help = "the copies of a given message to store in the NATS cluster.
+        Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
     )]
     pub replicas: usize,
     #[env_config(
         name = "ZO_NATS_HISTORY",
         default = 3,
-        help = "in the context of KV to configure how many historical entries to keep for a given bucket. 
-        Can not be modified after bucket is initialized. 
+        help = "in the context of KV to configure how many historical entries to keep for a given bucket.
+        Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
     )]
     pub history: i64,
@@ -1423,6 +1425,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 60;
+    }
+    if cfg.compact.pending_jobs_metric_interval == 0 {
+        cfg.compact.pending_jobs_metric_interval = 300;
     }
     // check compact_step_secs, min value is 600s
     if cfg.compact.step_secs == 0 {

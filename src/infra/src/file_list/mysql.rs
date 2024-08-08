@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap as stdHashMap;
+
 use async_trait::async_trait;
 use config::{
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
@@ -287,8 +289,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
-    FORCE INDEX (file_list_stream_ts_idx) 
+    FROM file_list
+    FORCE INDEX (file_list_stream_ts_idx)
     WHERE stream = ? AND flattened = ? LIMIT 1000;
                 "#,
             )
@@ -301,8 +303,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
-    FORCE INDEX (file_list_stream_ts_idx) 
+    FROM file_list
+    FORCE INDEX (file_list_stream_ts_idx)
     WHERE stream = ? AND max_ts >= ? AND min_ts <= ?;
                 "#,
             )
@@ -400,9 +402,9 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         };
         let sql = format!(
             r#"
-SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num, 
+SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num,
     CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size
-    FROM file_list 
+    FROM file_list
     WHERE {field} = '{value}'
             "#,
         );
@@ -491,7 +493,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
             if let Err(e) = sqlx::query(
                 r#"
-INSERT INTO stream_stats 
+INSERT INTO stream_stats
     (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
     VALUES (?, ?, 0, 0, 0, 0, 0, 0);
                 "#,
@@ -516,7 +518,7 @@ INSERT INTO stream_stats
         for (stream_key, stats) in update_streams {
             if let Err(e) = sqlx::query(
                 r#"
-UPDATE stream_stats 
+UPDATE stream_stats
     SET file_num = ?, min_ts = ?, max_ts = ?, records = ?, original_size = ?, compressed_size = ?
     WHERE stream = ?;
                 "#,
@@ -663,10 +665,10 @@ UPDATE stream_stats
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
 SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
-    FROM file_list_jobs 
-    WHERE status = ? 
-    GROUP BY stream 
-    ORDER BY num DESC 
+    FROM file_list_jobs
+    WHERE status = ?
+    GROUP BY stream
+    ORDER BY num DESC
     LIMIT ?;"#,
         )
         .bind(super::FileListJobStatus::Pending)
@@ -828,6 +830,45 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             log::warn!("[MYSQL] clean done jobs");
         }
         Ok(())
+    }
+
+    async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
+        let pool = CLIENT.clone();
+
+        let ret =
+            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs GROUP BY stream, status ORDER BY status desc;"#)
+                .fetch_all(&pool)
+                .await?;
+
+        let mut job_status: stdHashMap<String, stdHashMap<String, i64>> = stdHashMap::new();
+
+        for r in ret.iter() {
+            let stream = r.get::<String, &str>("stream");
+            let status = r.get::<i32, &str>("status");
+            let mut counts = r.get::<i64, &str>("counts");
+            let parts: Vec<&str> = stream.split('/').collect();
+            let mut stream_type = "";
+            let mut org = "";
+            if parts.len() >= 2 {
+                org = parts[0];
+                stream_type = parts[1];
+            }
+
+            if status != 0 {
+                counts = 0;
+            }
+
+            job_status
+                .entry(org.to_string())
+                .and_modify(|inner_map| {
+                    inner_map
+                        .entry(stream_type.to_string())
+                        .and_modify(|e| *e = counts)
+                        .or_insert(counts);
+                })
+                .or_insert(stdHashMap::from([(stream_type.to_string(), counts)]));
+        }
+        Ok(job_status)
     }
 }
 
