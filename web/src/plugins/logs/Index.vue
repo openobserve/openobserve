@@ -1189,6 +1189,7 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
+
       if (
         this.searchObj.meta.showHistogram &&
         !this.searchObj.shouldIgnoreWatcher
@@ -1200,19 +1201,24 @@ export default defineComponent({
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
           // this.handleRunQuery();
+          this.searchObj.loadingHistogram = true;
+
           this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
             (res: any) => {
-              this.searchObj.loadingHistogram = true; 
+
                  this.refreshTimezone();
                  this.searchResultRef.reDrawChart();
-              this.searchObj.loadingHistogram = false;         
 
             }          
             ).catch((err: any) => {
             console.log(err,"err in updating chart");
+          }).finally(() => {
+            this.searchObj.loadingHistogram = false;
+
           })
         }
       }
+
       this.updateUrlQueryParams();
     },
     moveSplitter() {
