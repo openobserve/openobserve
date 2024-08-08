@@ -49,7 +49,7 @@ impl Ingest for InternalIngestServer {
                         None,
                     )
                     .await
-                    .map_or_else(|e| Err(e), |_| Ok(())),
+                    .map_or_else(Err, |_| Ok(())),
                 }
             }
             Ok(StreamType::EnrichmentTables) => {

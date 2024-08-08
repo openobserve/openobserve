@@ -60,10 +60,7 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    format!(
-                        "Failed to save DerivedStream details error: {}",
-                        e.to_string()
-                    ),
+                    format!("Failed to save DerivedStream details error: {}", e),
                 )));
             }
         }
@@ -118,10 +115,7 @@ pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Err
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    format!(
-                        "Failed to update DerivedStream details with error {}",
-                        e.to_string()
-                    ),
+                    format!("Failed to update DerivedStream details with error {}", e),
                 )));
             }
         }
@@ -180,7 +174,7 @@ pub async fn delete_pipeline(
     pipeline_name: &str,
     source: StreamParams,
 ) -> Result<HttpResponse, Error> {
-    let existing_pipeline = match check_existing_pipeline(&pipeline_name, &source).await {
+    let existing_pipeline = match check_existing_pipeline(pipeline_name, &source).await {
         Some(pipeline) => pipeline,
         None => {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(

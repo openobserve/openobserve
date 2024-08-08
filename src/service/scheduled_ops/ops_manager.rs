@@ -539,7 +539,7 @@ async fn handle_derived_stream_triggers(
     if let Some(data) = ret {
         let local_val = data
             .into_iter()
-            .map(|map| json::Value::Object(map))
+            .map(json::Value::Object)
             .collect::<Vec<_>>();
         // Ingest result into destination stream
         let (org_id, stream_name, stream_type): (String, String, i32) = {

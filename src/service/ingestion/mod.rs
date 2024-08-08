@@ -578,9 +578,9 @@ pub async fn get_user_defined_schema(
     }
 }
 
-pub fn create_log_ingestion_req<'a>(
+pub fn create_log_ingestion_req(
     ingestion_type: i32,
-    data: &'a actix_web::web::Bytes,
+    data: &actix_web::web::Bytes,
 ) -> Result<IngestionRequest> {
     match IngestionType::try_from(ingestion_type) {
         Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),
