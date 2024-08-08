@@ -642,7 +642,7 @@ export default defineComponent({
 
     const pagination = ref({
       page: 1,
-      rowsPerPage: 10000,
+      rowsPerPage: 250,
     });
 
     // custom query fields length
