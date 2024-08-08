@@ -34,9 +34,22 @@ use crate::common::{
     },
 };
 
-pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[:#?\s]+").unwrap());
+pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[:#?\s%&]+").unwrap());
+static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
+    let char_pattern = r"[^a-zA-Z0-9:#?&%\s]";
+    let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
+    Regex::new(&pattern).unwrap()
+});
 
 pub fn into_ofga_supported_format(name: &str) -> String {
+    // remove spaces around special characters
+    let result = RE_OFGA_UNSUPPORTED_NAME.replace_all(name, |caps: &regex::Captures| {
+        caps.iter()
+            .find_map(|m| m)
+            .map(|m| m.as_str().trim())
+            .unwrap_or("")
+            .to_string()
+    });
     RE_OFGA_UNSUPPORTED_NAME.replace_all(name, "_").to_string()
 }
 
