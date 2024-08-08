@@ -1693,28 +1693,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const columnType = getColumnType(column);
     console.log("columnType", columnType);
 
-    if (columnType === "Utf8") {
-      // Escape single quotes by doubling them
-      const escapedValue = value.replace(/'/g, "''");
-      // Check if the value already has quotes
-      if (value.startsWith("'") && value.endsWith("'")) {
-        console.log("value if utf8", value);
-        return value;
-      } else {
-        console.log("value if not utf8", escapedValue);
-        return `'${escapedValue}'`;
-      }
-    } else if (columnType === "Int64") {
-      // Remove quotes if they exist
-      if (value.startsWith("'") && value.endsWith("'")) {
-        console.log("value if int64", value.substring(1, value.length - 1));
-        return value.substring(1, value.length - 1);
-      } else {
-        console.log("value if not int64", value);
-        return value;
-      }
+    let tempValue = value
+    if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
+      console.log("value if utf8", value);
+      tempValue = value.substring(1, value.length - 1)
     }
-    return value;
+    tempValue = escapeSingleQuotes(tempValue);
+    tempValue = `'${tempValue}'`;
+    return tempValue;
   };
 
   const escapeSingleQuotes = (value: any) => {
