@@ -1382,7 +1382,9 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="dashboard-b-item-kubernetes_container_hash-remove"]'
       )
       .click();
-    await expect(page.getByText("Chart configuration has been")).toBeVisible();
+    await expect(
+      page.getByText("Chart Configuration / Variables has been updated")
+    ).toBeVisible();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
 
