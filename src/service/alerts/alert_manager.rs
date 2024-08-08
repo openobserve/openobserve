@@ -141,10 +141,23 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         );
     }
     if ret.is_some() && alert.trigger_condition.silence > 0 {
-        new_trigger.next_run_at += Duration::try_minutes(alert.trigger_condition.silence)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+        if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+            let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
+            let silence =
+                Utc::now() + Duration::try_minutes(alert.trigger_condition.silence).unwrap();
+            let silence = silence.with_timezone(
+                FixedOffset::east_opt(alert.tz_offset * 60)
+                    .as_ref()
+                    .unwrap(),
+            );
+            // Check for the cron timestamp after the silence period
+            new_trigger.next_run_at = schedule.after(&silence).next().unwrap().timestamp_micros();
+        } else {
+            new_trigger.next_run_at += Duration::try_minutes(alert.trigger_condition.silence)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        }
         new_trigger.is_silenced = true;
     } else if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
         let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
