@@ -1693,10 +1693,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const columnType = getColumnType(column);
     console.log("columnType", columnType);
 
-    let tempValue = value
+    let tempValue = value;
     if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
       console.log("value if utf8", value);
-      tempValue = value.substring(1, value.length - 1)
+      tempValue = value.substring(1, value.length - 1);
     }
     tempValue = escapeSingleQuotes(tempValue);
     tempValue = `'${tempValue}'`;
@@ -1789,7 +1789,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         } else if (condition.operator === "IN") {
           selectFilter += `${condition.column} IN (${formatINValue(condition.value)})`;
         } else if (condition.operator === "match_all") {
-          selectFilter += `match_all('${condition.value}')`;
+          selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
         } else if (condition.value != null && condition.value !== "") {
           console.log("condition.value---------", condition.value);
 
