@@ -58,10 +58,7 @@ use super::{
     udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::{
-        plan::{get_final_plan, get_without_dist_plan, UpdateOffsetExec},
-        ExtLimit,
-    },
+    datafusion::{plan::UpdateOffsetExec, ExtLimit},
     sql::{Sql, RE_SELECT_WILDCARD},
 };
 
@@ -154,38 +151,38 @@ async fn exec_query(
     }
 
     let plan = ctx.state().create_logical_plan(sql).await?;
-    println!("+---------------------------+----------+");
-    println!("logic plan");
-    println!("+---------------------------+----------+");
-    println!("{:?}", plan);
+    if cfg.common.print_key_sql {
+        println!("+---------------------------+----------+");
+        println!("logic plan");
+        println!("+---------------------------+----------+");
+        println!("{:?}", plan);
+    }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-        .set_show_schema(false)
-        .indent(true)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("physical plan");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
+            .set_show_schema(false)
+            .indent(true)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("physical plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
 
     let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
         Some(plan) => plan,
-        None => {
-            if physical_plan.name() == "ProjectionExec" {
-                (*physical_plan.children().first().unwrap()).clone()
-            } else {
-                physical_plan.clone()
-            }
-        }
+        None => super::plan::get_empty_partial_plan(&physical_plan),
     };
-    let plan = datafusion::physical_plan::displayable(partial_paln.as_ref())
-        .set_show_schema(false)
-        .indent(false)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("partial plan");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(partial_paln.as_ref())
+            .set_show_schema(false)
+            .indent(false)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("partial plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
 
     let data = match collect_partitioned(partial_paln, ctx.task_ctx()).await {
         Ok(v) => v,
@@ -250,42 +247,51 @@ pub async fn merge_partitions(
     ctx.register_table("tbl", memtable)?;
 
     let plan = ctx.state().create_logical_plan(sql).await?;
-    let plan = ctx.state().optimize(&plan)?;
-    println!("+---------------------------+----------+");
-    println!("logic plan");
-    println!("+---------------------------+----------+");
-    println!("{:?}", plan);
+    if cfg.common.print_key_sql {
+        println!("+---------------------------+----------+");
+        println!("logic plan");
+        println!("+---------------------------+----------+");
+        println!("{:?}", plan);
+    }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-        .set_show_schema(false)
-        .indent(true)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("physical plan");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
+            .set_show_schema(false)
+            .indent(true)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("physical plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
 
-    let final_plan = match get_final_plan(&physical_plan, &batches) {
+    let final_plan = match super::plan::get_final_plan(&physical_plan, &batches) {
         Ok((Some(plan), v)) => {
             if v {
                 plan
             } else {
-                get_without_dist_plan(&plan, &batches, ctx.state().config().batch_size())
+                super::plan::get_empty_final_plan(
+                    &plan,
+                    &batches,
+                    ctx.state().config().batch_size(),
+                )
             }
         }
         _ => physical_plan.clone(),
     };
     let mut update_offset_rewriter = UpdateOffsetExec::new(offset as usize, limit as usize);
     let final_plan = final_plan.rewrite(&mut update_offset_rewriter)?.data;
-    let plan = datafusion::physical_plan::displayable(final_plan.as_ref())
-        .set_show_schema(false)
-        .indent(true)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("final plan");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
-    println!("+---------------------------+----------+");
+    if cfg.common.print_key_sql {
+        let plan = datafusion::physical_plan::displayable(final_plan.as_ref())
+            .set_show_schema(false)
+            .indent(true)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("final plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+        println!("+---------------------------+----------+");
+    }
     let data = collect(final_plan, ctx.task_ctx()).await?;
     Ok(data)
 }

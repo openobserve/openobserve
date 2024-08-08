@@ -205,9 +205,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Your chart is not up to date
                         </div>
                         <div>
-                          Chart configuration has been updated, but the chart
-                          was not updated automatically. Click on the "Apply"
-                          button to run the query again
+                          Chart Configuration / Variables  has been updated, but
+                          the chart was not updated automatically. Click on the
+                          "Apply" button to run the query again
                         </div>
                       </div>
 
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="variablesData"
+                          :variablesData="updatedVariablesData"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
-                    :variablesData="variablesData"
+                    :variablesData="updatedVariablesData"
                   />
                 </PanelSidebar>
               </div>
@@ -400,6 +400,10 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+
+    // used to provide values to chart only when apply is clicked (same as chart data)
+    let updatedVariablesData: any = reactive({});
+
     const metaData = ref(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
@@ -562,8 +566,11 @@ export default defineComponent({
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
       if (isInitailDashboardPanelData() && !editMode.value) return false;
-      //compare chartdata and dashboardpaneldata
-      return !isEqual(chartData.value, dashboardPanelData.data);
+      //compare chartdata and dashboardpaneldata and variables data as well
+      return (
+        !isEqual(chartData.value, dashboardPanelData.data) ||
+        !isEqual(variablesData, updatedVariablesData) 
+      );
     });
 
     watch(isOutDated, () => {
@@ -618,6 +625,10 @@ export default defineComponent({
       if (!isValid(true)) {
         return;
       }
+
+      // Also update variables data
+      Object.assign(updatedVariablesData, JSON.parse(JSON.stringify(variablesData)));
+
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       // refresh the date time based on current time if relative date is selected
@@ -1039,6 +1050,7 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      updatedVariablesData,
       savePanelData,
       resetAggregationFunction,
       isOutDated,

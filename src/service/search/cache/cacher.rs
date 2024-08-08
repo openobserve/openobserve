@@ -426,7 +426,7 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-fn get_ts_col(
+pub fn get_ts_col(
     parsed_sql: &config::meta::sql::Sql,
     ts_col: &str,
     is_aggregate: bool,
