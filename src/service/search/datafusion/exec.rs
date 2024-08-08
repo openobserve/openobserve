@@ -58,10 +58,7 @@ use super::{
     udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::{
-        plan::{get_final_plan, get_without_dist_plan, UpdateOffsetExec},
-        ExtLimit,
-    },
+    datafusion::{plan::UpdateOffsetExec, ExtLimit},
     sql::{Sql, RE_SELECT_WILDCARD},
 };
 
@@ -170,13 +167,7 @@ async fn exec_query(
 
     let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
         Some(plan) => plan,
-        None => {
-            if physical_plan.name() == "ProjectionExec" {
-                (*physical_plan.children().first().unwrap()).clone()
-            } else {
-                physical_plan.clone()
-            }
-        }
+        None => super::plan::get_empty_partial_plan(&physical_plan),
     };
     let plan = datafusion::physical_plan::displayable(partial_paln.as_ref())
         .set_show_schema(false)
@@ -265,12 +256,16 @@ pub async fn merge_partitions(
     println!("+---------------------------+----------+");
     println!("{}", plan);
 
-    let final_plan = match get_final_plan(&physical_plan, &batches) {
+    let final_plan = match super::plan::get_final_plan(&physical_plan, &batches) {
         Ok((Some(plan), v)) => {
             if v {
                 plan
             } else {
-                get_without_dist_plan(&plan, &batches, ctx.state().config().batch_size())
+                super::plan::get_empty_final_plan(
+                    &plan,
+                    &batches,
+                    ctx.state().config().batch_size(),
+                )
             }
         }
         _ => physical_plan.clone(),
