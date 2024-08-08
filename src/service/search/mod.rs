@@ -16,6 +16,7 @@
 use std::{cmp::max, collections::HashSet, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
+use cache::cacher::get_ts_col;
 use chrono::Duration;
 use config::{
     get_config, ider,
@@ -273,12 +274,11 @@ pub async fn search_partition(
         partitions: vec![],
     };
 
-    // if is aggregate query, return single partitions
-    if let Ok(v) = is_aggregate_query(&req.sql) {
-        if v {
-            resp.partitions.push([req.start_time, req.end_time]);
-            return Ok(resp);
-        }
+    // if there is no _timestamp field in the query, return single partitions
+    let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
+    if get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate).is_none() {
+        resp.partitions.push([req.start_time, req.end_time]);
+        return Ok(resp);
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
