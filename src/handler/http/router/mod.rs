@@ -146,7 +146,7 @@ async fn check_keepalive(
     let mut resp = next.call(req).await?;
     if resp.status() != StatusCode::OK {
         resp.headers_mut().insert(
-            header::HeaderName::from_static("Connection"),
+            header::HeaderName::from_static("connection"),
             header::HeaderValue::from_static("close"),
         );
     }
