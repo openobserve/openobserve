@@ -642,7 +642,7 @@ export default defineComponent({
 
     const pagination = ref({
       page: 1,
-      rowsPerPage: 10000,
+      rowsPerPage: 250,
     });
 
     // custom query fields length
@@ -678,6 +678,7 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
@@ -917,16 +918,16 @@ export default defineComponent({
 
         for (
           let i = 0;
-          i < dashboardPanelData.meta.stream.selectedStreamFields.length;
+          i < selectedStreamFieldsBasedOnUserDefinedSchema.value.length;
           i++
         ) {
           if (
-            dashboardPanelData.meta.stream.selectedStreamFields[i]["name"]
+            selectedStreamFieldsBasedOnUserDefinedSchema.value[i]["name"]
               .toLowerCase()
               .includes(terms)
           ) {
             filtered.push(
-              dashboardPanelData.meta.stream.selectedStreamFields[i],
+              selectedStreamFieldsBasedOnUserDefinedSchema.value[i],
             );
           }
         }
