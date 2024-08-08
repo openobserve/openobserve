@@ -381,7 +381,7 @@ pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "compact_pending_jobs",
-            "Compactor pending jobs count. ".to_owned() + HELP_SUFFIX,
+            "Compactor pending jobs count. Please include 'organization and 'stream type' labels for this metric.".to_owned(),
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
