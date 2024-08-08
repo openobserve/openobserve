@@ -9,7 +9,7 @@
     @update:model-value="emitLogicalOperatorChange"
     class="condition-logical-operator"
   />
-  <div class="group" :style="`--group-index: ${groupIndex}`">
+  <div class="group" :style="`--group-index: ${groupNestedIndex}`">
     <div class="group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
@@ -19,7 +19,8 @@
         <Group
           v-if="condition.filterType === 'group'"
           :group="condition"
-          :group-index="groupIndex + 1"
+          :group-nested-index="groupNestedIndex + 1"
+          :group-index="index"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
@@ -54,7 +55,7 @@
         </q-menu>
       </q-btn>
     </div>
-    <div v-if="groupIndex !== 0" class="group-remove">
+    <div v-if="groupNestedIndex !== 0" class="group-remove">
       <q-btn flat size="xs" dense @click="$emit('remove-group')" icon="close" />
     </div>
   </div>
@@ -73,7 +74,13 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    // For identifying the index of that group in the current conditions array
     groupIndex: {
+      type: Number,
+      required: true,
+    },
+    // For identifying the index of the nested position of that group
+    groupNestedIndex: {
       type: Number,
       required: true,
     },
@@ -175,7 +182,7 @@ export default defineComponent({
 .group {
   display: flex;
   padding: 0px 0px 0px 5px;
-  background-color: rgba(89, 96, 178, calc(0.2 * var(--group-index)));
+  background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));
   border-radius: 5px;
 }
 

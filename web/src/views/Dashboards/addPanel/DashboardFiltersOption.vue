@@ -20,6 +20,7 @@
         <Group
           v-if="topLevelGroup"
           :group="topLevelGroup"
+          :group-nested-index="0"
           :group-index="0"
           :schema-options="schemaOptions"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems(0)"
