@@ -127,25 +127,17 @@ export default defineComponent({
     };
 
     const removeGroupFromNested = (groupIndex: number) => {
-      console.log(
-        "Remove group from nested called with groupIndex:",
-        groupIndex,
-      );
-
       const removeGroup = (conditions: any[], index: number) => {
         const nestedGroup = conditions[index];
         if (nestedGroup && nestedGroup.filterType === "group") {
-          console.log("Nested group found:", nestedGroup);
           // Create a copy of the conditions array to avoid modifying it while iterating
           const nestedConditions = [...nestedGroup.conditions];
           nestedConditions.forEach((condition: any, idx: number) => {
             if (condition.filterType === "group") {
-              console.log("Recursively calling removeGroup with idx:", idx);
               removeGroup(nestedGroup.conditions, idx);
             }
           });
         }
-        console.log("Removing group from conditions with index:", index);
         conditions.splice(index, 1);
       };
 

@@ -1066,12 +1066,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (!dashboardPanelData.meta.filterValue) {
       dashboardPanelData.meta.filterValue = [];
     }
-    console.log(
-      "filterValue",
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter,
-    );
 
     try {
       const res = await StreamService.fieldValues({
@@ -1670,14 +1664,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const formatValue = (value: any) => {
     if (value == null) {
-      console.log("Value is null or undefined, returning as is");
       return value;
     }
-    console.log("formatValue", value);
 
     let tempValue = value;
     if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
-      console.log("value if utf8", value);
       tempValue = value.substring(1, value.length - 1);
     }
     tempValue = escapeSingleQuotes(tempValue);
@@ -1691,7 +1682,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const parseLine = (input: any) => {
     if (input == null) {
-      console.log("Value is null or undefined, returning as is");
       return input;
     }
     input = input.trim();
@@ -1713,7 +1703,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const formatINValue = (value: any) => {
-    console.log("formatINValue", value);
     //if variable is present dont want to use parseLine
     if (value?.includes("$")) {
       // if ((${aa})) remove unnecessary ()
@@ -1733,8 +1722,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const buildWhereClause = (filterData: any) => {
     const buildCondition = (condition: any) => {
-      console.log("condition", condition);
-
       if (condition.filterType === "group") {
         const groupConditions = condition.conditions
           .map(buildCondition)
@@ -1773,8 +1760,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value)})`;
         } else if (condition.value != null && condition.value !== "") {
-          console.log("condition.value---------", condition.value);
-
           selectFilter += `${condition.column} `;
           switch (condition.operator) {
             case "=":
@@ -1990,7 +1975,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].config.limit ?? 0;
     query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
-    // console.log("query", query);
 
     return query;
   };

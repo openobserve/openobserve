@@ -470,7 +470,6 @@ export default defineComponent({
           route.query.folder,
           route.query.tab,
         );
-        console.log("panelData", panelData);
 
         Object.assign(
           dashboardPanelData.data,
@@ -571,7 +570,8 @@ export default defineComponent({
         dashboardPanelData.data.queries[0].fields?.breakdown?.length == 0 &&
         dashboardPanelData.data.queries[0].fields.y.length == 0 &&
         dashboardPanelData.data.queries[0].fields.z.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.filter.conditions.length == 0 &&
+        dashboardPanelData.data.queries[0].fields.filter.conditions.length ==
+          0 &&
         dashboardPanelData.data.queries.length == 1
       );
     };
@@ -802,7 +802,6 @@ export default defineComponent({
 
         isPanelConfigWatcherActivated = false;
         isPanelConfigChanged.value = false;
-        console.log("panel saved successfully", dashboardPanelData.data);
 
         await nextTick();
         return router.push({

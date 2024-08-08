@@ -25,7 +25,6 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
       label.operator,
     );
   }
-  console.log("dummyQuery-------", dummyQuery);
 
   try {
     const astOfOriginalQuery: any = parser.astify(originalQuery);
@@ -550,8 +549,6 @@ export const getFieldsFromQuery = async (
     const streamName = extractTableName(ast) ?? null;
     let fields = extractFields(ast, timeField);
     let filters: any = extractFilters(ast);
-
-    console.log(filters, "filters");
 
     // remove wrong fields and filters
     fields = fields.filter((field: any) => field.column);
