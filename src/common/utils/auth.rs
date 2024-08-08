@@ -34,7 +34,7 @@ use crate::common::{
     },
 };
 
-pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[:#?\s]").unwrap());
+pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[:#?\s]+").unwrap());
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     RE_OFGA_UNSUPPORTED_NAME.replace_all(name, "_").to_string()
