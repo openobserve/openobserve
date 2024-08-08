@@ -128,7 +128,15 @@ pub fn get_final_plan(
     ))
 }
 
-pub fn get_without_dist_plan(
+pub fn get_empty_partial_plan(plan: &Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+    if plan.name() == "ProjectionExec" {
+        get_empty_partial_plan(plan.children().first().unwrap())
+    } else {
+        plan.clone()
+    }
+}
+
+pub fn get_empty_final_plan(
     plan: &Arc<dyn ExecutionPlan>,
     data: &[Vec<RecordBatch>],
     batch_size: usize,
