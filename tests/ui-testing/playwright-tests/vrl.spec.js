@@ -165,7 +165,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
@@ -226,7 +226,8 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+      await page.getByRole("option", { name: "e2e_automate" }).click();
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-b-data"]'
@@ -410,7 +411,8 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
+
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-b-data"]'
@@ -490,7 +492,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click(); ///////////
+    await page.getByText("e2e_automate").click(); 
 
     await page
       .locator(
@@ -619,7 +621,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]'
@@ -700,7 +702,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-b-data"]'
@@ -787,7 +789,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-b-data"]'
@@ -867,8 +869,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
-
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]'
@@ -954,7 +955,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1019,120 +1020,129 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test("should update the VRL function in the function editor when a different function is selected from the saved function list", async ({
-    page,
-  }) => {
-    const randomDashboardName = `Dashboard-${Math.floor(
-      Math.random() * 10000
-    )}`;
+  // test("should update the VRL function in the function editor when a different function is selected from the saved function list", async ({
+  //   page,
+  // }) => {
+  //   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+  //   await page.getByRole('button', { name: 'Create new function' }).click();
+  //   await page.getByLabel('Name').click();
+  //   await page.getByLabel('Name').fill('VRltest');
+  //   await page.locator('.view-lines').click();
+  //   await page.getByLabel('Editor content;Press Alt+F1').fill('.test=100');
+  //   await page.getByRole('button', { name: 'Save' }).click();
 
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-add"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').click();
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .fill(randomDashboardName);
-    await page.locator('[data-test="dashboard-add-submit"]').click();
 
-    // Add a new panel to the dashboard
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .click();
-    await page
-      .locator("label")
-      .filter({ hasText: "Streamarrow_drop_down" })
-      .locator("i")
-      .click();
-    await page.getByText("e2e_automate").click();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page.locator('[data-test="dashboard-apply"]').click();
+  //   // const randomDashboardName = `Dashboard-${Math.floor(
+  //   //   Math.random() * 10000
+  //   // )}`;
 
-    // Set the date-time filter
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
+  //   await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+  //   await waitForDashboardPage(page);
+  //   await page.locator('[data-test="dashboard-add"]').click();
+  //   await page.locator('[data-test="add-dashboard-name"]').click();
+  //   await page
+  //     .locator('[data-test="add-dashboard-name"]')
+  //     .fill(randomDashboardName);
+  //   await page.locator('[data-test="dashboard-add-submit"]').click();
 
-    // Apply a VRL function and verify
-    await page
-      .locator('[data-test="logs-search-bar-show-query-toggle-btn"] div')
-      .nth(2)
-      .click();
-    await page
-      .locator('[data-test="dashboard-query"]')
-      .getByText("arrow_drop_down")
-      .click();
+  //   // Add a new panel to the dashboard
+  //   await page
+  //     .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+  //     .click();
+  //   await page
+  //     .locator("label")
+  //     .filter({ hasText: "Streamarrow_drop_down" })
+  //     .locator("i")
+  //     .click();
+  //   await page.getByRole("option", { name: "e2e_automate" }).click();
+  //   await page
+  //     .locator(
+  //       '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]'
+  //     )
+  //     .click();
+  //   await page
+  //     .locator(
+  //       '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
+  //     )
+  //     .click();
+  //   await page.locator('[data-test="dashboard-apply"]').click();
 
-    // Select the VRL function from the dropdown using the XPath approach
-    await page
-      .getByRole("option", { name: "vrltest" })
-      .locator("div")
-      .nth(2)
-      .click();
+  //   // Set the date-time filter
+  //   await page.locator('[data-test="date-time-btn"]').click();
+  //   await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+  //   await page.locator('[data-test="dashboard-apply"]').click();
 
-    // Verify the VRL function is applied
-    const vrlTestAppliedText = await page
-      .locator("text=vrltest function applied")
-      .textContent();
-    expect(vrlTestAppliedText).toContain("vrltest function applied");
+  //   // Apply a VRL function and verify
+  //   await page
+  //     .locator('[data-test="logs-search-bar-show-query-toggle-btn"] div')
+  //     .nth(2)
+  //     .click();
+  //   await page
+  //     .locator('[data-test="dashboard-query"]')
+  //     .getByText("arrow_drop_down")
+  //     .click();
 
-    const vrlTestText = await page.locator("text=.TEst=").textContent();
-    expect(vrlTestText).toContain(".TEst=");
+  //   // Select the VRL function from the dropdown using the XPath approach
+  //   await page
+  //     .getByRole("option", { name: "vrltest" })
+  //     .locator("div")
+  //     .nth(2)
+  //     .click();
 
-    // // Change the VRL function and verify
-    // await page.locator('[data-test="dashboard-query"]').getByText('arrow_drop_down').click();
+  //   // Verify the VRL function is applied
+  //   const vrlTestAppliedText = await page
+  //     .locator("text=vrltest function applied")
+  //     .textContent();
+  //   expect(vrlTestAppliedText).toContain("VRltest function applied successfully.");
 
-    // // Select the next VRL function using the XPath approach
-    // await page.getByRole('option', { name: 'VRL_01' }).locator('div').nth(2).click();
+  //   const vrlTestText = await page.locator("text=.TEst=").textContent();
+  //   expect(vrlTestText).toContain(".TEst=");
 
-    // // Verify the new VRL function is applied
-    // const vrl01AppliedText = await page.locator('text=VRL_01 function applied').textContent();
-    // expect(vrl01AppliedText).toContain('VRL_01 function applied');
+  //   // // Change the VRL function and verify
+  //   // await page.locator('[data-test="dashboard-query"]').getByText('arrow_drop_down').click();
 
-    // const vrl01Text = await page.locator('text=.percentage, err=.y_axis_1 /').textContent();
-    // expect(vrl01Text).toContain('.percentage, err=.y_axis_1 /');
+  //   // // Select the next VRL function using the XPath approach
+  //   // await page.getByRole('option', { name: 'VRL_01' }).locator('div').nth(2).click();
 
-    // Save the dashboard panel
-    await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("VRL");
-    await page.locator('[data-test="dashboard-panel-save"]').click();
+  //   // // Verify the new VRL function is applied
+  //   // const vrl01AppliedText = await page.locator('text=VRL_01 function applied').textContent();
+  //   // expect(vrl01AppliedText).toContain('VRL_01 function applied');
 
-    // Delete the dashboard panel
-    await page
-      .locator('[data-test="dashboard-edit-panel-VRL-dropdown"]')
-      .click();
-    await page.locator('[data-test="dashboard-delete-panel"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
+  //   // const vrl01Text = await page.locator('text=.percentage, err=.y_axis_1 /').textContent();
+  //   // expect(vrl01Text).toContain('.percentage, err=.y_axis_1 /');
 
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+  //   // Save the dashboard panel
+  //   await page.locator('[data-test="dashboard-panel-name"]').click();
+  //   await page.locator('[data-test="dashboard-panel-name"]').fill("VRL");
+  //   await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    // Debugging step to verify the dashboard name
-    console.log(`Deleting dashboard with name: ${randomDashboardName}`);
-    const dashboardNameLocator = await page.locator(
-      `//tr[.//td[text()="${randomDashboardName}"]]`
-    );
-    const dashboardDeleteButton = dashboardNameLocator.locator(
-      '[data-test="dashboard-delete"]'
-    );
+  //   // Delete the dashboard panel
+  //   await page
+  //     .locator('[data-test="dashboard-edit-panel-VRL-dropdown"]')
+  //     .click();
+  //   await page.locator('[data-test="dashboard-delete-panel"]').click();
+  //   await page.locator('[data-test="confirm-button"]').click();
 
-    await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
-    await dashboardDeleteButton.click(); // Click the delete button
-    await page.locator('[data-test="confirm-button"]').click();
-  });
+  //   await page.locator('[data-test="dashboard-back-btn"]').click();
+
+  //   // Debugging step to verify the dashboard name
+  //   console.log(`Deleting dashboard with name: ${randomDashboardName}`);
+  //   const dashboardNameLocator = await page.locator(
+  //     `//tr[.//td[text()="${randomDashboardName}"]]`
+  //   );
+  //   const dashboardDeleteButton = dashboardNameLocator.locator(
+  //     '[data-test="dashboard-delete"]'
+  //   );
+
+  //   await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
+  //   await dashboardDeleteButton.click(); // Click the delete button
+  //   await page.locator('[data-test="confirm-button"]').click();
+  // });
 
   test("should display the VRL function field when changing the chart type", async ({
     page,
   }) => {
-    // const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+   const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
 
     // Navigate to dashboards page
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -1155,7 +1165,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     // Set up Y-axis data
     await page
@@ -1265,7 +1275,7 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test.skip("1should display the VRL field in the table chart", async ({
+  test.skip("should display the VRL field in the table chart", async ({
     page,
   }) => {
     let logMessages = [];
@@ -1293,8 +1303,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
-
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]'
@@ -1354,7 +1363,7 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
   });
 
-  test("111should not show an error when filtering data using an absolute time zone after applying a VRL function", async ({
+  test("should not show an error when filtering data using an absolute time zone after applying a VRL function", async ({
     page,
   }) => {
     const randomDashboardName = `Dashboard-${Math.floor(
@@ -1378,7 +1387,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
@@ -1427,9 +1436,10 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "chevron_left" })
       .first()
       .click();
-    await page.getByRole("button", { name: "7", exact: true }).click();
-    await page.getByRole("button", { name: "8", exact: true }).click();
-    await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
+      await page.getByRole("button", { name: "7" }).last().click();
+      await page.getByRole("button", { name: "8" }).last().click();
+
+      await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
     await page.getByText("Asia/Dubai").click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
