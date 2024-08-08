@@ -226,7 +226,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-      await page.getByRole("option", { name: "e2e_automate" }).click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -492,7 +492,7 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-    await page.getByText("e2e_automate").click(); 
+      await page.getByRole("option", { name: "e2e_automate" }).click();
 
     await page
       .locator(
@@ -1142,7 +1142,9 @@ test.describe(" VRL UI testcases", () => {
   test("should display the VRL function field when changing the chart type", async ({
     page,
   }) => {
-   const randomDashboardName = `Dashboard-${Math.floor(Math.random() * 10000)}`;
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
 
     // Navigate to dashboards page
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -1436,10 +1438,10 @@ test.describe(" VRL UI testcases", () => {
       .filter({ hasText: "chevron_left" })
       .first()
       .click();
-      await page.getByRole("button", { name: "7" }).last().click();
-      await page.getByRole("button", { name: "8" }).last().click();
+    await page.getByRole("button", { name: "7" }).last().click();
+    await page.getByRole("button", { name: "8" }).last().click();
 
-      await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
+    await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
     await page.getByText("Asia/Dubai").click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
