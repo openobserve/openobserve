@@ -30,8 +30,7 @@ use crate::common::{
     },
 };
 
-// TODO(taiming): add tracing fields since function signature changed
-#[tracing::instrument(skip(pipeline))]
+#[tracing::instrument(skip_all, fields(name = &pipeline.name))]
 pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error> {
     if check_existing_pipeline(&pipeline.name, &pipeline.source)
         .await
@@ -47,6 +46,14 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
     if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
+            derived_stream.trigger_condition.frequency *= 60; // convert to seconds
+            if !derived_stream.is_valid() {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Invalid DerivedStream details. Name, destination, and Trigger Period required"
+                        .to_string(),
+                )));
+            }
             if let Err(e) =
                 super::scheduled_ops::derived_streams::save(derived_stream.clone(), &pipeline.name)
                     .await
@@ -77,7 +84,7 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
     }
 }
 
-#[tracing::instrument(skip(pipeline))]
+#[tracing::instrument(skip_all, fields(name = &pipeline.name))]
 pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error> {
     let existing_pipeline = match check_existing_pipeline(&pipeline.name, &pipeline.source).await {
         Some(pipeline) => pipeline,
@@ -92,27 +99,19 @@ pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Err
         return Ok(HttpResponse::Ok().json(pipeline));
     }
 
-    // QUESTION(taiming): is this necessary?
-    // delete the existing pipeline
-    if let Err(error) = delete_pipeline(&existing_pipeline.name, existing_pipeline.source).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        );
-    }
-
     // Update DerivedStream details if there's any
     if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
+            derived_stream.trigger_condition.frequency *= 60; // convert to seconds
             if !derived_stream.is_valid() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid DerivedStream details. Name and destination required ".to_string(),
+                    "Invalid DerivedStream details. Name, destination, and Trigger Period required"
+                        .to_string(),
                 )));
             }
+            // derived_streams::save updates existing triggers when found
             if let Err(e) =
                 super::scheduled_ops::derived_streams::save(derived_stream.clone(), &pipeline.name)
                     .await

@@ -578,17 +578,16 @@ pub async fn get_user_defined_schema(
     }
 }
 
-// TODO(taiming) -> better error handling
 pub fn create_log_ingestion_req<'a>(
     ingestion_type: i32,
     data: &'a actix_web::web::Bytes,
-) -> IngestionRequest {
+) -> Result<IngestionRequest> {
     match IngestionType::try_from(ingestion_type) {
-        Ok(IngestionType::Json) => IngestionRequest::JSON(data),
-        Ok(IngestionType::Multi) => IngestionRequest::Multi(data),
-        Ok(IngestionType::Usage) => IngestionRequest::Usage(data),
-        Ok(IngestionType::Rum) => IngestionRequest::RUM(data),
-        _ => todo!("Future improvement"),
+        Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),
+        Ok(IngestionType::Multi) => Ok(IngestionRequest::Multi(data)),
+        Ok(IngestionType::Usage) => Ok(IngestionRequest::Usage(data)),
+        Ok(IngestionType::Rum) => Ok(IngestionRequest::RUM(data)),
+        _ => Err(anyhow::anyhow!("Not yet supported")),
     }
 }
 

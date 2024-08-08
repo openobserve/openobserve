@@ -39,10 +39,18 @@ impl Ingest for InternalIngestServer {
             Ok(StreamType::Logs) => {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = actix_web::web::Bytes::from(in_data.data);
-                let ingestion_req = create_log_ingestion_req(log_ingestion_type, &data);
-                crate::service::logs::ingest::ingest(&org_id, &stream_name, ingestion_req, "", None)
+                match create_log_ingestion_req(log_ingestion_type, &data) {
+                    Err(e) => Err(e),
+                    Ok(ingestion_req) => crate::service::logs::ingest::ingest(
+                        &org_id,
+                        &stream_name,
+                        ingestion_req,
+                        "",
+                        None,
+                    )
                     .await
-                    .map_or_else(|e| Err(e), |_| Ok(()))
+                    .map_or_else(|e| Err(e), |_| Ok(())),
+                }
             }
             Ok(StreamType::EnrichmentTables) => {
                 let json_records: Vec<json::Map<String, json::Value>> =
@@ -73,21 +81,16 @@ impl Ingest for InternalIngestServer {
             )),
         };
 
-        match resp {
-            Ok(_) => {
-                let reply = IngestionResponse {
-                    status_code: 200,
-                    message: "OK".to_string(),
-                };
-                Ok(Response::new(reply))
-            }
-            Err(err) => {
-                let reply = IngestionResponse {
-                    status_code: 500,
-                    message: err.to_string(),
-                };
-                Ok(Response::new(reply))
-            }
-        }
+        let reply = match resp {
+            Ok(_) => IngestionResponse {
+                status_code: 200,
+                message: "OK".to_string(),
+            },
+            Err(err) => IngestionResponse {
+                status_code: 500,
+                message: err.to_string(),
+            },
+        };
+        Ok(Response::new(reply))
     }
 }

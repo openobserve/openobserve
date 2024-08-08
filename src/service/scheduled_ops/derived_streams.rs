@@ -15,13 +15,10 @@
 
 use std::str::FromStr;
 
-use actix_web::http;
+use chrono::{Duration, Utc};
 use config::{
     get_config,
-    utils::{
-        base64,
-        json::{Map, Value},
-    },
+    utils::json::{Map, Value},
 };
 use cron::Schedule;
 use hashbrown::HashMap;
@@ -29,18 +26,14 @@ use hashbrown::HashMap;
 use crate::{
     common::{
         meta::{
-            authz::Authz,
+            // authz::Authz,
             scheduled_ops::{
                 derived_streams::DerivedStreamMeta, FrequencyType, Operator, QueryType,
             },
-            stream::StreamParams,
         },
-        utils::auth::{remove_ownership, set_ownership},
+        // utils::auth::{remove_ownership, set_ownership},
     },
-    service::{
-        db,
-        scheduled_ops::{build_sql, destinations},
-    },
+    service::db,
 };
 
 pub async fn save(
@@ -50,7 +43,9 @@ pub async fn save(
     derived_stream.name = derived_stream.name.trim().to_string();
     // 1. Start validate DerivedStream
     if !derived_stream.is_valid() {
-        return Err(anyhow::anyhow!("Name and destination required"));
+        return Err(anyhow::anyhow!(
+            "DerivedStream Name, destination, and Trigger period required"
+        ));
     }
 
     // query_type for realtime
@@ -65,7 +60,6 @@ pub async fn save(
     match derived_stream.query_condition.query_type {
         QueryType::Custom => {
             if derived_stream.query_condition.aggregation.is_some() {
-                // TODO(taiming): this might only apply to alert?
                 // if it has result we should fire the alert when enable aggregation
                 derived_stream.trigger_condition.operator = Operator::GreaterThanEquals;
                 derived_stream.trigger_condition.threshold = 1;
@@ -98,7 +92,6 @@ pub async fn save(
         }
     }
 
-    // QUESTION(taiming): saw this in alerts. is this necessary?
     // check source stream schema
     let schema = infra::schema::get(
         &derived_stream.source.org_id,
@@ -120,10 +113,9 @@ pub async fn save(
         // Check the cron expression
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
-        // TODO(taiming): need default freq for derived streams
-        // default frequency is 60 seconds
+        // default 3 mins, set min at 10 seconds
         derived_stream.trigger_condition.frequency =
-            std::cmp::max(10, get_config().limit.alert_schedule_interval);
+            std::cmp::max(10, get_config().limit.derived_stream_schedule_interval);
     }
 
     // 3. clean up DerivedStream context attributes
@@ -136,41 +128,48 @@ pub async fn save(
     }
 
     // test derived_stream
-    _ = &derived_stream.evaluate(None).await?;
+    if let Err(e) = &derived_stream.evaluate(None).await {
+        return Err(anyhow::anyhow!(
+            "DerivedStream not saved due to failed test run caused by {}",
+            e.to_string()
+        ));
+    };
 
     // Save the trigger to db
+    let next_run_at = Utc::now().timestamp_micros()
+        + Duration::try_seconds(derived_stream.trigger_condition.frequency)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
     let trigger = db::scheduler::Trigger {
         org: derived_stream.source.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
-        module_key: derived_stream.get_schedule_key(pipeline_name),
-        next_run_at: chrono::Utc::now().timestamp_micros(), /* TODO(taiming): change this to the
-                                                             * future */
-        is_realtime: derived_stream.is_real_time, /* TODO(taiming): maybe default this to false
-                                                   * for now */
+        module_key: derived_stream.get_scheduler_module_key(pipeline_name),
+        next_run_at,
+        is_realtime: derived_stream.is_real_time,
         is_silenced: false,
         ..Default::default()
     };
 
-    // check if trigger already exists
-    if db::scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key)
-        .await
-        .is_ok()
-    {
-        return Err(anyhow::anyhow!("Trigger already exists"));
-    }
-
-    match db::scheduler::push(trigger).await {
-        Ok(_) => {
-            // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
-            set_ownership(
-                &derived_stream.source.org_id,
-                "derived_stream",
-                Authz::new(&derived_stream.name),
-            )
-            .await;
-            Ok(())
+    match db::scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key).await {
+        Ok(_) => db::scheduler::update_trigger(trigger)
+            .await
+            .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update")),
+        Err(_) => {
+            match db::scheduler::push(trigger).await {
+                Ok(_) => {
+                    // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
+                    // set_ownership(
+                    //     &derived_stream.source.org_id,
+                    //     "derived_stream",
+                    //     Authz::new(&derived_stream.name),
+                    // )
+                    // .await;
+                    Ok(())
+                }
+                Err(e) => Err(anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
+            }
         }
-        Err(e) => Err(anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
     }
 }
 
@@ -181,29 +180,36 @@ pub async fn delete(
     match db::scheduler::delete(
         &derived_stream.source.org_id,
         db::scheduler::TriggerModule::DerivedStream,
-        &derived_stream.get_schedule_key(pipeline_name),
+        &derived_stream.get_scheduler_module_key(pipeline_name),
     )
     .await
     {
         Ok(_) => {
-            remove_ownership(
-                &derived_stream.source.org_id,
-                "derived_stream",
-                Authz::new(&derived_stream.name),
-            )
-            .await;
+            // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
+            // remove_ownership(
+            //     &derived_stream.source.org_id,
+            //     "derived_stream",
+            //     Authz::new(&derived_stream.name),
+            // )
+            // .await;
             Ok(())
         }
-        Err(e) => Err(anyhow::anyhow!("Error deleting derived stream: {e}")),
+        Err(e) => Err(anyhow::anyhow!(
+            "Error deleting derived stream trigger: {e}"
+        )),
     }
 }
 
 impl DerivedStreamMeta {
     pub fn is_valid(&self) -> bool {
-        !self.name.is_empty() && self.source.is_valid() && self.destination.is_valid()
+        !self.name.is_empty()
+            && !self.is_real_time // TODO(taiming): support realtime DerivedStream
+            && self.source.is_valid()
+            && self.destination.is_valid()
+            && self.trigger_condition.period != 0
     }
 
-    pub fn get_schedule_key(&self, pipeline_name: &str) -> String {
+    pub fn get_scheduler_module_key(&self, pipeline_name: &str) -> String {
         format!(
             "{}/{}/{}/{}",
             self.source.stream_type, self.source.stream_name, pipeline_name, self.name

@@ -76,7 +76,6 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     }
 }
 
-// TODO(taiming): add derived_streams to clean_complete_jobs
 async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
         get_config().limit.scheduler_clean_interval,
@@ -90,7 +89,6 @@ async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
     }
 }
 
-// TODO(taiming): add derived_streams to watch_timeout_jobs
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
         get_config().limit.scheduler_watch_interval,

@@ -5,7 +5,8 @@ pub struct EmptyRequest {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EmptyResponse {}
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileDescriptor {
@@ -14,7 +15,8 @@ pub struct FileDescriptor {
     #[prost(enumeration = "StreamType", tag = "2")]
     pub file_type: i32,
 }
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileMeta {
@@ -32,7 +34,8 @@ pub struct FileMeta {
     pub compressed_size: i64,
 }
 /// Job information for a request
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Job {
@@ -45,7 +48,8 @@ pub struct Job {
     #[prost(int32, tag = "4")]
     pub partition: i32,
 }
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScanStats {
@@ -69,14 +73,16 @@ pub struct ScanStats {
     #[prost(int64, tag = "8")]
     pub idx_scan_size: i64,
 }
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileList {
     #[prost(message, repeated, tag = "1")]
     pub items: ::prost::alloc::vec::Vec<FileKey>,
 }
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileKey {
@@ -96,8 +102,9 @@ pub enum StreamType {
     Metrics = 1,
     Traces = 2,
     Metadata = 3,
-    Filelist = 4,
-    Index = 5,
+    EnrichmentTables = 4,
+    Filelist = 5,
+    Index = 6,
 }
 impl StreamType {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -110,6 +117,7 @@ impl StreamType {
             StreamType::Metrics => "METRICS",
             StreamType::Traces => "TRACES",
             StreamType::Metadata => "METADATA",
+            StreamType::EnrichmentTables => "EnrichmentTables",
             StreamType::Filelist => "FILELIST",
             StreamType::Index => "INDEX",
         }
@@ -121,6 +129,7 @@ impl StreamType {
             "METRICS" => Some(Self::Metrics),
             "TRACES" => Some(Self::Traces),
             "METADATA" => Some(Self::Metadata),
+            "EnrichmentTables" => Some(Self::EnrichmentTables),
             "FILELIST" => Some(Self::Filelist),
             "INDEX" => Some(Self::Index),
             _ => None,
@@ -167,7 +176,8 @@ impl SearchType {
 /// Generated client implementations.
 pub mod event_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct EventClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -206,13 +216,14 @@ pub mod event_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                    http::Request<tonic::body::BoxBody>,
-                    Response = http::Response<
-                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                    >,
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             EventClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -251,14 +262,19 @@ pub mod event_client {
             &mut self,
             request: impl tonic::IntoRequest<super::FileList>,
         ) -> std::result::Result<tonic::Response<super::EmptyResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Event/SendFileList");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Event/SendFileList",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.Event", "SendFileList"));
@@ -301,7 +317,10 @@ pub mod event_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -357,16 +376,21 @@ pub mod event_server {
                 "/cluster.Event/SendFileList" => {
                     #[allow(non_camel_case_types)]
                     struct SendFileListSvc<T: Event>(pub Arc<T>);
-                    impl<T: Event> tonic::server::UnaryService<super::FileList> for SendFileListSvc<T> {
+                    impl<T: Event> tonic::server::UnaryService<super::FileList>
+                    for SendFileListSvc<T> {
                         type Response = super::EmptyResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::FileList>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Event>::send_file_list(&inner, request).await };
+                            let fut = async move {
+                                <T as Event>::send_file_list(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -393,14 +417,18 @@ pub mod event_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -455,7 +483,8 @@ pub struct FileListQueryRequest {
 /// Generated client implementations.
 pub mod filelist_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct FilelistClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -494,13 +523,14 @@ pub mod filelist_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                    http::Request<tonic::body::BoxBody>,
-                    Response = http::Response<
-                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                    >,
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             FilelistClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -539,34 +569,38 @@ pub mod filelist_client {
             &mut self,
             request: impl tonic::IntoRequest<super::EmptyRequest>,
         ) -> std::result::Result<tonic::Response<super::MaxIdResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/cluster.Filelist/MaxID");
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Filelist", "MaxID"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Filelist", "MaxID"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn query(
             &mut self,
             request: impl tonic::IntoRequest<super::FileListQueryRequest>,
         ) -> std::result::Result<tonic::Response<super::FileList>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/cluster.Filelist/Query");
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Filelist", "Query"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Filelist", "Query"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -575,8 +609,7 @@ pub mod filelist_client {
 pub mod filelist_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with
-    /// FilelistServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with FilelistServer.
     #[async_trait]
     pub trait Filelist: Send + Sync + 'static {
         async fn max_id(
@@ -611,7 +644,10 @@ pub mod filelist_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -667,15 +703,21 @@ pub mod filelist_server {
                 "/cluster.Filelist/MaxID" => {
                     #[allow(non_camel_case_types)]
                     struct MaxIDSvc<T: Filelist>(pub Arc<T>);
-                    impl<T: Filelist> tonic::server::UnaryService<super::EmptyRequest> for MaxIDSvc<T> {
+                    impl<T: Filelist> tonic::server::UnaryService<super::EmptyRequest>
+                    for MaxIDSvc<T> {
                         type Response = super::MaxIdResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::EmptyRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { <T as Filelist>::max_id(&inner, request).await };
+                            let fut = async move {
+                                <T as Filelist>::max_id(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -705,15 +747,23 @@ pub mod filelist_server {
                 "/cluster.Filelist/Query" => {
                     #[allow(non_camel_case_types)]
                     struct QuerySvc<T: Filelist>(pub Arc<T>);
-                    impl<T: Filelist> tonic::server::UnaryService<super::FileListQueryRequest> for QuerySvc<T> {
+                    impl<
+                        T: Filelist,
+                    > tonic::server::UnaryService<super::FileListQueryRequest>
+                    for QuerySvc<T> {
                         type Response = super::FileList;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::FileListQueryRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { <T as Filelist>::query(&inner, request).await };
+                            let fut = async move {
+                                <T as Filelist>::query(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -740,14 +790,18 @@ pub mod filelist_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -899,7 +953,8 @@ pub struct MetricsWalFile {
 /// Generated client implementations.
 pub mod metrics_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct MetricsClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -938,13 +993,14 @@ pub mod metrics_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                    http::Request<tonic::body::BoxBody>,
-                    Response = http::Response<
-                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                    >,
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             MetricsClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -982,37 +1038,45 @@ pub mod metrics_client {
         pub async fn query(
             &mut self,
             request: impl tonic::IntoRequest<super::MetricsQueryRequest>,
-        ) -> std::result::Result<tonic::Response<super::MetricsQueryResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::MetricsQueryResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/Query");
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Metrics", "Query"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Query"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn wal_file(
             &mut self,
             request: impl tonic::IntoRequest<super::MetricsWalFileRequest>,
-        ) -> std::result::Result<tonic::Response<super::MetricsWalFileResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::MetricsWalFileResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/WalFile");
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Metrics", "WalFile"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "WalFile"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -1021,18 +1085,23 @@ pub mod metrics_client {
 pub mod metrics_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with
-    /// MetricsServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with MetricsServer.
     #[async_trait]
     pub trait Metrics: Send + Sync + 'static {
         async fn query(
             &self,
             request: tonic::Request<super::MetricsQueryRequest>,
-        ) -> std::result::Result<tonic::Response<super::MetricsQueryResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::MetricsQueryResponse>,
+            tonic::Status,
+        >;
         async fn wal_file(
             &self,
             request: tonic::Request<super::MetricsWalFileRequest>,
-        ) -> std::result::Result<tonic::Response<super::MetricsWalFileResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::MetricsWalFileResponse>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct MetricsServer<T: Metrics> {
@@ -1057,7 +1126,10 @@ pub mod metrics_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -1113,15 +1185,23 @@ pub mod metrics_server {
                 "/cluster.Metrics/Query" => {
                     #[allow(non_camel_case_types)]
                     struct QuerySvc<T: Metrics>(pub Arc<T>);
-                    impl<T: Metrics> tonic::server::UnaryService<super::MetricsQueryRequest> for QuerySvc<T> {
+                    impl<
+                        T: Metrics,
+                    > tonic::server::UnaryService<super::MetricsQueryRequest>
+                    for QuerySvc<T> {
                         type Response = super::MetricsQueryResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::MetricsQueryRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { <T as Metrics>::query(&inner, request).await };
+                            let fut = async move {
+                                <T as Metrics>::query(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -1151,16 +1231,23 @@ pub mod metrics_server {
                 "/cluster.Metrics/WalFile" => {
                     #[allow(non_camel_case_types)]
                     struct WalFileSvc<T: Metrics>(pub Arc<T>);
-                    impl<T: Metrics> tonic::server::UnaryService<super::MetricsWalFileRequest> for WalFileSvc<T> {
+                    impl<
+                        T: Metrics,
+                    > tonic::server::UnaryService<super::MetricsWalFileRequest>
+                    for WalFileSvc<T> {
                         type Response = super::MetricsWalFileResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::MetricsWalFileRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Metrics>::wal_file(&inner, request).await };
+                            let fut = async move {
+                                <T as Metrics>::wal_file(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -1187,14 +1274,18 @@ pub mod metrics_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -1282,7 +1373,8 @@ pub struct SearchRequest {
     #[prost(string, optional, tag = "11")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
-#[derive(Eq, serde::Serialize)]
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {
@@ -1415,7 +1507,8 @@ impl WorkGroup {
 /// Generated client implementations.
 pub mod search_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct SearchClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -1454,13 +1547,14 @@ pub mod search_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                    http::Request<tonic::body::BoxBody>,
-                    Response = http::Response<
-                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                    >,
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             SearchClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -1499,31 +1593,38 @@ pub mod search_client {
             &mut self,
             request: impl tonic::IntoRequest<super::SearchRequest>,
         ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/cluster.Search/Search");
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Search", "Search"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "Search"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn cluster_search(
             &mut self,
             request: impl tonic::IntoRequest<super::SearchRequest>,
         ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/ClusterSearch");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/ClusterSearch",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.Search", "ClusterSearch"));
@@ -1532,16 +1633,23 @@ pub mod search_client {
         pub async fn query_status(
             &mut self,
             request: impl tonic::IntoRequest<super::QueryStatusRequest>,
-        ) -> std::result::Result<tonic::Response<super::QueryStatusResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::QueryStatusResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/QueryStatus");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/QueryStatus",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.Search", "QueryStatus"));
@@ -1550,16 +1658,23 @@ pub mod search_client {
         pub async fn cancel_query(
             &mut self,
             request: impl tonic::IntoRequest<super::CancelQueryRequest>,
-        ) -> std::result::Result<tonic::Response<super::CancelQueryResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::CancelQueryResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/CancelQuery");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/CancelQuery",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.Search", "CancelQuery"));
@@ -1568,16 +1683,23 @@ pub mod search_client {
         pub async fn cluster_cancel_query(
             &mut self,
             request: impl tonic::IntoRequest<super::CancelQueryRequest>,
-        ) -> std::result::Result<tonic::Response<super::CancelQueryResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::CancelQueryResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/ClusterCancelQuery");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/ClusterCancelQuery",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.Search", "ClusterCancelQuery"));
@@ -1589,8 +1711,7 @@ pub mod search_client {
 pub mod search_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with
-    /// SearchServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with SearchServer.
     #[async_trait]
     pub trait Search: Send + Sync + 'static {
         async fn search(
@@ -1604,15 +1725,24 @@ pub mod search_server {
         async fn query_status(
             &self,
             request: tonic::Request<super::QueryStatusRequest>,
-        ) -> std::result::Result<tonic::Response<super::QueryStatusResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::QueryStatusResponse>,
+            tonic::Status,
+        >;
         async fn cancel_query(
             &self,
             request: tonic::Request<super::CancelQueryRequest>,
-        ) -> std::result::Result<tonic::Response<super::CancelQueryResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::CancelQueryResponse>,
+            tonic::Status,
+        >;
         async fn cluster_cancel_query(
             &self,
             request: tonic::Request<super::CancelQueryRequest>,
-        ) -> std::result::Result<tonic::Response<super::CancelQueryResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::CancelQueryResponse>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct SearchServer<T: Search> {
@@ -1637,7 +1767,10 @@ pub mod search_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -1693,15 +1826,21 @@ pub mod search_server {
                 "/cluster.Search/Search" => {
                     #[allow(non_camel_case_types)]
                     struct SearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest> for SearchSvc<T> {
+                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
+                    for SearchSvc<T> {
                         type Response = super::SearchResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::SearchRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { <T as Search>::search(&inner, request).await };
+                            let fut = async move {
+                                <T as Search>::search(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -1731,16 +1870,21 @@ pub mod search_server {
                 "/cluster.Search/ClusterSearch" => {
                     #[allow(non_camel_case_types)]
                     struct ClusterSearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest> for ClusterSearchSvc<T> {
+                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
+                    for ClusterSearchSvc<T> {
                         type Response = super::SearchResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::SearchRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Search>::cluster_search(&inner, request).await };
+                            let fut = async move {
+                                <T as Search>::cluster_search(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -1770,16 +1914,23 @@ pub mod search_server {
                 "/cluster.Search/QueryStatus" => {
                     #[allow(non_camel_case_types)]
                     struct QueryStatusSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::QueryStatusRequest> for QueryStatusSvc<T> {
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::QueryStatusRequest>
+                    for QueryStatusSvc<T> {
                         type Response = super::QueryStatusResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::QueryStatusRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Search>::query_status(&inner, request).await };
+                            let fut = async move {
+                                <T as Search>::query_status(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -1809,16 +1960,23 @@ pub mod search_server {
                 "/cluster.Search/CancelQuery" => {
                     #[allow(non_camel_case_types)]
                     struct CancelQuerySvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::CancelQueryRequest> for CancelQuerySvc<T> {
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::CancelQueryRequest>
+                    for CancelQuerySvc<T> {
                         type Response = super::CancelQueryResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::CancelQueryRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Search>::cancel_query(&inner, request).await };
+                            let fut = async move {
+                                <T as Search>::cancel_query(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -1848,11 +2006,15 @@ pub mod search_server {
                 "/cluster.Search/ClusterCancelQuery" => {
                     #[allow(non_camel_case_types)]
                     struct ClusterCancelQuerySvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::CancelQueryRequest>
-                        for ClusterCancelQuerySvc<T>
-                    {
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::CancelQueryRequest>
+                    for ClusterCancelQuerySvc<T> {
                         type Response = super::CancelQueryResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::CancelQueryRequest>,
@@ -1887,14 +2049,18 @@ pub mod search_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -1926,6 +2092,360 @@ pub mod search_server {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IngestionData {
+    #[prost(bytes = "vec", tag = "1")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IngestionRequest {
+    #[prost(string, tag = "1")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub stream_name: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "3")]
+    pub data: ::core::option::Option<IngestionData>,
+    #[prost(enumeration = "StreamType", tag = "4")]
+    pub stream_type: i32,
+    #[prost(enumeration = "IngestionType", optional, tag = "5")]
+    pub ingestion_type: ::core::option::Option<i32>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IngestionResponse {
+    #[prost(int32, tag = "1")]
+    pub status_code: i32,
+    #[prost(string, tag = "2")]
+    pub message: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum IngestionType {
+    Json = 0,
+    Multi = 1,
+    Gcp = 2,
+    Kinesisfh = 3,
+    Rum = 4,
+    Usage = 5,
+}
+impl IngestionType {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            IngestionType::Json => "JSON",
+            IngestionType::Multi => "MULTI",
+            IngestionType::Gcp => "GCP",
+            IngestionType::Kinesisfh => "KINESISFH",
+            IngestionType::Rum => "RUM",
+            IngestionType::Usage => "USAGE",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "JSON" => Some(Self::Json),
+            "MULTI" => Some(Self::Multi),
+            "GCP" => Some(Self::Gcp),
+            "KINESISFH" => Some(Self::Kinesisfh),
+            "RUM" => Some(Self::Rum),
+            "USAGE" => Some(Self::Usage),
+            _ => None,
+        }
+    }
+}
+/// Generated client implementations.
+pub mod ingest_client {
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
+    #[derive(Debug, Clone)]
+    pub struct IngestClient<T> {
+        inner: tonic::client::Grpc<T>,
+    }
+    impl IngestClient<tonic::transport::Channel> {
+        /// Attempt to create a new client by connecting to a given endpoint.
+        pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
+        where
+            D: TryInto<tonic::transport::Endpoint>,
+            D::Error: Into<StdError>,
+        {
+            let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
+            Ok(Self::new(conn))
+        }
+    }
+    impl<T> IngestClient<T>
+    where
+        T: tonic::client::GrpcService<tonic::body::BoxBody>,
+        T::Error: Into<StdError>,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
+    {
+        pub fn new(inner: T) -> Self {
+            let inner = tonic::client::Grpc::new(inner);
+            Self { inner }
+        }
+        pub fn with_origin(inner: T, origin: Uri) -> Self {
+            let inner = tonic::client::Grpc::with_origin(inner, origin);
+            Self { inner }
+        }
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> IngestClient<InterceptedService<T, F>>
+        where
+            F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
+            T: tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
+                >,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
+        {
+            IngestClient::new(InterceptedService::new(inner, interceptor))
+        }
+        /// Compress requests with the given encoding.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.send_compressed(encoding);
+            self
+        }
+        /// Enable decompressing responses.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.inner = self.inner.accept_compressed(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_decoding_message_size(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.inner = self.inner.max_encoding_message_size(limit);
+            self
+        }
+        pub async fn ingest(
+            &mut self,
+            request: impl tonic::IntoRequest<super::IngestionRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::IngestionResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Ingest/Ingest");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Ingest", "Ingest"));
+            self.inner.unary(req, path, codec).await
+        }
+    }
+}
+/// Generated server implementations.
+pub mod ingest_server {
+    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
+    use tonic::codegen::*;
+    /// Generated trait containing gRPC methods that should be implemented for use with IngestServer.
+    #[async_trait]
+    pub trait Ingest: Send + Sync + 'static {
+        async fn ingest(
+            &self,
+            request: tonic::Request<super::IngestionRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::IngestionResponse>,
+            tonic::Status,
+        >;
+    }
+    #[derive(Debug)]
+    pub struct IngestServer<T: Ingest> {
+        inner: _Inner<T>,
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
+        max_decoding_message_size: Option<usize>,
+        max_encoding_message_size: Option<usize>,
+    }
+    struct _Inner<T>(Arc<T>);
+    impl<T: Ingest> IngestServer<T> {
+        pub fn new(inner: T) -> Self {
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
+            let inner = _Inner(inner);
+            Self {
+                inner,
+                accept_compression_encodings: Default::default(),
+                send_compression_encodings: Default::default(),
+                max_decoding_message_size: None,
+                max_encoding_message_size: None,
+            }
+        }
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
+        where
+            F: tonic::service::Interceptor,
+        {
+            InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with the given encoding.
+        #[must_use]
+        pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.accept_compression_encodings.enable(encoding);
+            self
+        }
+        /// Compress responses with the given encoding, if the client supports it.
+        #[must_use]
+        pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
+            self.send_compression_encodings.enable(encoding);
+            self
+        }
+        /// Limits the maximum size of a decoded message.
+        ///
+        /// Default: `4MB`
+        #[must_use]
+        pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+            self.max_decoding_message_size = Some(limit);
+            self
+        }
+        /// Limits the maximum size of an encoded message.
+        ///
+        /// Default: `usize::MAX`
+        #[must_use]
+        pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+            self.max_encoding_message_size = Some(limit);
+            self
+        }
+    }
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for IngestServer<T>
+    where
+        T: Ingest,
+        B: Body + Send + 'static,
+        B::Error: Into<StdError> + Send + 'static,
+    {
+        type Response = http::Response<tonic::body::BoxBody>;
+        type Error = std::convert::Infallible;
+        type Future = BoxFuture<Self::Response, Self::Error>;
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn call(&mut self, req: http::Request<B>) -> Self::Future {
+            let inner = self.inner.clone();
+            match req.uri().path() {
+                "/cluster.Ingest/Ingest" => {
+                    #[allow(non_camel_case_types)]
+                    struct IngestSvc<T: Ingest>(pub Arc<T>);
+                    impl<T: Ingest> tonic::server::UnaryService<super::IngestionRequest>
+                    for IngestSvc<T> {
+                        type Response = super::IngestionResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::IngestionRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Ingest>::ingest(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = IngestSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
+            }
+        }
+    }
+    impl<T: Ingest> Clone for IngestServer<T> {
+        fn clone(&self) -> Self {
+            let inner = self.inner.clone();
+            Self {
+                inner,
+                accept_compression_encodings: self.accept_compression_encodings,
+                send_compression_encodings: self.send_compression_encodings,
+                max_decoding_message_size: self.max_decoding_message_size,
+                max_encoding_message_size: self.max_encoding_message_size,
+            }
+        }
+    }
+    impl<T: Ingest> Clone for _Inner<T> {
+        fn clone(&self) -> Self {
+            Self(Arc::clone(&self.0))
+        }
+    }
+    impl<T: std::fmt::Debug> std::fmt::Debug for _Inner<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{:?}", self.0)
+        }
+    }
+    impl<T: Ingest> tonic::server::NamedService for IngestServer<T> {
+        const NAME: &'static str = "cluster.Ingest";
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UsageData {
     #[prost(bytes = "vec", tag = "1")]
     pub data: ::prost::alloc::vec::Vec<u8>,
@@ -1949,7 +2469,8 @@ pub struct UsageResponse {
 /// Generated client implementations.
 pub mod usage_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct UsageClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -1988,13 +2509,14 @@ pub mod usage_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                    http::Request<tonic::body::BoxBody>,
-                    Response = http::Response<
-                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                    >,
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             UsageClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -2033,17 +2555,21 @@ pub mod usage_client {
             &mut self,
             request: impl tonic::IntoRequest<super::UsageRequest>,
         ) -> std::result::Result<tonic::Response<super::UsageResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Usage/ReportUsage");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Usage/ReportUsage",
+            );
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Usage", "ReportUsage"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Usage", "ReportUsage"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -2083,7 +2609,10 @@ pub mod usage_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -2139,16 +2668,21 @@ pub mod usage_server {
                 "/cluster.Usage/ReportUsage" => {
                     #[allow(non_camel_case_types)]
                     struct ReportUsageSvc<T: Usage>(pub Arc<T>);
-                    impl<T: Usage> tonic::server::UnaryService<super::UsageRequest> for ReportUsageSvc<T> {
+                    impl<T: Usage> tonic::server::UnaryService<super::UsageRequest>
+                    for ReportUsageSvc<T> {
                         type Response = super::UsageResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::UsageRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut =
-                                async move { <T as Usage>::report_usage(&inner, request).await };
+                            let fut = async move {
+                                <T as Usage>::report_usage(&inner, request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2175,14 +2709,18 @@ pub mod usage_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -2287,7 +2825,8 @@ pub struct DeleteResultCacheResponse {
 /// Generated client implementations.
 pub mod query_cache_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::{http::Uri, *};
+    use tonic::codegen::*;
+    use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
     pub struct QueryCacheClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -2326,13 +2865,14 @@ pub mod query_cache_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                    http::Request<tonic::body::BoxBody>,
-                    Response = http::Response<
-                        <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
-                    >,
+                http::Request<tonic::body::BoxBody>,
+                Response = http::Response<
+                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            >,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             QueryCacheClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -2370,16 +2910,23 @@ pub mod query_cache_client {
         pub async fn get_cached_result(
             &mut self,
             request: impl tonic::IntoRequest<super::QueryCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::QueryCacheResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::QueryCacheResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.QueryCache/GetCachedResult");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.QueryCache/GetCachedResult",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.QueryCache", "GetCachedResult"));
@@ -2388,17 +2935,23 @@ pub mod query_cache_client {
         pub async fn delete_result_cache(
             &mut self,
             request: impl tonic::IntoRequest<super::DeleteResultCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::DeleteResultCacheResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::DeleteResultCacheResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/cluster.QueryCache/DeleteResultCache");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.QueryCache/DeleteResultCache",
+            );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("cluster.QueryCache", "DeleteResultCache"));
@@ -2410,18 +2963,23 @@ pub mod query_cache_client {
 pub mod query_cache_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with
-    /// QueryCacheServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with QueryCacheServer.
     #[async_trait]
     pub trait QueryCache: Send + Sync + 'static {
         async fn get_cached_result(
             &self,
             request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::QueryCacheResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::QueryCacheResponse>,
+            tonic::Status,
+        >;
         async fn delete_result_cache(
             &self,
             request: tonic::Request<super::DeleteResultCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::DeleteResultCacheResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::DeleteResultCacheResponse>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct QueryCacheServer<T: QueryCache> {
@@ -2446,7 +3004,10 @@ pub mod query_cache_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -2502,11 +3063,15 @@ pub mod query_cache_server {
                 "/cluster.QueryCache/GetCachedResult" => {
                     #[allow(non_camel_case_types)]
                     struct GetCachedResultSvc<T: QueryCache>(pub Arc<T>);
-                    impl<T: QueryCache> tonic::server::UnaryService<super::QueryCacheRequest>
-                        for GetCachedResultSvc<T>
-                    {
+                    impl<
+                        T: QueryCache,
+                    > tonic::server::UnaryService<super::QueryCacheRequest>
+                    for GetCachedResultSvc<T> {
                         type Response = super::QueryCacheResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::QueryCacheRequest>,
@@ -2544,18 +3109,23 @@ pub mod query_cache_server {
                 "/cluster.QueryCache/DeleteResultCache" => {
                     #[allow(non_camel_case_types)]
                     struct DeleteResultCacheSvc<T: QueryCache>(pub Arc<T>);
-                    impl<T: QueryCache> tonic::server::UnaryService<super::DeleteResultCacheRequest>
-                        for DeleteResultCacheSvc<T>
-                    {
+                    impl<
+                        T: QueryCache,
+                    > tonic::server::UnaryService<super::DeleteResultCacheRequest>
+                    for DeleteResultCacheSvc<T> {
                         type Response = super::DeleteResultCacheResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::DeleteResultCacheRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as QueryCache>::delete_result_cache(&inner, request).await
+                                <T as QueryCache>::delete_result_cache(&inner, request)
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -2583,14 +3153,18 @@ pub mod query_cache_server {
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
