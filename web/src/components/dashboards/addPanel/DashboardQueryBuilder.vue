@@ -1265,6 +1265,7 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -1381,10 +1382,9 @@ export default defineComponent({
           // move the item from field list to axis
           const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-          const dragName =
-            dashboardPanelData.meta.stream.selectedStreamFields.find(
-              (item: any) => item?.name === dragElement?.column,
-            );
+          const dragName = selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
+            (item: any) => item?.name === dragElement?.column,
+          );
           const customDragName =
             dashboardPanelData.meta.stream.customQueryFields.find(
               (item: any) => item?.name === dragElement?.column,

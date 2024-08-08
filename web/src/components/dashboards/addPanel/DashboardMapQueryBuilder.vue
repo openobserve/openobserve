@@ -732,6 +732,7 @@ export default defineComponent({
       loadFilterItem,
       promqlMode,
       cleanupDraggingFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -799,8 +800,8 @@ export default defineComponent({
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         const dragName =
-          dashboardPanelData.meta.stream.selectedStreamFields.find(
-            (item: any) => item?.name === dragElement
+          selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
+            (item: any) => item?.name === dragElement,
           );
         const customDragName =
           dashboardPanelData.meta.stream.customQueryFields.find(

@@ -245,6 +245,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     () => dashboardPanelData.data.queryType == "promql",
   );
 
+  const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
+    if (
+      store.state.zoConfig.user_defined_schemas_enabled &&
+      dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+      dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+        "user_defined_schema"
+    ) {
+      return dashboardPanelData.meta.stream.userDefinedSchema ?? [];
+    }
+
+    return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
+  });
+
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -2651,7 +2664,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.x.filter(
           (it: any) =>
             ![
-              ...dashboardPanelData.meta.stream.selectedStreamFields,
+              ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
               ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ].find((i: any) => i.name == it.column),
         );
@@ -2669,7 +2682,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.y.filter(
           (it: any) =>
             ![
-              ...dashboardPanelData.meta.stream.selectedStreamFields,
+              ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
               ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
             ].find((i: any) => i.name == it.column),
         );
@@ -2819,7 +2832,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery,
-      dashboardPanelData.meta.stream.selectedStreamFields,
+      selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
       // Only continue if the current mode is "show custom query"
@@ -2904,6 +2917,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentXLabel,
     currentYLabel,
     generateLabelFromName,
+    selectedStreamFieldsBasedOnUserDefinedSchema,
   };
 };
 export default useDashboardPanelData;
