@@ -301,7 +301,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
+    FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
             )
@@ -314,7 +314,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
-    FROM file_list 
+    FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
             )
@@ -414,7 +414,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let sql = format!(
             r#"
 SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_num, SUM(records) as records, SUM(original_size) as original_size, SUM(compressed_size) as compressed_size
-    FROM file_list 
+    FROM file_list
     WHERE {field} = '{value}'
             "#,
         );
@@ -505,7 +505,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
             let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
             if let Err(e) = sqlx::query(
                 r#"
-    INSERT INTO stream_stats 
+    INSERT INTO stream_stats
     (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size)
     VALUES ($1, $2, 0, 0, 0, 0, 0, 0);
                 "#,
@@ -530,7 +530,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         for (stream_key, stats) in update_streams {
             if let Err(e) = sqlx::query(
                 r#"
-    UPDATE stream_stats 
+    UPDATE stream_stats
     SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
     WHERE stream = $7;
                 "#,
@@ -648,10 +648,10 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
 SELECT stream, max(id) as id, COUNT(*) AS num
-    FROM file_list_jobs 
-    WHERE status = $1 
-    GROUP BY stream 
-    ORDER BY num DESC 
+    FROM file_list_jobs
+    WHERE status = $1
+    GROUP BY stream
+    ORDER BY num DESC
     LIMIT $2;"#,
         )
         .bind(super::FileListJobStatus::Pending)
@@ -795,7 +795,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         let pool = CLIENT_RO.clone();
 
         let ret =
-            sqlx::query(r#"SELECT stream, count(*) as counts FROM file_list_jobs WHERE status = 0 GROUP BY stream;"#)
+            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs GROUP BY stream, status ORDER BY status desc;"#)
                 .fetch_all(&pool)
                 .await?;
 
@@ -803,7 +803,8 @@ SELECT stream, max(id) as id, COUNT(*) AS num
 
         for r in ret.iter() {
             let stream = r.get::<String, &str>("stream");
-            let counts = r.get::<i64, &str>("counts");
+            let status = r.get::<i32, &str>("status");
+            let mut counts = r.get::<i64, &str>("counts");
             let parts: Vec<&str> = stream.split('/').collect();
             let mut stream_type = "";
             let mut org = "";
@@ -811,10 +812,18 @@ SELECT stream, max(id) as id, COUNT(*) AS num
                 org = parts[0];
                 stream_type = parts[1];
             }
+
+            if status != 0 {
+                counts = 0;
+            }
+
             job_status
                 .entry(org.to_string())
                 .and_modify(|inner_map| {
-                    inner_map.entry(stream_type.to_string()).or_insert(counts);
+                    inner_map
+                        .entry(stream_type.to_string())
+                        .and_modify(|e| *e = counts)
+                        .or_insert(counts);
                 })
                 .or_insert(stdHashMap::from([(stream_type.to_string(), counts)]));
         }

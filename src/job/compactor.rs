@@ -103,8 +103,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
     let interval = get_config().compact.pending_jobs_metric_interval;
 
+    log::info!("[COMPACTOR] start run_compactor_pending_jobs_metric job");
+
     loop {
-        let locker = match infra::dist_lock::lock(COMPACTOR_PENDING_JOBS_KEY, interval).await {
+        let locker = match infra::dist_lock::lock(COMPACTOR_PENDING_JOBS_KEY, interval, None).await
+        {
             Ok(locker) => locker,
             Err(_) => continue,
         };
@@ -119,6 +122,10 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
                 continue;
             }
         };
+
+        if job_status.len() == 0 {
+            metrics::COMPACT_PENDING_JOBS.reset();
+        }
 
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {

@@ -958,9 +958,9 @@ pub struct Compact {
         default = 86400, // 1 day
         help = "Clean the jobs which are finished more than this time"
     )]
+    pub job_clean_wait_time: i64,
     #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
     pub pending_jobs_metric_interval: u64,
-    pub job_clean_wait_time: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1102,16 +1102,16 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_REPLICAS",
         default = 3,
-        help = "the copies of a given message to store in the NATS cluster. 
-        Can not be modified after bucket is initialized. 
+        help = "the copies of a given message to store in the NATS cluster.
+        Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
     )]
     pub replicas: usize,
     #[env_config(
         name = "ZO_NATS_HISTORY",
         default = 3,
-        help = "in the context of KV to configure how many historical entries to keep for a given bucket. 
-        Can not be modified after bucket is initialized. 
+        help = "in the context of KV to configure how many historical entries to keep for a given bucket.
+        Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
     )]
     pub history: i64,
