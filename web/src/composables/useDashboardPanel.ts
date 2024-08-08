@@ -1668,30 +1668,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     updateQueryValue();
   };
 
-  const getColumnType = (column: string) => {
-    console.log("---------------column", column);
-    console.log(
-      "---dashboard",
-      dashboardPanelData.meta.stream.selectedStreamFields,
-    );
-
-    const field = [
-      ...dashboardPanelData.meta.stream.selectedStreamFields,
-      ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-    ].find((field: any) => field?.name === column);
-    console.log("field", field);
-
-    return field ? field.type : null;
-  };
-
-  const formatValue = (value: any, column: string) => {
+  const formatValue = (value: any) => {
     if (value == null) {
       console.log("Value is null or undefined, returning as is");
       return value;
     }
-    console.log("formatValue", value, column);
-    const columnType = getColumnType(column);
-    console.log("columnType", columnType);
+    console.log("formatValue", value);
 
     let tempValue = value;
     if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
@@ -1772,7 +1754,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         return groupConditions.length ? `(${groupQuery})` : "";
       } else if (condition.type === "list" && condition.values?.length > 0) {
         return `${condition.column} IN (${condition.values
-          .map((value: any) => formatValue(value, condition.column))
+          .map((value: any) => formatValue(value))
           .join(", ")})`;
       } else if (condition.type === "condition" && condition.operator != null) {
         let selectFilter = "";
@@ -1789,7 +1771,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         } else if (condition.operator === "IN") {
           selectFilter += `${condition.column} IN (${formatINValue(condition.value)})`;
         } else if (condition.operator === "match_all") {
-          selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
+          selectFilter += `match_all(${formatValue(condition.value)})`;
         } else if (condition.value != null && condition.value !== "") {
           console.log("condition.value---------", condition.value);
 
@@ -1801,7 +1783,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             case ">":
             case "<=":
             case ">=":
-              selectFilter += `${condition.operator} ${formatValue(condition.value, condition.column)}`;
+              selectFilter += `${condition.operator} ${formatValue(condition.value)}`;
               break;
             case "Contains":
               selectFilter += `LIKE '%${condition.value}%'`;
@@ -1810,7 +1792,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               selectFilter += `NOT LIKE '%${condition.value}%'`;
               break;
             default:
-              selectFilter += `${condition.operator} ${formatValue(condition.value, condition.column)}`;
+              selectFilter += `${condition.operator} ${formatValue(condition.value)}`;
               break;
           }
         }
