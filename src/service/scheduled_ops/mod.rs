@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use alerts::to_float;
 use arrow_schema::DataType;
 use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
     meta::search::SearchEventType,
-    utils::json::{Map, Value},
+    utils::{
+        base64,
+        json::{Map, Value},
+    },
 };
 
 use super::promql;
@@ -71,6 +72,7 @@ impl QueryCondition {
         &self,
         stream_param: &StreamParams,
         trigger_condition: &TriggerCondition,
+        query_condition: &QueryCondition,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
@@ -170,7 +172,7 @@ impl QueryCondition {
             query: config::meta::search::Query {
                 sql: sql.clone(),
                 from: 0,
-                size: 100,
+                size: std::cmp::max(100, trigger_condition.threshold),
                 start_time: now
                     - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
@@ -178,16 +180,25 @@ impl QueryCondition {
                         .unwrap(),
                 end_time: now,
                 sort_by: None,
-                sql_mode: "full".to_string(),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
-                query_context: None,
-                query_fn: None,
+                query_fn: if query_condition.vrl_function.is_some() {
+                    match base64::decode_url(query_condition.vrl_function.as_ref().unwrap()) {
+                        Ok(query_fn) => Some(query_fn),
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Error decoding alert vrl query function: {e}" /* TODO: update
+                                                                                * error msg */
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                },
                 skip_wal: false,
             },
-            aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
             clusters: vec![],
@@ -206,8 +217,12 @@ impl QueryCondition {
         .await
         {
             Ok(v) => v,
-            Err(_) => {
-                return Ok(None);
+            Err(e) => {
+                if let infra::errors::Error::ErrorCode(e) = e {
+                    return Err(anyhow::anyhow!("{}", e.get_message()));
+                } else {
+                    return Err(anyhow::anyhow!("{}", e));
+                }
             }
         };
         if resp.total < trigger_condition.threshold as usize {
@@ -350,6 +365,7 @@ async fn build_sql(
         AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
         AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
         AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
+        AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
         AggFunction::P50 => format!("approx_percentile_cont(\"{}\", 0.5)", agg.having.column),
         AggFunction::P75 => format!("approx_percentile_cont(\"{}\", 0.75)", agg.having.column),
         AggFunction::P90 => format!("approx_percentile_cont(\"{}\", 0.9)", agg.having.column),

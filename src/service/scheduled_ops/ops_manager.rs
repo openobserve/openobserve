@@ -145,7 +145,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         );
     }
     if ret.is_some() && alert.trigger_condition.silence > 0 {
-        if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+        if alert.trigger_condition.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
             let silence =
                 Utc::now() + Duration::try_minutes(alert.trigger_condition.silence).unwrap();
