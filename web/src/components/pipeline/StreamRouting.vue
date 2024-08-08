@@ -292,7 +292,7 @@ const filteredColumns: any = ref([]);
 
 const isValidSqlQuery = ref(true);
 
-const validateSqlQueryPromise = ref<Promise<unknown>>(null);
+const validateSqlQueryPromise = ref<Promise<unknown>>();
 
 const scheduledAlertRef = ref<any>(null);
 
