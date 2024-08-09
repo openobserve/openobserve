@@ -773,6 +773,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :variablesData="variablesData"
       />
+
+      <div class="space"></div>
+      <MarkLineConfig
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+      />
     </div>
   </div>
 </template>
@@ -782,18 +798,19 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete },
+  components: { Drilldown, CommonAutoComplete, MarkLineConfig },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
 
