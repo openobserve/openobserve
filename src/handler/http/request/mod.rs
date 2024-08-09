@@ -25,7 +25,7 @@ pub mod organization;
 pub mod pipelines;
 pub mod prom;
 pub mod rum;
-pub mod scheduled_ops;
+pub mod alerts;
 pub mod search;
 pub mod status;
 pub mod stream;
