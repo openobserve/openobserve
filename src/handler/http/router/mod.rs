@@ -144,11 +144,10 @@ async fn check_keepalive(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     let mut resp = next.call(req).await?;
-    if resp.status() != StatusCode::OK {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("connection"),
-            header::HeaderValue::from_static("close"),
-        );
+    if resp.status() >= StatusCode::BAD_REQUEST {
+        resp.response_mut()
+            .head_mut()
+            .set_connection_type(actix_http::ConnectionType::Close);
     }
     Ok(resp)
 }
@@ -324,12 +323,12 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 
     cfg.service(
         web::scope("/api")
-            .wrap(from_fn(check_keepalive))
             .wrap(from_fn(audit_middleware))
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
+            .wrap(from_fn(check_keepalive))
             .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
             .service(users::list)
             .service(users::save)
