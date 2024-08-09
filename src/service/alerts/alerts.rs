@@ -67,7 +67,7 @@ pub async fn save(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alerts::get(org_id, stream_type, stream_name, &alert.name).await {
+    match db::alerts::get(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(_)) => {
             if create {
                 return Err(anyhow::anyhow!("Alert already exists"));
@@ -197,7 +197,7 @@ pub async fn save(
     }
 
     // save the alert
-    match db::alerts::alerts::set(org_id, stream_type, stream_name, &alert, create).await {
+    match db::alerts::set(org_id, stream_type, stream_name, &alert, create).await {
         Ok(_) => {
             if name.is_empty() {
                 set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
@@ -214,7 +214,7 @@ pub async fn get(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
-    db::alerts::alerts::get(org_id, stream_type, stream_name, name).await
+    db::alerts::get(org_id, stream_type, stream_name, name).await
 }
 
 pub async fn list(
@@ -223,7 +223,7 @@ pub async fn list(
     stream_name: Option<&str>,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    match db::alerts::alerts::list(org_id, stream_type, stream_name).await {
+    match db::alerts::list(org_id, stream_type, stream_name).await {
         Ok(alerts) => {
             let mut result = Vec::new();
             for alert in alerts {
@@ -252,7 +252,7 @@ pub async fn delete(
     stream_name: &str,
     name: &str,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    if db::alerts::alerts::get(org_id, stream_type, stream_name, name)
+    if db::alerts::get(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
@@ -261,7 +261,7 @@ pub async fn delete(
             anyhow::anyhow!("Alert not found"),
         ));
     }
-    match db::alerts::alerts::delete(org_id, stream_type, stream_name, name).await {
+    match db::alerts::delete(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(name)).await;
             Ok(())
@@ -278,7 +278,7 @@ pub async fn enable(
     value: bool,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
     let mut alert =
-        match db::alerts::alerts::get(org_id, stream_type, stream_name, name).await {
+        match db::alerts::get(org_id, stream_type, stream_name, name).await {
             Ok(Some(alert)) => alert,
             _ => {
                 return Err((
@@ -288,7 +288,7 @@ pub async fn enable(
             }
         };
     alert.enabled = value;
-    db::alerts::alerts::set(org_id, stream_type, stream_name, &alert, false)
+    db::alerts::set(org_id, stream_type, stream_name, &alert, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -299,7 +299,7 @@ pub async fn trigger(
     stream_name: &str,
     name: &str,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let alert = match db::alerts::alerts::get(org_id, stream_type, stream_name, name).await {
+    let alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
             return Err((
