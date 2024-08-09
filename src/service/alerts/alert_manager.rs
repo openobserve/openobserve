@@ -201,12 +201,23 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert.send_notification(&data).await {
-            Ok(_) => {
+            Ok((true, _)) => {
                 log::info!(
                     "Alert notification sent, org: {}, module_key: {}",
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
+                db::scheduler::update_trigger(new_trigger).await?;
+            }
+            Ok((false, msg)) => {
+                log::error!(
+                    "Some notifications for alert {}/{} could not be sent: {msg}",
+                    &new_trigger.org,
+                    &new_trigger.module_key
+                );
+                // Notification is already sent to some destinations,
+                // hence no need to retry
+                trigger_data_stream.error = Some(msg);
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Err(e) => {
@@ -251,7 +262,6 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     // publish the triggers as stream
-    trigger_data_stream.end_time = Utc::now().timestamp_micros();
     publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())

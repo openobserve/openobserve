@@ -296,7 +296,7 @@ pub async fn trigger(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
+) -> Result<(bool, String), (http::StatusCode, anyhow::Error)> {
     let alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
@@ -327,24 +327,41 @@ impl Alert {
         }
     }
 
+    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
+    /// and the error message if any
     pub async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(bool, String), anyhow::Error> {
+        let mut message = "".to_string();
+        let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
             if let Err(e) = send_notification(self, &dest, rows).await {
                 log::error!(
-                    "Error sending notification for {}/{}/{}/{} err: {}",
+                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
                     self.org_id,
                     self.stream_type,
                     self.stream_name,
                     self.name,
+                    dest.name,
                     e
+                );
+                no_of_error += 1;
+                message = format!(
+                    "{message} Error sending notification for destination {} err: {e};",
+                    dest.name
                 );
             }
         }
-        Ok(())
+        if no_of_error == self.destinations.len() {
+            Err(anyhow::anyhow!(message))
+        } else if no_of_error != 0 {
+            // Some send notification job failed
+            Ok((false, message))
+        } else {
+            Ok((true, "".to_owned()))
+        }
     }
 }
 
