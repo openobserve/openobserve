@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <scheduled-alert
             ref="scheduledAlertRef"
             :columns="filteredColumns"
-            :conditions="streamRoute.query_condition.conditions"
+            :conditions="[]"
             :alertData="streamRoute"
             :disableThreshold="true"
             :disableVrlFunction="true"
@@ -239,7 +239,6 @@ interface StreamRoute {
     aggregation: {
       group_by: string[];
     } | null;
-    conditions: RouteCondition[];
   };
   trigger_condition: {
     period: number;
@@ -335,11 +334,8 @@ const getDefaultStreamRoute = () => {
       sql: "",
       type: "sql",
       aggregation: null,
-      conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
     },
     trigger_condition: {
-      operator: "=",
-      threshold: 2,
       period: 10,
       frequency_type: "minutes",
       cron: "",
@@ -380,15 +376,6 @@ onMounted(() => {
           id: getUUID(),
         };
       });
-
-      // If query conditions are present, add uuid to each condition
-      streamRoute.value.query_condition.conditions =
-        streamRoute.value.query_condition.conditions.map((condition: any) => {
-          return {
-            ...condition,
-            id: getUUID(),
-          };
-        });
     }
   }
 
@@ -457,13 +444,6 @@ const addField = () => {
       value: "",
       id: getUUID(),
     });
-  } else {
-    streamRoute.value.query_condition.conditions.push({
-      column: "",
-      operator: "",
-      value: "",
-      id: getUUID(),
-    });
   }
 };
 
@@ -472,11 +452,6 @@ const removeField = (field: any) => {
     streamRoute.value.conditions = streamRoute.value.conditions.filter(
       (_field: any) => _field.id !== field.id,
     );
-  } else {
-    streamRoute.value.query_condition.conditions =
-      streamRoute.value.query_condition.conditions.filter(
-        (_field: any) => _field.id !== field.id,
-      );
   }
 };
 
@@ -639,8 +614,12 @@ const getRoutePayload = () => {
     }
 
     if (payload.query_condition.aggregation?.having) {
-      delete payload.query_condition?.aggregation.having;
+      delete payload.query_condition?.aggregation?.having;
     }
+
+    delete payload?.conditions;
+
+    delete payload?.query_condition?.conditions;
   }
 
   if (isUpdating.value) {
