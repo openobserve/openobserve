@@ -38,7 +38,7 @@ impl Ingest for Ingester {
         let resp = match StreamType::try_from(req.stream_type) {
             Ok(StreamType::Logs) => {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
-                let data = actix_web::web::Bytes::from(in_data.data);
+                let data = bytes::Bytes::from(in_data.data);
                 match create_log_ingestion_req(log_ingestion_type, &data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
@@ -55,15 +55,20 @@ impl Ingest for Ingester {
             Ok(StreamType::EnrichmentTables) => {
                 let json_records: Vec<json::Map<String, json::Value>> =
                     json::from_slice(&in_data.data).unwrap_or({
-                        let json_records: json::Map<String, json::Value> =
-                            json::from_slice(&in_data.data).unwrap();
-                        vec![json_records]
+                        let vec_value: Vec<json::Value> = json::from_slice(&in_data.data).unwrap();
+                        vec_value
+                            .into_iter()
+                            .filter_map(|v| match v {
+                                json::Value::Object(map) => Some(map),
+                                _ => None,
+                            })
+                            .collect()
                     });
                 crate::service::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,
-                    true,
+                    false,
                 )
                 .await
                 .map_or_else(
