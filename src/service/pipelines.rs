@@ -47,7 +47,6 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
     if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
-            derived_stream.trigger_condition.frequency *= 60; // convert to seconds
             derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
             if !derived_stream.is_valid() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -101,7 +100,6 @@ pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Err
     if let Some(ref mut derived_streams) = &mut pipeline.derived_streams {
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
-            derived_stream.trigger_condition.frequency *= 60; // convert to seconds
             derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
             if !derived_stream.is_valid() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

@@ -538,7 +538,7 @@ async fn handle_derived_stream_triggers(
             .timestamp_micros();
     } else {
         new_trigger.next_run_at +=
-            Duration::try_seconds(derived_stream.trigger_condition.frequency)
+            Duration::try_minutes(derived_stream.trigger_condition.frequency)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
@@ -578,7 +578,7 @@ async fn handle_derived_stream_triggers(
             stream_name: stream_name.clone(),
             stream_type,
             data: Some(cluster_rpc::IngestionData::from(local_val)),
-            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()), /* TODO(taiming): finalize IngestionType for derived_stream */
         };
         match ingestion_service::ingest(&org_id, req).await {
             Ok(_) => {

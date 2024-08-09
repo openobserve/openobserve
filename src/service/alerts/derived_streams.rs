@@ -105,9 +105,9 @@ pub async fn save(
         // Check the cron expression
         Schedule::from_str(&derived_stream.trigger_condition.cron)?;
     } else if derived_stream.trigger_condition.frequency == 0 {
-        // default 3 mins, set min at 10 seconds
+        // default 3 mins, set min at 1 minutes
         derived_stream.trigger_condition.frequency =
-            std::cmp::max(10, get_config().limit.derived_stream_schedule_interval);
+            std::cmp::max(1, get_config().limit.derived_stream_schedule_interval / 60);
     }
 
     // 3. clean up DerivedStream context attributes
@@ -129,7 +129,7 @@ pub async fn save(
 
     // Save the trigger to db
     let next_run_at = Utc::now().timestamp_micros()
-        + Duration::try_seconds(derived_stream.trigger_condition.frequency)
+        + Duration::try_minutes(derived_stream.trigger_condition.frequency)
             .unwrap()
             .num_microseconds()
             .unwrap();
@@ -147,21 +147,9 @@ pub async fn save(
         Ok(_) => db::scheduler::update_trigger(trigger)
             .await
             .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update")),
-        Err(_) => {
-            match db::scheduler::push(trigger).await {
-                Ok(_) => {
-                    // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
-                    // set_ownership(
-                    //     &derived_stream.source.org_id,
-                    //     "derived_stream",
-                    //     Authz::new(&derived_stream.name),
-                    // )
-                    // .await;
-                    Ok(())
-                }
-                Err(e) => Err(anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
-            }
-        }
+        Err(_) => db::scheduler::push(trigger)
+            .await
+            .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e)),
     }
 }
 
@@ -169,27 +157,13 @@ pub async fn delete(
     derived_stream: DerivedStreamMeta,
     pipeline_name: &str,
 ) -> Result<(), anyhow::Error> {
-    match db::scheduler::delete(
+    db::scheduler::delete(
         &derived_stream.source.org_id,
         db::scheduler::TriggerModule::DerivedStream,
         &derived_stream.get_scheduler_module_key(pipeline_name),
     )
     .await
-    {
-        Ok(_) => {
-            // TODO(taiming): is this needed, what needs to be updated in ofpg if so?
-            // remove_ownership(
-            //     &derived_stream.source.org_id,
-            //     "derived_stream",
-            //     Authz::new(&derived_stream.name),
-            // )
-            // .await;
-            Ok(())
-        }
-        Err(e) => Err(anyhow::anyhow!(
-            "Error deleting derived stream trigger: {e}"
-        )),
-    }
+    .map_err(|e| anyhow::anyhow!("Error deleting derived stream trigger: {e}"))
 }
 
 impl DerivedStreamMeta {
