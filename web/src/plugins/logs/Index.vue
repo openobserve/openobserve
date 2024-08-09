@@ -248,7 +248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
-              @update:stream-list="streamListUpdated"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -454,9 +453,6 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
-
-    // flag to know if it is the first time visualize
-    let firstTimeVisualizeFlag = false;
 
     const { showErrorNotification } = useNotifications();
 
@@ -955,9 +951,6 @@ export default defineComponent({
 
       // set stream type and stream name
       if (streamName && streamName != "undefined") {
-        // set firstTimeVisualizeFlag as true
-        firstTimeVisualizeFlag = true;
-
         dashboardPanelData.data.queries[0].fields.stream_type =
           searchObj.data.stream.streamType ?? "logs";
         dashboardPanelData.data.queries[0].fields.stream = streamName;
@@ -1011,6 +1004,9 @@ export default defineComponent({
 
           // set fields and conditions
           await setFieldsAndConditions();
+
+          // run query
+          handleRunQueryFn();
         }
       },
     );
@@ -1078,17 +1074,6 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
-    const streamListUpdated = () => {
-      if (
-        searchObj.meta.logsVisualizeToggle == "visualize" &&
-        firstTimeVisualizeFlag
-      ) {
-        firstTimeVisualizeFlag = false;
-        // run query
-        handleRunQueryFn();
-      }
-    };
-
     return {
       t,
       store,
@@ -1126,7 +1111,6 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
-      streamListUpdated,
       disableMoreErrorDetails,
     };
   },

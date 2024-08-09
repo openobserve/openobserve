@@ -620,7 +620,6 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "FieldList",
   props: ["editMode"],
-  emits: ["update:streamList"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -1068,7 +1067,6 @@ export default defineComponent({
             }
           }
         }
-        emit("update:streamList");
       } catch (e: any) {
         console.log("Error while extracting fields");
       }
