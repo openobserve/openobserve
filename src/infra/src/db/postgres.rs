@@ -349,6 +349,8 @@ impl super::Db for PostgresDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
+        // Escape ' (single quote) character with ''
+        let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
         let sql = if with_prefix {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
