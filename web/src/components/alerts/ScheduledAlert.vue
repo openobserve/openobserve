@@ -40,29 +40,104 @@
       />
     </template>
     <template v-else>
-      <div class="text-bold q-mr-sm q-my-sm">
-        {{ tab === "promql" ? "Promql" : "SQL" }}
+      <div class="flex tw-justify-between items-center">
+        <div class="text-bold q-mr-sm q-my-sm">
+          {{ tab === "promql" ? "Promql" : "SQL" }}
+        </div>
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="isVrlFunctionEnabled"
+          :icon="'img:' + getImageURL('images/common/function.svg')"
+          title="Toggle Function Editor"
+          class="q-pl-xs"
+          size="30px"
+          :disable="tab === 'promql'"
+        />
       </div>
-      <template v-if="tab === 'sql'">
-        <query-editor
-          data-test="scheduled-alert-sql-editor"
-          ref="queryEditorRef"
-          editor-id="alerts-query-editor"
-          class="monaco-editor q-mb-md"
-          v-model:query="query"
-          @update:query="updateQueryValue"
-        />
-      </template>
-      <template v-if="tab === 'promql'">
-        <query-editor
-          data-test="scheduled-alert-promql-editor"
-          ref="queryEditorRef"
-          editor-id="alerts-query-editor"
-          class="monaco-editor q-mb-md"
-          v-model:query="promqlQuery"
-          @update:query="updateQueryValue"
-        />
-      </template>
+
+      <div class="flex">
+        <template v-if="tab === 'sql'">
+          <div>
+            <query-editor
+              data-test="scheduled-alert-sql-editor"
+              ref="queryEditorRef"
+              editor-id="alerts-query-editor"
+              class="monaco-editor"
+              v-model:query="query"
+              :class="
+                query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+              "
+              @update:query="updateQueryValue"
+              @focus="queryEditorPlaceholderFlag = false"
+              @blur="onBlurQueryEditor"
+            />
+            <div class="text-negative q-mb-xs" style="height: 21px">
+              <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
+            </div>
+          </div>
+        </template>
+        <template v-if="tab === 'promql'">
+          <query-editor
+            data-test="scheduled-alert-promql-editor"
+            ref="queryEditorRef"
+            editor-id="alerts-query-editor"
+            class="monaco-editor q-mb-md"
+            v-model:query="promqlQuery"
+            @update:query="updateQueryValue"
+          />
+        </template>
+
+        <div
+          data-test="logs-vrl-function-editor"
+          v-show="isVrlFunctionEnabled && tab === 'sql'"
+        >
+          <div style="height: 40px; width: 100%">
+            <div style="display: flex; height: 40px">
+              <q-select
+                v-model="selectedFunction"
+                label="Use Saved function"
+                :options="functionOptions"
+                data-test="dashboard-use-saved-vrl-function"
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                filled
+                borderless
+                dense
+                hide-selected
+                menu-anchor="top left"
+                fill-input
+                option-label="name"
+                option-value="name"
+                @filter="filterFunctionOptions"
+                @update:modelValue="onFunctionSelect"
+                style="width: 100%"
+              >
+                <template #no-option>
+                  <q-item>
+                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+          </div>
+          <query-editor
+            data-test="logs-vrl-function-editor"
+            ref="fnEditorRef"
+            editor-id="fnEditor"
+            class="monaco-editor"
+            v-model:query="vrlFunctionContent"
+            :class="
+              vrlFunctionContent == '' && functionEditorPlaceholderFlag
+                ? 'empty-function'
+                : ''
+            "
+            language="ruby"
+            @focus="functionEditorPlaceholderFlag = false"
+            @blur="functionEditorPlaceholderFlag = true"
+          />
+        </div>
+      </div>
     </template>
 
     <div class="q-mt-sm">
@@ -642,9 +717,12 @@ import {
   outlinedInfo,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import { getImageURL } from "@/utils/zincutils";
+import useQuery from "@/composables/useQuery";
+import searchService from "@/services/search";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/QueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -658,6 +736,9 @@ const props = defineProps([
   "alertData",
   "promql",
   "promql_condition",
+  "vrl_function",
+  "showVrlFunction",
+  "isValidSqlQuery",
 ]);
 
 const emits = defineEmits([
@@ -671,6 +752,9 @@ const emits = defineEmits([
   "input:update",
   "update:promql",
   "update:promql_condition",
+  "update:vrl_function",
+  "update:showVrlFunction",
+  "validate-sql",
 ]);
 
 const { t } = useI18n();
@@ -685,17 +769,21 @@ const tab = ref(props.query_type || "custom");
 
 const store = useStore();
 
+const functionEditorPlaceholderFlag = ref(true);
+
+const queryEditorPlaceholderFlag = ref(true);
+
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
 const aggFunctions = computed(() =>
   props.alertData.stream_type === "metrics"
     ? [...regularFunctions, ...metricFunctions]
-    : [...regularFunctions]
+    : [...regularFunctions],
 );
 
 const _isAggregationEnabled = ref(
-  tab.value === "custom" && props.isAggregationEnabled
+  tab.value === "custom" && props.isAggregationEnabled,
 );
 
 const promqlCondition = ref(props.promql_condition);
@@ -724,6 +812,8 @@ const addField = () => {
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
+
+const selectedFunction = ref("");
 
 const removeField = (field: any) => {
   emits("field:remove", field);
@@ -757,6 +847,40 @@ const getDefaultPromqlCondition = () => {
     value: 0,
   };
 };
+
+const onFunctionSelect = (_function: any) => {
+  selectedFunction.value = _function.name;
+  vrlFunctionContent.value = _function.function;
+};
+
+const functionsList = computed(() => store.state.organizationData.functions);
+
+const functionOptions = ref<any[]>([]);
+
+watch(
+  () => functionsList.value,
+  (functions: any[]) => {
+    functionOptions.value = [...functions];
+  },
+);
+
+const vrlFunctionContent = computed({
+  get() {
+    return props.vrl_function;
+  },
+  set(value) {
+    emits("update:vrl_function", value);
+  },
+});
+
+const isVrlFunctionEnabled = computed({
+  get() {
+    return props.showVrlFunction;
+  },
+  set(value) {
+    emits("update:showVrlFunction", value);
+  },
+});
 
 const updateQuery = () => {
   if (tab.value === "promql") {
@@ -816,7 +940,7 @@ const filterColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredFields.value = props.columns.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };
@@ -830,7 +954,7 @@ const filterNumericColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredNumericColumns.value = getNumericColumns.value.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };
@@ -839,6 +963,20 @@ const updateAggregationToggle = () => {
   _isAggregationEnabled.value =
     tab.value === "custom" && props.isAggregationEnabled;
 };
+
+const filterFunctionOptions = (val: string, update: any) => {
+  update(() => {
+    functionOptions.value = functionsList.value.filter((fn: any) => {
+      return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+    });
+  });
+};
+
+const onBlurQueryEditor = () => {
+  queryEditorPlaceholderFlag.value = true;
+  emits("validate-sql");
+};
+
 defineExpose({
   tab,
 });
@@ -879,6 +1017,18 @@ defineExpose({
     &.icon-dark {
       filter: none !important;
     }
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
   }
 }
 </style>

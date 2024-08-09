@@ -20,7 +20,7 @@ use std::{
 
 use actix_web::http;
 use arrow_schema::DataType;
-use chrono::{Duration, Local, TimeZone, Utc};
+use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config, ider,
     meta::{search::SearchEventType, stream::StreamType},
@@ -86,6 +86,17 @@ pub async fn save(
     }
 
     if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+        let cron_exp = alert.trigger_condition.cron.clone();
+        if cron_exp.starts_with("* ") {
+            let (_, rest) = cron_exp.split_once(" ").unwrap();
+            let now = Utc::now().second().to_string();
+            alert.trigger_condition.cron = format!("{now} {rest}");
+            log::debug!(
+                "New cron expression for alert {}: {}",
+                alert.name,
+                alert.trigger_condition.cron
+            );
+        }
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron)?;
     } else if alert.trigger_condition.frequency == 0 {
@@ -99,6 +110,22 @@ pub async fn save(
     }
     if alert.name.contains('/') {
         return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
+    }
+
+    if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
+        match base64::decode_url(vrl) {
+            Ok(vrl) => {
+                if !vrl.ends_with('.') {
+                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    alert.query_condition.vrl_function = Some(vrl);
+                }
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Error decoding vrl function for alert: {e}"
+                ));
+            }
+        }
     }
 
     // before saving alert check alert destination
@@ -164,7 +191,9 @@ pub async fn save(
     }
 
     // test the alert
-    _ = &alert.evaluate(None).await?;
+    if let Err(e) = &alert.evaluate(None).await {
+        return Err(anyhow::anyhow!("Alert test failed: {}", e));
+    }
 
     // save the alert
     match db::alerts::set(org_id, stream_type, stream_name, &alert, create).await {
@@ -440,11 +469,11 @@ impl QueryCondition {
         };
 
         // fire the query
-        let req = config::meta::search::Request {
+        let req: config::meta::search::Request = config::meta::search::Request {
             query: config::meta::search::Query {
                 sql: sql.clone(),
                 from: 0,
-                size: 100,
+                size: std::cmp::max(100, alert.trigger_condition.threshold),
                 start_time: now
                     - Duration::try_minutes(alert.trigger_condition.period)
                         .unwrap()
@@ -456,7 +485,18 @@ impl QueryCondition {
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
-                query_fn: None,
+                query_fn: if alert.query_condition.vrl_function.is_some() {
+                    match base64::decode_url(alert.query_condition.vrl_function.as_ref().unwrap()) {
+                        Ok(query_fn) => Some(query_fn),
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Error decoding alert vrl query function: {e}"
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                },
                 skip_wal: false,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
@@ -471,8 +511,12 @@ impl QueryCondition {
                 .await
             {
                 Ok(v) => v,
-                Err(_) => {
-                    return Ok(None);
+                Err(e) => {
+                    if let infra::errors::Error::ErrorCode(e) = e {
+                        return Err(anyhow::anyhow!("{}", e.get_message()));
+                    } else {
+                        return Err(anyhow::anyhow!("{}", e));
+                    }
                 }
             };
         if resp.total < alert.trigger_condition.threshold as usize {

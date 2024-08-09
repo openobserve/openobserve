@@ -148,6 +148,8 @@ async fn dispatch(
     payload: web::Payload,
     client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
     let new_url = get_url(path).await;
@@ -161,7 +163,12 @@ async fn dispatch(
         .send_stream(payload)
         .await;
     if let Err(e) = resp {
-        log::error!("dispatch: {}, error: {}", new_url.value, e);
+        log::error!(
+            "dispatch: {}, error: {}, took: {} ms",
+            new_url.value,
+            e,
+            start.elapsed().as_millis()
+        );
         return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
     }
 

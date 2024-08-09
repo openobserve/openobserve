@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                      v-if="searchObj.meta.quickMode && props.row.name != store.state.zoConfig.timestamp_column"
+                      v-if="searchObj.meta.quickMode"
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
                         props.row.name
-                      ) && props.row.name != store.state.zoConfig.timestamp_column
+                      )
                     "
                     :name="outlinedVisibility"
                     style="margin-right: 0.375rem"
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       searchObj.data.stream.selectedFields.includes(
                         props.row.name
-                      ) && props.row.name != store.state.zoConfig.timestamp_column
+                      )
                     "
                     :name="outlinedVisibilityOff"
                     style="margin-right: 0.375rem"
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-icon
                     :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                    v-if="searchObj.meta.quickMode && props.row.name != store.state.zoConfig.timestamp_column"
+                    v-if="searchObj.meta.quickMode"
                     :name="
                       props.row.isInterestingField ? 'info' : 'info_outline'
                     "
@@ -977,11 +977,16 @@ export default defineComponent({
                 }
               }
             })
+            .catch((err: any) => {
+              fieldValues.value[name]["isLoading"] = false;
+            })
             .finally(() => {
               if (countTotal == 0) fieldValues.value[name]["isLoading"] = false;
             });
         });
       } catch (err) {
+        fieldValues.value[name]["isLoading"] = false;
+
         console.log(err);
         $q.notify({
           type: "negative",
