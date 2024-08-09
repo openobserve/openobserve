@@ -40,10 +40,8 @@ export const convertSQLData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   resultMetaData: any,
-  metadata: any
+  metadata: any,
 ) => {
-  // console.time("convertSQLData");
-
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -84,11 +82,28 @@ export const convertSQLData = async (
       : [];
   };
 
+  const getMarkLineData = (panelSchema: any) => {
+    return (
+      panelSchema?.config?.mark_line?.map((markLine: any) => {
+        return {
+          name: markLine.name,
+          type: markLine.type,
+          xAxis: markLine.type == "xAxis" ? markLine.value : null,
+          yAxis: markLine.type == "yAxis" ? markLine.value : null,
+          label: {
+            formatter: markLine.name ? "{b}:{c}" : "{c}",
+            position: "insideEndTop",
+          },
+        };
+      }) ?? []
+    );
+  };
+
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
     const interval = resultMetaData.value.map(
-      (it: any) => it.histogram_interval
+      (it: any) => it.histogram_interval,
     )[0];
 
     if (
@@ -120,7 +135,7 @@ export const convertSQLData = async (
       ...getBreakDownKeys(),
     ];
     let timeBasedKey = keys?.find((key) =>
-      isTimeSeries([searchQueryDataFirstEntry?.[key]])
+      isTimeSeries([searchQueryDataFirstEntry?.[key]]),
     );
 
     if (!timeBasedKey) {
@@ -132,10 +147,10 @@ export const convertSQLData = async (
     const endTime = new Date(parseInt(metaDataEndTime) / 1000);
 
     const xAxisKeysWithoutTimeStamp = getXAxisKeys().filter(
-      (key: any) => key !== timeBasedKey
+      (key: any) => key !== timeBasedKey,
     );
     const breakdownAxisKeysWithoutTimeStamp = getBreakDownKeys().filter(
-      (key: any) => key !== timeBasedKey
+      (key: any) => key !== timeBasedKey,
     );
 
     const timeKey = timeBasedKey;
@@ -146,7 +161,7 @@ export const convertSQLData = async (
 
     // Create a set of unique xAxis values
     const uniqueXAxisValues = new Set(
-      searchQueryData[0].map((d: any) => d[uniqueKey])
+      searchQueryData[0].map((d: any) => d[uniqueKey]),
     );
 
     const filledData: any = [];
@@ -166,7 +181,7 @@ export const convertSQLData = async (
     while (currentTime <= endTime) {
       const currentFormattedTime = format(
         toZonedTime(currentTime, "UTC"),
-        "yyyy-MM-dd'T'HH:mm:ss"
+        "yyyy-MM-dd'T'HH:mm:ss",
       );
 
       if (
@@ -260,7 +275,7 @@ export const convertSQLData = async (
   const breakDownKeys = getBreakDownKeys();
 
   const legendPosition = getLegendPosition(
-    panelSchema.config?.legends_position
+    panelSchema.config?.legends_position,
   );
 
   const legendConfig: any = {
@@ -322,8 +337,8 @@ export const convertSQLData = async (
             ? 50
             : 60
           : panelSchema.config?.axis_width == null
-          ? 35
-          : "40",
+            ? 35
+            : "40",
     },
     tooltip: {
       trigger: "axis",
@@ -353,8 +368,8 @@ export const convertSQLData = async (
                     params.value,
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
+                    panelSchema.config?.decimals,
+                  ),
                 );
 
               //we does not required any linebreaks for h-stacked because we only use one x axis
@@ -377,8 +392,8 @@ export const convertSQLData = async (
                   params.value,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
+                  panelSchema.config?.decimals,
+                ),
               );
             for (
               let i = 0;
@@ -409,7 +424,7 @@ export const convertSQLData = async (
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
             (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // swap current hovered series index to top in tooltip
@@ -431,9 +446,9 @@ export const convertSQLData = async (
                     it.value,
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )} </strong>`
+                    panelSchema.config?.decimals,
+                  ),
+                )} </strong>`,
               );
             // else normal text
             else
@@ -443,9 +458,9 @@ export const convertSQLData = async (
                     it.value,
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )}`
+                    panelSchema.config?.decimals,
+                  ),
+                )}`,
               );
           }
         });
@@ -479,10 +494,10 @@ export const convertSQLData = async (
             panelSchema.type == "h-stacked"
               ? "auto"
               : index == xAxisKeys.length + breakDownKeys.length - 1
-              ? "auto"
-              : function (i: any) {
-                  return arr.includes(i);
-                },
+                ? "auto"
+                : function (i: any) {
+                    return arr.includes(i);
+                  },
           overflow:
             index == xAxisKeys.length + breakDownKeys.length - 1
               ? "none"
@@ -530,9 +545,9 @@ export const convertSQLData = async (
                   largestLabel(getAxisDataFromKey(yAxisKeys[0])),
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
-              )
+                  panelSchema.config?.decimals,
+                ),
+              ),
         ) + 8,
       nameTextStyle: {
         fontWeight: "bold",
@@ -545,8 +560,8 @@ export const convertSQLData = async (
               value,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         },
       },
@@ -608,8 +623,8 @@ export const convertSQLData = async (
                   params.value,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
+                  panelSchema.config?.decimals,
+                ),
               );
             return params.value.toString();
           },
@@ -620,7 +635,7 @@ export const convertSQLData = async (
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
-          new Set(getAxisDataFromKey(xAxisKeys[0]))
+          new Set(getAxisDataFromKey(xAxisKeys[0])),
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
 
@@ -636,25 +651,32 @@ export const convertSQLData = async (
         options.series = yAxisKeys
           .map((yAxis: any) => {
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == yAxis
+              (it: any) => it.alias == yAxis,
             ).label;
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               const data = missingValueData.filter(
-                (it: any) => it[key1] == key
+                (it: any) => it[key1] == key,
               );
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                 ...defaultSeriesProps,
+                // markLine if exist
+                markLine: {
+                  silent: true,
+                  animation: false,
+                  data: getMarkLineData(panelSchema),
+                },
                 // config to connect null values
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
                 data: options.xAxis[0].data.map(
                   (it: any) =>
                     data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
-                    null
+                    null,
                 ),
+                large: true,
               };
               return seriesObj;
             });
@@ -665,14 +687,20 @@ export const convertSQLData = async (
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == key
+              (it: any) => it.alias == key,
             )?.label,
             color:
               panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
+                (it: any) => it.alias == key,
               )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
+            // markLine if exist
+            markLine: {
+              silent: true,
+              animation: false,
+              data: getMarkLineData(panelSchema),
+            },
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -697,7 +725,7 @@ export const convertSQLData = async (
             // get the current series index from name
             const currentSeriesIndex = name.findIndex(
               (it: any) =>
-                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
             );
             // swap current hovered series index to top in tooltip
             const temp = name[0];
@@ -718,9 +746,9 @@ export const convertSQLData = async (
                       it.data,
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals
-                    )
-                  )} </strong>`
+                      panelSchema.config?.decimals,
+                    ),
+                  )} </strong>`,
                 );
               // else normal text
               else
@@ -730,9 +758,9 @@ export const convertSQLData = async (
                       it.data,
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals
-                    )
-                  )}`
+                      panelSchema.config?.decimals,
+                    ),
+                  )}`,
                 );
             }
           });
@@ -741,14 +769,20 @@ export const convertSQLData = async (
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == key
+              (it: any) => it.alias == key,
             )?.label,
             color:
               panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
+                (it: any) => it.alias == key,
               )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
+            // markLine if exist
+            markLine: {
+              silent: true,
+              animation: false,
+              data: getMarkLineData(panelSchema),
+            },
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -762,13 +796,19 @@ export const convertSQLData = async (
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
+            (it: any) => it.alias == key,
           )?.label,
           color:
             panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
               ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -780,13 +820,19 @@ export const convertSQLData = async (
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
           name: panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
+            (it: any) => it.alias == key,
           )?.label,
           color:
             panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
               ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -800,8 +846,8 @@ export const convertSQLData = async (
         it.nameGap = calculateWidthText(
           xAxisKeys.reduce(
             (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
-            ""
-          )
+            "",
+          ),
         );
       });
       (options.xAxis.name =
@@ -835,8 +881,8 @@ export const convertSQLData = async (
               name.value,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           )}</b>`;
         },
       };
@@ -886,8 +932,8 @@ export const convertSQLData = async (
               name.value,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           )}<b/>`;
         },
       };
@@ -915,7 +961,7 @@ export const convertSQLData = async (
     }
     case "stacked": {
       options.xAxis[0].data = Array.from(
-        new Set(getAxisDataFromKey(xAxisKeys[0]))
+        new Set(getAxisDataFromKey(xAxisKeys[0])),
       );
       options.xAxis = options.xAxis.slice(0, 1);
       options.tooltip.axisPointer.label = {
@@ -931,8 +977,8 @@ export const convertSQLData = async (
                 params.value,
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
+                panelSchema.config?.decimals,
+              ),
             );
           return params.value.toString();
         },
@@ -957,11 +1003,17 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: options.xAxis[0].data.map(
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
                 yAxisKeys[0]
-              ] ?? null
+              ] ?? null,
           ),
         };
         return seriesObj;
@@ -999,9 +1051,9 @@ export const convertSQLData = async (
           (a: any, b: any) =>
             Math.max(
               a,
-              b.reduce((c: any, d: any) => Math.max(c, +d || 0), 0)
+              b.reduce((c: any, d: any) => Math.max(c, +d || 0), 0),
             ),
-          0
+          0,
         ),
         calculable: true,
         orient: "horizontal",
@@ -1016,7 +1068,7 @@ export const convertSQLData = async (
                 return xAxisZerothPositionUniqueValue.map(
                   (i: any, j: number) => {
                     return [j, index, it[j]];
-                  }
+                  },
                 );
               })
               .flat(),
@@ -1030,8 +1082,8 @@ export const convertSQLData = async (
                       params.value[2],
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals
-                    )
+                      panelSchema.config?.decimals,
+                    ),
                   ) || params.value[2]
                 );
               },
@@ -1067,8 +1119,8 @@ export const convertSQLData = async (
                 params?.value[2],
                 panelSchema?.config?.unit,
                 panelSchema?.config?.unit_custom,
-                panelSchema?.config?.decimals
-              )
+                panelSchema?.config?.decimals,
+              ),
             ) || params.value[2]
           }`;
         },
@@ -1088,7 +1140,7 @@ export const convertSQLData = async (
         const field = panelSchema.queries[0].fields?.x.find(
           (it: any) =>
             it.aggregationFunction == "histogram" &&
-            it.column == store.state.zoConfig.timestamp_column
+            it.column == store.state.zoConfig.timestamp_column,
         );
         // if histogram
         if (field) {
@@ -1096,7 +1148,7 @@ export const convertSQLData = async (
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
               return formatDate(toZonedTime(it + "Z", store.state.timezone));
-            }
+            },
           );
         }
         // else custom sql
@@ -1104,7 +1156,7 @@ export const convertSQLData = async (
         // sampling data to know whether data is timeseries or not
         const sample = xAxisZerothPositionUniqueValue.slice(
           0,
-          Math.min(20, xAxisZerothPositionUniqueValue.length)
+          Math.min(20, xAxisZerothPositionUniqueValue.length),
         );
         // if timeseries
         if (isTimeSeries(sample)) {
@@ -1112,7 +1164,7 @@ export const convertSQLData = async (
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
               return formatDate(toZonedTime(it + "Z", store.state.timezone));
-            }
+            },
           );
         }
       }
@@ -1141,7 +1193,7 @@ export const convertSQLData = async (
     }
     case "h-stacked": {
       options.xAxis[0].data = Array.from(
-        new Set(getAxisDataFromKey(xAxisKeys[0]))
+        new Set(getAxisDataFromKey(xAxisKeys[0])),
       );
       options.xAxis = options.xAxis.slice(0, 1);
 
@@ -1160,11 +1212,17 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: options.xAxis[0].data.map(
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
                 yAxisKeys[0]
-              ] ?? null
+              ] ?? null,
           ),
         };
         return seriesObj;
@@ -1186,7 +1244,7 @@ export const convertSQLData = async (
         yAxisValue.length > 0 ? yAxisValue[0] : 0,
         panelSchema.config?.unit,
         panelSchema.config?.unit_custom,
-        panelSchema.config?.decimals
+        panelSchema.config?.decimals,
       );
       options.dataset = { source: [[]] };
       options.tooltip = {
@@ -1210,7 +1268,7 @@ export const convertSQLData = async (
               style: {
                 text:
                   (parseFloat(unitValue?.value)?.toFixed(
-                    panelSchema?.config?.decimals ?? 2
+                    panelSchema?.config?.decimals ?? 2,
                   ) ?? 0) + unitValue?.unit,
                 fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
@@ -1236,7 +1294,7 @@ export const convertSQLData = async (
       const gridDataForGauge = calculateGridPositions(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
-        yAxisValue.length
+        yAxisValue.length,
       );
 
       options.dataset = { source: [[]] };
@@ -1254,8 +1312,8 @@ export const convertSQLData = async (
               value,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         },
         enterable: true,
@@ -1296,7 +1354,7 @@ export const convertSQLData = async (
             width: `${
               Math.min(
                 gridDataForGauge.gridWidth,
-                gridDataForGauge.gridHeight
+                gridDataForGauge.gridHeight,
               ) / 6
             }`,
           },
@@ -1305,7 +1363,7 @@ export const convertSQLData = async (
               width: `${
                 Math.min(
                   gridDataForGauge.gridWidth,
-                  gridDataForGauge.gridHeight
+                  gridDataForGauge.gridHeight,
                 ) / 6
               }`,
             },
@@ -1343,7 +1401,7 @@ export const convertSQLData = async (
                     value,
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
+                    panelSchema.config?.decimals,
                   );
                   return unitValue.value + unitValue.unit;
                 },
@@ -1381,13 +1439,13 @@ export const convertSQLData = async (
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         it.aggregationFunction == "histogram" &&
-        it.column == store.state.zoConfig.timestamp_column
+        it.column == store.state.zoConfig.timestamp_column,
     );
 
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         !it.aggregationFunction &&
-        it.column == store.state.zoConfig.timestamp_column
+        it.column == store.state.zoConfig.timestamp_column,
     );
 
     //if x axis has time series
@@ -1399,28 +1457,45 @@ export const convertSQLData = async (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
+      let timeStringCache: any = {};
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            toZonedTime(
-              new Date(options.xAxis[0].data[index] + "Z").getTime(),
-              store.state.timezone
-            ),
-            it ?? null,
-          ]);
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            const xKey = options.xAxis[0].data[index] + "Z";
+            let x;
+            if (timeStringCache[xKey]) {
+              x = timeStringCache[xKey];
+            } else {
+              x = toZonedTime(
+                new Date(options.xAxis[0].data[index] + "Z").getTime(),
+                store.state.timezone,
+              );
+              timeStringCache[xKey] = x;
+            }
+            return [x, it ?? null];
+          });
         } else if (timestampField) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            toZonedTime(
-              new Date(options.xAxis[0].data[index]).getTime() / 1000,
-              store.state.timezone
-            ),
-            it ?? null,
-          ]);
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            const xKey = options.xAxis[0].data[index].toString();
+            let x;
+            if (timeStringCache[xKey]) {
+              x = timeStringCache[xKey];
+            } else {
+              x = toZonedTime(
+                new Date(options.xAxis[0].data[index]).getTime() / 1000,
+                store.state.timezone,
+              );
+              timeStringCache[xKey] = x;
+            }
+            return [x, it ?? null];
+          });
         }
       });
+
       options.xAxis[0].type = "time";
       options.xAxis[0].data = [];
+
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
@@ -1439,7 +1514,7 @@ export const convertSQLData = async (
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
             (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // swap current hovered series index to top in tooltip
@@ -1460,9 +1535,9 @@ export const convertSQLData = async (
                     it.data[1],
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )} </strong>`
+                    panelSchema.config?.decimals,
+                  ),
+                )} </strong>`,
               );
             // else normal text
             else
@@ -1472,15 +1547,16 @@ export const convertSQLData = async (
                     it.data[1],
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )}`
+                    panelSchema.config?.decimals,
+                  ),
+                )}`,
               );
           }
         });
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
+
       options.tooltip.axisPointer = {
         type: "cross",
         label: {
@@ -1493,8 +1569,8 @@ export const convertSQLData = async (
                   params.value,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
+                  panelSchema.config?.decimals,
+                ),
               );
             return Number.isInteger(params.value)
               ? formatDate(new Date(params.value))
@@ -1524,7 +1600,7 @@ export const convertSQLData = async (
   ) {
     const sample = options.xAxis[0].data.slice(
       0,
-      Math.min(20, options.xAxis[0].data.length)
+      Math.min(20, options.xAxis[0].data.length),
     );
 
     const isTimeSeriesData = isTimeSeries(sample);
@@ -1540,7 +1616,7 @@ export const convertSQLData = async (
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             toZonedTime(
               new Date(options.xAxis[0].data[index] + "Z").getTime(),
-              store.state.timezone
+              store.state.timezone,
             ),
             it ?? null,
           ]);
@@ -1548,7 +1624,7 @@ export const convertSQLData = async (
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             toZonedTime(
               new Date(options.xAxis[0].data[index]).getTime() / 1000,
-              store.state.timezone
+              store.state.timezone,
             ),
             it ?? null,
           ]);
@@ -1574,7 +1650,7 @@ export const convertSQLData = async (
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
             (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // swap current hovered series index to top in tooltip
@@ -1595,9 +1671,9 @@ export const convertSQLData = async (
                     it.data[1],
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )} </strong>`
+                    panelSchema.config?.decimals,
+                  ),
+                )} </strong>`,
               );
             // else normal text
             else
@@ -1607,9 +1683,9 @@ export const convertSQLData = async (
                     it.data[1],
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals
-                  )
-                )}`
+                    panelSchema.config?.decimals,
+                  ),
+                )}`,
               );
           }
         });
@@ -1628,8 +1704,8 @@ export const convertSQLData = async (
                   params.value,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
+                  panelSchema.config?.decimals,
+                ),
               );
             return formatDate(new Date(params?.value)).toString();
           },
@@ -1659,7 +1735,7 @@ export const convertSQLData = async (
     // will return ASC or DESC if exist
     const isYAxisExistInOrderBy = await isGivenFieldInOrderBy(
       panelSchema?.queries[0]?.query ?? "",
-      yAxisKeys[0]
+      yAxisKeys[0],
     );
     if (isYAxisExistInOrderBy) {
       // Calculate the total for each series and combine it with the corresponding x-axis label
@@ -1668,7 +1744,7 @@ export const convertSQLData = async (
         let total = options?.series?.reduce(
           (sum: number, currentSeries: any) =>
             sum + currentSeries?.data[i] ?? 0,
-          0
+          0,
         );
         totals.set(i, { label: xAxisObj[0]?.data[i], total });
       }
@@ -1728,7 +1804,7 @@ export const convertSQLData = async (
       legendWidth =
         Math.min(
           chartPanelRef.value?.offsetWidth / 3,
-          calculateWidthText(maxValue) + 60
+          calculateWidthText(maxValue) + 60,
         ) ?? 20;
     }
 
@@ -1750,7 +1826,6 @@ export const convertSQLData = async (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
-  // console.timeEnd("convertSQLData");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },

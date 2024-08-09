@@ -522,7 +522,7 @@ async fn write_traces(
             if let Some(alerts) = stream_alerts_map.get(&key) {
                 let mut trigger_alerts: TriggerAlertData = Vec::new();
                 for alert in alerts {
-                    if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
+                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
                         trigger_alerts.push((alert.clone(), v));
                     }
                 }

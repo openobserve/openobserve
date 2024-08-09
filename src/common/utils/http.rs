@@ -19,8 +19,7 @@ use std::{
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_http::header::HeaderName;
-use actix_web::web::Query;
+use actix_web::{http::header::HeaderName, web::Query};
 use awc::http::header::HeaderMap;
 use config::meta::{search::SearchEventType, stream::StreamType};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};

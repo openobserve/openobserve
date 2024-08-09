@@ -29,8 +29,16 @@ use futures::future::try_join_all;
 use proto::cluster_rpc;
 
 use crate::{
-    common::meta::{dashboards::reports::ReportFrequencyType, scheduled_ops::FrequencyType},
-    service::{db, ingestion::ingestion_service, usage::publish_triggers_usage},
+    common::meta::{
+        alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType,
+        scheduled_ops::FrequencyType,
+    },
+    service::{
+        alerts::{get_alert_start_end_time, get_row_column_map},
+        db,
+        ingestion::ingestion_service,
+        usage::publish_triggers_usage,
+    },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -137,7 +145,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     // evaluate alert
-    let ret = alert.evaluate(None).await?;
+    let (ret, end_time) = alert.evaluate(None).await?;
     if ret.is_some() {
         log::info!(
             "Alert conditions satisfied, org: {}, module_key: {}",
@@ -189,21 +197,41 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time.unwrap_or_default(),
-        end_time: trigger.end_time.unwrap_or_default(),
+        start_time: end_time
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+        end_time,
         retries: trigger.retries,
         error: None,
     };
 
     // send notification
     if let Some(data) = ret {
+        let vars = get_row_column_map(&data);
+        let (alert_start_time, alert_end_time) =
+            get_alert_start_end_time(&vars, alert.trigger_condition.period);
+        trigger_data_stream.start_time = alert_start_time;
+        trigger_data_stream.end_time = alert_end_time;
         match alert.send_notification(&data).await {
-            Ok(_) => {
+            Ok((true, _)) => {
                 log::info!(
                     "Alert notification sent, org: {}, module_key: {}",
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
+                db::scheduler::update_trigger(new_trigger).await?;
+            }
+            Ok((false, msg)) => {
+                log::error!(
+                    "Some notifications for alert {}/{} could not be sent: {msg}",
+                    &new_trigger.org,
+                    &new_trigger.module_key
+                );
+                // Notification is already sent to some destinations,
+                // hence no need to retry
+                trigger_data_stream.error = Some(msg);
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Err(e) => {
@@ -248,7 +276,6 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     // publish the triggers as stream
-    trigger_data_stream.end_time = Utc::now().timestamp_micros();
     publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())

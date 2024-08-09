@@ -2398,11 +2398,15 @@ const useLogs = () => {
             removeTraceId(traceId);
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
             searchObj.loading = false;
+            if(searchObj.data.queryResults.aggs == null)  {
+                searchObj.data.queryResults.aggs = [];                
+            }
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
               res.data.result_cache_ratio;
+
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
@@ -2493,6 +2497,7 @@ const useLogs = () => {
         searchObj.loadingHistogram = false;
         notificationMsg.value = searchObj.data.histogram.errorMsg;
         showErrorNotification("Error while fetching histogram data");
+
         reject(false);
       }
     });
