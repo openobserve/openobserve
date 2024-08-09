@@ -82,6 +82,23 @@ export const convertSQLData = async (
       : [];
   };
 
+  const getMarkLineData = (panelSchema: any) => {
+    return (
+      panelSchema?.config?.mark_line?.map((markLine: any) => {
+        return {
+          name: markLine.name,
+          type: markLine.type,
+          xAxis: markLine.type == "xAxis" ? markLine.value : null,
+          yAxis: markLine.type == "yAxis" ? markLine.value : null,
+          label: {
+            formatter: markLine.name ? "{b}:{c}" : "{c}",
+            position: "insideEndTop",
+          },
+        };
+      }) ?? []
+    );
+  };
+
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
   const missingValue = () => {
     // Get the interval in minutes
@@ -646,6 +663,12 @@ export const convertSQLData = async (
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                 ...defaultSeriesProps,
+                // markLine if exist
+                markLine: {
+                  silent: true,
+                  animation: false,
+                  data: getMarkLineData(panelSchema),
+                },
                 // config to connect null values
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
                 data: options.xAxis[0].data.map(
@@ -672,6 +695,12 @@ export const convertSQLData = async (
               )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
+            // markLine if exist
+            markLine: {
+              silent: true,
+              animation: false,
+              data: getMarkLineData(panelSchema),
+            },
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -748,6 +777,12 @@ export const convertSQLData = async (
               )?.color || "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
+            // markLine if exist
+            markLine: {
+              silent: true,
+              animation: false,
+              data: getMarkLineData(panelSchema),
+            },
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -768,6 +803,12 @@ export const convertSQLData = async (
               ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -786,6 +827,12 @@ export const convertSQLData = async (
               ?.color || "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -956,6 +1003,12 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: options.xAxis[0].data.map(
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
@@ -1159,6 +1212,12 @@ export const convertSQLData = async (
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
+          // markLine if exist
+          markLine: {
+            silent: true,
+            animation: false,
+            data: getMarkLineData(panelSchema),
+          },
           data: options.xAxis[0].data.map(
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
