@@ -856,7 +856,7 @@ export default defineComponent({
             whereClause = parseQuery[0].trim();
           }
 
-          query_context = `SELECT *${queryFunctions} FROM [INDEX_NAME] [WHERE_CLAUSE]`;
+          query_context = `SELECT *${queryFunctions} FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
             whereClause = whereClause
