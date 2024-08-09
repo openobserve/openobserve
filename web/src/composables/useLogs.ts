@@ -1708,7 +1708,7 @@ const useLogs = () => {
               searchObj.loadingHistogram = true;
 
               const parsedSQL: any = fnParsedSQL();
-              searchObj.data.queryResults.aggs = null
+              searchObj.data.queryResults.aggs = [];
 
               const partitions = JSON.parse(
                 JSON.stringify(
