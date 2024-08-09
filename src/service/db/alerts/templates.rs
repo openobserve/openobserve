@@ -21,7 +21,7 @@ use itertools::Itertools;
 use crate::{
     common::{
         infra::config::ALERTS_TEMPLATES,
-        meta::{organization::DEFAULT_ORG, alerts::templates::Template},
+        meta::{alerts::templates::Template, organization::DEFAULT_ORG},
     },
     service::db,
 };

@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::common::meta::{
-    functions::StreamFunctionsList, alerts::derived_streams::DerivedStreamMeta,
+    alerts::derived_streams::DerivedStreamMeta, functions::StreamFunctionsList,
     stream::StreamParams,
 };
 

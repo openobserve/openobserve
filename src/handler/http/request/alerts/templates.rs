@@ -18,8 +18,8 @@ use std::io::Error;
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, scheduled_ops::templates::Template},
-    service::alert::templates,
+    common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse},
+    service::alerts::templates,
 };
 
 /// CreateTemplate

@@ -17,7 +17,7 @@ use config::{meta::search::SearchEventType, utils::json::Value};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub mod alerts;
+pub mod alert;
 pub mod derived_streams;
 pub mod destinations;
 pub mod templates;

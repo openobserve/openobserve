@@ -55,7 +55,8 @@ pub fn get_partial_plan(
     if cplan.name() == "RepartitionExec" {
         let plan = cplan.as_any().downcast_ref::<RepartitionExec>().unwrap();
         if let Partitioning::RoundRobinBatch(_) = plan.partitioning() {
-            return Ok(None);
+            let child = *cplan.children().first().unwrap();
+            return get_partial_plan(child);
         }
     }
     if DISTRIBUTED_PLAN_NAMES.contains(&cplan.name()) {

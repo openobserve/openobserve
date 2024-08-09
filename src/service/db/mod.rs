@@ -19,6 +19,7 @@ use infra::{db as infra_db, errors::Result};
 #[cfg(feature = "enterprise")]
 use {infra::errors::Error, o2_enterprise::enterprise::common::infra::config::O2_CONFIG};
 
+pub mod alerts;
 pub mod compact;
 pub mod dashboards;
 pub mod enrichment_table;
@@ -31,7 +32,6 @@ pub mod ofga;
 pub mod organization;
 pub mod pipelines;
 pub mod saved_view;
-pub mod scheduled_ops;
 pub mod scheduler;
 pub mod schema;
 pub mod session;

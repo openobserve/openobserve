@@ -44,9 +44,9 @@ use crate::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
         meta::{
+            alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             ingestion::IngestionRequest,
-            alerts::alerts::Alert,
             stream::{SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,

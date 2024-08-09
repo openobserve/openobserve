@@ -35,19 +35,19 @@ use lettre::{message::SinglePart, AsyncTransport, Message};
 use crate::{
     common::{
         meta::{
-            authz::Authz,
-            scheduled_ops::{
-                alerts::Alert,
+            alerts::{
+                alert::Alert,
                 destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 FrequencyType, Operator, QueryType,
             },
+            authz::Authz,
             stream::StreamParams,
         },
         utils::auth::{remove_ownership, set_ownership},
     },
     service::{
+        alerts::{build_sql, destinations},
         db,
-        alert::{build_sql, destinations},
     },
 };
 
@@ -67,7 +67,7 @@ pub async fn save(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::get(org_id, stream_type, stream_name, &alert.name).await {
+    match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(_)) => {
             if create {
                 return Err(anyhow::anyhow!("Alert already exists"));
@@ -131,10 +131,7 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert destinations is required"));
     }
     for dest in alert.destinations.iter() {
-        if db::alerts::destinations::get(org_id, dest)
-            .await
-            .is_err()
-        {
+        if db::alerts::destinations::get(org_id, dest).await.is_err() {
             return Err(anyhow::anyhow!("Alert destination {dest} not found"));
         };
     }
@@ -197,7 +194,7 @@ pub async fn save(
     }
 
     // save the alert
-    match db::alerts::set(org_id, stream_type, stream_name, &alert, create).await {
+    match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
         Ok(_) => {
             if name.is_empty() {
                 set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
@@ -214,7 +211,7 @@ pub async fn get(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
-    db::alerts::get(org_id, stream_type, stream_name, name).await
+    db::alerts::alert::get(org_id, stream_type, stream_name, name).await
 }
 
 pub async fn list(
@@ -223,7 +220,7 @@ pub async fn list(
     stream_name: Option<&str>,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    match db::alerts::list(org_id, stream_type, stream_name).await {
+    match db::alerts::alert::list(org_id, stream_type, stream_name).await {
         Ok(alerts) => {
             let mut result = Vec::new();
             for alert in alerts {
@@ -252,7 +249,7 @@ pub async fn delete(
     stream_name: &str,
     name: &str,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    if db::alerts::get(org_id, stream_type, stream_name, name)
+    if db::alerts::alert::get(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
@@ -261,7 +258,7 @@ pub async fn delete(
             anyhow::anyhow!("Alert not found"),
         ));
     }
-    match db::alerts::delete(org_id, stream_type, stream_name, name).await {
+    match db::alerts::alert::delete(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(name)).await;
             Ok(())
@@ -277,18 +274,17 @@ pub async fn enable(
     name: &str,
     value: bool,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let mut alert =
-        match db::alerts::get(org_id, stream_type, stream_name, name).await {
-            Ok(Some(alert)) => alert,
-            _ => {
-                return Err((
-                    http::StatusCode::NOT_FOUND,
-                    anyhow::anyhow!("Alert not found"),
-                ));
-            }
-        };
+    let mut alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
+        Ok(Some(alert)) => alert,
+        _ => {
+            return Err((
+                http::StatusCode::NOT_FOUND,
+                anyhow::anyhow!("Alert not found"),
+            ));
+        }
+    };
     alert.enabled = value;
-    db::alerts::set(org_id, stream_type, stream_name, &alert, false)
+    db::alerts::alert::set(org_id, stream_type, stream_name, &alert, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -298,8 +294,8 @@ pub async fn trigger(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
+) -> Result<(bool, String), (http::StatusCode, anyhow::Error)> {
+    let alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
             return Err((
@@ -315,10 +311,12 @@ pub async fn trigger(
 }
 
 impl Alert {
+    /// Returns the evaluated row data and the end time of the search timerange,
+    /// for realtime this is 0
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
@@ -332,24 +330,41 @@ impl Alert {
         }
     }
 
+    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
+    /// and the error message if any
     pub async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(bool, String), anyhow::Error> {
+        let mut message = "".to_string();
+        let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
             if let Err(e) = send_notification(self, &dest, rows).await {
                 log::error!(
-                    "Error sending notification for {}/{}/{}/{} err: {}",
+                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
                     self.org_id,
                     self.stream_type,
                     self.stream_name,
                     self.name,
+                    dest.name,
                     e
+                );
+                no_of_error += 1;
+                message = format!(
+                    "{message} Error sending notification for destination {} err: {e};",
+                    dest.name
                 );
             }
         }
-        Ok(())
+        if no_of_error == self.destinations.len() {
+            Err(anyhow::anyhow!(message))
+        } else if no_of_error != 0 {
+            // Some send notification job failed
+            Ok((false, message))
+        } else {
+            Ok((true, "".to_owned()))
+        }
     }
 
     pub fn get_stream_params(&self) -> StreamParams {
@@ -590,66 +605,8 @@ async fn process_dest_template(
     }
 
     // calculate start and end time
-    let mut alert_start_time = 0;
-    let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
-        for val in values {
-            let val = val.parse::<i64>().unwrap_or_default();
-            if alert_start_time == 0 || val < alert_start_time {
-                alert_start_time = val;
-            }
-            if alert_end_time == 0 || val > alert_end_time {
-                alert_end_time = val;
-            }
-        }
-    }
-    if let Some(values) = vars.get("zo_sql_min_time") {
-        for val in values {
-            let val = val.parse::<i64>().unwrap_or_default();
-            if alert_start_time == 0 || val < alert_start_time {
-                alert_start_time = val;
-            }
-        }
-    }
-    if let Some(values) = vars.get("zo_sql_max_time") {
-        for val in values {
-            let val = val.parse::<i64>().unwrap_or_default();
-            if alert_end_time == 0 || val > alert_end_time {
-                alert_end_time = val;
-            }
-        }
-    }
-
-    // Hack time range for alert url
-    alert_end_time = if alert_end_time == 0 {
-        Utc::now().timestamp_micros()
-    } else {
-        // the frontend will drop the second, so we add 1 minute to the end time
-        alert_end_time
-            + Duration::try_minutes(1)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-    };
-    if alert_start_time == 0 {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-    }
-    if alert_end_time - alert_start_time
-        < Duration::try_minutes(1)
-            .unwrap()
-            .num_microseconds()
-            .unwrap()
-    {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-    }
+    let (alert_start_time, alert_end_time) =
+        get_alert_start_end_time(&vars, alert.trigger_condition.period);
 
     let alert_start_time_str = if alert_start_time > 0 {
         Local
@@ -803,6 +760,94 @@ fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue
             }
         }
     }
+}
+
+pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
+    let mut vars = HashMap::with_capacity(rows.len());
+    for row in rows.iter() {
+        for (key, value) in row.iter() {
+            let value = if value.is_string() {
+                value.as_str().unwrap_or_default().to_string()
+            } else if value.is_f64() {
+                format!("{:.2}", value.as_f64().unwrap_or_default())
+            } else {
+                value.to_string()
+            };
+            let entry = vars.entry(key.to_string()).or_insert_with(HashSet::new);
+            entry.insert(value);
+        }
+    }
+    vars
+}
+
+pub fn get_alert_start_end_time(
+    vars: &HashMap<String, HashSet<String>>,
+    period: i64,
+) -> (i64, i64) {
+    let cfg = get_config();
+
+    // calculate start and end time
+    let mut alert_start_time = 0;
+    let mut alert_end_time = 0;
+    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+    if let Some(values) = vars.get("zo_sql_min_time") {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+        }
+    }
+    if let Some(values) = vars.get("zo_sql_max_time") {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+
+    // Hack time range for alert url
+    alert_end_time = if alert_end_time == 0 {
+        Utc::now().timestamp_micros()
+    } else {
+        // the frontend will drop the second, so we add 1 minute to the end time
+        alert_end_time
+            + Duration::try_minutes(1)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
+    };
+    if alert_start_time == 0 {
+        alert_start_time = alert_end_time
+            - Duration::try_minutes(period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+    }
+    if alert_end_time - alert_start_time
+        < Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap()
+    {
+        alert_start_time = alert_end_time
+            - Duration::try_minutes(period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+    }
+    (alert_start_time, alert_end_time)
 }
 
 fn format_variable_value(val: String) -> String {

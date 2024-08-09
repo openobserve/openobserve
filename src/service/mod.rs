@@ -16,6 +16,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+pub mod alerts;
 pub mod compact;
 pub mod dashboards;
 pub mod db;
@@ -32,7 +33,6 @@ pub mod metrics;
 pub mod organization;
 pub mod pipelines;
 pub mod promql;
-pub mod alert;
 pub mod schema;
 pub mod search;
 pub mod session;

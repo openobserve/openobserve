@@ -27,9 +27,7 @@ use crate::{
     common::{
         meta::{
             // authz::Authz,
-            scheduled_ops::{
-                derived_streams::DerivedStreamMeta, FrequencyType, QueryType,
-            },
+            alerts::{derived_streams::DerivedStreamMeta, FrequencyType, QueryType},
         },
         // utils::auth::{remove_ownership, set_ownership},
     },
@@ -213,7 +211,7 @@ impl DerivedStreamMeta {
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {

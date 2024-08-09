@@ -21,10 +21,10 @@ use tonic::{Request, Response, Status};
 use crate::service::ingestion::create_log_ingestion_req;
 
 #[derive(Debug, Default)]
-pub struct InternalIngestServer;
+pub struct Ingester;
 
 #[async_trait]
-impl Ingest for InternalIngestServer {
+impl Ingest for Ingester {
     async fn ingest(
         &self,
         request: Request<IngestionRequest>,

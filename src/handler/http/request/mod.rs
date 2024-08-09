@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod alerts;
 pub mod authz;
 pub mod clusters;
 pub mod dashboards;
@@ -25,7 +26,6 @@ pub mod organization;
 pub mod pipelines;
 pub mod prom;
 pub mod rum;
-pub mod alerts;
 pub mod search;
 pub mod status;
 pub mod stream;

@@ -41,8 +41,8 @@ use prost::Message;
 
 use crate::{
     common::meta::{
+        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
-        alerts::alerts::Alert,
         stream::{SchemaRecords, StreamParams},
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },

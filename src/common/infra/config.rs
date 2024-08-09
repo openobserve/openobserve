@@ -24,13 +24,13 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
+        alerts::{alert::Alert, destinations::Destination, templates::Template},
         dashboards::reports,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
         pipelines::PipeLine,
         prom::ClusterLeader,
-        alerts::{alerts::Alert, destinations::Destination, templates::Template},
         syslog::SyslogRoute,
         user::User,
     },

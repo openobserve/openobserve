@@ -29,12 +29,9 @@ use futures::future::try_join_all;
 use proto::cluster_rpc;
 
 use crate::{
-    common::meta::{
-        alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType,
-        scheduled_ops::FrequencyType,
-    },
+    common::meta::{alerts::FrequencyType, dashboards::reports::ReportFrequencyType},
     service::{
-        alerts::{get_alert_start_end_time, get_row_column_map},
+        alerts::alert::{get_alert_start_end_time, get_row_column_map},
         db,
         ingestion::ingestion_service,
         usage::publish_triggers_usage,
@@ -61,13 +58,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     for trigger in triggers {
         let task = tokio::task::spawn(async move {
             if let Err(e) = handle_triggers(trigger).await {
-                log::error!("[SCHEDULED_OPS_MANAGER] Error handling trigger: {}", e);
+                log::error!("[SCHEDULER] Error handling trigger: {}", e);
             }
         });
         tasks.push(task);
     }
     if let Err(e) = try_join_all(tasks).await {
-        log::error!("[SCHEDULED_OPS_MANAGER] Error handling triggers: {}", e);
+        log::error!("[SCHEDULER] Error handling triggers: {}", e);
     }
     Ok(())
 }
@@ -114,7 +111,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
-    let alert = match super::alerts::get(org_id, stream_type, stream_name, alert_name).await? {
+    let alert = match super::alert::get(org_id, stream_type, stream_name, alert_name).await? {
         Some(alert) => alert,
         None => {
             return Err(anyhow::anyhow!(
@@ -502,7 +499,7 @@ async fn handle_derived_stream_triggers(
     };
 
     // evaluate trigger and configure trigger next run time
-    let ret = derived_stream.evaluate(None).await?;
+    let (ret, _) = derived_stream.evaluate(None).await?;
     if ret.is_some() {
         log::info!(
             "DerivedStream conditions satisfied, org: {}, module_key: {}",

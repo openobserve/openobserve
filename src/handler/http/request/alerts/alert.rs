@@ -19,10 +19,10 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::{
-        meta::{http::HttpResponse as MetaHttpResponse, alerts::alerts::Alert},
+        meta::{alerts::alert::Alert, http::HttpResponse as MetaHttpResponse},
         utils::http::get_stream_type_from_request,
     },
-    service::alert::alerts,
+    service::alerts::alert,
 };
 
 /// CreateAlert
@@ -54,7 +54,7 @@ pub async fn save_alert(
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
 
-    match alerts::save(&org_id, &stream_name, "", alert, true).await {
+    match alert::save(&org_id, &stream_name, "", alert, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -89,7 +89,7 @@ pub async fn update_alert(
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
-    match alerts::save(&org_id, &stream_name, &name, alert, false).await {
+    match alert::save(&org_id, &stream_name, &name, alert, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -125,7 +125,7 @@ async fn list_stream_alerts(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::list(&org_id, stream_type, Some(stream_name.as_str()), None).await {
+    match alert::list(&org_id, stream_type, Some(stream_name.as_str()), None).await {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             for alert in data.iter_mut() {
@@ -184,7 +184,7 @@ async fn list_alerts(path: web::Path<String>, _req: HttpRequest) -> Result<HttpR
         // Get List of allowed objects ends
     }
 
-    match alerts::list(&org_id, None, None, _alert_list_from_rbac).await {
+    match alert::list(&org_id, None, None, _alert_list_from_rbac).await {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             for alert in data.iter_mut() {
@@ -230,7 +230,7 @@ async fn get_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::get(&org_id, stream_type, &stream_name, &name).await {
+    match alert::get(&org_id, stream_type, &stream_name, &name).await {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             if let Some(ref mut data) = data {
@@ -274,7 +274,7 @@ async fn delete_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::delete(&org_id, stream_type, &stream_name, &name).await {
+    match alert::delete(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert deleted")),
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
@@ -322,7 +322,7 @@ async fn enable_alert(
     };
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
-    match alerts::enable(&org_id, stream_type, &stream_name, &name, enable).await {
+    match alert::enable(&org_id, stream_type, &stream_name, &name, enable).await {
         Ok(_) => Ok(MetaHttpResponse::json(resp)),
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
@@ -363,7 +363,7 @@ async fn trigger_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::trigger(&org_id, stream_type, &stream_name, &name).await {
+    match alert::trigger(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert triggered")),
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),

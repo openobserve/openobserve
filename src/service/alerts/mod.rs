@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use alerts::to_float;
+use alert::to_float;
 use arrow_schema::DataType;
 use chrono::{Duration, Utc};
 use config::{
@@ -28,44 +28,43 @@ use config::{
 use super::promql;
 use crate::{
     common::meta::{
-        scheduled_ops::{
-            AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
-        },
+        alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
         stream::StreamParams,
     },
     service::search as SearchService,
 };
 
-pub mod alerts;
+pub mod alert;
 pub mod derived_streams;
 pub mod destinations;
-pub mod ops_manager;
+pub mod scheduler;
 pub mod templates;
 
 impl QueryCondition {
     pub async fn evaluate_realtime(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+        let now = Utc::now().timestamp_micros();
         let row = match row {
             Some(row) => row,
             None => {
-                return Ok(None);
+                return Ok((None, now));
             }
         };
         if self.conditions.is_none() {
-            return Ok(None);
+            return Ok((None, now));
         }
         let conditions = self.conditions.as_ref().unwrap();
         if conditions.is_empty() {
-            return Ok(None);
+            return Ok((None, now));
         }
         for condition in conditions.iter() {
             if !condition.evaluate(row).await {
-                return Ok(None);
+                return Ok((None, now));
             }
         }
-        Ok(Some(vec![row.to_owned()]))
+        Ok((Some(vec![row.to_owned()]), now))
     }
 
     pub async fn evaluate_scheduled(
@@ -73,31 +72,31 @@ impl QueryCondition {
         stream_param: &StreamParams,
         trigger_condition: &TriggerCondition,
         query_condition: &QueryCondition,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
                 let Some(v) = self.conditions.as_ref() else {
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 build_sql(stream_param, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 if v.is_empty() {
-                    return Ok(None);
+                    return Ok((None, now));
                 } else {
                     v.to_string()
                 }
             }
             QueryType::PromQL => {
                 let Some(v) = self.promql.as_ref() else {
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 if v.is_empty() {
-                    return Ok(None);
+                    return Ok((None, now));
                 }
                 let start = now
                     - Duration::try_minutes(trigger_condition.period)
@@ -126,7 +125,7 @@ impl QueryCondition {
                 let resp = match promql::search::search(&stream_param.org_id, &req, 0, "").await {
                     Ok(v) => v,
                     Err(_) => {
-                        return Ok(None);
+                        return Ok((None, now));
                     }
                 };
                 let promql::value::Value::Matrix(value) = resp else {
@@ -135,7 +134,7 @@ impl QueryCondition {
                         v,
                         resp
                     );
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 // TODO calculate the sample in a row, suddenly a sample can be ignored
                 let value = value
@@ -143,25 +142,31 @@ impl QueryCondition {
                     .filter(|f| f.samples.len() >= trigger_condition.threshold as usize)
                     .collect::<Vec<_>>();
                 return if value.is_empty() {
-                    Ok(None)
+                    return Ok((None, now));
                 } else {
-                    Ok(Some(
-                        value
-                            .iter()
-                            .map(|v| {
-                                let mut val = Map::with_capacity(v.labels.len() + 2);
-                                for label in v.labels.iter() {
+                    Ok((
+                        Some(
+                            value
+                                .iter()
+                                .map(|v| {
+                                    let mut val = Map::with_capacity(v.labels.len() + 2);
+                                    for label in v.labels.iter() {
+                                        val.insert(
+                                            label.name.to_string(),
+                                            label.value.to_string().into(),
+                                        );
+                                    }
+                                    let last_sample = v.samples.last().unwrap();
                                     val.insert(
-                                        label.name.to_string(),
-                                        label.value.to_string().into(),
+                                        "_timestamp".to_string(),
+                                        last_sample.timestamp.into(),
                                     );
-                                }
-                                let last_sample = v.samples.last().unwrap();
-                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
-                                val.insert("value".to_string(), last_sample.value.into());
-                                val
-                            })
-                            .collect(),
+                                    val.insert("value".to_string(), last_sample.value.into());
+                                    val
+                                })
+                                .collect(),
+                        ),
+                        now,
                     ))
                 };
             }
@@ -230,13 +235,16 @@ impl QueryCondition {
             }
         };
         if self.search_event_type.is_none() && resp.total < trigger_condition.threshold as usize {
-            Ok(None)
+            Ok((None, now))
         } else {
-            Ok(Some(
-                resp.hits
-                    .iter()
-                    .map(|hit| hit.as_object().unwrap().clone())
-                    .collect(),
+            Ok((
+                Some(
+                    resp.hits
+                        .iter()
+                        .map(|hit| hit.as_object().unwrap().clone())
+                        .collect(),
+                ),
+                now,
             ))
         }
     }

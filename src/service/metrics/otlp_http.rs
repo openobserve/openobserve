@@ -40,9 +40,9 @@ use prost::Message;
 use crate::{
     common::meta::{
         self,
+        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-        alerts::alerts::Alert,
         stream::{SchemaRecords, StreamParams},
     },
     handler::http::request::CONTENT_TYPE_JSON,

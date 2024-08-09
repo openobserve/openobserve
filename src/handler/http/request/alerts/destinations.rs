@@ -18,10 +18,8 @@ use std::io::Error;
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse, scheduled_ops::destinations::Destination,
-    },
-    service::alert::destinations,
+    common::meta::{alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse},
+    service::alerts::destinations,
 };
 
 /// CreateDestination
