@@ -106,13 +106,10 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR] start run_compactor_pending_jobs_metric job");
 
     loop {
-        let locker = match infra::dist_lock::lock(COMPACTOR_PENDING_JOBS_KEY, interval, None).await
-        {
+        let _ = match infra::dist_lock::lock(COMPACTOR_PENDING_JOBS_KEY, interval, None).await {
             Ok(locker) => locker,
             Err(_) => continue,
         };
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
 
         log::debug!("[COMPACTOR] Running compactor pending jobs to report metric");
         let job_status = match infra::file_list::get_pending_jobs_count().await {
@@ -123,10 +120,6 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
             }
         };
 
-        if job_status.len() == 0 {
-            metrics::COMPACT_PENDING_JOBS.reset();
-        }
-
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {
                 metrics::COMPACT_PENDING_JOBS
@@ -134,8 +127,6 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
                     .set(counter);
             }
         }
-
-        infra::dist_lock::unlock(&locker).await?;
     }
 }
 
