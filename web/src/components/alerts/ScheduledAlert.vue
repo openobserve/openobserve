@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="scheduled-alerts">
-    <div class="scheduled-alert-tabs q-mb-lg">
+    <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-mb-lg">
       <q-tabs
         data-test="scheduled-alert-tabs"
         v-model="tab"
@@ -762,6 +762,7 @@ const props = defineProps([
   "isValidSqlQuery",
   "disableThreshold",
   "disableVrlFunction",
+  "disableQueryTypeSelection",
 ]);
 
 const emits = defineEmits([

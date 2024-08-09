@@ -131,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableThreshold="true"
             :disableVrlFunction="true"
             :isValidSqlQuery="isValidSqlQuery"
+            :disableQueryTypeSelection="true"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:query_type="streamRoute.query_condition.type"
@@ -332,7 +333,7 @@ const getDefaultStreamRoute = () => {
     is_real_time: true,
     query_condition: {
       sql: "",
-      type: "custom",
+      type: "sql",
       aggregation: null,
       conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
     },
