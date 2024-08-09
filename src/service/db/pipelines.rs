@@ -22,13 +22,10 @@ use crate::{
     service::db,
 };
 
-pub async fn set(pipeline: &PipeLine) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, pipeline: &PipeLine) -> Result<(), anyhow::Error> {
     let key = format!(
-        "/pipeline/{}/{}/{}/{}",
-        pipeline.source.org_id,
-        pipeline.source.stream_type,
-        pipeline.source.stream_name,
-        pipeline.name
+        "/pipeline/{org_id}/{}/{}/{}",
+        pipeline.stream_type, pipeline.stream_name, pipeline.name
     );
     match db::put(
         &key,
@@ -123,7 +120,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 let key = format!(
                     "{org_id}/{}/{}",
-                    item_value.source.stream_type, item_value.source.stream_name
+                    item_value.stream_type, item_value.stream_name
                 );
                 STREAM_PIPELINES.insert(key.to_owned(), item_value);
             }
@@ -149,10 +146,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: PipeLine = json::from_slice(&item_value).unwrap();
         let org_id = &item_key[0..item_key.find('/').unwrap()];
-        let key = format!(
-            "{org_id}/{}/{}",
-            json_val.source.stream_type, json_val.source.stream_name
-        );
+        let key = format!("{org_id}/{}/{}", json_val.stream_type, json_val.stream_name);
 
         STREAM_PIPELINES.insert(key.to_string(), json_val);
     }

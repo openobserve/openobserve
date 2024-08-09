@@ -24,16 +24,17 @@ use utoipa::ToSchema;
 
 use crate::common::meta::{
     alerts::derived_streams::DerivedStreamMeta, functions::StreamFunctionsList,
-    stream::StreamParams,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct PipeLine {
     pub name: String,
     #[serde(default)]
-    pub source: StreamParams,
-    #[serde(default)]
     pub description: String,
+    #[serde(default)]
+    pub stream_name: String,
+    #[serde(default)]
+    pub stream_type: StreamType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -47,8 +48,8 @@ impl PipeLine {
         PipeLineResponse {
             name: self.name,
             description: self.description,
-            stream_name: self.source.stream_name.into(),
-            stream_type: self.source.stream_type,
+            stream_name: self.stream_name,
+            stream_type: self.stream_type,
             routing: self.routing,
             derived_streams: self.derived_streams,
             functions,
