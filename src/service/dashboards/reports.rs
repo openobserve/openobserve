@@ -71,7 +71,7 @@ pub async fn save(
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&report.name) {
         return Err(anyhow::anyhow!(
-            "Report name cannot contain ':', '#', '?' and space characters"
+            "Report name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
         ));
     }
     if report.name.is_empty() {

@@ -40,7 +40,7 @@ pub async fn save(
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&template.name) {
         return Err(anyhow::anyhow!(
-            "Alert template name cannot contain ':', '#', '?' and space characters"
+            "Alert template name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
         ));
     }
     if template.name.is_empty() {

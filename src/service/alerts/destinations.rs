@@ -68,7 +68,7 @@ pub async fn save(
         return Err((
             http::StatusCode::BAD_REQUEST,
             anyhow::anyhow!(
-                "Alert destination name cannot contain ':', '#', '?' and space characters"
+                "Alert destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
             ),
         ));
     }
