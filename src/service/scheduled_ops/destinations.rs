@@ -19,8 +19,8 @@ use crate::{
     common::{
         infra::config::STREAM_ALERTS,
         meta::{
-            scheduled_ops::destinations::{Destination, DestinationType, DestinationWithTemplate},
             authz::Authz,
+            scheduled_ops::destinations::{Destination, DestinationType, DestinationWithTemplate},
         },
         utils::auth::{remove_ownership, set_ownership},
     },
@@ -172,7 +172,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
     }
     drop(cacher);
 
-    if db::scheduled_ops::destinations::get(org_id, name).await.is_err() {
+    if db::scheduled_ops::destinations::get(org_id, name)
+        .await
+        .is_err()
+    {
         return Err((
             http::StatusCode::NOT_FOUND,
             anyhow::anyhow!("Alert destination not found {}", name),

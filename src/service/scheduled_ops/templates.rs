@@ -18,7 +18,7 @@ use actix_web::http;
 use crate::{
     common::{
         infra::config::ALERTS_DESTINATIONS,
-        meta::{scheduled_ops::templates::Template, authz::Authz},
+        meta::{authz::Authz, scheduled_ops::templates::Template},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::db,
@@ -114,7 +114,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
         }
     }
 
-    if db::scheduled_ops::templates::get(org_id, name).await.is_err() {
+    if db::scheduled_ops::templates::get(org_id, name)
+        .await
+        .is_err()
+    {
         return Err((
             http::StatusCode::NOT_FOUND,
             anyhow::anyhow!("Alert template not found {}", name),

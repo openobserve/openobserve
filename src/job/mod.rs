@@ -147,7 +147,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::scheduled_ops::realtime_triggers::cache()
         .await
         .expect("alerts realtime triggers cache failed");
-    db::scheduled_ops::alerts::cache().await.expect("alerts cache failed");
+    db::scheduled_ops::alerts::cache()
+        .await
+        .expect("alerts cache failed");
     db::dashboards::reports::cache()
         .await
         .expect("reports cache failed");
