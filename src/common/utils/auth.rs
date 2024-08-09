@@ -43,14 +43,16 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
-    let result = RE_OFGA_UNSUPPORTED_NAME.replace_all(name, |caps: &regex::Captures| {
+    let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {
         caps.iter()
             .find_map(|m| m)
             .map(|m| m.as_str().trim())
             .unwrap_or("")
             .to_string()
     });
-    RE_OFGA_UNSUPPORTED_NAME.replace_all(name, "_").to_string()
+    RE_OFGA_UNSUPPORTED_NAME
+        .replace_all(&result, "_")
+        .to_string()
 }
 
 pub fn is_ofga_unsupported(name: &str) -> bool {
