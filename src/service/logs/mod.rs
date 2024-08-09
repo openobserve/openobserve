@@ -44,7 +44,7 @@ use super::{
 use crate::{
     common::meta::{
         ingestion::IngestionStatus,
-        scheduled_ops::alerts::Alert,
+        alerts::alerts::Alert,
         stream::{SchemaRecords, StreamParams},
     },
     service::{

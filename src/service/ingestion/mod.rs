@@ -46,7 +46,7 @@ use crate::{
         meta::{
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             ingestion::IngestionRequest,
-            scheduled_ops::alerts::Alert,
+            alerts::alerts::Alert,
             stream::{SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,

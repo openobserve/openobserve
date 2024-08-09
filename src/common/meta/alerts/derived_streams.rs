@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::common::meta::{
-    scheduled_ops::{QueryCondition, TriggerCondition},
+    alerts::{QueryCondition, TriggerCondition},
     stream::StreamParams,
 };
 

@@ -45,7 +45,7 @@ use crate::{
         meta::{
             functions::StreamTransform,
             prom::*,
-            scheduled_ops::alerts,
+            alerts::alerts,
             stream::{SchemaRecords, StreamParams},
         },
     },

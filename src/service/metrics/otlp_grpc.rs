@@ -41,7 +41,7 @@ use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
         prom::*,
-        scheduled_ops::alerts,
+        alerts::alerts,
         stream::{SchemaRecords, StreamParams},
     },
     service::{

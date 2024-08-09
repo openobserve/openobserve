@@ -30,7 +30,7 @@ use crate::{
         organization::OrganizationSetting,
         pipelines::PipeLine,
         prom::ClusterLeader,
-        scheduled_ops::{alerts::Alert, destinations::Destination, templates::Template},
+        alerts::{alerts::Alert, destinations::Destination, templates::Template},
         syslog::SyslogRoute,
         user::User,
     },

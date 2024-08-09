@@ -19,7 +19,7 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::{
-        meta::{http::HttpResponse as MetaHttpResponse, scheduled_ops::alerts::Alert},
+        meta::{http::HttpResponse as MetaHttpResponse, alerts::alerts::Alert},
         utils::http::get_stream_type_from_request,
     },
     service::alert::alerts,
