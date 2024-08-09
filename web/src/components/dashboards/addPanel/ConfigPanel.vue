@@ -777,17 +777,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
       <MarkLineConfig
         v-if="
-          ![
-            'html',
-            'markdown',
-            'geomap',
-            'sankey',
-            'table',
-            'pie',
-            'donut',
-            'heatmap',
-            'metric',
-            'gauge',
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
           ].includes(dashboardPanelData.data.type)
         "
       />

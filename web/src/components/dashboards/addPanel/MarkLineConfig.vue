@@ -110,7 +110,7 @@
       </div>
     </div>
     <q-btn
-      @click="addNeMarkLine"
+      @click="addNewMarkLine"
       style="cursor: pointer; padding: 0px 5px"
       label="+ Add"
       no-caps
@@ -153,7 +153,7 @@ export default defineComponent({
       }
     });
 
-    const addNeMarkLine = () => {
+    const addNewMarkLine = () => {
       dashboardPanelData.data.config.mark_line.push({
         name: "",
         type: "yAxis",
@@ -170,7 +170,7 @@ export default defineComponent({
       dashboardPanelData,
       markLineTypeOptions,
       removeMarkLineByIndex,
-      addNeMarkLine,
+      addNewMarkLine,
     };
   },
 });
