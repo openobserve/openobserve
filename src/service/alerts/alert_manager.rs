@@ -28,7 +28,7 @@ use futures::future::try_join_all;
 
 use crate::{
     common::meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
-    service::{db, usage::publish_triggers_usage},
+    service::{alerts::get_alert_start_end_time, db, usage::publish_triggers_usage},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -132,7 +132,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     // evaluate alert
-    let ret = alert.evaluate(None).await?;
+    let (ret, end_time) = alert.evaluate(None).await?;
     if ret.is_some() {
         log::info!(
             "Alert conditions satisfied, org: {}, module_key: {}",
@@ -184,14 +184,22 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time.unwrap_or_default(),
-        end_time: trigger.end_time.unwrap_or_default(),
+        start_time: end_time
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+        end_time,
         retries: trigger.retries,
         error: None,
     };
 
     // send notification
     if let Some(data) = ret {
+        let (alert_start_time, alert_end_time) =
+            get_alert_start_end_time(&data, alert.trigger_condition.period);
+        trigger_data_stream.start_time = alert_start_time;
+        trigger_data_stream.end_time = alert_end_time;
         match alert.send_notification(&data).await {
             Ok(_) => {
                 log::info!(
