@@ -17,6 +17,7 @@ import { reactive, computed, watch, onBeforeMount } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
+import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 
 const colors = [
   "#5960b2",
@@ -1676,43 +1677,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return tempValue;
   };
 
-  const escapeSingleQuotes = (value: any) => {
-    return value.replace(/'/g, "''");
-  };
-
-  const parseLine = (input: any) => {
-    if (input == null) {
-      return input;
-    }
-    input = input.trim();
-
-    const regex = /'([^']*?)'|"([^"]*?)"|([^,()]+)/g;
-
-    const result = [];
-
-    let match;
-    while ((match = regex.exec(input)) !== null) {
-      const value = match[1] || match[2] || match[3];
-      const trimmedValue = value.trim();
-      if (trimmedValue) {
-        result.push(trimmedValue);
-      }
-    }
-
-    return result;
-  };
-
   const formatINValue = (value: any) => {
-    //if variable is present dont want to use parseLine
+    //if variable is present dont want to use splitQuotedString
     if (value?.includes("$")) {
-      // if ((${aa})) remove unnecessary ()
-      // if (${aa}) dont remove ()
       if (value.startsWith("(") && value.endsWith(")")) {
         return value.substring(1, value.length - 1);
       }
       return value;
     } else {
-      return parseLine(value)
+      return splitQuotedString(value)
         ?.map((it: any) => {
           return `'${escapeSingleQuotes(it)}'`;
         })

@@ -1,3 +1,5 @@
+import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+
 let parser: any;
 let parserInitialized = false;
 
@@ -73,38 +75,6 @@ export const addLabelToSQlQuery = async (
 ) => {
   await importSqlParser();
 
-  const escapeSingleQuotes = (value: any) => {
-    return value?.replace(/'/g, "''");
-  };
-  const parseLine = (input: any) => {
-    // Trim the input to remove any leading/trailing whitespace
-    input = input.trim();
-
-    // Regular expression to match elements which can be:
-    // - Enclosed in single or double quotes (allowing commas inside)
-    // - Not enclosed in any quotes
-    const regex = /'([^']*?)'|"([^"]*?)"|([^,()]+)/g;
-
-    // Result array to store the parsed elements
-    const result = [];
-
-    // Match all elements according to the pattern
-    let match;
-    while ((match = regex.exec(input)) !== null) {
-      // Use the first non-null captured group
-      const value = match[1] || match[2] || match[3];
-
-      // Trim whitespace around the element (though quotes should handle this)
-      const trimmedValue = value.trim();
-
-      // Push non-empty values to the result array
-      if (trimmedValue) {
-        result.push(trimmedValue);
-      }
-    }
-
-    return result;
-  };
   let condition: any;
 
   switch (operator) {
@@ -125,7 +95,7 @@ export const addLabelToSQlQuery = async (
     case "IN":
       operator = "IN";
       // add brackets if not present in "IN" conditions
-      value = parseLine(value).map((it: any) => ({
+      value = splitQuotedString(value).map((it: any) => ({
         type: "single_quote_string",
         value: escapeSingleQuotes(it),
       }));

@@ -865,3 +865,42 @@ export const isValidResourceName = (name: string) => {
   // Check if the role name is valid
   return roleNameRegex.test(name);
 };
+
+
+export const escapeSingleQuotes = (value: any) => {
+  return value?.replace(/'/g, "''");
+};
+
+export const splitQuotedString = (input: any) => {
+  // Check if the input is null or empty
+  if (input == null) {
+    return input;
+  }
+  // Trim the input to remove any leading/trailing whitespace
+  input = input.trim();
+
+  // Regular expression to match elements which can be:
+  // - Enclosed in single or double quotes (allowing commas inside)
+  // - Not enclosed in any quotes
+  const regex = /'([^']*?)'|"([^"]*?)"|([^,()]+)/g;
+
+  // Result array to store the parsed elements
+  const result = [];
+
+  // Match all elements according to the pattern
+  let match;
+  while ((match = regex.exec(input)) !== null) {
+    // Use the first non-null captured group
+    const value = match[1] || match[2] || match[3];
+
+    // Trim whitespace around the element (though quotes should handle this)
+    const trimmedValue = value.trim();
+
+    // Push non-empty values to the result array
+    if (trimmedValue) {
+      result.push(trimmedValue);
+    }
+  }
+
+  return result;
+};
