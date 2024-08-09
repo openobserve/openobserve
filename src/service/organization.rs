@@ -35,7 +35,7 @@ use crate::{
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let functions = db::functions::list(org_id).await.unwrap();
-    let alerts = db::alerts::list(org_id, None, None).await.unwrap();
+    let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
     let mut num_streams = 0;
     let mut total_storage_size = 0.00;
     let mut total_compressed_size = 0.00;

@@ -81,6 +81,7 @@ pub enum TriggerModule {
     Report,
     #[default]
     Alert,
+    DerivedStream,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -88,6 +89,7 @@ impl std::fmt::Display for TriggerModule {
         match self {
             TriggerModule::Alert => write!(f, "alert"),
             TriggerModule::Report => write!(f, "report"),
+            TriggerModule::DerivedStream => write!(f, "derived_stream"),
         }
     }
 }

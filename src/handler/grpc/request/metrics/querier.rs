@@ -41,10 +41,10 @@ use crate::{
     service::{promql::search as SearchService, search::match_source},
 };
 
-pub struct Querier;
+pub struct MetricsQuerier;
 
 #[tonic::async_trait]
-impl Metrics for Querier {
+impl Metrics for MetricsQuerier {
     #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(org_id = req.get_ref().org_id))]
     async fn query(
         &self,

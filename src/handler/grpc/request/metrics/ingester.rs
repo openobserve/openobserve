@@ -21,10 +21,10 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 use tonic::{Response, Status};
 
 #[derive(Default)]
-pub struct Ingester;
+pub struct MetricsIngester;
 
 #[async_trait]
-impl MetricsService for Ingester {
+impl MetricsService for MetricsIngester {
     async fn export(
         &self,
         request: tonic::Request<ExportMetricsServiceRequest>,
