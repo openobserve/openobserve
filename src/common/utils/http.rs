@@ -62,6 +62,7 @@ pub(crate) fn get_search_type_from_request(
             "alerts" => Some(SearchEventType::Alerts),
             "values" => Some(SearchEventType::Values),
             "rum" => Some(SearchEventType::RUM),
+            "derived_stream" => Some(SearchEventType::DerivedStream),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,

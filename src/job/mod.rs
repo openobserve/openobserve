@@ -109,7 +109,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
-    tokio::task::spawn(async move { db::alerts::watch().await });
+    tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::dashboards::reports::watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
@@ -147,7 +147,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::realtime_triggers::cache()
         .await
         .expect("alerts realtime triggers cache failed");
-    db::alerts::cache().await.expect("alerts cache failed");
+    db::alerts::alert::cache()
+        .await
+        .expect("alerts cache failed");
     db::dashboards::reports::cache()
         .await
         .expect("reports cache failed");

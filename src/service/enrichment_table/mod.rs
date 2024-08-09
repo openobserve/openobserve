@@ -56,7 +56,7 @@ pub mod geoip;
 pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
-    mut payload: Multipart,
+    payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -118,77 +118,44 @@ pub async fn save_enrichment_data(
             .parse::<i64>()
             .unwrap()
     };
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition();
-        let filename = content_disposition.get_filename();
-        let mut data = bytes::Bytes::new();
 
-        if filename.is_some() {
-            while let Some(chunk) = field.next().await {
-                let chunked_data = chunk.unwrap();
-                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
-                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
-            }
-            let mut rdr = csv::Reader::from_reader(data.as_ref());
-            let headers: csv::StringRecord = rdr
-                .headers()?
-                .iter()
-                .map(|x| {
-                    let mut x = x.trim().to_string();
-                    format_key(&mut x);
-                    x
-                })
-                .collect::<Vec<_>>()
-                .into();
+    for mut json_record in payload {
+        json_record.insert(
+            get_config().common.column_timestamp.clone(),
+            json::Value::Number(timestamp.into()),
+        );
 
-            for result in rdr.records() {
-                // The iterator yields Result<StringRecord, Error>, so we check the
-                // error here.
-                let record = result?;
-                // Transform the record to a JSON value
-                let mut json_record = json::Map::new();
-
-                for (header, field) in headers.iter().zip(record.iter()) {
-                    json_record.insert(header.into(), json::Value::String(field.into()));
-                }
-                json_record.insert(
-                    get_config().common.column_timestamp.clone(),
-                    json::Value::Number(timestamp.into()),
-                );
-
-                // check for schema evolution
-                if !schema_evolved
-                    && check_for_schema(
-                        org_id,
-                        stream_name,
-                        StreamType::EnrichmentTables,
-                        &mut stream_schema_map,
-                        vec![&json_record],
-                        timestamp,
-                    )
-                    .await
-                    .is_ok()
-                {
-                    schema_evolved = true;
-                }
-
-                if records.is_empty() {
-                    let schema = stream_schema_map.get(stream_name).unwrap();
-                    let schema_key = schema.hash_key();
-                    hour_key = super::ingestion::get_wal_time_key(
-                        timestamp,
-                        &vec![],
-                        PartitionTimeLevel::Unset,
-                        &json_record,
-                        Some(schema_key),
-                    );
-                }
-                let record = json::Value::Object(json_record);
-                let record_size = json::estimate_json_bytes(&record);
-                records.push(Arc::new(record));
-                records_size += record_size;
-            }
+        // check for schema evolution
+        if !schema_evolved
+            && check_for_schema(
+                org_id,
+                stream_name,
+                StreamType::EnrichmentTables,
+                &mut stream_schema_map,
+                vec![&json_record],
+                timestamp,
+            )
+            .await
+            .is_ok()
+        {
+            schema_evolved = true;
         }
+
+        if records.is_empty() {
+            let schema = stream_schema_map.get(stream_name).unwrap();
+            let schema_key = schema.hash_key();
+            hour_key = super::ingestion::get_wal_time_key(
+                timestamp,
+                &vec![],
+                PartitionTimeLevel::Unset,
+                &json_record,
+                Some(schema_key),
+            );
+        }
+        let record = json::Value::Object(json_record);
+        let record_size = json::estimate_json_bytes(&record);
+        records.push(Arc::new(record));
+        records_size += record_size;
     }
 
     if records.is_empty() {
@@ -279,4 +246,52 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);
     log::info!("deleted enrichment table  {stream_name}");
+}
+
+pub async fn extract_multipart(
+    mut payload: Multipart,
+) -> Result<Vec<json::Map<String, json::Value>>, Error> {
+    let mut records = Vec::new();
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let content_disposition = field.content_disposition();
+        let filename = content_disposition.get_filename();
+        let mut data = bytes::Bytes::new();
+
+        if filename.is_some() {
+            while let Some(chunk) = field.next().await {
+                let chunked_data = chunk.unwrap();
+                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
+                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+            }
+            let mut rdr = csv::Reader::from_reader(data.as_ref());
+            let headers: csv::StringRecord = rdr
+                .headers()?
+                .iter()
+                .map(|x| {
+                    let mut x = x.trim().to_string();
+                    format_key(&mut x);
+                    x
+                })
+                .collect::<Vec<_>>()
+                .into();
+
+            for result in rdr.records() {
+                // The iterator yields Result<StringRecord, Error>, so we check the
+                // error here.
+                let record = result?;
+                // Transform the record to a JSON value
+                let mut json_record = json::Map::new();
+
+                for (header, field) in headers.iter().zip(record.iter()) {
+                    json_record.insert(header.into(), json::Value::String(field.into()));
+                }
+
+                if !json_record.is_empty() {
+                    records.push(json_record);
+                }
+            }
+        }
+    }
+
+    Ok(records)
 }

@@ -164,7 +164,9 @@ impl From<&str> for RoleGroup {
 impl From<SearchEventType> for RoleGroup {
     fn from(value: SearchEventType) -> Self {
         match value {
-            SearchEventType::Reports | SearchEventType::Alerts => RoleGroup::Background,
+            SearchEventType::Reports | SearchEventType::Alerts | SearchEventType::DerivedStream => {
+                RoleGroup::Background
+            }
             _ => RoleGroup::Interactive,
         }
     }
