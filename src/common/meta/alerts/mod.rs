@@ -60,6 +60,7 @@ pub struct QueryCondition {
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
+    #[serde(default)]
     pub search_event_type: Option<SearchEventType>,
 }
 
