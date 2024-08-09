@@ -296,7 +296,7 @@ pub async fn trigger(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
+) -> Result<(bool, String), (http::StatusCode, anyhow::Error)> {
     let alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
@@ -313,35 +313,55 @@ pub async fn trigger(
 }
 
 impl Alert {
+    /// Returns the evaluated row data and the end time of the search timerange,
+    /// for realtime this is 0
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
-            self.query_condition.evaluate_realtime(row).await
+            let rows = self.query_condition.evaluate_realtime(row).await?;
+            Ok((rows, Utc::now().timestamp_micros()))
         } else {
             self.query_condition.evaluate_scheduled(self).await
         }
     }
 
+    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
+    /// and the error message if any
     pub async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(bool, String), anyhow::Error> {
+        let mut message = "".to_string();
+        let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
             if let Err(e) = send_notification(self, &dest, rows).await {
                 log::error!(
-                    "Error sending notification for {}/{}/{}/{} err: {}",
+                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
                     self.org_id,
                     self.stream_type,
                     self.stream_name,
                     self.name,
+                    dest.name,
                     e
+                );
+                no_of_error += 1;
+                message = format!(
+                    "{message} Error sending notification for destination {} err: {e};",
+                    dest.name
                 );
             }
         }
-        Ok(())
+        if no_of_error == self.destinations.len() {
+            Err(anyhow::anyhow!(message))
+        } else if no_of_error != 0 {
+            // Some send notification job failed
+            Ok((false, message))
+        } else {
+            Ok((true, "".to_owned()))
+        }
     }
 }
 
@@ -374,31 +394,31 @@ impl QueryCondition {
     pub async fn evaluate_scheduled(
         &self,
         alert: &Alert,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
                 let Some(v) = self.conditions.as_ref() else {
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 build_sql(alert, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 if v.is_empty() {
-                    return Ok(None);
+                    return Ok((None, now));
                 } else {
                     v.to_string()
                 }
             }
             QueryType::PromQL => {
                 let Some(v) = self.promql.as_ref() else {
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 if v.is_empty() {
-                    return Ok(None);
+                    return Ok((None, now));
                 }
                 let start = now
                     - Duration::try_minutes(alert.trigger_condition.period)
@@ -427,7 +447,7 @@ impl QueryCondition {
                 let resp = match promql::search::search(&alert.org_id, &req, 0, "").await {
                     Ok(v) => v,
                     Err(_) => {
-                        return Ok(None);
+                        return Ok((None, now));
                     }
                 };
                 let promql::value::Value::Matrix(value) = resp else {
@@ -436,7 +456,7 @@ impl QueryCondition {
                         v,
                         resp
                     );
-                    return Ok(None);
+                    return Ok((None, now));
                 };
                 // TODO calculate the sample in a row, suddenly a sample can be ignored
                 let value = value
@@ -444,25 +464,31 @@ impl QueryCondition {
                     .filter(|f| f.samples.len() >= alert.trigger_condition.threshold as usize)
                     .collect::<Vec<_>>();
                 return if value.is_empty() {
-                    Ok(None)
+                    Ok((None, now))
                 } else {
-                    Ok(Some(
-                        value
-                            .iter()
-                            .map(|v| {
-                                let mut val = Map::with_capacity(v.labels.len() + 2);
-                                for label in v.labels.iter() {
+                    Ok((
+                        Some(
+                            value
+                                .iter()
+                                .map(|v| {
+                                    let mut val = Map::with_capacity(v.labels.len() + 2);
+                                    for label in v.labels.iter() {
+                                        val.insert(
+                                            label.name.to_string(),
+                                            label.value.to_string().into(),
+                                        );
+                                    }
+                                    let last_sample = v.samples.last().unwrap();
                                     val.insert(
-                                        label.name.to_string(),
-                                        label.value.to_string().into(),
+                                        "_timestamp".to_string(),
+                                        last_sample.timestamp.into(),
                                     );
-                                }
-                                let last_sample = v.samples.last().unwrap();
-                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
-                                val.insert("value".to_string(), last_sample.value.into());
-                                val
-                            })
-                            .collect(),
+                                    val.insert("value".to_string(), last_sample.value.into());
+                                    val
+                                })
+                                .collect(),
+                        ),
+                        now,
                     ))
                 };
             }
@@ -520,13 +546,16 @@ impl QueryCondition {
                 }
             };
         if resp.total < alert.trigger_condition.threshold as usize {
-            Ok(None)
+            Ok((None, now))
         } else {
-            Ok(Some(
-                resp.hits
-                    .iter()
-                    .map(|hit| hit.as_object().unwrap().clone())
-                    .collect(),
+            Ok((
+                Some(
+                    resp.hits
+                        .iter()
+                        .map(|hit| hit.as_object().unwrap().clone())
+                        .collect(),
+                ),
+                now,
             ))
         }
     }
@@ -1069,66 +1098,8 @@ async fn process_dest_template(
     }
 
     // calculate start and end time
-    let mut alert_start_time = 0;
-    let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
-        for val in values {
-            let val = val.parse::<i64>().unwrap_or_default();
-            if alert_start_time == 0 || val < alert_start_time {
-                alert_start_time = val;
-            }
-            if alert_end_time == 0 || val > alert_end_time {
-                alert_end_time = val;
-            }
-        }
-    }
-    if let Some(values) = vars.get("zo_sql_min_time") {
-        for val in values {
-            let val = val.parse::<i64>().unwrap_or_default();
-            if alert_start_time == 0 || val < alert_start_time {
-                alert_start_time = val;
-            }
-        }
-    }
-    if let Some(values) = vars.get("zo_sql_max_time") {
-        for val in values {
-            let val = val.parse::<i64>().unwrap_or_default();
-            if alert_end_time == 0 || val > alert_end_time {
-                alert_end_time = val;
-            }
-        }
-    }
-
-    // Hack time range for alert url
-    alert_end_time = if alert_end_time == 0 {
-        Utc::now().timestamp_micros()
-    } else {
-        // the frontend will drop the second, so we add 1 minute to the end time
-        alert_end_time
-            + Duration::try_minutes(1)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-    };
-    if alert_start_time == 0 {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-    }
-    if alert_end_time - alert_start_time
-        < Duration::try_minutes(1)
-            .unwrap()
-            .num_microseconds()
-            .unwrap()
-    {
-        alert_start_time = alert_end_time
-            - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-    }
+    let (alert_start_time, alert_end_time) =
+        get_alert_start_end_time(&vars, alert.trigger_condition.period);
 
     let alert_start_time_str = if alert_start_time > 0 {
         Local
@@ -1276,6 +1247,94 @@ fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue
             }
         }
     }
+}
+
+pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
+    let mut vars = HashMap::with_capacity(rows.len());
+    for row in rows.iter() {
+        for (key, value) in row.iter() {
+            let value = if value.is_string() {
+                value.as_str().unwrap_or_default().to_string()
+            } else if value.is_f64() {
+                format!("{:.2}", value.as_f64().unwrap_or_default())
+            } else {
+                value.to_string()
+            };
+            let entry = vars.entry(key.to_string()).or_insert_with(HashSet::new);
+            entry.insert(value);
+        }
+    }
+    vars
+}
+
+pub fn get_alert_start_end_time(
+    vars: &HashMap<String, HashSet<String>>,
+    period: i64,
+) -> (i64, i64) {
+    let cfg = get_config();
+
+    // calculate start and end time
+    let mut alert_start_time = 0;
+    let mut alert_end_time = 0;
+    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+    if let Some(values) = vars.get("zo_sql_min_time") {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_start_time == 0 || val < alert_start_time {
+                alert_start_time = val;
+            }
+        }
+    }
+    if let Some(values) = vars.get("zo_sql_max_time") {
+        for val in values {
+            let val = val.parse::<i64>().unwrap_or_default();
+            if alert_end_time == 0 || val > alert_end_time {
+                alert_end_time = val;
+            }
+        }
+    }
+
+    // Hack time range for alert url
+    alert_end_time = if alert_end_time == 0 {
+        Utc::now().timestamp_micros()
+    } else {
+        // the frontend will drop the second, so we add 1 minute to the end time
+        alert_end_time
+            + Duration::try_minutes(1)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
+    };
+    if alert_start_time == 0 {
+        alert_start_time = alert_end_time
+            - Duration::try_minutes(period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+    }
+    if alert_end_time - alert_start_time
+        < Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap()
+    {
+        alert_start_time = alert_end_time
+            - Duration::try_minutes(period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+    }
+    (alert_start_time, alert_end_time)
 }
 
 fn format_variable_value(val: String) -> String {
