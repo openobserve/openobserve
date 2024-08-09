@@ -19,7 +19,7 @@ use actix_cors::Cors;
 use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
-    http::{header, StatusCode},
+    http::{header, ConnectionType, StatusCode},
     middleware, web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
@@ -147,7 +147,7 @@ async fn check_keepalive(
     if resp.status() >= StatusCode::BAD_REQUEST {
         resp.response_mut()
             .head_mut()
-            .set_connection_type(actix_http::ConnectionType::Close);
+            .set_connection_type(ConnectionType::Close);
     }
     Ok(resp)
 }
