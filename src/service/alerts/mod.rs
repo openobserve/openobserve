@@ -1099,7 +1099,7 @@ async fn process_dest_template(
 
     // calculate start and end time
     let (alert_start_time, alert_end_time) =
-        get_alert_start_end_time(rows, alert.trigger_condition.period);
+        get_alert_start_end_time(&vars, alert.trigger_condition.period);
 
     let alert_start_time_str = if alert_start_time > 0 {
         Local
@@ -1249,8 +1249,7 @@ fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue
     }
 }
 
-pub fn get_alert_start_end_time(rows: &[Map<String, Value>], period: i64) -> (i64, i64) {
-    let cfg = get_config();
+pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -1265,6 +1264,14 @@ pub fn get_alert_start_end_time(rows: &[Map<String, Value>], period: i64) -> (i6
             entry.insert(value);
         }
     }
+    vars
+}
+
+pub fn get_alert_start_end_time(
+    vars: &HashMap<String, HashSet<String>>,
+    period: i64,
+) -> (i64, i64) {
+    let cfg = get_config();
 
     // calculate start and end time
     let mut alert_start_time = 0;

@@ -28,7 +28,11 @@ use futures::future::try_join_all;
 
 use crate::{
     common::meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
-    service::{alerts::get_alert_start_end_time, db, usage::publish_triggers_usage},
+    service::{
+        alerts::{get_alert_start_end_time, get_row_column_map},
+        db,
+        usage::publish_triggers_usage,
+    },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -196,8 +200,9 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     // send notification
     if let Some(data) = ret {
+        let vars = get_row_column_map(&data);
         let (alert_start_time, alert_end_time) =
-            get_alert_start_end_time(&data, alert.trigger_condition.period);
+            get_alert_start_end_time(&vars, alert.trigger_condition.period);
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert.send_notification(&data).await {
