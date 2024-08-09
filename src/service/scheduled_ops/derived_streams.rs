@@ -28,7 +28,7 @@ use crate::{
         meta::{
             // authz::Authz,
             scheduled_ops::{
-                derived_streams::DerivedStreamMeta, FrequencyType, Operator, QueryType,
+                derived_streams::DerivedStreamMeta, FrequencyType, QueryType,
             },
         },
         // utils::auth::{remove_ownership, set_ownership},
@@ -58,13 +58,6 @@ pub async fn save(
 
     // other checks for query type
     match derived_stream.query_condition.query_type {
-        QueryType::Custom => {
-            if derived_stream.query_condition.aggregation.is_some() {
-                // if it has result we should fire the alert when enable aggregation
-                derived_stream.trigger_condition.operator = Operator::GreaterThanEquals;
-                derived_stream.trigger_condition.threshold = 1;
-            }
-        }
         QueryType::SQL => {
             if derived_stream
                 .query_condition
@@ -90,6 +83,7 @@ pub async fn save(
                 ));
             }
         }
+        _ => {}
     }
 
     // check source stream schema

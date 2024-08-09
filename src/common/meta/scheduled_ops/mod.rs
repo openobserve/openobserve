@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json::Value;
+use config::{meta::search::SearchEventType, utils::json::Value};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -60,6 +60,7 @@ pub struct QueryCondition {
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
+    pub search_event_type: Option<SearchEventType>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

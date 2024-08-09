@@ -172,7 +172,11 @@ impl QueryCondition {
             query: config::meta::search::Query {
                 sql: sql.clone(),
                 from: 0,
-                size: std::cmp::max(100, trigger_condition.threshold),
+                size: if self.search_event_type.is_some() {
+                    -1
+                } else {
+                    std::cmp::max(100, trigger_condition.threshold)
+                },
                 start_time: now
                     - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
@@ -225,7 +229,7 @@ impl QueryCondition {
                 }
             }
         };
-        if resp.total < trigger_condition.threshold as usize {
+        if self.search_event_type.is_none() && resp.total < trigger_condition.threshold as usize {
             Ok(None)
         } else {
             Ok(Some(

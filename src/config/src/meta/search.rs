@@ -506,6 +506,7 @@ pub enum SearchEventType {
     Values,
     Other,
     RUM,
+    DerivedStream,
 }
 
 impl std::fmt::Display for SearchEventType {
@@ -518,6 +519,7 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Other => write!(f, "Other"),
             SearchEventType::Values => write!(f, "_values"),
             SearchEventType::RUM => write!(f, "RUM"),
+            SearchEventType::DerivedStream => write!(f, "DERIVEDSTREAM"),
         }
     }
 }
@@ -534,6 +536,7 @@ impl FromStr for SearchEventType {
             "values" => Ok(SearchEventType::Values),
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
+            "derived_stream" => Ok(SearchEventType::DerivedStream),
             _ => Err(format!("Invalid search event type: {s}")),
         }
     }

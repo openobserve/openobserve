@@ -19,6 +19,7 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
+use config::meta::search::SearchEventType;
 
 use super::db;
 use crate::common::{
@@ -47,6 +48,7 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
             derived_stream.trigger_condition.frequency *= 60; // convert to seconds
+            derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
             if !derived_stream.is_valid() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
@@ -101,6 +103,7 @@ pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Err
         for derived_stream in derived_streams {
             derived_stream.source = pipeline.source.clone();
             derived_stream.trigger_condition.frequency *= 60; // convert to seconds
+            derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
             if !derived_stream.is_valid() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
