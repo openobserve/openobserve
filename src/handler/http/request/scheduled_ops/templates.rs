@@ -19,7 +19,7 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, scheduled_ops::templates::Template},
-    service::scheduled_ops::templates,
+    service::alert::templates,
 };
 
 /// CreateTemplate

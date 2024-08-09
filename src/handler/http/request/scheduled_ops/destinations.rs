@@ -21,7 +21,7 @@ use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse, scheduled_ops::destinations::Destination,
     },
-    service::scheduled_ops::destinations,
+    service::alert::destinations,
 };
 
 /// CreateDestination

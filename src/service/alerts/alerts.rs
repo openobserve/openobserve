@@ -47,7 +47,7 @@ use crate::{
     },
     service::{
         db,
-        scheduled_ops::{build_sql, destinations},
+        alert::{build_sql, destinations},
     },
 };
 

@@ -32,7 +32,7 @@ pub mod metrics;
 pub mod organization;
 pub mod pipelines;
 pub mod promql;
-pub mod scheduled_ops;
+pub mod alert;
 pub mod schema;
 pub mod search;
 pub mod session;

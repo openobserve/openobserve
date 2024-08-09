@@ -57,7 +57,7 @@ pub async fn save_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Error
                 )));
             }
             if let Err(e) =
-                super::scheduled_ops::derived_streams::save(derived_stream.clone(), &pipeline.name)
+                super::alert::derived_streams::save(derived_stream.clone(), &pipeline.name)
                     .await
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -113,7 +113,7 @@ pub async fn update_pipeline(mut pipeline: PipeLine) -> Result<HttpResponse, Err
             }
             // derived_streams::save updates existing triggers when found
             if let Err(e) =
-                super::scheduled_ops::derived_streams::save(derived_stream.clone(), &pipeline.name)
+                super::alert::derived_streams::save(derived_stream.clone(), &pipeline.name)
                     .await
             {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -190,7 +190,7 @@ pub async fn delete_pipeline(
     // delete DerivedStream details if there's any
     if let Some(derived_streams) = existing_pipeline.derived_streams {
         for derived_stream in derived_streams {
-            if let Err(error) = super::scheduled_ops::derived_streams::delete(
+            if let Err(error) = super::alert::derived_streams::delete(
                 derived_stream,
                 &existing_pipeline.name,
             )

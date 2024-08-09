@@ -22,7 +22,7 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, scheduled_ops::alerts::Alert},
         utils::http::get_stream_type_from_request,
     },
-    service::scheduled_ops::alerts,
+    service::alert::alerts,
 };
 
 /// CreateAlert
