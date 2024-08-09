@@ -235,12 +235,12 @@ interface StreamRoute {
   query_condition: {
     sql: string;
     type: string;
-    aggregation: string | null;
+    aggregation: {
+      group_by: string[];
+    } | null;
     conditions: RouteCondition[];
   };
   trigger_condition: {
-    operator: string;
-    threshold: number;
     period: number;
     frequency_type: string;
     frequency: number;
@@ -333,7 +333,7 @@ const getDefaultStreamRoute = () => {
     query_condition: {
       sql: "",
       type: "custom",
-      aggregation: "",
+      aggregation: null,
       conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
     },
     trigger_condition: {
@@ -620,10 +620,6 @@ const getRoutePayload = () => {
         payload.context_attributes[attr.key] = attr.value;
     });
 
-    payload.trigger_condition.threshold = Number(
-      streamRoute.value.trigger_condition.threshold,
-    );
-
     payload.trigger_condition.period = Number(
       streamRoute.value.trigger_condition.period,
     );
@@ -639,6 +635,10 @@ const getRoutePayload = () => {
       streamRoute.value.query_condition.type !== "custom"
     ) {
       payload.query_condition.aggregation = null;
+    }
+
+    if (payload.query_condition.aggregation?.having) {
+      delete payload.query_condition?.aggregation.having;
     }
   }
 
