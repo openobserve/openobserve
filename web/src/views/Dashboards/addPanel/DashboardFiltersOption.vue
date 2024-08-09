@@ -58,8 +58,12 @@ export default defineComponent({
       "dashboard",
     );
 
-    const { dashboardPanelData, removeFilterItem, loadFilterItem } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const {
+      dashboardPanelData,
+      removeFilterItem,
+      loadFilterItem,
+      selectedStreamFieldsBasedOnUserDefinedSchema,
+    } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { t } = useI18n();
     const showAddMenu = ref(false);
@@ -191,7 +195,7 @@ export default defineComponent({
         } else {
           value = it.multiSelect
             ? "(" + "$" + "{" + it.name + "}" + ")"
-            :  "$" + it.name ;
+            : "$" + it.name;
         }
 
         return {
@@ -201,7 +205,7 @@ export default defineComponent({
       });
 
     const schemaOptions = computed(() =>
-      dashboardPanelData?.meta?.stream?.selectedStreamFields?.map(
+      selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map(
         (field: any) => ({
           label: field.name,
           value: field.name,
