@@ -106,19 +106,7 @@ pub async fn save_enrichment_data(
 
     let mut records = vec![];
     let mut records_size = 0;
-    let timestamp = if !append_data {
-        Utc::now().timestamp_micros()
-    } else {
-        let schema = stream_schema_map.get(stream_name).unwrap();
-        schema
-            .schema()
-            .metadata()
-            .get("created_at")
-            .unwrap()
-            .parse::<i64>()
-            .unwrap()
-    };
-
+    let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
         json_record.insert(
             get_config().common.column_timestamp.clone(),
