@@ -127,7 +127,6 @@ pub async fn save_enrichment_data(
             Some(v) => v.as_i64().unwrap_or(timestamp),
             None => timestamp,
         };
-
         json_record.insert(
             get_config().common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
