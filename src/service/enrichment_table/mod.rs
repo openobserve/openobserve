@@ -121,16 +121,11 @@ pub async fn save_enrichment_data(
 
     let mut records = vec![];
     let mut records_size = 0;
-
+    let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
-        let timestamp = if json_record.contains_key(&get_config().common.column_timestamp) {
-            json_record
-                .get(&get_config().common.column_timestamp)
-                .unwrap()
-                .as_i64()
-                .unwrap_or_else(|| Utc::now().timestamp_micros())
-        } else {
-            Utc::now().timestamp_micros()
+        let timestamp = match json_record.get(&get_config().common.column_timestamp) {
+            Some(v) => v.as_i64().unwrap_or(timestamp),
+            None => timestamp,
         };
 
         json_record.insert(
