@@ -128,9 +128,9 @@ pub async fn save_enrichment_data(
                 .get(&get_config().common.column_timestamp)
                 .unwrap()
                 .as_i64()
-                .unwrap_or_else(|| Utc::now().timestamp_micros() as i64)
+                .unwrap_or_else(|| Utc::now().timestamp_micros())
         } else {
-            Utc::now().timestamp_micros() as i64
+            Utc::now().timestamp_micros()
         };
 
         json_record.insert(
