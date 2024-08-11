@@ -84,7 +84,6 @@ cron = "0.12.1"
 csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
-datafusion-expr.workspace = true
 datafusion-proto.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
@@ -228,7 +227,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
 datafusion = "40"
-datafusion-expr = "40"
 datafusion-proto = "40"
 arrow = { version = "52.1.0", features = ["ipc_compression", "prettyprint"] }
 arrow-json = "52.1.0"

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::Duration;
 use config::{
@@ -72,7 +72,7 @@ pub struct Sql {
     pub fast_mode: bool, /* there is no group by, no aggregatioin,
                           * no where or only 1 equality where clause with term as a partition
                           * key, we can just get data from the latest file */
-    pub schema: Schema,
+    pub schema: Arc<Schema>,
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
     pub fts_terms: Vec<String>,
@@ -539,7 +539,7 @@ impl Sql {
             meta,
             fulltext,
             fast_mode,
-            schema,
+            schema: Arc::new(schema),
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),

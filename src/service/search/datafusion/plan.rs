@@ -37,7 +37,7 @@ pub fn get_partial_plan(
     if children.is_empty() {
         return Ok(None);
     }
-    if children.len() > 1 {
+    if plan.name() != "UnionExec" && children.len() > 1 {
         return Err(datafusion::error::DataFusionError::NotImplemented(
             "ExecutionPlan with multiple children".to_string(),
         ));

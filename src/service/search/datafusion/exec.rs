@@ -36,6 +36,7 @@ use datafusion::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
+        TableProvider,
     },
     error::{DataFusionError, Result},
     execution::{
@@ -54,7 +55,7 @@ use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGr
 use super::{
     file_type::{FileType, GetExt},
     storage::file_list,
-    table_provider::{memtable::NewMemTable, NewListingTable},
+    table_provider::{memtable::NewMemTable, uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
@@ -65,7 +66,7 @@ use crate::service::search::{
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
-pub async fn sql(
+pub async fn _sql(
     session: &SearchSession,
     schema: Arc<Schema>,
     rules: HashMap<String, DataType>,
@@ -743,4 +744,135 @@ pub async fn register_table(
     ctx.register_table(table_name, Arc::new(table))?;
 
     Ok(ctx)
+}
+
+pub async fn query_tables(
+    session: &SearchSession,
+    sql: &Arc<Sql>,
+    tables: Vec<Arc<dyn TableProvider>>,
+) -> Result<Vec<Vec<RecordBatch>>> {
+    if tables.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let start = std::time::Instant::now();
+    let trace_id = session.id.clone();
+
+    let mut ctx = prepare_datafusion_context(
+        session.work_group.clone(),
+        &session.search_type,
+        false,
+        false,
+        session.target_partitions,
+        None,
+    )
+    .await?;
+
+    // register UDF
+    register_udf(&mut ctx, &sql.org_id).await;
+
+    // regsiter union table
+    let union_table = Arc::new(NewUnionTable::try_new(sql.schema.clone(), tables)?);
+    ctx.register_table("tbl", union_table)?;
+
+    // query sql
+    let data = exec_query(&ctx, session, sql).await?;
+
+    // drop table
+    ctx.deregister_table("tbl")?;
+    log::info!(
+        "[trace_id {trace_id}] Query all took {} ms",
+        start.elapsed().as_millis()
+    );
+
+    Ok(data)
+}
+
+pub async fn create_parquet_table(
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    files: &[FileKey],
+    rules: HashMap<String, DataType>,
+    sort_key: &[(String, bool)],
+) -> Result<Arc<dyn TableProvider>> {
+    let cfg = get_config();
+    let target_partitions = if session.target_partitions == 0 {
+        cfg.limit.cpu_num
+    } else {
+        std::cmp::max(DATAFUSION_MIN_PARTITION, session.target_partitions)
+    };
+
+    // only sort by timestamp desc
+    let sort_by_timestamp_desc =
+        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+
+    // Configure listing options
+    let file_format = ParquetFormat::default();
+    let mut listing_options = ListingOptions::new(Arc::new(file_format))
+        .with_file_extension(FileType::PARQUET.get_ext())
+        .with_target_partitions(target_partitions)
+        .with_collect_stat(true);
+
+    if sort_by_timestamp_desc {
+        // specify sort columns for parquet file
+        listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
+            datafusion::logical_expr::SortExpr {
+                expr: Box::new(Expr::Column(Column::new_unqualified(
+                    cfg.common.column_timestamp.clone(),
+                ))),
+                asc: false,
+                nulls_first: false,
+            },
+        )]]);
+    }
+
+    let schema_key = schema.hash_key();
+    let prefix = if session.storage_type == StorageType::Memory {
+        file_list::set(&session.id, &schema_key, files).await;
+        format!("memory:///{}/schema={}/", session.id, schema_key)
+    } else if session.storage_type == StorageType::Wal {
+        file_list::set(&session.id, &schema_key, files).await;
+        format!("wal:///{}/schema={}/", session.id, schema_key)
+    } else if session.storage_type == StorageType::Tmpfs {
+        format!("tmpfs:///{}/", session.id)
+    } else {
+        return Err(DataFusionError::Execution(format!(
+            "Unsupported storage_type {:?}",
+            session.storage_type,
+        )));
+    };
+    let prefix = match ListingTableUrl::parse(prefix) {
+        Ok(url) => url,
+        Err(e) => {
+            return Err(datafusion::error::DataFusionError::Execution(format!(
+                "ListingTableUrl error: {e}",
+            )));
+        }
+    };
+
+    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
+    let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
+    let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+        let new_fields = schema
+            .fields()
+            .iter()
+            .map(|x| {
+                if x.name() == &cfg.common.column_timestamp {
+                    Arc::new(Field::new(
+                        cfg.common.column_timestamp.clone(),
+                        DataType::Int64,
+                        false,
+                    ))
+                } else {
+                    x.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        Arc::new(Schema::new(new_fields))
+    } else {
+        schema
+    };
+    config = config.with_schema(schema);
+    let table = NewListingTable::try_new(config, rules)?;
+    Ok(Arc::new(table))
 }

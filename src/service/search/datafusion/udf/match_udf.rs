@@ -23,11 +23,10 @@ use datafusion::{
     },
     common::cast::as_string_array,
     error::DataFusionError,
-    logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
+    logical_expr::{ColumnarValue, ScalarFunctionImplementation, ScalarUDF, Volatility},
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// Implementation of match_range

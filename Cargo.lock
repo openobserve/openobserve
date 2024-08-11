@@ -5353,7 +5353,6 @@ dependencies = [
  "csv",
  "dashmap",
  "datafusion",
- "datafusion-expr",
  "datafusion-proto",
  "enrichment",
  "env_logger 0.10.2",

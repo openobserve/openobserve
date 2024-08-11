@@ -47,6 +47,7 @@ use datafusion::{
         cache::{cache_manager::FileStatisticsCache, cache_unit::DefaultFileStatisticsCache},
         context::SessionState,
     },
+    logical_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType},
     physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
     physical_plan::{
         empty::EmptyExec,
@@ -55,7 +56,6 @@ use datafusion::{
         ExecutionPlan, PhysicalExpr,
     },
 };
-use datafusion_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType};
 use futures::{future, stream, StreamExt};
 use hashbrown::HashMap;
 use helpers::*;
@@ -63,6 +63,7 @@ use object_store::ObjectStore;
 
 mod helpers;
 pub mod memtable;
+pub mod uniontable;
 
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,

@@ -22,16 +22,15 @@ use datafusion::{
     common::{project_schema, Constraints, Result},
     datasource::{MemTable, TableProvider},
     execution::context::SessionState,
+    logical_expr::{Expr, TableType},
     physical_plan::{
         expressions::{CastExpr, Column},
         projection::ProjectionExec,
         ExecutionPlan, PhysicalExpr,
     },
 };
-use datafusion_expr::{Expr, TableType};
 use hashbrown::HashMap;
 
-#[derive(Debug)]
 pub(crate) struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,

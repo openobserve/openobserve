@@ -719,7 +719,7 @@ async fn merge_grpc_result(
         .collect::<Vec<_>>();
 
     // format recordbatch with same schema
-    let mut schema_latest = Arc::new(sql.schema.clone());
+    let mut schema_latest = sql.schema.clone();
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
     if !batches.is_empty() {
         let mut schema = batches[0].schema();
