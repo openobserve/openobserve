@@ -123,6 +123,10 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
+        let timestamp = match json_record.get(&get_config().common.column_timestamp) {
+            Some(v) => v.as_i64().unwrap_or(timestamp),
+            None => timestamp,
+        };
         json_record.insert(
             get_config().common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
