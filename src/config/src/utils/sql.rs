@@ -35,7 +35,7 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
 
     for statement in ast {
         if let Statement::Query(query) = statement {
-            if is_aggregate_in_select(query) {
+            if is_aggregate_in_select(&query) || has_group_by(&query) || has_having(&query) {
                 return Ok(true);
             }
         }
@@ -43,7 +43,7 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
     Ok(false)
 }
 
-fn is_aggregate_in_select(query: Box<Query>) -> bool {
+fn is_aggregate_in_select(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
         if select.distinct.is_some() {
             return true;
@@ -63,10 +63,56 @@ fn is_aggregate_in_select(query: Box<Query>) -> bool {
 
 fn is_aggregate_expression(expr: &Expr) -> bool {
     match expr {
-        Expr::Function(Function { name, args: _, .. }) => {
+        Expr::Function(Function { name, .. }) => {
             AGGREGATE_UDF_LIST.contains(&name.to_string().to_lowercase().as_str())
         }
-
+        Expr::BinaryOp { left, right, .. } => {
+            // Recursively check both sides of binary operations
+            is_aggregate_expression(left) || is_aggregate_expression(right)
+        }
+        Expr::Case {
+            conditions,
+            results,
+            else_result,
+            ..
+        } => {
+            // Check if any part of the CASE expression is an aggregate function
+            conditions.iter().any(is_aggregate_expression)
+                || results.iter().any(is_aggregate_expression)
+                || else_result
+                    .as_ref()
+                    .map_or(false, |e| is_aggregate_expression(e))
+        }
+        Expr::Nested(expr) => {
+            // Check nested expressions
+            is_aggregate_expression(expr)
+        }
+        Expr::Cast { expr, .. } => {
+            // Check casted expressions
+            is_aggregate_expression(expr)
+        }
+        Expr::UnaryOp { expr, .. } => {
+            // Check unary operations
+            is_aggregate_expression(expr)
+        }
         _ => false,
+    }
+}
+
+// Check if has group_by
+fn has_group_by(query: &Query) -> bool {
+    if let SetExpr::Select(ref select) = *query.body {
+        !select.group_by.to_string().is_empty()
+    } else {
+        false
+    }
+}
+
+// Check if has having
+fn has_having(query: &Query) -> bool {
+    if let SetExpr::Select(ref select) = *query.body {
+        select.having.is_some()
+    } else {
+        false
     }
 }
