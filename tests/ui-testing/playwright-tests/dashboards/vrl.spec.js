@@ -506,7 +506,9 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
-    await page.getByText("Asia/Dhaka").click();
+   // await page.getByText("Asia/Dhaka").click();
+   await page.getByRole("option", { name: "Asia/Dhaka" }).click();
+
 
     await page.locator('[data-test="dashboard-apply"]').click();
     //  await page.getByText('arrow_rightQueryAutoPromQLCustom SQL').click();
@@ -1441,7 +1443,9 @@ test.describe(" VRL UI testcases", () => {
     await page.getByRole("button", { name: "8" }).last().click();
 
     await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
-    await page.getByText("Asia/Dubai").click();
+    await page.getByRole("option", { name: "Asia/Dubai" }).click();
+
+  //  await page.getByText("Asia/Dubai").click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
     await expect(
