@@ -33,7 +33,7 @@ use crate::{
     common::{
         infra::config::VERSION,
         meta::{
-            alerts::{destinations::Destination, templates::Template, Alert},
+            alerts::{alert::Alert, destinations::Destination, templates::Template},
             dashboards::reports::Report,
         },
         utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
@@ -513,12 +513,19 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
             // updating the destinations of the alert.
             alert.destinations = destinations;
             // First create an alert copy with formatted alert name
-            match db::alerts::set(keys[0], StreamType::from(keys[1]), keys[2], &alert, create).await
+            match db::alerts::alert::set(
+                keys[0],
+                StreamType::from(keys[1]),
+                keys[2],
+                &alert,
+                create,
+            )
+            .await
             {
                 // Delete alert with unsupported alert name
                 Ok(_) => {
                     if create
-                        && db::alerts::delete(
+                        && db::alerts::alert::delete(
                             keys[0],
                             StreamType::from(keys[1]),
                             keys[2],
