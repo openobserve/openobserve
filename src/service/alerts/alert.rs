@@ -120,9 +120,12 @@ pub async fn save(
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
         match base64::decode_url(vrl) {
             Ok(vrl) => {
-                if !vrl.ends_with('.') {
+                let vrl = vrl.trim().to_owned();
+                if !vrl.is_empty() && !vrl.ends_with('.') {
                     let vrl = base64::encode_url(&format!("{vrl} \n ."));
                     alert.query_condition.vrl_function = Some(vrl);
+                } else if vrl.is_empty() {
+                    alert.query_condition.vrl_function = None;
                 }
             }
             Err(e) => {
@@ -639,6 +642,19 @@ async fn process_dest_template(
     };
 
     let mut alert_query = String::new();
+    let function_content = if alert.query_condition.vrl_function.is_none() {
+        "".to_owned()
+    } else {
+        format!(
+            "&functionContent={}",
+            alert
+                .query_condition
+                .vrl_function
+                .as_ref()
+                .unwrap()
+                .replace('+', "%2B")
+        )
+    };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
             let condition = alert.query_condition.promql_condition.as_ref().unwrap();
@@ -654,7 +670,7 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -664,6 +680,7 @@ async fn process_dest_template(
             alert_end_time,
             base64::encode_url(&alert_query).replace('+', "%2B"),
             alert.org_id,
+            function_content,
         )
     } else {
         match alert.query_condition.query_type {
@@ -689,7 +706,7 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -699,6 +716,7 @@ async fn process_dest_template(
             alert_end_time,
             base64::encode_url(&alert_query),
             alert.org_id,
+            function_content,
         )
     };
 
