@@ -27,13 +27,16 @@
           handle=".table-head"
           :class="{
             'tw-cursor-move': table.getState().columnOrder.length > 1,
+            
           }"
+          
           :style="{
             width:
               columnOrder.includes('source') && wrap
                 ? width - 12 + 'px'
                 : tableRowSize + 'px',
             minWidth: '100%',
+
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -318,6 +321,7 @@
       </tbody>
     </table>
   </div>
+  
 </template>
 
 <script setup lang="ts">
@@ -376,6 +380,8 @@ const emits = defineEmits([
   "addFieldToTable",
   "closeColumn",
   "click:dataRow",
+  "update:columnSizes",
+  "update:columnOrder"
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -422,11 +428,14 @@ watch(
   },
 );
 
+
+
 const table = useVueTable({
   get data() {
     return tableRows.value || [];
   },
   get columns() {
+    
     return props.columns as ColumnDef<unknown, any>[];
   },
   state: {
@@ -434,6 +443,8 @@ const table = useVueTable({
       return sorting.value;
     },
     get columnOrder() {
+
+      emits("update:columnOrder", columnOrder.value);
       return columnOrder.value;
     },
   },
@@ -464,6 +475,10 @@ const columnSizeVars = computed(() => {
     colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
   }
   return colSizes;
+  
+});
+watch(columnSizeVars, (newColSizes) => {
+  emits('update:columnSizes', newColSizes);
 });
 
 const formattedRows = computed(() => {

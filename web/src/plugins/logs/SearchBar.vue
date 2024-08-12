@@ -1969,6 +1969,22 @@ export default defineComponent({
                 console.log(e);
               }
             }, 1000);
+            if (
+            extractedObj.data.resultGrid.colOrder &&
+            extractedObj.data.resultGrid.colOrder.hasOwnProperty(searchObj.data.stream.selectedStream)
+          ) {
+            const colOrderObject = extractedObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
+            
+            const colOrderArray = Object.values(colOrderObject);
+
+            searchObj.data.stream.selectedFields = colOrderArray[0];
+          } else {
+
+            searchObj.data.stream.selectedFields = extractedObj.data.stream.selectedFields
+          }
+
+            searchObj.data.resultGrid[searchObj.data.stream.selectedStream] = extractedObj.data.resultGrid[searchObj.data.stream.selectedStream]
+
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
@@ -1976,7 +1992,10 @@ export default defineComponent({
             //   updatedLocalLogFilterField();
             //   handleRunQuery();
             // }
+
+           
           } else {
+
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             $q.notify({
@@ -2099,7 +2118,6 @@ export default defineComponent({
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
-
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
@@ -2193,6 +2211,7 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
+            console.log(res,"res at after view updated  ")
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               //update the payload and view_name in savedViews object based on id
@@ -3049,10 +3068,7 @@ export default defineComponent({
 }
 
 .logs-visualize-toggle {
-  .selected {
-    background-color: var(--q-primary) !important;
-    color: white;
-  }
+
 
   .button-group {
     border: 1px solid gray !important;
@@ -3071,11 +3087,18 @@ export default defineComponent({
   .button-left {
     border-top-left-radius: 4px;
     border-bottom-left-radius: 4px;
+    color:black;
   }
 
   .button-right {
     border-top-right-radius: 4px;
     border-bottom-right-radius: 4px;
+    color:black;
+
+  }
+  .selected {
+    background-color: var(--q-primary) !important;
+    color: white;
   }
 }
 </style>

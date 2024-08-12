@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="col column oveflow-hidden full-height">
+
     <div
       class="search-list full-height"
       ref="searchListContainer"
@@ -400,6 +401,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-virtual-scroll> -->
       <tenstack-table
         ref="searchTableRef"
+        @update:columnSizes="handleColumnSizesUpdate" 
+        @update:columnOrder="handleColumnOrderUpdate"
         :columns="searchObj.data.resultGrid.columns"
         :rows="searchObj.data.queryResults.hits"
         :wrap="searchObj.meta.toggleSourceWrap"
@@ -419,6 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="expandRowDetail"
       />
+     
       <q-dialog
         data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
@@ -508,6 +512,8 @@ export default defineComponent({
     "search:timeboxed",
     "expandlog",
     "update:recordsPerPage",
+    "update:columnSizes",
+    
   ],
   props: {
     expandedLogs: {
@@ -516,6 +522,14 @@ export default defineComponent({
     },
   },
   methods: {
+    handleColumnSizesUpdate(newColSizes : any) {
+    this.searchObj.data.resultGrid[this.searchObj.data.stream.selectedStream] = [newColSizes];
+  },
+  handleColumnOrderUpdate(newColOrder : any) {
+    const colOrderToStore = newColOrder.slice(1);
+    this.searchObj.data.resultGrid.colOrder[this.searchObj.data.stream.selectedStream] = [colOrderToStore];
+  },
+
     getPageData(actionType: string) {
       if (actionType == "prev") {
         if (this.searchObj.data.resultGrid.currentPage > 1) {
@@ -630,6 +644,8 @@ export default defineComponent({
     onUpdated(() => {
       pageNumberInput.value = searchObj.data.resultGrid.currentPage;
     });
+    const columnSizes = ref({});
+
 
     const reDrawChart = () => {
       if (
@@ -862,6 +878,7 @@ export default defineComponent({
   }
 
   .my-sticky-header-table {
+
     .q-table__top,
     .q-table__bottom,
     thead tr:first-child th {
@@ -988,6 +1005,8 @@ export default defineComponent({
 
   .table-head-chip {
     background-color: #565656;
+
+    
   }
 }
 

@@ -164,6 +164,7 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 1,
       columns: <any>[],
+      colOrder:{},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -3097,8 +3098,24 @@ const useLogs = () => {
             size: 225,
           });
         }
+        //@ts-ignore
+        const sizes = searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
+    
+
+        console.log(sizes[0] ,"sizes obj entire each obj")
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
+
+            let foundKey, foundValue;
+
+            Object.keys(sizes[0]).forEach((key) => {
+                const trimmedKey = key.replace(/^--(header|col)-/, "").replace(/-size$/, "");
+                if (trimmedKey === field) {
+                    foundKey = key;
+                    foundValue = sizes[0][key];
+                }
+            });
+
             searchObj.data.resultGrid.columns.push({
               name: field,
               id: field,
@@ -3114,7 +3131,9 @@ const useLogs = () => {
                 showWrap: true,
                 wrapContent: false,
               },
-              size: 250,
+
+              size:   foundValue 
+              ,
             });
           }
         }
@@ -3531,6 +3550,7 @@ const useLogs = () => {
   };
 
   const loadLogsData = async () => {
+
     try {
       resetFunctions();
       await getStreamList();
@@ -3546,6 +3566,7 @@ const useLogs = () => {
   };
 
   const handleQueryData = async () => {
+
     try {
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
@@ -3556,9 +3577,12 @@ const useLogs = () => {
       console.log("Error while loading logs data");
     }
   };
+  const saveColumnSizes = () =>{}
 
   const handleRunQuery = async () => {
     try {
+
+
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
