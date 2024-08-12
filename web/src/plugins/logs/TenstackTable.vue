@@ -5,7 +5,7 @@
       class="tw-w-full tw-table-auto"
       :style="{
         minWidth: '100%',
-        minHeight: '100%',
+        minHeight:totalSize + 'px',
         ...columnSizeVars,
         width: !columnOrder.includes('source')
           ? table.getCenterTotalSize() + 'px'
@@ -36,7 +36,7 @@
                 ? width - 12 + 'px'
                 : tableRowSize + 'px',
             minWidth: '100%',
-
+            background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -87,7 +87,7 @@
 
               <div
                 :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-bg-white tw-px-2 column-actions"
+                class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0  tw-px-2 column-actions"
                 :class="
                   store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
@@ -668,12 +668,14 @@ const handleDataRowClick = (row: any, index: number) => {
 table {
   border-collapse: collapse;
   border-spacing: 0;
-  font-family: monospace;
   font-size: 12px !important;
 }
 
 thead {
   background: lightgray;
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px !important;
+
 }
 
 .table-row {
