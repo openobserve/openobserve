@@ -2063,6 +2063,24 @@ const useLogs = () => {
     queryReq: any,
     appendResult: boolean = false,
   ) => {
+    if (
+      searchObj.data.resultGrid.colOrder &&
+      searchObj.data.resultGrid.colOrder.hasOwnProperty(searchObj.data.stream.selectedStream)
+      //@ts-ignore
+      &&searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream][0].length > 0
+      && searchObj.data.stream.selectedFields.length > 0
+    ) {
+
+      searchObj.data.stream.selectedFields = [];
+      // @ts-ignore
+      const colOrderObject = searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
+      
+      const colOrderArray = Object.values(colOrderObject) ;
+      // @ts-ignore
+
+      searchObj.data.stream.selectedFields = colOrderArray[0] 
+    }
+    // searchObj.data.stream.selectedFields = 
     return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
