@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="300px"
             >
               <span style="font-size: 14px"
-                >Configure the option to enable a cron job for this alert.</span
+                >Configure the option to enable a cron job.</span
               >
             </q-tooltip>
           </q-icon>
@@ -640,9 +640,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 style="font-size: 14px"
                 v-if="triggerData.frequency_type == 'minutes'"
-                >How often the alert should be evaluated.<br />
-                e.g. 2 minutes means that the query will be run every 2 minutes
-                and evaluated based on the other parameters provided.</span
+                >How often the task should be executed.<br />
+                e.g., 2 minutes means that the task will run every 2 minutes and
+                will be processed based on the other parameters provided.</span
               >
               <span style="font-size: 14px" v-else>
                 Pattern: * * * * * * means every second.
