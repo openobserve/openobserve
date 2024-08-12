@@ -18,9 +18,9 @@ use std::{any::Any, sync::Arc};
 use arrow_schema::SchemaRef;
 use async_trait::async_trait;
 use datafusion::{
+    catalog::Session,
     common::Result,
     datasource::TableProvider,
-    execution::context::SessionState,
     logical_expr::{Expr, TableProviderFilterPushDown, TableType},
     physical_plan::{union::UnionExec, ExecutionPlan},
 };
@@ -53,7 +53,7 @@ impl TableProvider for NewUnionTable {
 
     async fn scan(
         &self,
-        state: &SessionState,
+        state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,

@@ -22,7 +22,6 @@ use datafusion::{
     catalog::Session,
     common::{project_schema, Constraints, Result},
     datasource::{MemTable, TableProvider},
-    execution::context::SessionState,
     logical_expr::{Expr, TableType},
     physical_plan::{
         expressions::{CastExpr, Column},
