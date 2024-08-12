@@ -35,6 +35,7 @@ use std::{any::Any, sync::Arc};
 use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use datafusion::{
+    catalog::Session,
     common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
     datasource::{
         get_statistics_with_limit,
@@ -162,10 +163,13 @@ impl NewListingTable {
                     if let Some(access_plan) = access_plan {
                         part_file.extensions = Some(access_plan as _);
                     }
-                    Ok((part_file, statistics)) as Result<(PartitionedFile, Statistics)>
+                    Ok((part_file, Arc::new(statistics)))
+                        as Result<(PartitionedFile, Arc<Statistics>)>
                 } else {
-                    Ok((part_file, Statistics::new_unknown(&self.file_schema)))
-                        as Result<(PartitionedFile, Statistics)>
+                    Ok((
+                        part_file,
+                        Arc::new(Statistics::new_unknown(&self.file_schema)),
+                    )) as Result<(PartitionedFile, Arc<Statistics>)>
                 }
             })
             .boxed()
@@ -230,13 +234,15 @@ impl TableProvider for NewListingTable {
 
     async fn scan(
         &self,
-        state: &SessionState,
+        state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        // TODO (https://github.com/apache/datafusion/issues/11600) remove downcast_ref from here?
+        let session_state = state.as_any().downcast_ref::<SessionState>().unwrap();
         let (mut partitioned_file_lists, statistics) =
-            self.list_files_for_scan(state, limit).await?;
+            self.list_files_for_scan(session_state, limit).await?;
 
         let projected_schema = project_schema(&self.schema(), projection)?;
 
@@ -320,7 +326,7 @@ impl TableProvider for NewListingTable {
             .options
             .format
             .create_physical_plan(
-                state,
+                session_state,
                 FileScanConfig::new(object_store_url, Arc::clone(&self.file_schema))
                     .with_file_groups(partitioned_file_lists)
                     .with_statistics(statistics)

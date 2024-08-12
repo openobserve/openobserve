@@ -225,14 +225,14 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 ], default-features = false, rev = "348967500868c2b5dfcb3930fe483b2ff17b35ff" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
-dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "40"
-datafusion-proto = "40"
-arrow = { version = "52.1.0", features = ["ipc_compression", "prettyprint"] }
-arrow-json = "52.1.0"
-arrow-schema = { version = "52.1.0", features = ["serde"] }
-parquet = { version = "52.1.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.10.1", features = ["aws", "azure", "gcp"] }
+dashmap = { version = "6.0", features = ["serde"] }
+datafusion = "41"
+datafusion-proto = "41"
+arrow = { version = "52.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-json = "52.2.0"
+arrow-schema = { version = "52.2.0", features = ["serde"] }
+parquet = { version = "52.2.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.10.2", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -285,7 +285,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.47", features = ["serde", "visitor"] }
+sqlparser = { version = "0.49", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"

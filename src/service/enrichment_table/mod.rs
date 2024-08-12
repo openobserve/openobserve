@@ -44,7 +44,8 @@ use crate::{
     common::meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         compact::retention,
-        db, format_stream_name,
+        db::{self, enrichment_table},
+        format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
@@ -90,6 +91,20 @@ pub async fn save_enrichment_data(
         );
     }
 
+    let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
+    let max_enrichment_table_size = get_config().limit.max_enrichment_table_size;
+    if stats.storage_size > max_enrichment_table_size as f64 {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!(
+                    "enrichment table [{stream_name}] storage size {} exceeds max storage size {}",
+                    stats.storage_size, max_enrichment_table_size
+                ),
+            )),
+        );
+    }
+
     let mut schema_evolved = false;
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
@@ -108,6 +123,10 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
+        let timestamp = match json_record.get(&get_config().common.column_timestamp) {
+            Some(v) => v.as_i64().unwrap_or(timestamp),
+            None => timestamp,
+        };
         json_record.insert(
             get_config().common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
@@ -184,6 +203,13 @@ pub async fn save_enrichment_data(
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
+    // notifiy update
+    if stream_schema.has_fields {
+        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
+            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
+        };
+    }
+
     req_stats.response_time = start.elapsed().as_secs_f64();
     // metric + data usage
     report_request_usage_stats(
@@ -230,6 +256,9 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
+
+    // delete stream key
+    let _ = enrichment_table::delete(org_id, stream_name).await;
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);

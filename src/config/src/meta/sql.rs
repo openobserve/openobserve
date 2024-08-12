@@ -129,14 +129,16 @@ impl TryFrom<&Statement> for Sql {
                 let source = Source(table_with_joins).try_into()?;
 
                 let mut order_by = Vec::new();
-                for expr in orders {
-                    order_by.push(Order(expr).try_into()?);
+                if let Some(orders) = orders {
+                    for expr in orders.exprs.iter() {
+                        order_by.push(Order(expr).try_into()?);
+                    }
                 }
 
                 // TODO: support Group by all
                 // https://docs.snowflake.com/en/sql-reference/constructs/group-by#label-group-by-all-columns
                 let mut group_by = Vec::new();
-                if let GroupByExpr::Expressions(exprs) = groups {
+                if let GroupByExpr::Expressions(exprs, _) = groups {
                     for expr in exprs {
                         group_by.push(Group(expr).try_into()?);
                     }
@@ -882,11 +884,21 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
         SqlExpr::Case {
             operand: _,
             conditions,
-            results: _,
-            else_result: _,
+            results,
+            else_result,
         } => {
             let mut fields = Vec::new();
             for expr in conditions.iter() {
+                if let Some(v) = get_field_name_from_expr(expr)? {
+                    fields.extend(v);
+                }
+            }
+            for expr in results.iter() {
+                if let Some(v) = get_field_name_from_expr(expr)? {
+                    fields.extend(v);
+                }
+            }
+            if let Some(expr) = else_result.as_ref() {
                 if let Some(v) = get_field_name_from_expr(expr)? {
                     fields.extend(v);
                 }
