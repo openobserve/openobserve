@@ -214,7 +214,6 @@ pub struct DrillDown {
     data: Option<DrillDownData>,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkLine {

@@ -882,11 +882,21 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
         SqlExpr::Case {
             operand: _,
             conditions,
-            results: _,
-            else_result: _,
+            results,
+            else_result,
         } => {
             let mut fields = Vec::new();
             for expr in conditions.iter() {
+                if let Some(v) = get_field_name_from_expr(expr)? {
+                    fields.extend(v);
+                }
+            }
+            for expr in results.iter() {
+                if let Some(v) = get_field_name_from_expr(expr)? {
+                    fields.extend(v);
+                }
+            }
+            if let Some(expr) = else_result.as_ref() {
                 if let Some(v) = get_field_name_from_expr(expr)? {
                     fields.extend(v);
                 }
