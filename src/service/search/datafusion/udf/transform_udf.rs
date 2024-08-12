@@ -21,10 +21,9 @@ use datafusion::{
         array::{Array, ArrayRef, StringArray, StructArray},
         datatypes::{DataType, Field, Fields},
     },
-    logical_expr::{ScalarUDF, Volatility},
+    logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use datafusion_expr::ColumnarValue;
 use hashbrown::HashMap;
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
@@ -32,9 +31,7 @@ use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef
 use crate::{common::infra::config::QUERY_FUNCTIONS, service::ingestion::compile_vrl_function};
 
 type FnType = Arc<
-    dyn Fn(
-            &[datafusion_expr::ColumnarValue],
-        ) -> Result<datafusion_expr::ColumnarValue, datafusion::error::DataFusionError>
+    dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue, datafusion::error::DataFusionError>
         + Sync
         + Send,
 >;

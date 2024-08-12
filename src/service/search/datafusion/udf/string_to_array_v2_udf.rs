@@ -21,10 +21,9 @@ use datafusion::{
     arrow::{array::ArrayRef, datatypes::DataType},
     common::cast::as_generic_string_array,
     error::DataFusionError,
-    logical_expr::{ScalarUDF, Volatility},
+    logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// The name of the string_to_array_v2 UDF given to DataFusion.

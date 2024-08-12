@@ -29,13 +29,12 @@ use datafusion::{
     functions::regex::regexpmatch::regexp_match,
     logical_expr::{
         ExprSchemable, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl, Signature,
-        Volatility,
+        TypeSignature::Exact, Volatility,
     },
     physical_plan::ColumnarValue,
     prelude::{create_udf, Expr},
     scalar::ScalarValue,
 };
-use datafusion_expr::TypeSignature::Exact;
 use once_cell::sync::Lazy;
 
 /// Implementation of regexp_match
