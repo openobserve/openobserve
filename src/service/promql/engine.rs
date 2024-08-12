@@ -22,7 +22,8 @@ use datafusion::{
         datatypes::Schema,
     },
     error::{DataFusionError, Result},
-    prelude::{col, lit, max, SessionContext},
+    functions_aggregate::min_max::max,
+    prelude::{col, lit, SessionContext},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;

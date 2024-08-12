@@ -129,14 +129,16 @@ impl TryFrom<&Statement> for Sql {
                 let source = Source(table_with_joins).try_into()?;
 
                 let mut order_by = Vec::new();
-                for expr in orders {
-                    order_by.push(Order(expr).try_into()?);
+                if let Some(orders) = orders {
+                    for expr in orders.exprs.iter() {
+                        order_by.push(Order(expr).try_into()?);
+                    }
                 }
 
                 // TODO: support Group by all
                 // https://docs.snowflake.com/en/sql-reference/constructs/group-by#label-group-by-all-columns
                 let mut group_by = Vec::new();
-                if let GroupByExpr::Expressions(exprs) = groups {
+                if let GroupByExpr::Expressions(exprs, _) = groups {
                     for expr in exprs {
                         group_by.push(Group(expr).try_into()?);
                     }
