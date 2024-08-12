@@ -40,9 +40,10 @@ use datafusion::{
     error::{DataFusionError, Result},
     execution::{
         cache::cache_manager::CacheManagerConfig,
-        context::{SessionConfig, SessionState},
+        context::SessionConfig,
         memory_pool::{FairSpillPool, GreedyMemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
+        session_state::SessionStateBuilder,
     },
     physical_plan::{collect, collect_partitioned},
     prelude::{Expr, SessionContext},
@@ -579,16 +580,19 @@ pub async fn prepare_datafusion_context(
 
     let session_config =
         create_session_config(search_type, sort_by_timestamp_desc, target_partition, limit)?;
-    let runtime_env = create_runtime_env(memory_size).await?;
+    let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
     if without_optimizer {
-        let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
+        let state = SessionStateBuilder::new()
+            .with_config(session_config)
+            .with_runtime_env(runtime_env)
             .with_optimizer_rules(vec![])
-            .with_analyzer_rules(vec![]);
+            .with_analyzer_rules(vec![])
+            .build();
         Ok(SessionContext::new_with_state(state))
     } else {
         Ok(SessionContext::new_with_config_rt(
             session_config,
-            Arc::new(runtime_env),
+            runtime_env,
         ))
     }
 }

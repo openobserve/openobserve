@@ -19,16 +19,16 @@ use arrow::array::RecordBatch;
 use arrow_schema::{DataType, SchemaRef};
 use async_trait::async_trait;
 use datafusion::{
+    catalog::Session,
     common::{project_schema, Constraints, Result},
     datasource::{MemTable, TableProvider},
-    execution::context::SessionState,
+    logical_expr::{Expr, TableType},
     physical_plan::{
         expressions::{CastExpr, Column},
         projection::ProjectionExec,
         ExecutionPlan, PhysicalExpr,
     },
 };
-use datafusion_expr::{Expr, TableType};
 use hashbrown::HashMap;
 
 #[derive(Debug)]
@@ -72,7 +72,7 @@ impl TableProvider for NewMemTable {
 
     async fn scan(
         &self,
-        state: &SessionState,
+        state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
@@ -104,7 +104,7 @@ impl TableProvider for NewMemTable {
 
     async fn insert_into(
         &self,
-        state: &SessionState,
+        state: &dyn Session,
         input: Arc<dyn ExecutionPlan>,
         overwrite: bool,
     ) -> Result<Arc<dyn ExecutionPlan>> {
