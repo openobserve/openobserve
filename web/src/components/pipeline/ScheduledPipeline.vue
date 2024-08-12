@@ -881,21 +881,13 @@ const updateFrequency = async () => {
   emits("input:update", "period", triggerData.value);
 };
 
-function convertCronToMinutes(cronExpression) {
+function convertCronToMinutes(cronExpression: string) {
   // Parse the cron expression using cron-parser
   const interval = cronParser.parseExpression(cronExpression);
 
   // Get the first and second execution times
   const firstExecution = interval.next();
   const secondExecution = interval.next();
-
-  console.log(
-    "first execution",
-    firstExecution.getTime(),
-    "second execution",
-    secondExecution.getTime(),
-    secondExecution.getTime() - firstExecution.getTime(),
-  );
 
   // Calculate the difference in milliseconds
   const diffInMs = secondExecution.getTime() - firstExecution.getTime();
