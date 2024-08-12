@@ -18,9 +18,9 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::datatypes::SchemaRef,
+    catalog::Session,
     common::{project_schema, Result},
     datasource::{TableProvider, TableType},
-    execution::context::SessionState,
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
     prelude::Expr,
@@ -65,7 +65,7 @@ impl TableProvider for NewEmptyTable {
 
     async fn scan(
         &self,
-        _state: &SessionState,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,

@@ -22,11 +22,10 @@ use datafusion::{
         datatypes::DataType,
     },
     error::DataFusionError,
-    logical_expr::{ScalarUDF, Volatility},
+    logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// The name of the time_range UDF given to DataFusion.
