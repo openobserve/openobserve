@@ -18,6 +18,8 @@ use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHashe
 use base64::Engine;
 use config::utils::json;
 use futures::future::{ready, Ready};
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
@@ -31,6 +33,32 @@ use crate::common::{
         user::{AuthTokens, UserRole},
     },
 };
+
+pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
+static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
+    let char_pattern = r#"[^a-zA-Z0-9:#?'"&%\s]"#;
+    let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
+    Regex::new(&pattern).unwrap()
+});
+
+pub fn into_ofga_supported_format(name: &str) -> String {
+    // remove spaces around special characters
+    let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {
+        caps.iter()
+            .find_map(|m| m)
+            .map(|m| m.as_str().trim())
+            .unwrap_or("")
+            .to_string()
+    });
+    RE_OFGA_UNSUPPORTED_NAME
+        .replace_all(&result, "_")
+        .to_string()
+}
+
+pub fn is_ofga_unsupported(name: &str) -> bool {
+    RE_OFGA_UNSUPPORTED_NAME.is_match(name)
+}
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");

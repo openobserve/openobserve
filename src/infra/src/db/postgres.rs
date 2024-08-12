@@ -86,8 +86,15 @@ impl super::Db for PostgresDb {
             .await
         {
             Ok(v) => v,
-            Err(_) => {
-                return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+                } else {
+                    return Err(Error::from(DbError::DBOperError(
+                        e.to_string(),
+                        key.to_string(),
+                    )));
+                }
             }
         };
         Ok(Bytes::from(value))
@@ -342,6 +349,8 @@ impl super::Db for PostgresDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
+        // Escape ' (single quote) character with ''
+        let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
         let sql = if with_prefix {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
