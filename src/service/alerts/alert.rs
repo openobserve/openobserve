@@ -43,7 +43,7 @@ use crate::{
             authz::Authz,
             stream::StreamParams,
         },
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{
         alerts::{build_sql, destinations},
@@ -62,6 +62,13 @@ pub async fn save(
         alert.name = name.to_string();
     }
     alert.name = alert.name.trim().to_string();
+
+    // Don't allow the characters not supported by ofga
+    if is_ofga_unsupported(&alert.name) {
+        return Err(anyhow::anyhow!(
+            "Alert name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
+        ));
+    }
     alert.org_id = org_id.to_string();
     let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();

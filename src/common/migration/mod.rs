@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::cluster::LOCAL_NODE;
+use schema::migrate_resource_names;
 use version_compare::Version;
 
 pub mod dashboards;
@@ -61,5 +63,14 @@ async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     // migration schema
     schema::run().await?;
 
+    Ok(())
+}
+
+pub async fn upgrade_resource_names() -> Result<(), anyhow::Error> {
+    // The below migration requires ofga init ready, but on Router node,
+    // we don't initialize ofga, hence the migration should not run on router
+    if !LOCAL_NODE.is_router() {
+        migrate_resource_names().await?;
+    }
     Ok(())
 }
