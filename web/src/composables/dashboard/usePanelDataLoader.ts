@@ -32,7 +32,7 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -333,47 +333,82 @@ export const usePanelDataLoader = (
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
 
-            // console.log("Calling search API", query, metadata);
-            return await queryService
-              .search(
-                {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  query: {
-                    query: {
-                      sql: query,
-                      query_fn: it.vrlFunctionQuery
-                        ? b64EncodeUnicode(it.vrlFunctionQuery)
-                        : null,
-                      sql_mode: "full",
-                      start_time: startISOTimestamp,
-                      end_time: endISOTimestamp,
-                      size: -1,
-                    },
-                  },
-                  page_type: pageType,
-                },
-                searchType.value ?? "Dashboards",
-              )
-              .then((res) => {
-                // Set searchQueryData.data to the API response hits
-                // state.data = res.data.hits;
-                state.errorDetail = "";
-                // console.log("API response received");
+            // partition api call
+            const { traceparent } = generateTraceContext();
 
-                // if there is an error in vrl function, throw error
-                if (res.data.function_error) {
-                  throw new Error(`Function error: ${res.data.function_error}`);
+            return await queryService
+              .partition({
+                org_identifier: store.state.selectedOrganization.identifier,
+                query: {
+                  sql: query,
+                  sql_mode: "full",
+                  start_time: startISOTimestamp,
+                  end_time: endISOTimestamp,
+                  size: -1,
+                },
+                page_type: pageType,
+                traceparent,
+              })
+              .then(async (res: any) => {
+                const partitionArr = res?.data?.partitions ?? [];
+
+                const partitionResult: any = [];
+
+                const responseMetaData: any = {};
+
+                // loop on all partitions and call search api for each partition
+                for (const partition of partitionArr) {
+                  await queryService
+                    .search(
+                      {
+                        org_identifier:
+                          store.state.selectedOrganization.identifier,
+                        query: {
+                          query: {
+                            sql: query,
+                            query_fn: it.vrlFunctionQuery
+                              ? b64EncodeUnicode(it.vrlFunctionQuery)
+                              : null,
+                            sql_mode: "full",
+                            start_time: partition[0],
+                            end_time: partition[1],
+                            size: -1,
+                          },
+                        },
+                        page_type: pageType,
+                      },
+                      searchType.value ?? "Dashboards",
+                    )
+                    .then((res) => {
+                      // Set searchQueryData.data to the API response hits
+                      // state.data = res.data.hits;
+                      state.errorDetail = "";
+                      // console.log("API response received");
+
+                      // if there is an error in vrl function, throw error
+                      if (res.data.function_error) {
+                        throw new Error(
+                          `Function error: ${res.data.function_error}`,
+                        );
+                      }
+
+                      partitionResult.push(...res.data.hits);
+                      Object.assign(responseMetaData, res.data);
+                    })
+                    .catch((error) => {
+                      // Process API error for "sql"
+                      processApiError(error, "sql");
+                      return { result: null, metadata: metadata };
+                    });
                 }
 
                 return {
-                  result: res.data.hits,
+                  result: partitionResult,
                   metadata: metadata,
-                  resultMetaData: { ...res.data },
+                  resultMetaData: responseMetaData,
                 };
               })
               .catch((error) => {
-                // console.log("API error received", error);
-
                 // Process API error for "sql"
                 processApiError(error, "sql");
                 return { result: null, metadata: metadata };
