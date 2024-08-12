@@ -64,7 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               v-bind:readonly="isUpdatingTemplate"
               v-bind:disable="isUpdatingTemplate"
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+              :rules="[
+                (val: any) =>
+                  !!val
+                    ? isValidResourceName(val) ||
+                      `Characters like :, ?, /, #, and spaces are not allowed.`
+                    : t('common.nameRequired'),
+              ]"
               tabindex="0"
             />
           </div>
@@ -185,6 +191,8 @@ import { useStore } from "vuex";
 import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
+import { isValidResourceName } from "@/utils/zincutils";
+
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const { t } = useI18n();
@@ -287,9 +295,9 @@ watch(
   () => store.state.theme,
   () => {
     monaco.editor.setTheme(
-      store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+      store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
     );
-  }
+  },
 );
 
 const isTemplateBodyValid = () => {
@@ -393,7 +401,7 @@ const copyTemplateBody = (text: any) => {
       type: "positive",
       message: "Content Copied Successfully!",
       timeout: 1000,
-    })
+    }),
   );
 };
 </script>
