@@ -106,10 +106,7 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR] start run_compactor_pending_jobs_metric job");
 
     loop {
-        let _ = match infra::dist_lock::lock(COMPACTOR_PENDING_JOBS_KEY, interval, None).await {
-            Ok(locker) => locker,
-            Err(_) => continue,
-        };
+        time::sleep(time::Duration::from_secs(interval)).await;
 
         log::debug!("[COMPACTOR] Running compactor pending jobs to report metric");
         let job_status = match infra::file_list::get_pending_jobs_count().await {
@@ -210,5 +207,3 @@ async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
         time::sleep(time::Duration::from_secs(time as u64)).await;
     }
 }
-
-const COMPACTOR_PENDING_JOBS_KEY: &str = "/compact/file_list_jobs/metric_reporter";
