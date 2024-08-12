@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
@@ -22,7 +21,7 @@ use tonic::{Response, Status};
 #[derive(Default)]
 pub struct LogsServer;
 
-#[async_trait]
+#[tonic::async_trait]
 impl LogsService for LogsServer {
     async fn export(
         &self,

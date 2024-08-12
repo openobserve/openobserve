@@ -73,7 +73,7 @@ impl TableProvider for NewEmptyTable {
         // even though there is no data, projections apply
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
-            super::emptyexec::NewEmptyExec::new(projected_schema, projection, filters, limit)
+            super::empty_exec::NewEmptyExec::new(projected_schema, projection, filters, limit)
                 .with_partitions(self.partitions),
         ))
     }

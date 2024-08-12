@@ -2967,3 +2967,11 @@ pub struct NewEmptyExecNode {
     #[prost(uint64, optional, tag = "4")]
     pub limit: ::core::option::Option<u64>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RemoteExecNode {
+    #[prost(bytes = "vec", tag = "1")]
+    pub plan: ::prost::alloc::vec::Vec<u8>,
+    #[prost(string, tag = "2")]
+    pub path: ::prost::alloc::string::String,
+}

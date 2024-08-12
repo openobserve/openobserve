@@ -86,6 +86,7 @@ dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 arrow.workspace = true
+arrow-flight.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
@@ -229,6 +230,7 @@ dashmap = { version = "6.0", features = ["serde"] }
 datafusion = "41"
 datafusion-proto = "41"
 arrow = { version = "52.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "52.2.0"
 arrow-json = "52.2.0"
 arrow-schema = { version = "52.2.0", features = ["serde"] }
 parquet = { version = "52.2.0", features = ["arrow", "async", "object_store"] }

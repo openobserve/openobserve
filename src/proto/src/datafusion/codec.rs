@@ -32,12 +32,12 @@ use datafusion_proto::{
 };
 use prost::Message;
 
-use super::{super::cluster_rpc, emptyexec::NewEmptyExec};
+use super::{super::cluster_rpc, empty_exec::NewEmptyExec};
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[allow(dead_code)]
 #[derive(Debug)]
-struct EmptyExecPhysicalExtensionCodec;
+pub struct EmptyExecPhysicalExtensionCodec;
 
 impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
     fn try_decode(
@@ -105,8 +105,8 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
 /// until one works
 #[allow(dead_code)]
 #[derive(Debug)]
-struct ComposedPhysicalExtensionCodec {
-    codecs: Vec<Arc<dyn PhysicalExtensionCodec>>,
+pub struct ComposedPhysicalExtensionCodec {
+    pub codecs: Vec<Arc<dyn PhysicalExtensionCodec>>,
 }
 
 impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {

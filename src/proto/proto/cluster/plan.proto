@@ -10,10 +10,13 @@
  import "datafusion/datafusion.proto";
  
  message NewEmptyExecNode {
-   datafusion_common.Schema schema = 1;
-   repeated uint64 projection = 2;
-   repeated datafusion.LogicalExprNode filters = 3;
-   optional uint64 limit = 4;
- }
- 
- 
+    datafusion_common.Schema schema = 1;
+    repeated uint64 projection = 2;
+    repeated datafusion.LogicalExprNode filters = 3;
+    optional uint64 limit = 4;
+}
+
+message RemoteExecNode {
+    bytes plan = 1;
+    string path = 2;
+}

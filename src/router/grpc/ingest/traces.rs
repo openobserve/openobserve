@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_client::TraceServiceClient, trace_service_server::TraceService,
     ExportTraceServiceRequest, ExportTraceServiceResponse,
@@ -26,7 +25,7 @@ use crate::{common::infra::cluster, service::search::MetadataMap};
 #[derive(Default)]
 pub struct TraceServer;
 
-#[async_trait]
+#[tonic::async_trait]
 impl TraceService for TraceServer {
     async fn export(
         &self,

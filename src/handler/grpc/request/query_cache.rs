@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use proto::cluster_rpc::{
     query_cache_server::QueryCache, DeleteResultCacheRequest, DeleteResultCacheResponse,
     QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
@@ -22,10 +21,10 @@ use tonic::{Request, Response, Status};
 
 use crate::{common::meta::search::CacheQueryRequest, service::search::cache::cacher};
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct QueryCacheServerImpl;
 
-#[async_trait]
+#[tonic::async_trait]
 impl QueryCache for QueryCacheServerImpl {
     async fn get_cached_result(
         &self,

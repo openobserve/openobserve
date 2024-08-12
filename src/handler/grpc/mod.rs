@@ -19,6 +19,7 @@ use proto::cluster_rpc;
 use crate::service::promql;
 
 pub mod auth;
+pub mod flight;
 pub mod request;
 
 impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {

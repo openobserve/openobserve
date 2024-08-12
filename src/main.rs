@@ -17,6 +17,7 @@ use std::{cmp::max, collections::HashMap, net::SocketAddr, str::FromStr, time::D
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
+use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
 use log::LevelFilter;
 use openobserve::{
@@ -29,6 +30,7 @@ use openobserve::{
     handler::{
         grpc::{
             auth::check_auth,
+            flight::server::FlightServiceImpl,
             request::{
                 event::Eventer,
                 file_list::Filelister,
@@ -398,14 +400,16 @@ async fn init_common_grpc_server(
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let tracer = TraceServer::default();
-    let trace_svc = TraceServiceServer::new(tracer)
+    let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let ingest_svc = IngestServer::new(Ingester)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
@@ -423,6 +427,7 @@ async fn init_common_grpc_server(
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
+        .add_service(flight_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");

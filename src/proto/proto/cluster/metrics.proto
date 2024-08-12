@@ -9,8 +9,8 @@ package cluster;
 import "cluster/common.proto";
 
 service Metrics {
-  rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
-  rpc WalFile (MetricsWalFileRequest) returns (MetricsWalFileResponse) {}
+    rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
+    rpc WalFile (MetricsWalFileRequest) returns (MetricsWalFileResponse) {}
 }
 
 message MetricsQueryRequest {
