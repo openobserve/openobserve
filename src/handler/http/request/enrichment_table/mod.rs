@@ -22,7 +22,7 @@ use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::save_enrichment_data,
+    service::enrichment_table::{extract_multipart, save_enrichment_data},
 };
 
 /// CreateEnrichmentTable
@@ -81,7 +81,8 @@ pub async fn save_enrichment_table(
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,
                 };
-                save_enrichment_data(&org_id, &table_name, payload, append_data).await
+                let json_record = extract_multipart(payload).await?;
+                save_enrichment_data(&org_id, &table_name, json_record, append_data).await
             } else {
                 Ok(MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",

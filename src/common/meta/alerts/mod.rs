@@ -13,74 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, utils::json::Value};
-use hashbrown::HashMap;
+use config::{meta::search::SearchEventType, utils::json::Value};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub mod alert;
+pub mod derived_streams;
 pub mod destinations;
 pub mod templates;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Alert {
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub org_id: String,
-    #[serde(default)]
-    pub stream_type: StreamType,
-    #[serde(default)]
-    pub stream_name: String,
-    #[serde(default)]
-    pub is_real_time: bool,
-    #[serde(default)]
-    pub query_condition: QueryCondition,
-    #[serde(default)]
-    pub trigger_condition: TriggerCondition,
-    pub destinations: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context_attributes: Option<HashMap<String, String>>,
-    #[serde(default)]
-    pub row_template: String,
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    /// Timezone offset in minutes.
-    /// The negative secs means the Western Hemisphere
-    pub tz_offset: i32,
-}
-
-impl PartialEq for Alert {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.stream_type == other.stream_type
-            && self.stream_name == other.stream_name
-    }
-}
-
-impl Default for Alert {
-    fn default() -> Self {
-        Self {
-            name: "".to_string(),
-            org_id: "".to_string(),
-            stream_type: StreamType::default(),
-            stream_name: "".to_string(),
-            is_real_time: false,
-            query_condition: QueryCondition::default(),
-            trigger_condition: TriggerCondition::default(),
-            destinations: vec![],
-            context_attributes: None,
-            row_template: "".to_string(),
-            description: "".to_string(),
-            enabled: false,
-            tz_offset: 0, // UTC
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
     pub period: i64, // 10 minutes
     #[serde(default)]
@@ -92,13 +34,13 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub cron: String, // Cron Expression
     #[serde(default)]
-    pub frequency_type: AlertFrequencyType,
+    pub frequency_type: FrequencyType,
     #[serde(default)]
     pub silence: i64, // silence for 10 minutes after fire an alert
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
-pub enum AlertFrequencyType {
+pub enum FrequencyType {
     #[serde(rename = "cron")]
     Cron,
     #[serde(rename = "minutes")]
@@ -106,7 +48,7 @@ pub enum AlertFrequencyType {
     Minutes,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
@@ -118,9 +60,11 @@ pub struct QueryCondition {
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
+    #[serde(default)]
+    pub search_event_type: Option<SearchEventType>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,

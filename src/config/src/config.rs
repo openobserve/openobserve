@@ -872,6 +872,8 @@ pub struct Limit {
     pub alert_schedule_timeout: i64,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
+    #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
+    pub derived_stream_schedule_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
     pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
@@ -916,6 +918,12 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_LIMIT",
+        default = 256,
+        help = "Maximum size of a single enrichment table in mb"
+    )]
+    pub max_enrichment_table_size: usize,
 }
 
 #[derive(EnvConfig)]

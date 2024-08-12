@@ -41,6 +41,8 @@ pub enum TriggerDataType {
     Report,
     #[serde(rename = "alert")]
     Alert,
+    #[serde(rename = "derived_stream")]
+    DerivedStream,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

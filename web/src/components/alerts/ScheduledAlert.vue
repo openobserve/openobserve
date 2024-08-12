@@ -1,6 +1,22 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div class="scheduled-alerts">
-    <div class="scheduled-alert-tabs q-mb-lg">
+    <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-mb-lg">
       <q-tabs
         data-test="scheduled-alert-tabs"
         v-model="tab"
@@ -45,6 +61,7 @@
           {{ tab === "promql" ? "Promql" : "SQL" }}
         </div>
         <q-toggle
+          v-if="!disableVrlFunction"
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="isVrlFunctionEnabled"
           :icon="'img:' + getImageURL('images/common/function.svg')"
@@ -89,7 +106,7 @@
 
         <div
           data-test="logs-vrl-function-editor"
-          v-show="isVrlFunctionEnabled && tab === 'sql'"
+          v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
         >
           <div style="height: 40px; width: 100%">
             <div style="display: flex; height: 40px">
@@ -280,7 +297,10 @@
           />
         </div>
       </div>
-      <div class="flex justify-start items-center q-mb-xs no-wrap q-pb-md">
+      <div
+        v-if="!disableThreshold"
+        class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+      >
         <div
           data-test="scheduled-alert-threshold-title"
           class="text-bold flex items-center"
@@ -710,7 +730,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, type Ref, defineAsyncComponent } from "vue";
-import FieldsInput from "./FieldsInput.vue";
+import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import {
   outlinedDelete,
@@ -720,6 +740,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -739,6 +760,9 @@ const props = defineProps([
   "vrl_function",
   "showVrlFunction",
   "isValidSqlQuery",
+  "disableThreshold",
+  "disableVrlFunction",
+  "disableQueryTypeSelection",
 ]);
 
 const emits = defineEmits([
@@ -766,6 +790,8 @@ const query = ref(props.sql);
 const promqlQuery = ref(props.promql);
 
 const tab = ref(props.query_type || "custom");
+
+const q = useQuasar();
 
 const store = useStore();
 
@@ -977,8 +1003,60 @@ const onBlurQueryEditor = () => {
   emits("validate-sql");
 };
 
+const validateInputs = (notify: boolean = true) => {
+  if (
+    Number(triggerData.value.period) < 1 ||
+    isNaN(Number(triggerData.value.period))
+  ) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Period should be greater than 0",
+        timeout: 1500,
+      });
+    return false;
+  }
+
+  if (aggregationData.value) {
+    if (
+      !props.disableThreshold &&
+      (isNaN(triggerData.value.threshold) ||
+        !aggregationData.value.having.value.toString().trim().length ||
+        !aggregationData.value.having.column ||
+        !aggregationData.value.having.operator)
+    ) {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Threshold should not be empty",
+          timeout: 1500,
+        });
+      return false;
+    }
+
+    return true;
+  }
+
+  if (
+    !props.disableThreshold &&
+    (isNaN(triggerData.value.threshold) ||
+      triggerData.value.threshold < 1 ||
+      !triggerData.value.operator)
+  ) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Threshold should not be empty",
+        timeout: 1500,
+      });
+    return false;
+  }
+
+  return true;
+};
 defineExpose({
   tab,
+  validateInputs,
 });
 </script>
 
