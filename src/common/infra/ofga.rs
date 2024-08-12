@@ -29,8 +29,11 @@ use {
 
 #[cfg(feature = "enterprise")]
 pub async fn init() {
-    use o2_enterprise::enterprise::openfga::authorizer::authz::get_tuple_for_new_index;
+    use o2_enterprise::enterprise::openfga::{
+        authorizer::authz::get_tuple_for_new_index, get_all_init_tuples,
+    };
 
+    let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
     let mut need_migrate_index_streams = false;
     let existing_meta = match db::ofga::get_ofga_model().await {
@@ -42,9 +45,23 @@ pub async fn init() {
     };
 
     let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model().await;
+    get_all_init_tuples(&mut init_tuples).await;
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
+            if !init_tuples.is_empty() {
+                match update_tuples(init_tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("Data migrated to openfga");
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Error writing init ofga tuples to the openfga during migration: {}",
+                            e
+                        );
+                    }
+                }
+            }
             return;
         }
         // Check if ofga migration of index streams are needed
@@ -134,6 +151,11 @@ pub async fn init() {
                 for org_name in orgs {
                     get_index_creation_tuples(org_name, &mut tuples).await;
                 }
+            }
+
+            // Check if there are init ofga tuples that needs to be added now
+            for tuple in init_tuples {
+                tuples.push(tuple);
             }
 
             if tuples.is_empty() {

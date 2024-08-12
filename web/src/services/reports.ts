@@ -28,30 +28,36 @@ const reports = {
     return http().get(`/api/${org_identifier}/reports`);
   },
   getReport: (org_identifier: string, reportName: string) => {
-    return http().get(`/api/${org_identifier}/reports/${reportName}`);
+    return http().get(
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
+    );
   },
   createReport: (org_identifier: string, payload: any) => {
     return http().post(`/api/${org_identifier}/reports`, payload);
   },
   updateReport: (org_identifier: string, payload: any) => {
     return http().put(
-      `/api/${org_identifier}/reports/${payload.name}`,
-      payload
+      `/api/${org_identifier}/reports/${encodeURIComponent(payload.name)}`,
+      payload,
     );
   },
   deleteReport: (org_identifier: string, reportName: string) => {
-    return http().delete(`/api/${org_identifier}/reports/${reportName}`);
+    return http().delete(
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
+    );
   },
   triggerReport: (org_identifier: string, reportName: string) => {
-    return http().put(`/api/${org_identifier}/reports/${reportName}/trigger`);
+    return http().put(
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`,
+    );
   },
   toggleReportState: (
     org_identifier: string,
     reportName: string,
-    state: boolean
+    state: boolean,
   ) => {
     return http().put(
-      `/api/${org_identifier}/reports/${reportName}/enable?value=${state}`
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=${state}`,
     );
   },
 };

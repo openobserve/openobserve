@@ -216,6 +216,10 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("migrate dashboards failed: {}", e);
             }
 
+            migration::upgrade_resource_names()
+                .await
+                .expect("migrate resource names into supported ofga format failed");
+
             // ingester init
             if let Err(e) = ingester::init().await {
                 job_init_tx.send(false).ok();
