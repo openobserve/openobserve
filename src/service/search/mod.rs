@@ -820,6 +820,12 @@ fn generate_select_start_search_schema(
             }
         }
     }
+    // add not exists field in group schema but defined in latest schema
+    for (name, field) in schema_latest_map.iter() {
+        if schema_fields_map.get(name).is_none() {
+            new_fields.push(Arc::new(field.as_ref().clone()));
+        }
+    }
     let cfg = get_config();
     let schema = if !defined_schema_fields.is_empty() {
         let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();

@@ -34,9 +34,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::{self, file_data::disk::FileType},
     file_list,
-    schema::{
-        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_FIELDS, STREAM_SCHEMAS_LATEST,
-    },
+    schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -700,15 +698,4 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
-}
-
-#[get("/stream_fields/{org_id}/{stream_type}/{stream_name}")]
-async fn stream_fields(path: web::Path<(String, String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, stream_type, stream_name) = path.into_inner();
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let r = STREAM_SCHEMAS_FIELDS.read().await;
-    Ok(MetaHttpResponse::json(match r.get(&key) {
-        Some((updated, fields)) => json::json!({"updated_at": *updated, "fields": fields}),
-        None => json::json!({"updated_at": 0, "fields": []}),
-    }))
 }

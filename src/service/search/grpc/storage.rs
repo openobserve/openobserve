@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use arrow_schema::Schema;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
@@ -48,14 +49,12 @@ pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
     file_list: &[FileKey],
+    schema: Arc<Schema>,
     stream_type: StreamType,
     work_group: &str,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
-    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     // fetch all schema versions, group files by version
     let schema_versions = match infra::schema::get_versions(
         &sql.org_id,
@@ -82,11 +81,11 @@ pub async fn search(
         schema_versions.len()
     );
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
@@ -107,7 +106,7 @@ pub async fn search(
         false => file_list.to_vec(),
     };
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default()));
+        return Ok((vec![], vec![], ScanStats::default()));
     }
     log::info!(
         "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
@@ -210,6 +209,12 @@ pub async fn search(
     };
 
     // construct latest schema map
+    let schema_latest = Arc::new(
+        schema
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
@@ -237,7 +242,7 @@ pub async fn search(
         };
 
         // cacluate the diff between latest schema and group schema
-        let (schema, diff_fields) = if select_wildcard {
+        let (_, diff_fields) = if select_wildcard {
             generate_select_start_search_schema(
                 &sql,
                 &schema,
@@ -248,13 +253,18 @@ pub async fn search(
             generate_search_schema(&sql, &schema, &schema_latest_map)?
         };
 
-        let table =
-            exec::create_parquet_table(&session, schema, &files, diff_fields, &sql.meta.order_by)
-                .await?;
+        let table = exec::create_parquet_table(
+            &session,
+            schema_latest.clone(),
+            &files,
+            diff_fields,
+            &sql.meta.order_by,
+        )
+        .await?;
         tables.push(table);
     }
 
-    Ok((tables, scan_stats))
+    Ok((tables, vec![], scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]

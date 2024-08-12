@@ -157,7 +157,7 @@ async fn exec_query(
         println!("+---------------------------+----------+");
         println!("logic plan");
         println!("+---------------------------+----------+");
-        println!("{:?}", plan);
+        println!("{}", plan);
     }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     if cfg.common.print_key_sql {
@@ -253,7 +253,7 @@ pub async fn merge_partitions(
         println!("+---------------------------+----------+");
         println!("logic plan");
         println!("+---------------------------+----------+");
-        println!("{:?}", plan);
+        println!("{}", plan);
     }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     if cfg.common.print_key_sql {
@@ -753,6 +753,7 @@ pub async fn register_table(
 pub async fn query_tables(
     session: &SearchSession,
     sql: &Arc<Sql>,
+    schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
 ) -> Result<Vec<Vec<RecordBatch>>> {
     if tables.is_empty() {
@@ -776,7 +777,7 @@ pub async fn query_tables(
     register_udf(&mut ctx, &sql.org_id).await;
 
     // regsiter union table
-    let union_table = Arc::new(NewUnionTable::try_new(sql.schema.clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::try_new(schema, tables)?);
     ctx.register_table("tbl", union_table)?;
 
     // query sql

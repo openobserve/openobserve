@@ -38,15 +38,14 @@ use super::datafusion;
 use crate::service::{
     db,
     search::{
-        datafusion::exec,
-        generate_search_schema, generate_select_start_search_schema,
-        sql::{Sql, RE_SELECT_WILDCARD},
+        datafusion::exec, generate_search_schema, generate_select_start_search_schema,
+        sql::RE_SELECT_WILDCARD,
     },
 };
 mod storage;
 mod wal;
 
-pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats), Error>;
+pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, Vec<String>, ScanStats), Error>;
 
 #[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
@@ -86,9 +85,7 @@ pub async fn search(
     // set target partitions based on cache type
 
     // construct latest schema map
-    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    let schema_latest = sql.schema.clone();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
@@ -97,8 +94,7 @@ pub async fn search(
     let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-
-    let (schema, _) = if select_wildcard {
+    let (schema_latest, _) = if select_wildcard {
         generate_select_start_search_schema(
             &sql,
             &schema_latest,
@@ -109,37 +105,90 @@ pub async fn search(
         generate_search_schema(&sql, &schema_latest, &schema_latest_map)?
     };
 
-    let sql = Arc::new(Sql {
-        schema: schema.clone(),
-        ..sql.as_ref().clone()
-    });
-
     // get all tables
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
-
-    // search in WAL parquet
-    let skip_wal = req.query.as_ref().unwrap().skip_wal;
-    if LOCAL_NODE.is_ingester() && !skip_wal {
-        let (tbls, stats) =
-            wal::search_parquet(&trace_id, sql.clone(), stream_type, &work_group).await?;
-        tables.extend(tbls);
-        scan_stats.add(&stats);
-    }
-
-    // search in WAL memory
-    if LOCAL_NODE.is_ingester() && !skip_wal {
-        let (tbls, stats) = wal::search_memtable(&trace_id, sql.clone(), stream_type).await?;
-        tables.extend(tbls);
-        scan_stats.add(&stats);
-    }
 
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
         let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-        let (tbls, stats) =
-            storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
+        let (tbls, _, stats) = match storage::search(
+            &trace_id,
+            sql.clone(),
+            &file_list,
+            schema_latest.clone(),
+            stream_type,
+            &work_group,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                datafusion::storage::file_list::clear(&trace_id);
+                log::error!(
+                    "[trace_id {}] search->storage: search storage parquet error: {}",
+                    trace_id,
+                    e
+                );
+                return Err(e);
+            }
+        };
+        tables.extend(tbls);
+        scan_stats.add(&stats);
+    }
+
+    // search in WAL parquet
+    let skip_wal = req.query.as_ref().unwrap().skip_wal;
+    let mut wal_lock_files = Vec::new();
+    if LOCAL_NODE.is_ingester() && !skip_wal {
+        let (tbls, lock_files, stats) = match wal::search_parquet(
+            &trace_id,
+            sql.clone(),
+            schema_latest.clone(),
+            stream_type,
+            &work_group,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                datafusion::storage::file_list::clear(&trace_id);
+                log::error!(
+                    "[trace_id {}] search->storage: search wal parquet error: {}",
+                    trace_id,
+                    e
+                );
+                return Err(e);
+            }
+        };
+        tables.extend(tbls);
+        scan_stats.add(&stats);
+        wal_lock_files = lock_files;
+    }
+
+    // search in WAL memory
+    if LOCAL_NODE.is_ingester() && !skip_wal {
+        let (tbls, _, stats) =
+            match wal::search_memtable(&trace_id, sql.clone(), schema_latest.clone(), stream_type)
+                .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    // clear session data
+                    datafusion::storage::file_list::clear(&trace_id);
+                    // release wal lock files
+                    crate::common::infra::wal::release_files(&wal_lock_files).await;
+                    log::error!(
+                        "[trace_id {}] search->storage: search wal memtable error: {}",
+                        trace_id,
+                        e
+                    );
+                    return Err(e);
+                }
+            };
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
@@ -166,6 +215,10 @@ pub async fn search(
         .await
         .is_err()
     {
+        // clear session data
+        datafusion::storage::file_list::clear(&trace_id);
+        // release wal lock files
+        crate::common::infra::wal::release_files(&wal_lock_files).await;
         log::info!(
             "[trace_id {}] search->storage: search canceled before call search->storage",
             session.id
@@ -177,7 +230,7 @@ pub async fn search(
     }
 
     let ret = tokio::select! {
-        ret = exec::query_tables(&session, &sql, tables) => {
+        ret = exec::query_tables(&session, &sql,schema_latest, tables) => {
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
@@ -204,6 +257,11 @@ pub async fn search(
             )))
         }
     };
+
+    // clear session data
+    datafusion::storage::file_list::clear(&trace_id);
+    // release wal lock files
+    crate::common::infra::wal::release_files(&wal_lock_files).await;
 
     let results = match ret {
         Ok(v) => v,
@@ -263,9 +321,6 @@ pub async fn search(
         }
     }
     log::info!("[trace_id {trace_id}] in node merge task finish");
-
-    // clear session data
-    datafusion::storage::file_list::clear(&trace_id);
 
     // final result
     let mut hits_total = 0;

@@ -29,9 +29,7 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, STREAM_SCHEMAS_FIELDS,
-    },
+    schema::{get_stream_setting_fts_fields, get_stream_setting_index_fields},
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -277,7 +275,11 @@ impl Sql {
         // fetch schema
         let schema = match infra::schema::get(&org_id, &meta.source, stream_type).await {
             Ok(schema) => schema,
-            Err(_) => Schema::empty(),
+            Err(_) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    meta.source,
+                )));
+            }
         };
         let schema_fields = schema.fields().to_vec();
         let stream_settings = infra::schema::unwrap_stream_settings(&schema);
@@ -294,17 +296,7 @@ impl Sql {
             && schema_fields.len() > cfg.limit.quick_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
-            let cached_fields: Option<Vec<String>> = if cfg.limit.quick_mode_file_list_enabled {
-                STREAM_SCHEMAS_FIELDS
-                    .read()
-                    .await
-                    .get(&stream_key)
-                    .map(|v| v.1.clone())
-            } else {
-                None
-            };
-            let fields = generate_quick_mode_fields(&schema, cached_fields, &fts_fields);
+            let fields = generate_quick_mode_fields(&schema, &fts_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -606,21 +598,14 @@ pub fn generate_filter_from_quick_text(
     filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
-pub(crate) fn generate_quick_mode_fields(
-    schema: &Schema,
-    cached_fields: Option<Vec<String>>,
-    fts_fields: &[String],
-) -> Vec<String> {
+pub(crate) fn generate_quick_mode_fields(schema: &Schema, fts_fields: &[String]) -> Vec<String> {
     let cfg = get_config();
     let strategy = cfg.limit.quick_mode_strategy.to_lowercase();
-    let schema_fields = match cached_fields {
-        Some(v) => v,
-        None => schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_string())
-            .collect(),
-    };
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect::<Vec<_>>();
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - cfg.limit.quick_mode_num_fields);
