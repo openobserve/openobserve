@@ -5,7 +5,7 @@
       class="tw-w-full tw-table-auto"
       :style="{
         minWidth: '100%',
-        minHeight:totalSize + 'px',
+        minHeight: totalSize + 'px',
         ...columnSizeVars,
         width: !columnOrder.includes('source')
           ? table.getCenterTotalSize() + 'px'
@@ -27,9 +27,7 @@
           handle=".table-head"
           :class="{
             'tw-cursor-move': table.getState().columnOrder.length > 1,
-            
           }"
-          
           :style="{
             width:
               columnOrder.includes('source') && wrap
@@ -87,7 +85,7 @@
 
               <div
                 :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0  tw-px-2 column-actions"
+                class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-px-2 column-actions"
                 :class="
                   store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
@@ -287,7 +285,7 @@
                 <q-btn
                   v-if="cellIndex == 0"
                   :icon="
-                    formattedRows[virtualRow.index].getIsExpanded()
+                    expandedRowIndices.includes(virtualRow.index)
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -296,7 +294,7 @@
                   flat
                   class="q-mr-xs"
                   data-test="table-row-expand-menu"
-                  @click.capture.stop="expandRow(virtualRow.index)"
+                  @click.capture.stop="handleExpandRow(virtualRow.index)"
                 ></q-btn>
 
                 <cell-actions
@@ -321,11 +319,10 @@
       </tbody>
     </table>
   </div>
-  
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineEmits, watch, nextTick } from "vue";
+import { ref, computed, defineEmits, watch, nextTick, onMounted } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   FlexRender,
@@ -370,6 +367,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  expandedRows: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const { t } = useI18n();
@@ -381,7 +382,8 @@ const emits = defineEmits([
   "closeColumn",
   "click:dataRow",
   "update:columnSizes",
-  "update:columnOrder"
+  "update:columnOrder",
+  "expandRow",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -420,22 +422,27 @@ watch(
 
 watch(
   () => props.rows,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) tableRows.value = [...newVal];
+
+    await nextTick();
+    await nextTick();
+
+    expandedRowIndices.value = [];
+    props.expandedRows.forEach((index) => {
+      expandRow(index as number);
+    });
   },
   {
     deep: true,
   },
 );
 
-
-
 const table = useVueTable({
   get data() {
     return tableRows.value || [];
   },
   get columns() {
-    
     return props.columns as ColumnDef<unknown, any>[];
   },
   state: {
@@ -443,7 +450,6 @@ const table = useVueTable({
       return sorting.value;
     },
     get columnOrder() {
-
       emits("update:columnOrder", columnOrder.value);
       return columnOrder.value;
     },
@@ -475,10 +481,16 @@ const columnSizeVars = computed(() => {
     colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
   }
   return colSizes;
-  
 });
+
 watch(columnSizeVars, (newColSizes) => {
-  emits('update:columnSizes', newColSizes);
+  emits("update:columnSizes", newColSizes);
+});
+
+onMounted(() => {
+  props.expandedRows.forEach((index) => {
+    expandRow(index as number);
+  });
 });
 
 const formattedRows = computed(() => {
@@ -563,6 +575,12 @@ const handleDragEnd = async (event: any) => {
 
 const expandedRowIndices = ref<number[]>([]);
 
+const handleExpandRow = (index: number) => {
+  emits("expandRow", calculateActualIndex(index));
+
+  expandRow(index);
+};
+
 const expandRow = async (index: number) => {
   let isCollapseOperation = false;
 
@@ -570,6 +588,11 @@ const expandRow = async (index: number) => {
     expandedRowIndices.value = expandedRowIndices.value.filter(
       (i) => i !== index,
     );
+
+    expandedRowIndices.value = expandedRowIndices.value.map((i) =>
+      i > index ? i - 1 : i,
+    );
+
     tableRows.value.splice(index + 1, 1);
     isCollapseOperation = true;
   } else {
@@ -578,11 +601,14 @@ const expandRow = async (index: number) => {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
     });
+
+    expandedRowIndices.value = expandedRowIndices.value.map((i) =>
+      i > index ? i + 1 : i,
+    );
   }
 
   expandedRowIndices.value = expandedRowIndices.value.sort();
 
-  formattedRows.value[index].toggleExpanded();
   tableRows.value = [...tableRows.value];
 
   await nextTick();
@@ -675,7 +701,6 @@ thead {
   background: lightgray;
   font-family: "Nunito Sans", sans-serif;
   font-size: 14px !important;
-
 }
 
 .table-row {

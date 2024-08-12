@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="col column oveflow-hidden full-height">
-
     <div
       class="search-list full-height"
       ref="searchListContainer"
@@ -401,8 +400,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-virtual-scroll> -->
       <tenstack-table
         ref="searchTableRef"
-        @update:columnSizes="handleColumnSizesUpdate" 
-        @update:columnOrder="handleColumnOrderUpdate"
         :columns="searchObj.data.resultGrid.columns"
         :rows="searchObj.data.queryResults.hits"
         :wrap="searchObj.meta.toggleSourceWrap"
@@ -410,19 +407,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :err-msg="searchObj.data.missingStreamMessage"
         :loading="searchObj.loading"
         :functionErrorMsg="searchObj.data.functionError"
+        :expandedRows="expandedLogs"
         class="col-12"
         :style="{
           height: !searchObj.meta.showHistogram
             ? 'calc(100% - 40px)'
             : 'calc(100% - 140px)',
         }"
+        @update:columnSizes="handleColumnSizesUpdate"
+        @update:columnOrder="handleColumnOrderUpdate"
         @copy="copyLogToClipboard"
         @add-field-to-table="addFieldToTable"
         @add-search-term="addSearchTerm"
         @close-column="closeColumn"
-        @click:data-row="expandRowDetail"
+        @click:data-row="openLogDetails"
+        @expand-row="expandLog"
       />
-     
+
       <q-dialog
         data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
@@ -483,8 +484,6 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
-import EqualIcon from "../../components/icons/EqualIcon.vue";
-import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -494,11 +493,7 @@ import TenstackTable from "./TenstackTable.vue";
 export default defineComponent({
   name: "SearchResult",
   components: {
-    HighLight,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
-    EqualIcon,
-    NotEqualIcon,
-    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -513,22 +508,25 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
-    
   ],
   props: {
     expandedLogs: {
-      type: Object,
-      default: () => ({}),
+      type: Array,
+      default: () => [],
     },
   },
   methods: {
-    handleColumnSizesUpdate(newColSizes : any) {
-    this.searchObj.data.resultGrid[this.searchObj.data.stream.selectedStream] = [newColSizes];
-  },
-  handleColumnOrderUpdate(newColOrder : any) {
-    const colOrderToStore = newColOrder.slice(1);
-    this.searchObj.data.resultGrid.colOrder[this.searchObj.data.stream.selectedStream] = [colOrderToStore];
-  },
+    handleColumnSizesUpdate(newColSizes: any) {
+      this.searchObj.data.resultGrid[
+        this.searchObj.data.stream.selectedStream
+      ] = [newColSizes];
+    },
+    handleColumnOrderUpdate(newColOrder: any) {
+      const colOrderToStore = newColOrder.slice(1);
+      this.searchObj.data.resultGrid.colOrder[
+        this.searchObj.data.stream.selectedStream
+      ] = [colOrderToStore];
+    },
 
     getPageData(actionType: string) {
       if (actionType == "prev") {
@@ -646,7 +644,6 @@ export default defineComponent({
     });
     const columnSizes = ref({});
 
-
     const reDrawChart = () => {
       if (
         // eslint-disable-next-line no-prototype-builtins
@@ -668,7 +665,7 @@ export default defineComponent({
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
-    const expandRowDetail = (props: any, index: number) => {
+    const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
     };
@@ -699,7 +696,7 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
-    const expandLog = async (row: any, index: number) => {
+    const expandLog = async (index: number) => {
       emit("expandlog", index);
     };
 
@@ -793,7 +790,7 @@ export default defineComponent({
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
-      expandRowDetail,
+      openLogDetails,
       changeMaxRecordToReturn,
       navigateRowDetail,
       totalHeight,
@@ -878,7 +875,6 @@ export default defineComponent({
   }
 
   .my-sticky-header-table {
-
     .q-table__top,
     .q-table__bottom,
     thead tr:first-child th {
@@ -1005,8 +1001,6 @@ export default defineComponent({
 
   .table-head-chip {
     background-color: #565656;
-
-    
   }
 }
 
