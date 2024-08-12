@@ -449,7 +449,7 @@ export default defineComponent({
     const isMonacoEditorLoaded = ref(false);
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
-      "org_identifier"
+      "org_identifier",
     )
       ? router.currentRoute.value.query.org_identifier
       : undefined;
@@ -652,10 +652,13 @@ export default defineComponent({
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
-          ?.map((val: string) => val?.trim()) || []
+          ?.filter((val: string) => val?.trim()) || [],
       );
+
+      store.dispatch("setHiddenMenus", disableMenus);
+
       linksList.value = linksList.value.filter(
-        (link: { name: string }) => !disableMenus.has(link.name)
+        (link: { name: string }) => !disableMenus.has(link.name),
       );
     };
 
@@ -753,7 +756,7 @@ export default defineComponent({
       // } else {
       if (
         store.state.zoConfig.hasOwnProperty(
-          "restricted_routes_on_empty_data"
+          "restricted_routes_on_empty_data",
         ) &&
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
@@ -785,7 +788,7 @@ export default defineComponent({
 
     const setSelectedOrganization = async () => {
       customOrganization = router.currentRoute.value.query.hasOwnProperty(
-        "org_identifier"
+        "org_identifier",
       )
         ? router.currentRoute.value.query.org_identifier
         : "";
@@ -859,7 +862,7 @@ export default defineComponent({
             }
 
             return optiondata;
-          }
+          },
         );
       }
 
@@ -888,7 +891,7 @@ export default defineComponent({
       try {
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
-          store.state?.selectedOrganization?.identifier
+          store.state?.selectedOrganization?.identifier,
         );
 
         //set settings in store
@@ -952,7 +955,7 @@ export default defineComponent({
                   path: machedRoutes[machedRoutes.length - 2].path,
                 });
               }
-            }
+            },
           );
         }
       } else {
@@ -975,7 +978,7 @@ export default defineComponent({
     const prefetch = () => {
       const href = "/web/assets/editor.api.v1.js";
       const existingLink = document.querySelector(
-        `link[rel="prefetch"][href="${href}"]`
+        `link[rel="prefetch"][href="${href}"]`,
       );
 
       if (!existingLink) {

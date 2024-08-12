@@ -429,9 +429,14 @@ export default defineComponent({
     onActivated(() => {
       const params = router.currentRoute.value.query;
 
+      // If selected trace is different from the one in the URL, reset the trace details
+      // If there is no selected trace, then also reset the trace details
+
       if (
-        searchObj.data.traceDetails.selectedTrace &&
-        params.trace_id !== searchObj.data.traceDetails.selectedTrace?.trace_id
+        (searchObj.data.traceDetails.selectedTrace &&
+          params.trace_id !==
+            searchObj.data.traceDetails.selectedTrace?.trace_id) ||
+        !searchObj.data.traceDetails.selectedTrace
       ) {
         resetTraceDetails();
         setupTraceDetails();

@@ -27,10 +27,10 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
     ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.slice(0, -1)
     : import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   : window.location.origin == "http://localhost:8081"
-  ? "/"
-  : pos > -1
-  ? window.location.origin + window.location.pathname.slice(0, pos)
-  : window.location.origin;
+    ? "/"
+    : pos > -1
+      ? window.location.origin + window.location.pathname.slice(0, pos)
+      : window.location.origin;
 
 const organizationObj = {
   organizationPasscode: "",
@@ -73,6 +73,7 @@ export default createStore({
     savedViewFlag: false,
     savedFunctionDialog: false,
     regionInfo: [],
+    hiddenMenus: [],
   },
   mutations: {
     login(state, payload) {
@@ -181,6 +182,9 @@ export default createStore({
     setRegionInfo(state, payload) {
       state.regionInfo = payload;
     },
+    setHiddenMenus(state, payload) {
+      state.hiddenMenus = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -281,6 +285,9 @@ export default createStore({
     },
     setRegionInfo(context, payload) {
       context.commit("setRegionInfo", payload);
+    },
+    setHiddenMenus(context, payload) {
+      context.commit("setHiddenMenus", payload);
     },
   },
   modules: {},
