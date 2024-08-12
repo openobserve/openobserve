@@ -60,12 +60,6 @@ pub async fn save_enrichment_data(
     payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
-    log::info!(
-        "save enrichment data to: {}/{}/{}",
-        org_id,
-        table_name,
-        append_data
-    );
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let mut hour_key = String::new();
@@ -192,11 +186,6 @@ pub async fn save_enrichment_data(
         .clone()
         .with_metadata(HashMap::new());
     let schema_key = schema.hash_key();
-    log::info!(
-        "enrichment table [{stream_name}] writing size {} to wal {}",
-        records_size,
-        hour_key
-    );
     buf.insert(
         hour_key,
         SchemaRecords {
