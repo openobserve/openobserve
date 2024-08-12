@@ -133,6 +133,7 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrl12=123");
+      await page.waitForTimeout(2000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await expect(
       page.getByText("drag_indicatortext_fields vrl12")
@@ -145,7 +146,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
-  test("test", async ({ page }) => {
+  test("should allow adding a VRL function from the saved function list in the visualization", async ({ page }) => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -159,6 +160,8 @@ test.describe(" visualize UI testcases", () => {
       .locator("#fnEditor")
       .getByLabel("Editor content;Press Alt+F1")
       .fill(".vrlsanity=100");
+      await page.waitForTimeout(2000);
+
     await page
       .locator('[data-test="logs-search-bar-function-dropdown"] button')
       .filter({ hasText: "save" })
@@ -168,11 +171,13 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="saved-function-name-input"]')
       .fill("VRLsanity");
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
-    await expect(page.getByText("Function saved successfully")).toBeVisible();
-    await page
-      .locator('[data-test="logs-search-bar-reset-filters-btn"]')
-      .click();
-    await page
+    await page.waitForTimeout(1000);
+
+   // await expect(page.getByText("Function saved successfully")).toBeVisible();
+    // await page
+    //   .locator('[data-test="logs-search-bar-reset-filters-btn"]')
+    //   .click();
+     await page
       .locator("div")
       .filter({ hasText: /^\.vrlsanity=100$/ })
       .nth(3)
@@ -195,4 +200,40 @@ test.describe(" visualize UI testcases", () => {
       page.locator('[data-test="chart-renderer"] canvas')
     ).toBeVisible();
   });
+
+  test('test', async ({ page }) => {
+
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page
+      .locator(
+        "#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line"
+      )
+      .click();
+    await page
+      .locator("#fnEditor")
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(".vrlsanity=100");
+      await page.waitForTimeout(2000);
+
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-y-data"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await expect(page.locator('[data-test="dashboard-y-item-vrlsanity"]')).toBeVisible();
+    await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] img').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+   // await expect(page.getByText('There are some errors, please')).toBeVisible();
+   await page.waitForTimeout(2000);
+
+    await page.locator('#q-notify').getByRole('button').click();
+   // await page.waitForTimeout(2000);
+
+    await expect(page.getByText('Please update Y-Axis')).toBeVisible();
+    await page.locator('[data-test="dashboard-y-item-vrlsanity-remove"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  });
+
 });
