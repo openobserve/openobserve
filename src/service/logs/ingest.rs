@@ -171,6 +171,7 @@ pub async fn ingest(
                 return Err(anyhow::anyhow!("Failed processing: {:?}", e));
             }
         };
+        let mut routed_stream_name = stream_name.clone();
 
         if let Some(extend) = extend_json.as_ref() {
             for (key, val) in extend.iter() {
@@ -179,7 +180,7 @@ pub async fn ingest(
         }
 
         // Start re-routing if exists
-        if let Some(routings) = stream_routing_map.get(&stream_name) {
+        if let Some(routings) = stream_routing_map.get(&routed_stream_name) {
             if !routings.is_empty() {
                 for route in routings {
                     let mut is_routed = true;
@@ -191,7 +192,7 @@ pub async fn ingest(
                         }
                     }
                     if !val.is_empty() && is_routed {
-                        stream_name = route.destination.clone();
+                        routed_stream_name = route.destination.clone();
                         break;
                     }
                 }
@@ -199,21 +200,48 @@ pub async fn ingest(
         }
         // End re-routing
 
+        let mut function_no = before_local_trans.len() + after_local_trans.len();
         // Start row based transform
-        let mut res = match apply_functions(
-            item,
-            &before_local_trans,
-            &after_local_trans,
-            &stream_vrl_map,
-            org_id,
-            &stream_name,
-            &mut runtime,
-        ) {
-            Ok(res) => res,
-            Err(e) => {
-                stream_status.status.failed += 1;
-                stream_status.status.error = e.to_string();
-                continue;
+        let mut res = if routed_stream_name.ne(&stream_name) {
+            let (before_local_trans, after_local_trans, stream_vrl_map) =
+                crate::service::ingestion::register_stream_functions(
+                    org_id,
+                    &StreamType::Logs,
+                    &routed_stream_name,
+                );
+            function_no = before_local_trans.len() + after_local_trans.len();
+            match apply_functions(
+                item,
+                &before_local_trans,
+                &after_local_trans,
+                &stream_vrl_map,
+                org_id,
+                &routed_stream_name,
+                &mut runtime,
+            ) {
+                Ok(res) => res,
+                Err(e) => {
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = e.to_string();
+                    continue;
+                }
+            }
+        } else {
+            match apply_functions(
+                item,
+                &before_local_trans,
+                &after_local_trans,
+                &stream_vrl_map,
+                org_id,
+                &routed_stream_name,
+                &mut runtime,
+            ) {
+                Ok(res) => res,
+                Err(e) => {
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = e.to_string();
+                    continue;
+                }
             }
         };
         // end row based transform
@@ -224,7 +252,7 @@ pub async fn ingest(
             _ => unreachable!(),
         };
 
-        if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+        if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
             local_val = crate::service::logs::refactor_map(local_val, fields);
         }
 
@@ -239,10 +267,10 @@ pub async fn ingest(
         };
 
         let (ts_data, fn_num) = json_data_by_stream
-            .entry(stream_name.clone())
+            .entry(routed_stream_name.clone())
             .or_insert((Vec::new(), None));
         ts_data.push((timestamp, local_val));
-        *fn_num = need_usage_report.then_some(before_local_trans.len() + after_local_trans.len());
+        *fn_num = need_usage_report.then_some(function_no);
     }
 
     // if no data, fast return

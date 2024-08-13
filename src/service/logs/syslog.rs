@@ -64,7 +64,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let org_id = &route.org_id;
 
     // check stream
-    let mut stream_name = format_stream_name(in_stream_name);
+    let stream_name = format_stream_name(in_stream_name);
     if let Err(e) = check_ingestion_allowed(org_id, Some(&stream_name)) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -139,6 +139,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
 
+    let mut routed_stream_name = stream_name.clone();
     // Start re-rerouting if exists
     if let Some(routings) = stream_routing_map.get(&stream_name) {
         if !routings.is_empty() {
@@ -152,7 +153,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     }
                 }
                 if !val.is_empty() && is_routed {
-                    stream_name = route.destination.clone();
+                    routed_stream_name = route.destination.clone();
                     break;
                 }
             }
@@ -161,7 +162,24 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     // End re-routing
 
     // Start row based transform
-    if !after_local_trans.is_empty() {
+    if routed_stream_name.ne(&stream_name) {
+        let (_, after_local_trans, stream_vrl_map) =
+            crate::service::ingestion::register_stream_functions(
+                org_id,
+                &StreamType::Logs,
+                &routed_stream_name,
+            );
+        if !after_local_trans.is_empty() {
+            value = crate::service::ingestion::apply_stream_functions(
+                &after_local_trans,
+                value,
+                &stream_vrl_map,
+                org_id,
+                &stream_name,
+                &mut runtime,
+            )?;
+        }
+    } else if !after_local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
             &after_local_trans,
             value,
@@ -171,6 +189,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             &mut runtime,
         )?;
     }
+    // end row based transform
 
     if value.is_null() || !value.is_object() {
         stream_status.status.failed += 1; // transform failed or dropped
@@ -187,7 +206,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         _ => unreachable!(),
     };
 
-    if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+    if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
         local_val = crate::service::logs::refactor_map(local_val, fields);
     }
 
@@ -208,7 +227,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs(
             org_id,
-            &stream_name,
+            &routed_stream_name,
             &mut status,
             vec![(timestamp, local_val)],
         )
