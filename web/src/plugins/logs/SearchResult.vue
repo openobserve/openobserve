@@ -522,10 +522,17 @@ export default defineComponent({
       ] = [newColSizes];
     },
     handleColumnOrderUpdate(newColOrder: any) {
-      const colOrderToStore = newColOrder.slice(1);
+      if(this.searchObj.data.stream?.selectedStream.length === 1){
+        const colOrderToStore = newColOrder.slice(1);
       this.searchObj.data.resultGrid.colOrder[
         this.searchObj.data.stream.selectedStream
       ] = [colOrderToStore];
+      }
+      else{
+        this.searchObj.data.resultGrid.colOrder[
+        this.searchObj.data.stream.selectedStream
+      ] = [newColOrder];      }
+     
     },
 
     getPageData(actionType: string) {
