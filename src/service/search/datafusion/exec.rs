@@ -156,7 +156,7 @@ async fn exec_query(
         println!("+---------------------------+----------+");
         println!("logic plan");
         println!("+---------------------------+----------+");
-        println!("{:?}", plan);
+        println!("{}", plan);
     }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     if cfg.common.print_key_sql {
@@ -252,7 +252,7 @@ pub async fn merge_partitions(
         println!("+---------------------------+----------+");
         println!("logic plan");
         println!("+---------------------------+----------+");
-        println!("{:?}", plan);
+        println!("{}", plan);
     }
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     if cfg.common.print_key_sql {
