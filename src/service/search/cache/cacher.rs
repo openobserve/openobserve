@@ -270,6 +270,12 @@ pub async fn get_cached_results(
                             cached_response.hits.last().unwrap(),
                         );
 
+                        let (hits_allowed_start_time,hits_allowed_end_time) =if cache_req.discard_interval > 0{
+                            // calcualtion in line with date bin of datafusion
+                            (cache_req.q_start_time - (cache_req.q_start_time%cache_req.discard_interval) , cache_req.q_end_time - (cache_req.q_end_time%cache_req.discard_interval))
+                        }else{
+                            (cache_req.q_start_time,cache_req.q_end_time)
+                        };
                         let discard_ts = if cache_req.is_descending {
                             if cache_req.discard_interval > 0 {
                                 first_ts
@@ -296,8 +302,8 @@ pub async fn get_cached_results(
 
                         cached_response.hits.retain(|hit| {
                             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                            hit_ts <= cache_req.q_end_time
-                                && hit_ts >= cache_req.q_start_time
+                            hit_ts <=  hits_allowed_end_time
+                                && hit_ts >= hits_allowed_start_time
                                 && hit_ts < discard_ts
                         });
 
