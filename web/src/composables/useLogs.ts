@@ -164,7 +164,7 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 1,
       columns: <any>[],
-      colOrder: {},
+      colOrder : <any> {},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -2068,21 +2068,14 @@ const useLogs = () => {
       searchObj.data.resultGrid.colOrder.hasOwnProperty(
         searchObj.data.stream.selectedStream,
       ) &&
-      //@ts-ignore
-      searchObj.data.resultGrid.colOrder[
-        searchObj.data.stream.selectedStream
-      ][0].length > 0 &&
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream][0].length > 0 &&
       searchObj.data.stream.selectedFields.length > 0
     ) {
       searchObj.data.stream.selectedFields = [];
-      // @ts-ignore
-      const colOrderObject =
-        searchObj.data.resultGrid.colOrder[
-          searchObj.data.stream.selectedStream
-        ];
+      const colOrderObject = searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
 
-      const colOrderArray = Object.values(colOrderObject);
-      // @ts-ignore
+      const colOrderArray : any = Object.values(colOrderObject);
+   
 
       searchObj.data.stream.selectedFields = colOrderArray[0];
     }
@@ -3117,10 +3110,8 @@ const useLogs = () => {
           });
         }
         //@ts-ignore
-        const sizes =
-          searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
+        const sizes = searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
 
-        console.log(sizes[0], "sizes obj entire each obj");
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             let foundKey, foundValue;

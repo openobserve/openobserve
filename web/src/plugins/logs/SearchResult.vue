@@ -517,9 +517,8 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
-      this.searchObj.data.resultGrid[
-        this.searchObj.data.stream.selectedStream
-      ] = [newColSizes];
+      //@ts-ignore
+      this.searchObj.data.resultGrid[this.searchObj.data.stream.selectedStream] = [newColSizes];
     },
     handleColumnOrderUpdate(newColOrder: any) {
       if(this.searchObj.data.stream?.selectedStream.length === 1){
