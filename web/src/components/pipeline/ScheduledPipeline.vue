@@ -899,7 +899,7 @@ function convertCronToMinutes(cronExpression: string) {
     return diffInMinutes;
   } catch (err) {
     cronJobError.value = "Invalid cron expression";
-    return;
+    return -1;
   }
 }
 
@@ -907,6 +907,8 @@ const updateCron = () => {
   let minutes = 0;
   try {
     minutes = convertCronToMinutes(triggerData.value.cron);
+
+    if (minutes < 0) return;
 
     // Check if the number is a float by checking if the value has a decimal part
     if (minutes % 1 !== 0) {
