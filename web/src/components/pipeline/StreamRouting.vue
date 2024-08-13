@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 400px"
             />
           </div>
-          <scheduled-alert
+          <scheduled-pipeline
             ref="scheduledAlertRef"
             :columns="filteredColumns"
             :conditions="[]"
@@ -208,7 +208,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledAlert from "@/components/alerts/ScheduledAlert.vue";
+import ScheduledPipeline from "@/components/pipeline/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 
@@ -336,10 +336,10 @@ const getDefaultStreamRoute = () => {
       aggregation: null,
     },
     trigger_condition: {
-      period: 10,
+      period: 15,
       frequency_type: "minutes",
       cron: "",
-      frequency: 2,
+      frequency: 15,
     },
     context_attributes: [
       {

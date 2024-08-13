@@ -30,6 +30,7 @@ use config::{
         usage::UsageType,
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
+    SIZE_IN_MB,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::{
@@ -93,7 +94,12 @@ pub async fn save_enrichment_data(
 
     let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
     let max_enrichment_table_size = get_config().limit.max_enrichment_table_size;
-    if stats.storage_size > max_enrichment_table_size as f64 {
+    log::info!(
+        "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
+        stats,
+        max_enrichment_table_size
+    );
+    if (stats.storage_size / SIZE_IN_MB) > max_enrichment_table_size as f64 {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -211,6 +217,14 @@ pub async fn save_enrichment_data(
     }
 
     req_stats.response_time = start.elapsed().as_secs_f64();
+    log::info!(
+        "save enrichment data to: {}/{}/{} success with stats {:?}",
+        org_id,
+        table_name,
+        append_data,
+        req_stats
+    );
+
     // metric + data usage
     report_request_usage_stats(
         req_stats,

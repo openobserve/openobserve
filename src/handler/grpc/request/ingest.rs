@@ -78,7 +78,20 @@ impl Ingest for Ingester {
                             e.to_string()
                         ))
                     },
-                    |_| Ok(()),
+                    |res| {
+                        if res.status().as_u16() != 200 {
+                            log::error!(
+                                "Internal gPRC ingestion service errors saving enrichment data: {:?}",
+                                res
+                            );
+                            Err(anyhow::anyhow!(
+                                "Internal gPRC ingestion service errors saving enrichment data: {}",
+                                res.error().map_or("".to_string(), |err| err.to_string())
+                            ))
+                        } else {
+                            Ok(())
+                        }
+                    },
                 )
             }
             _ => Err(anyhow::anyhow!(
