@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sqlparser::{
-    ast::{Expr, Function, Query, SelectItem, SetExpr, Statement},
+    ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, Statement},
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -102,7 +102,10 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
 // Check if has group_by
 fn has_group_by(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
-        !select.group_by.to_string().is_empty()
+        match &select.group_by {
+            GroupByExpr::All(v) => !v.is_empty(),
+            GroupByExpr::Expressions(v, _) => !v.is_empty(),
+        }
     } else {
         false
     }
