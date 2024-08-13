@@ -882,36 +882,39 @@ const updateFrequency = async () => {
 };
 
 function convertCronToMinutes(cronExpression: string) {
+  cronJobError.value = "";
   // Parse the cron expression using cron-parser
-  const interval = cronParser.parseExpression(cronExpression);
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
 
-  // Get the first and second execution times
-  const firstExecution = interval.next();
-  const secondExecution = interval.next();
+    // Calculate the difference in milliseconds
+    const diffInMs = secondExecution.getTime() - firstExecution.getTime();
 
-  // Calculate the difference in milliseconds
-  const diffInMs = secondExecution.getTime() - firstExecution.getTime();
+    // Convert milliseconds to minutes
+    const diffInMinutes = diffInMs / (1000 * 60);
 
-  // Convert milliseconds to minutes
-  const diffInMinutes = diffInMs / (1000 * 60);
-
-  return diffInMinutes;
+    return diffInMinutes;
+  } catch (err) {
+    cronJobError.value = "Invalid cron expression";
+    return;
+  }
 }
 
 const updateCron = () => {
   let minutes = 0;
   try {
     minutes = convertCronToMinutes(triggerData.value.cron);
-    if (minutes < 1) {
-      cronJobError.value = "Cron expression should be valid";
-      q.notify({
-        type: "negative",
-        message: "Cron expression should be valid",
-        timeout: 1500,
-      });
-      return;
+
+    // Check if the number is a float by checking if the value has a decimal part
+    if (minutes % 1 !== 0) {
+      // If it's a float, fix it to 2 decimal places
+      minutes = Number(minutes.toFixed(2));
     } else {
-      cronJobError.value = "";
+      // If it's an integer, return it as is
+      minutes = Number(minutes.toString());
     }
   } catch (err) {
     console.log(err);
