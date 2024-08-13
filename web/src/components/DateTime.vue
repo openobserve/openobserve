@@ -136,20 +136,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       filled
                       min="1"
+                      :max="
+                        relativePeriodsMaxValue[relativePeriod] > 0
+                          ? relativePeriodsMaxValue[relativePeriod]
+                          : ''
+                      "
                       @update:model-value="onCustomPeriodSelect"
-                      :disable="queryRangeRestrictionInHour > 0"
                     />
                   </div>
                   <div class="col">
                     <q-select
                       v-model="relativePeriod"
-                      :options="relativePeriods"
+                      :options="relativePeriodsSelect"
                       dense
                       filled
                       emit-value
                       @update:modelValue="onCustomPeriodSelect"
                       popup-content-style="z-index: 10002"
-                      :disable="queryRangeRestrictionInHour > 0"
+                      style="width: 100px"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel }}</div>
@@ -421,13 +425,22 @@ export default defineComponent({
 
     const filteredTimezone: any = ref([]);
 
-    const relativePeriods = [
+    let relativePeriods = [
       { label: "Minutes", value: "m" },
       { label: "Hours", value: "h" },
       { label: "Days", value: "d" },
       { label: "Weeks", value: "w" },
       { label: "Months", value: "M" },
     ];
+
+    let relativePeriodsSelect = ref([
+      { label: "Minutes", value: "m" },
+      { label: "Hours", value: "h" },
+      { label: "Days", value: "d" },
+      { label: "Weeks", value: "w" },
+      { label: "Months", value: "M" },
+    ]);
+
     const relativeDates = {
       m: [1, 5, 10, 15, 30, 45],
       h: [1, 2, 3, 6, 8, 12],
@@ -443,6 +456,14 @@ export default defineComponent({
       w: [168, 336, 504, 672, 840, 1008],
       M: [744, 1488, 2232, 2976, 3720, 4464],
     };
+
+    let relativePeriodsMaxValue: object = ref({
+      m: 0,
+      h: 0,
+      d: 0,
+      w: 0,
+      M: 0,
+    });
 
     const datetimeBtn = ref(null);
 
@@ -569,6 +590,15 @@ export default defineComponent({
     };
 
     const onCustomPeriodSelect = () => {
+      if (
+        selectedType.value == "relative" &&
+        props.queryRangeRestrictionInHour > 0
+      ) {
+        relativeValue.value =
+          relativePeriodsMaxValue.value[relativePeriod.value] > -1
+            ? relativePeriodsMaxValue.value[relativePeriod.value]
+            : 15;
+      }
       if (props.autoApply) saveDate("relative-custom");
     };
 
@@ -867,6 +897,67 @@ export default defineComponent({
         saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
 
+    const computeRelativePeriod = () => {
+      if (selectedType.value === "relative") {
+        if (props.queryRangeRestrictionInHour > 0) {
+          for (let period of relativePeriods) {
+            if (period.value == "m") {
+              relativePeriodsMaxValue.value[period.value] = 60;
+            }
+
+            if (period.value == "h" && props.queryRangeRestrictionInHour > 0) {
+              relativePeriodsMaxValue.value[period.value] = 24;
+            } else if (period.value == "h") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+
+            if (period.value == "d" && props.queryRangeRestrictionInHour > 24) {
+              relativePeriodsMaxValue.value[period.value] =
+                Math.round(props.queryRangeRestrictionInHour / 24) || 31;
+            } else if (period.value == "d") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+
+            if (
+              period.value == "w" &&
+              props.queryRangeRestrictionInHour > 24 * 7
+            ) {
+              relativePeriodsMaxValue.value[period.value] =
+                Math.round(props.queryRangeRestrictionInHour / (24 * 7)) || 100;
+            } else if (period.value == "w") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+
+            if (
+              period.value == "M" &&
+              props.queryRangeRestrictionInHour > 24 * 30
+            ) {
+              relativePeriodsMaxValue.value[period.value] = Math.round(props.queryRangeRestrictionInHour / (24 * 30)) || 100;
+            } else if (period.value == "M") {
+              relativePeriodsMaxValue.value[period.value] = -1;
+            }
+          }
+        } else {
+          relativePeriodsMaxValue.value = {
+            m: 0,
+            h: 0,
+            d: 0,
+            w: 0,
+            M: 0,
+          };
+        }
+
+        relativePeriodsSelect.value = relativePeriods.filter((period) => {
+          if (relativePeriodsMaxValue.value[period.value] > -1) {
+            return period;
+          }
+        });
+
+        relativeValue.value = "15";
+        relativePeriod.value = "m";
+      }
+    };
+
     return {
       t,
       datetimeBtn,
@@ -900,7 +991,20 @@ export default defineComponent({
       setAbsoluteTime,
       setRelativeTime,
       getDisplayValue,
+      relativePeriodsMaxValue,
+      relativePeriodsSelect,
+      computeRelativePeriod,
     };
+  },
+  computed: {
+    relativePeriodWatch() {
+      return this.queryRangeRestrictionInHour;
+    },
+  },
+  watch: {
+    relativePeriodWatch() {
+      this.computeRelativePeriod();
+    },
   },
 });
 </script>
