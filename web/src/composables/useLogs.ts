@@ -164,7 +164,7 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 1,
       columns: <any>[],
-      colOrder:{},
+      colOrder: {},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -2065,22 +2065,28 @@ const useLogs = () => {
   ) => {
     if (
       searchObj.data.resultGrid.colOrder &&
-      searchObj.data.resultGrid.colOrder.hasOwnProperty(searchObj.data.stream.selectedStream)
+      searchObj.data.resultGrid.colOrder.hasOwnProperty(
+        searchObj.data.stream.selectedStream,
+      ) &&
       //@ts-ignore
-      &&searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream][0].length > 0
-      && searchObj.data.stream.selectedFields.length > 0
+      searchObj.data.resultGrid.colOrder[
+        searchObj.data.stream.selectedStream
+      ][0].length > 0 &&
+      searchObj.data.stream.selectedFields.length > 0
     ) {
-
       searchObj.data.stream.selectedFields = [];
       // @ts-ignore
-      const colOrderObject = searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
-      
-      const colOrderArray = Object.values(colOrderObject) ;
+      const colOrderObject =
+        searchObj.data.resultGrid.colOrder[
+          searchObj.data.stream.selectedStream
+        ];
+
+      const colOrderArray = Object.values(colOrderObject);
       // @ts-ignore
 
-      searchObj.data.stream.selectedFields = colOrderArray[0] 
+      searchObj.data.stream.selectedFields = colOrderArray[0];
     }
-    // searchObj.data.stream.selectedFields = 
+    // searchObj.data.stream.selectedFields =
     return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
@@ -2750,9 +2756,7 @@ const useLogs = () => {
                 streams: [stream.name],
                 showValues: field !== timestampField && field !== allField,
                 isInterestingField:
-                  searchObj.data.stream.interestingFieldList.includes(
-                    field.name,
-                  )
+                  searchObj.data.stream.interestingFieldList.includes(field)
                     ? true
                     : false,
               };
@@ -2762,11 +2766,9 @@ const useLogs = () => {
                 stream.settings.hasOwnProperty("defined_schema_fields") &&
                 userDefineSchemaSettings.length > 0
               ) {
-                if (userDefineSchemaSettings.includes(field.name)) {
-                  schemaFieldsIndex = schemaFields.indexOf(field.name);
-                  commonSchemaFieldsIndex = commonSchemaFields.indexOf(
-                    field.name,
-                  );
+                if (userDefineSchemaSettings.includes(field)) {
+                  schemaFieldsIndex = schemaFields.indexOf(field);
+                  commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
                   if (schemaFieldsIndex > -1) {
                     fieldObj.group = "common";
 
@@ -2825,10 +2827,8 @@ const useLogs = () => {
                 //   break;
                 // }
               } else {
-                schemaFieldsIndex = schemaFields.indexOf(field.name);
-                commonSchemaFieldsIndex = commonSchemaFields.indexOf(
-                  field.name,
-                );
+                schemaFieldsIndex = schemaFields.indexOf(field);
+                commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
                 if (schemaFieldsIndex > -1) {
                   fieldObj.group = "common";
                   if (
@@ -3117,21 +3117,22 @@ const useLogs = () => {
           });
         }
         //@ts-ignore
-        const sizes = searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
-    
+        const sizes =
+          searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
 
-        console.log(sizes[0] ,"sizes obj entire each obj")
+        console.log(sizes[0], "sizes obj entire each obj");
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
-
             let foundKey, foundValue;
 
             Object.keys(sizes[0]).forEach((key) => {
-                const trimmedKey = key.replace(/^--(header|col)-/, "").replace(/-size$/, "");
-                if (trimmedKey === field) {
-                    foundKey = key;
-                    foundValue = sizes[0][key];
-                }
+              const trimmedKey = key
+                .replace(/^--(header|col)-/, "")
+                .replace(/-size$/, "");
+              if (trimmedKey === field) {
+                foundKey = key;
+                foundValue = sizes[0][key];
+              }
             });
 
             searchObj.data.resultGrid.columns.push({
@@ -3150,8 +3151,7 @@ const useLogs = () => {
                 wrapContent: false,
               },
 
-              size:   foundValue 
-              ,
+              size: foundValue,
             });
           }
         }
@@ -3568,7 +3568,6 @@ const useLogs = () => {
   };
 
   const loadLogsData = async () => {
-
     try {
       resetFunctions();
       await getStreamList();
@@ -3584,7 +3583,6 @@ const useLogs = () => {
   };
 
   const handleQueryData = async () => {
-
     try {
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
@@ -3595,12 +3593,10 @@ const useLogs = () => {
       console.log("Error while loading logs data");
     }
   };
-  const saveColumnSizes = () =>{}
+  const saveColumnSizes = () => {};
 
   const handleRunQuery = async () => {
     try {
-
-
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
