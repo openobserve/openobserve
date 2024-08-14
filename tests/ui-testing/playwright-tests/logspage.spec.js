@@ -366,7 +366,7 @@ test.describe("Logs UI testcases", () => {
 
     // Assert that the SQL query is visible
     const expectedQuery =
-      'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC';
+      'SELECT * FROM "e2e_automate"';
     const text = await page.evaluate(() => {
       const editor = document
         .querySelector('[data-test="logs-search-bar-query-editor"]')

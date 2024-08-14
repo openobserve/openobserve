@@ -734,12 +734,13 @@ export default defineComponent({
             }
           }
 
-          searchObj.data.query = addOrderByToQuery(
-            searchObj.data.query,
-            store.state.zoConfig.timestamp_column,
-            "DESC",
-            searchObj.data.stream.selectedStream.join(","),
-          );
+          // Removed order by as it creating problem while clicking on the URL generated from the Alert. It's appending order by and that is causing issue if _timestamp column not added in select clause
+          // searchObj.data.query = addOrderByToQuery(
+          //   searchObj.data.query,
+          //   store.state.zoConfig.timestamp_column,
+          //   "DESC",
+          //   searchObj.data.stream.selectedStream.join(","),
+          // );
 
           searchObj.data.editorValue = searchObj.data.query;
 

@@ -22,7 +22,10 @@ use config::{
         search::{SearchType, Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{
+        parquet::new_parquet_writer, record_batch_ext::format_recordbatch_by_schema,
+        schema_ext::SchemaExt,
+    },
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -48,7 +51,7 @@ use datafusion::{
     physical_plan::{collect, collect_partitioned},
     prelude::{Expr, SessionContext},
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
 
@@ -218,21 +221,6 @@ pub async fn merge_partitions(
         return Ok(vec![]);
     }
 
-    let cfg = get_config();
-    // repartition batches
-    let chunk_size = std::cmp::max(1, (batches.len() + cfg.limit.cpu_num) / cfg.limit.cpu_num);
-    let mut new_batches: Vec<Vec<RecordBatch>> = Vec::with_capacity(batches.len() / chunk_size);
-    for batch in batches {
-        if new_batches.last().is_none() || new_batches.last().unwrap().len() >= chunk_size {
-            let mut v = Vec::with_capacity(chunk_size);
-            v.push(batch);
-            new_batches.push(v);
-        } else {
-            new_batches.last_mut().unwrap().push(batch);
-        }
-    }
-    let batches = new_batches;
-
     let mut ctx =
         prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None).await?;
 
@@ -240,6 +228,7 @@ pub async fn merge_partitions(
     register_udf(&mut ctx, org_id).await;
 
     // Debug SQL
+    let cfg = get_config();
     if cfg.common.print_key_sql {
         log::info!("Merge sql: {sql}");
     }
@@ -266,6 +255,67 @@ pub async fn merge_partitions(
         println!("{}", plan);
     }
 
+    // get partial plan schema and format all the record batches
+    let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
+        Some(plan) => plan,
+        None => super::plan::get_empty_partial_plan(&physical_plan),
+    };
+    let mut schema_exec = partial_paln.schema();
+    let schema_fields = schema_exec
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let mut new_fields = HashSet::new();
+    let mut need_format = false;
+    for batch in batches.iter() {
+        if batch.num_rows() == 0 {
+            continue;
+        }
+        if batch.schema().fields() != schema_exec.fields() {
+            need_format = true;
+        }
+        for field in batch.schema().fields() {
+            if !schema_fields.contains(field.name()) {
+                new_fields.insert(field.clone());
+            }
+        }
+    }
+    drop(schema_fields);
+    if !new_fields.is_empty() {
+        need_format = true;
+        let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
+        schema_exec =
+            Arc::new(Schema::try_merge(vec![schema_exec.as_ref().clone(), new_schema]).unwrap());
+    }
+    let batches = if need_format {
+        let mut new_batches = Vec::new();
+        for batch in batches {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+            new_batches.push(format_recordbatch_by_schema(schema_exec.clone(), batch));
+        }
+        new_batches
+    } else {
+        batches
+    };
+
+    // repartition batches
+    let chunk_size = std::cmp::max(1, (batches.len() + cfg.limit.cpu_num) / cfg.limit.cpu_num);
+    let mut new_batches: Vec<Vec<RecordBatch>> = Vec::with_capacity(batches.len() / chunk_size);
+    for batch in batches {
+        if new_batches.last().is_none() || new_batches.last().unwrap().len() >= chunk_size {
+            let mut v = Vec::with_capacity(chunk_size);
+            v.push(batch);
+            new_batches.push(v);
+        } else {
+            new_batches.last_mut().unwrap().push(batch);
+        }
+    }
+    let batches = new_batches;
+
+    // get final physical plan
     let final_plan = match super::plan::get_final_plan(&physical_plan, &batches) {
         Ok((Some(plan), v)) => {
             if v {

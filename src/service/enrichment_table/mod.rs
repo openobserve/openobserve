@@ -42,7 +42,7 @@ use infra::{
 };
 
 use crate::{
-    common::meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         compact::retention,
         db::{self, enrichment_table},
@@ -172,12 +172,10 @@ pub async fn save_enrichment_data(
     }
 
     if records.is_empty() {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "No records to ingest for look up table".to_string(),
-            )),
-        );
+        return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
+            StatusCode::OK.into(),
+            "Saved enrichment table".to_string(),
+        )));
     }
 
     let schema = stream_schema_map

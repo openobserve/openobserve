@@ -185,7 +185,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC')
+      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
     ).toBeVisible();
 
 
@@ -274,7 +274,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=SELECT kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC'
+          'text=SELECT kubernetes_pod_id FROM "e2e_automate"'
         )
     ).toBeVisible();
   });
