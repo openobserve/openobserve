@@ -3012,7 +3012,6 @@ const useLogs = () => {
             store.state.zoConfig.timestamp_column,
           )
         ) {
-          console.log(searchObj.data.stream.selectedFields,"check")
           searchObj.data.resultGrid.columns.push({
             name: "@timestamp",
             field: (row: any) =>
