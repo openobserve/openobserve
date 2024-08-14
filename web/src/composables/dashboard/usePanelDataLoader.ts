@@ -33,6 +33,7 @@ import {
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { debounce } from 'lodash-es'
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -143,8 +144,10 @@ export const usePanelDataLoader = (
   // an async function that waits for the variables to load
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
+      log("waitForTheVariablesToLoad: entering...");
       // Immediately resolve if variables are already loaded
       if (ifPanelVariablesCompletedLoading()) {
+        log("waitForTheVariablesToLoad: variables are already loaded");
         resolve();
         return;
       }
@@ -154,6 +157,7 @@ export const usePanelDataLoader = (
         () => variablesData.value?.values,
         () => {
           if (ifPanelVariablesCompletedLoading()) {
+            log("waitForTheVariablesToLoad: variables are loaded (inside watch)");
             resolve();
             stopWatching(); // Stop watching once isVisible is true
           }
@@ -168,12 +172,12 @@ export const usePanelDataLoader = (
     });
   };
 
-  const loadData = async () => {
+  const loadDebouncedData = async () => {
     try {
       log("loadData: entering...");
 
       if (abortController) {
-        log("logData: aborting previous function call (if any)");
+        log("loadData: aborting previous function call (if any)");
         abortController.abort();
       }
 
@@ -373,6 +377,8 @@ export const usePanelDataLoader = (
       }
     }
   };
+
+  const loadData = debounce(loadDebouncedData, 50, { leading: false, trailing: true });
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
