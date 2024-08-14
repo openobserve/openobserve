@@ -2710,7 +2710,11 @@ const useLogs = () => {
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas != "all_fields"
-                ? stream.settings?.defined_schema_fields
+                ? [
+                    store.state.zoConfig?.timestamp_column,
+                    ...stream.settings?.defined_schema_fields,
+                    store.state.zoConfig?.all_fields_name,
+                  ]
                 : stream.schema.map((obj: any) => obj.name);
             for (const field of fields) {
               fieldObj = {
