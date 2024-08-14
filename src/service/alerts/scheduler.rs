@@ -565,58 +565,70 @@ async fn handle_derived_stream_triggers(
             .into_iter()
             .map(json::Value::Object)
             .collect::<Vec<_>>();
-        // Ingest result into destination stream
-        let (org_id, stream_name, stream_type): (String, String, i32) = {
-            (
-                derived_stream.destination.org_id.into(),
-                derived_stream.destination.stream_name.into(),
-                cluster_rpc::StreamType::from(derived_stream.destination.stream_type).into(),
-            )
-        };
-        let req = cluster_rpc::IngestionRequest {
-            org_id: org_id.clone(),
-            stream_name: stream_name.clone(),
-            stream_type,
-            data: Some(cluster_rpc::IngestionData::from(local_val)),
-            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()), /* TODO(taiming): finalize IngestionType for derived_stream */
-        };
-        match ingestion_service::ingest(&org_id, req).await {
-            Ok(_) => {
-                log::info!(
-                    "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
-                );
-                db::scheduler::update_trigger(new_trigger).await?;
-            }
-            Err(e) => {
-                log::error!(
-                    "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
-                    e,
-                    new_trigger.org,
-                    new_trigger.module_key
-                );
-                if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
-                    // It has been tried the maximum time, just update the
-                    // next_run_at to the next expected trigger time
-                    log::debug!(
-                        "This DerivedStream trigger: {}/{} has reached maximum retries",
-                        &new_trigger.org,
-                        &new_trigger.module_key
+        if local_val.is_empty() {
+            log::debug!(
+                "DerivedStream conditions not satisfied, org: {}, module_key: {}",
+                &new_trigger.org,
+                &new_trigger.module_key
+            );
+            db::scheduler::update_trigger(new_trigger).await?;
+            trigger_data_stream.status = TriggerDataStatus::Completed;
+        } else {
+            // Ingest result into destination stream
+            let (org_id, stream_name, stream_type): (String, String, i32) = {
+                (
+                    derived_stream.destination.org_id.into(),
+                    derived_stream.destination.stream_name.into(),
+                    cluster_rpc::StreamType::from(derived_stream.destination.stream_type).into(),
+                )
+            };
+            let req = cluster_rpc::IngestionRequest {
+                org_id: org_id.clone(),
+                stream_name: stream_name.clone(),
+                stream_type,
+                data: Some(cluster_rpc::IngestionData::from(local_val)),
+                ingestion_type: Some(cluster_rpc::IngestionType::Json.into()), /* TODO(taiming): finalize IngestionType for derived_stream */
+            };
+            match ingestion_service::ingest(&org_id, req).await {
+                Ok(resp) if resp.status_code == 200 => {
+                    log::info!(
+                        "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
                     );
                     db::scheduler::update_trigger(new_trigger).await?;
-                } else {
-                    // Otherwise update its status only
-                    db::scheduler::update_status(
-                        &new_trigger.org,
-                        new_trigger.module,
-                        &new_trigger.module_key,
-                        db::scheduler::TriggerStatus::Waiting,
-                        trigger.retries + 1,
-                    )
-                    .await?;
                 }
-                trigger_data_stream.status = TriggerDataStatus::Failed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
+                error => {
+                    let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                    log::error!(
+                        "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
+                        err,
+                        new_trigger.org,
+                        new_trigger.module_key
+                    );
+                    if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+                        // It has been tried the maximum time, just update the
+                        // next_run_at to the next expected trigger time
+                        log::debug!(
+                            "This DerivedStream trigger: {}/{} has reached maximum retries",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+                        db::scheduler::update_trigger(new_trigger).await?;
+                    } else {
+                        // Otherwise update its status only
+                        db::scheduler::update_status(
+                            &new_trigger.org,
+                            new_trigger.module,
+                            &new_trigger.module_key,
+                            db::scheduler::TriggerStatus::Waiting,
+                            trigger.retries + 1,
+                        )
+                        .await?;
+                    }
+                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    trigger_data_stream.error = Some(format!(
+                        "error saving enrichment table for DerivedStream: {err}"
+                    ));
+                }
             }
         }
     } else {

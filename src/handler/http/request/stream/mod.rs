@@ -97,7 +97,7 @@ async fn settings(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_bulk_stream_name {
+    if !config::get_config().common.skip_formatting_stream_name {
         stream_name = format_stream_name(&stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();

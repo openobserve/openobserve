@@ -2710,7 +2710,11 @@ const useLogs = () => {
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas != "all_fields"
-                ? stream.settings?.defined_schema_fields
+                ? [
+                    store.state.zoConfig?.timestamp_column,
+                    ...stream.settings?.defined_schema_fields,
+                    store.state.zoConfig?.all_fields_name,
+                  ]
                 : stream.schema.map((obj: any) => obj.name);
             for (const field of fields) {
               fieldObj = {
@@ -2860,8 +2864,20 @@ const useLogs = () => {
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
+            //here we check whether timestamp field is present or not 
+            //as we append timestamp dynamically for userDefined schema we need to check this
+              if(userDefineSchemaSettings.includes(
+                store.state.zoConfig?.timestamp_column,
+              )){
+                searchObj.data.hasSearchDataTimestampField = true;
 
-            searchObj.data.hasSearchDataTimestampField = false;
+              }
+              else{
+                searchObj.data.hasSearchDataTimestampField = false;
+
+              }
+
+
             // check for user defined schema is false then only consider checking new fields from result set
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&

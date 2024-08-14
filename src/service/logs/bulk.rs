@@ -102,7 +102,7 @@ pub async fn ingest(
             }
             (action, stream_name, doc_id) = ret.unwrap();
 
-            if !cfg.common.skip_formatting_bulk_stream_name {
+            if !cfg.common.skip_formatting_stream_name {
                 stream_name = format_stream_name(&stream_name);
             }
 
