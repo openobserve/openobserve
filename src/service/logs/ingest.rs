@@ -73,15 +73,10 @@ pub async fn ingest(
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (before_local_trans, after_local_trans, stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(
-            org_id,
-            &StreamType::Logs,
-            &stream_name,
-        );
-    // End Register Transforms for stream
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
+    let mut stream_before_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_after_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -112,6 +107,16 @@ pub async fn ingest(
     )
     .await;
     // End get user defined schema
+
+    // Start Register functions for stream
+    crate::service::ingestion::get_stream_functions(
+        &stream_params,
+        &mut stream_before_functions_map,
+        &mut stream_after_functions_map,
+        &mut stream_vrl_map,
+    )
+    .await;
+    // End Register functions for index
 
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (endpoint, usage_type, data) = match in_req {
@@ -179,6 +184,32 @@ pub async fn ingest(
             }
         }
 
+        let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+        // Start row based transform before flattening the value
+        if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
+            if !transforms.is_empty() {
+                item = match apply_functions(
+                    item,
+                    transforms,
+                    &stream_vrl_map,
+                    org_id,
+                    &routed_stream_name,
+                    &mut runtime,
+                ) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
+                    }
+                }
+            }
+        }
+        // end row based transformation
+
+        // JSON Flattening
+        let item = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
+
         // Start re-routing if exists
         if let Some(routings) = stream_routing_map.get(&routed_stream_name) {
             if !routings.is_empty() {
@@ -200,20 +231,12 @@ pub async fn ingest(
         }
         // End re-routing
 
-        let mut function_no = before_local_trans.len() + after_local_trans.len();
+        let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
         // Start row based transform
-        let mut res = if routed_stream_name.ne(&stream_name) {
-            let (before_local_trans, after_local_trans, stream_vrl_map) =
-                crate::service::ingestion::register_stream_functions(
-                    org_id,
-                    &StreamType::Logs,
-                    &routed_stream_name,
-                );
-            function_no = before_local_trans.len() + after_local_trans.len();
+        let mut res = if let Some(transforms) = stream_after_functions_map.get(&key) {
             match apply_functions(
                 item,
-                &before_local_trans,
-                &after_local_trans,
+                transforms,
                 &stream_vrl_map,
                 org_id,
                 &routed_stream_name,
@@ -227,22 +250,7 @@ pub async fn ingest(
                 }
             }
         } else {
-            match apply_functions(
-                item,
-                &before_local_trans,
-                &after_local_trans,
-                &stream_vrl_map,
-                org_id,
-                &routed_stream_name,
-                &mut runtime,
-            ) {
-                Ok(res) => res,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    continue;
-                }
-            }
+            item
         };
         // end row based transform
 
@@ -266,6 +274,14 @@ pub async fn ingest(
             }
         };
 
+        let function_no = stream_before_functions_map
+            .get(&main_stream_key)
+            .map(|v| v.len())
+            .unwrap_or_default()
+            + stream_after_functions_map
+                .get(&key)
+                .map(|v| v.len())
+                .unwrap_or_default();
         let (ts_data, fn_num) = json_data_by_stream
             .entry(routed_stream_name.clone())
             .or_insert((Vec::new(), None));
@@ -340,30 +356,16 @@ pub async fn ingest(
 
 pub fn apply_functions<'a>(
     item: json::Value,
-    before_local_trans: &[StreamTransform],
-    after_local_trans: &[StreamTransform],
+    local_trans: &[StreamTransform],
     stream_vrl_map: &'a HashMap<String, VRLResultResolver>,
     org_id: &'a str,
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value> {
-    let cfg = get_config();
     let mut value = item;
-    if !before_local_trans.is_empty() {
+    if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_functions(
-            before_local_trans,
-            value,
-            stream_vrl_map,
-            org_id,
-            stream_name,
-            runtime,
-        )?;
-    }
-    value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
-
-    if !after_local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_functions(
-            after_local_trans,
+            local_trans,
             value,
             stream_vrl_map,
             org_id,

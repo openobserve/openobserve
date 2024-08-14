@@ -314,7 +314,7 @@ pub async fn ingest(
             );
 
             let fns_length = stream_before_functions_map
-                .get(&routed_stream_name)
+                .get(&main_stream_key)
                 .map(|v| v.len())
                 .unwrap_or_default()
                 + stream_after_functions_map

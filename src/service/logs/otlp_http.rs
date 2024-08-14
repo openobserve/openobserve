@@ -36,6 +36,7 @@ use prost::Message;
 
 use crate::{
     common::meta::{
+        functions::{StreamTransform, VRLResultResolver},
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionStatus, StreamStatus},
         stream::StreamParams,
@@ -96,15 +97,10 @@ pub async fn logs_json_handler(
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (before_local_trans, after_local_trans, stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(
-            org_id,
-            &StreamType::Logs,
-            &stream_name,
-        );
-    // End Register Transforms for stream
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
+    let mut stream_before_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_after_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -135,6 +131,16 @@ pub async fn logs_json_handler(
     )
     .await;
     // End get user defined schema
+
+    // Start Register functions for stream
+    crate::service::ingestion::get_stream_functions(
+        &stream_params,
+        &mut stream_before_functions_map,
+        &mut stream_after_functions_map,
+        &mut stream_vrl_map,
+    )
+    .await;
+    // End Register functions for stream
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
@@ -310,19 +316,24 @@ pub async fn logs_json_handler(
                 local_val.append(&mut service_att_map.clone());
 
                 value = json::to_value(local_val)?;
-                // Start row based transform
-                if !before_local_trans.is_empty() {
-                    value = crate::service::ingestion::apply_stream_functions(
-                        &before_local_trans,
-                        value,
-                        &stream_vrl_map,
-                        org_id,
-                        &stream_name,
-                        &mut runtime,
-                    )
-                    .unwrap();
+
+                let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+
+                // Start row based transform before flattening the value
+                if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
+                    if !transforms.is_empty() {
+                        value = crate::service::ingestion::apply_stream_functions(
+                            transforms,
+                            value,
+                            &stream_vrl_map,
+                            org_id,
+                            &stream_name,
+                            &mut runtime,
+                        )
+                        .unwrap();
+                    }
                 }
-                // End row based transform
+                // end row based transformation
 
                 // JSON Flattening
                 value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
@@ -349,19 +360,13 @@ pub async fn logs_json_handler(
                 }
                 // End re-routing
 
-                let mut function_no = before_local_trans.len() + after_local_trans.len();
+                let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
+
                 // Start row based transform
-                if routed_stream_name.ne(&stream_name) {
-                    let (_, after_local_trans, stream_vrl_map) =
-                        crate::service::ingestion::register_stream_functions(
-                            org_id,
-                            &StreamType::Logs,
-                            &routed_stream_name,
-                        );
-                    function_no = before_local_trans.len() + after_local_trans.len();
-                    if !after_local_trans.is_empty() {
+                if let Some(transforms) = stream_after_functions_map.get(&key) {
+                    if !transforms.is_empty() {
                         value = crate::service::ingestion::apply_stream_functions(
-                            &after_local_trans,
+                            transforms,
                             value,
                             &stream_vrl_map,
                             org_id,
@@ -370,16 +375,6 @@ pub async fn logs_json_handler(
                         )
                         .unwrap();
                     }
-                } else if !after_local_trans.is_empty() {
-                    value = crate::service::ingestion::apply_stream_functions(
-                        &after_local_trans,
-                        value,
-                        &stream_vrl_map,
-                        org_id,
-                        &routed_stream_name,
-                        &mut runtime,
-                    )
-                    .unwrap();
                 }
                 // end row based transform
 
@@ -393,6 +388,14 @@ pub async fn logs_json_handler(
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
+                let function_no = stream_before_functions_map
+                    .get(&main_stream_key)
+                    .map(|v| v.len())
+                    .unwrap_or_default()
+                    + stream_after_functions_map
+                        .get(&key)
+                        .map(|v| v.len())
+                        .unwrap_or_default();
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(routed_stream_name.clone())
                     .or_insert((Vec::new(), None));

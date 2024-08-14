@@ -34,6 +34,7 @@ use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
         meta::{
+            functions::{StreamTransform, VRLResultResolver},
             http::HttpResponse as MetaHttpResponse,
             ingestion::{IngestionResponse, IngestionStatus, StreamStatus},
             stream::StreamParams,
@@ -78,15 +79,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (before_local_trans, after_local_trans, stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(
-            org_id,
-            &StreamType::Logs,
-            &stream_name,
-        );
-    // End Register Transforms for stream
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
+    let mut stream_before_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_after_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -118,23 +114,38 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     .await;
     // End get user defined schema
 
+    // Start Register functions for stream
+    crate::service::ingestion::get_stream_functions(
+        &stream_params,
+        &mut stream_before_functions_map,
+        &mut stream_after_functions_map,
+        &mut stream_vrl_map,
+    )
+    .await;
+    // End Register functions for stream
+
     let mut stream_status = StreamStatus::new(&stream_name);
 
     // parse msg to json::Value
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
 
+    let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+
     // Start row based transform. Apply vrl functions with apply_before_flattening flag
-    if !before_local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_functions(
-            &before_local_trans,
-            value,
-            &stream_vrl_map,
-            org_id,
-            &stream_name,
-            &mut runtime,
-        )?;
+    if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
+        if !transforms.is_empty() {
+            value = crate::service::ingestion::apply_stream_functions(
+                transforms,
+                value,
+                &stream_vrl_map,
+                org_id,
+                &stream_name,
+                &mut runtime,
+            )?;
+        }
     }
+    // end row based transformation
 
     // JSON Flattening
     value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level).unwrap();
@@ -161,33 +172,21 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     }
     // End re-routing
 
+    let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
+
     // Start row based transform
-    if routed_stream_name.ne(&stream_name) {
-        let (_, after_local_trans, stream_vrl_map) =
-            crate::service::ingestion::register_stream_functions(
-                org_id,
-                &StreamType::Logs,
-                &routed_stream_name,
-            );
-        if !after_local_trans.is_empty() {
+    if let Some(transforms) = stream_after_functions_map.get(&key) {
+        if !transforms.is_empty() {
             value = crate::service::ingestion::apply_stream_functions(
-                &after_local_trans,
+                transforms,
                 value,
                 &stream_vrl_map,
                 org_id,
-                &stream_name,
+                &routed_stream_name,
                 &mut runtime,
-            )?;
+            )
+            .unwrap();
         }
-    } else if !after_local_trans.is_empty() {
-        value = crate::service::ingestion::apply_stream_functions(
-            &after_local_trans,
-            value,
-            &stream_vrl_map,
-            org_id,
-            &stream_name,
-            &mut runtime,
-        )?;
     }
     // end row based transform
 
