@@ -23,7 +23,8 @@ use datafusion::{
     },
     prelude::SessionContext,
 };
-use proto::datafusion::empty_table::NewEmptyTable;
+
+use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
 
 #[allow(dead_code)]
 pub async fn generate_context(testdata: &str, target_partitions: usize) -> Result<SessionContext> {

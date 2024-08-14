@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use proto::cluster_rpc;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct RemoteExecNode {
@@ -34,18 +36,18 @@ impl RemoteExecNode {
     }
 }
 
-impl TryInto<super::super::cluster_rpc::RemoteExecNode> for RemoteExecNode {
+impl TryInto<cluster_rpc::RemoteExecNode> for RemoteExecNode {
     type Error = datafusion::common::DataFusionError;
 
-    fn try_into(self) -> Result<super::super::cluster_rpc::RemoteExecNode, Self::Error> {
-        Ok(super::super::cluster_rpc::RemoteExecNode {
+    fn try_into(self) -> Result<cluster_rpc::RemoteExecNode, Self::Error> {
+        Ok(cluster_rpc::RemoteExecNode {
             plan: self.plan,
             path: self.path,
         })
     }
 }
 
-impl TryInto<RemoteExecNode> for super::super::cluster_rpc::RemoteExecNode {
+impl TryInto<RemoteExecNode> for cluster_rpc::RemoteExecNode {
     type Error = datafusion::common::DataFusionError;
 
     fn try_into(self) -> Result<RemoteExecNode, Self::Error> {

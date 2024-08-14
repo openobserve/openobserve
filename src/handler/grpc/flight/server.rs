@@ -40,11 +40,6 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use futures::{stream::BoxStream, TryStreamExt};
 use prost::Message;
-use proto::datafusion::{
-    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-    empty_exec::NewEmptyExec,
-    remote_exec::RemoteExecNode,
-};
 use tokio::{
     sync::mpsc::{channel, error::SendError, Sender},
     task,
@@ -53,6 +48,11 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
 use super::utils::generate_context_with_empty_table_scan;
+use crate::service::search::datafusion::distributed_plan::{
+    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+    empty_exec::NewEmptyExec,
+    remote_exec::RemoteExecNode,
+};
 
 #[derive(Default)]
 pub struct FlightServiceImpl;

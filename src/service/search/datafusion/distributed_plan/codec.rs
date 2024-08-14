@@ -31,8 +31,9 @@ use datafusion_proto::{
     protobuf::proto_error,
 };
 use prost::Message;
+use proto::cluster_rpc;
 
-use super::{super::cluster_rpc, empty_exec::NewEmptyExec};
+use super::empty_exec::NewEmptyExec;
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[allow(dead_code)]

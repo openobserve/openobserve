@@ -15,6 +15,7 @@
 
 use std::str::FromStr;
 
+pub mod distributed_plan;
 pub mod exec;
 pub mod file_type;
 pub mod plan;
