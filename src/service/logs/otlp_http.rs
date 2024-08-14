@@ -49,6 +49,7 @@ use crate::{
 };
 
 const SERVICE_NAME: &str = "service.name";
+const SERVICE_PREFIX: &str = "service.";
 const SERVICE: &str = "service";
 
 pub async fn logs_proto_handler(
@@ -186,27 +187,13 @@ pub async fn logs_json_handler(
                 let attributes = resource.get("attributes").unwrap().as_array().unwrap();
                 for res_attr in attributes {
                     let local_attr = res_attr.as_object().unwrap();
-                    if local_attr
-                        .get("key")
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .eq(SERVICE_NAME)
-                    {
-                        let loc_service_name =
-                            local_attr.get("value").unwrap().as_object().unwrap();
-                        for item in loc_service_name {
-                            service_att_map.insert(SERVICE_NAME.to_string(), item.1.clone());
-                        }
+                    let res_attr_key = local_attr.get("key").unwrap().as_str().unwrap();
+                    let res_attr_value = get_val_for_attr(local_attr.get("value").unwrap());
+                    if res_attr_key.starts_with(SERVICE_PREFIX) {
+                        service_att_map.insert(res_attr_key.to_string(), res_attr_value);
                     } else {
-                        service_att_map.insert(
-                            format!(
-                                "{}_{}",
-                                SERVICE,
-                                local_attr.get("key").unwrap().as_str().unwrap()
-                            ),
-                            get_val_for_attr(local_attr.get("value").unwrap()),
-                        );
+                        service_att_map
+                            .insert(format!("{}_{}", SERVICE, res_attr_key), res_attr_value);
                     }
                 }
             }

@@ -64,6 +64,7 @@ const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
 const SERVICE_NAME: &str = "service.name";
+const SERVICE_PREFIX: &str = "service.";
 const SERVICE: &str = "service";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
 
@@ -131,17 +132,16 @@ pub async fn handle_trace_request(
         let resource = res_span.resource.unwrap();
 
         for res_attr in resource.attributes {
-            if res_attr.key.eq(SERVICE_NAME) {
-                let loc_service_name = get_val(&res_attr.value.as_ref());
-                if let Some(name) = loc_service_name.as_str() {
-                    service_name = name.to_string();
-                    service_att_map.insert(res_attr.key, loc_service_name);
+            let res_attr_value = get_val(&res_attr.value.as_ref());
+            if res_attr.key.starts_with(SERVICE_PREFIX) {
+                if res_attr.key.eq(SERVICE_NAME)
+                    && let Some(service_name_value) = res_attr_value.as_str()
+                {
+                    service_name = service_name_value.to_string();
                 }
+                service_att_map.insert(res_attr.key, loc_service_name);
             } else {
-                service_att_map.insert(
-                    format!("{}.{}", SERVICE, res_attr.key),
-                    get_val(&res_attr.value.as_ref()),
-                );
+                service_att_map.insert(format!("{}.{}", SERVICE, res_attr.key), res_attr_value);
             }
         }
         let inst_resources = res_span.scope_spans;
