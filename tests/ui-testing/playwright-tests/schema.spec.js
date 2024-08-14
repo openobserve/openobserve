@@ -131,7 +131,7 @@ test.describe("Schema testcases", () => {
   await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
   await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_all');
   await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
-  await page.locator('button').filter({ hasText: /^schema$/ }).click();
+  await page.locator('[data-test="logs-all-fields-btn"]').click();
   await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
   await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
   await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
