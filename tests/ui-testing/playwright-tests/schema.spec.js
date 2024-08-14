@@ -90,15 +90,15 @@ test.describe("Schema testcases", () => {
   });
 
   test('stream schema settings updated to be displayed under logs', async ({ page }) => {
-    page.on('console', msg => console.log(msg.text()));
-    page.on('response', async (resp) => {
-      if (resp.url().includes('api/default/')) {
-        console.log('url      -> ', resp.url());
-        console.log('code     -> ', resp.status());
-        console.log('payload  -> ', resp.request().postData());
-        console.log('response -> ', await resp.text());
-      }
-    });
+    // page.on('console', msg => console.log(msg.text()));
+    // page.on('response', async (resp) => {
+    //   if (resp.url().includes('api/default/')) {
+    //     console.log('url      -> ', resp.url());
+    //     console.log('code     -> ', resp.status());
+    //     console.log('payload  -> ', resp.request().postData());
+    //     console.log('response -> ', await resp.text());
+    //   }
+    // });
 
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
