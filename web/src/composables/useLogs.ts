@@ -3517,7 +3517,6 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent = "";
       searchObj.loading = true;
       await getQueryData();
-      console.log(searchObj,"search obj")
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
