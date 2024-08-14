@@ -717,6 +717,8 @@ pub struct Common {
     pub report_server_skip_tls_verify: bool,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
     pub schema_cache_compress_enabled: bool,
+    #[env_config(name = "ZO_SKIP_FORMAT_STREAM_NAME", default = false)]
+    pub skip_formatting_stream_name: bool,
     #[env_config(name = "ZO_SKIP_FORMAT_BULK_STREAM_NAME", default = false)]
     pub skip_formatting_bulk_stream_name: bool,
     #[env_config(name = "ZO_BULK_RESPONSE_INCLUDE_ERRORS_ONLY", default = false)]

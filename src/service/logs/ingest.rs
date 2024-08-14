@@ -44,7 +44,8 @@ use crate::{
         stream::StreamParams,
     },
     service::{
-        format_stream_name, ingestion::check_ingestion_allowed, schema::get_upto_discard_error,
+        format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
+        schema::get_upto_discard_error,
     },
 };
 
@@ -55,15 +56,20 @@ pub async fn ingest(
     user_email: &str,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
 ) -> Result<IngestionResponse> {
+    let cfg = config::get_config();
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let mut need_usage_report = true;
 
     // check stream
-    let mut stream_name = format_stream_name(in_stream_name);
+    let mut stream_name = if cfg.common.skip_formatting_stream_name {
+        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, StreamType::Logs))
+            .await?
+    } else {
+        format_stream_name(in_stream_name)
+    };
     check_ingestion_allowed(org_id, Some(&stream_name))?;
 
-    let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
