@@ -533,7 +533,7 @@ export default defineComponent({
     const cancelQuery = () => {
       console.log("cancelQuery called");
       console.log("Current state of searchRequestTraceIds:", traceIdRef.value);
-      if (traceIdRef.value.length === 0) {
+      if (traceIdRef?.value?.length === 0) {
         console.error("No trace IDs to cancel");
         return;
       }
