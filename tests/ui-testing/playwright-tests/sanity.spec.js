@@ -137,7 +137,7 @@ test.describe("Sanity testcases", () => {
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
-        .getByText(/_timestamp/)
+        .getByText(/job/)
         .first()
     ).toBeVisible();
   });
