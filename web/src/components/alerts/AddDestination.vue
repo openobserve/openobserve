@@ -230,15 +230,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-if="formData.type === 'email'">
-          <q-input
-            v-model="formData.emails"
+          <q-select
+            filled
+            hint="Separate multiple values by [,;|]"
             :label="t('reports.recipients') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
+            class="showLabelOnTop no-case"
+            v-model="formData.usernames"
+            use-input
+            no-case
+            use-chips
+            multiple
             stack-label
             outlined
-            filled
             dense
             :rules="[
               (val: any) =>
@@ -249,7 +252,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
             style="width: 100%"
             borderless
-            :placeholder="t('user.inviteByEmail')"
           />
         </template>
       </div>
@@ -296,6 +298,7 @@ import type { Template, DestinationData, Headers } from "@/ts/interfaces";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import usersService from "@/services/users";
 
 const props = defineProps<{
   templates: Template[] | [];
@@ -313,12 +316,19 @@ const formData: Ref<DestinationData> = ref({
   skip_tls_verify: false,
   template: "",
   headers: {},
-  emails: [],
+  usernames: [],
   type: "web_hook",
 });
+
+const usersList = ref([]);
+
+const userListOptions = ref([]);
+
 const isUpdatingDestination = ref(false);
 
 const router = useRouter();
+
+const isLoadingUsers = ref(false);
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -361,7 +371,26 @@ const tabs = computed(() => [
 onActivated(() => setupDestinationData());
 onBeforeMount(() => {
   setupDestinationData();
+  getUsers();
 });
+
+const getUsers = () => {
+  isLoadingUsers.value = true;
+  usersService
+    .orgUsers(
+      0,
+      100000,
+      "username",
+      false,
+      "username",
+      store.state.selectedOrganization.identifier,
+    )
+    .then((res: any) => {
+      isLoadingUsers.value = false;
+      usersList.value = res.data.data.map((user: any) => user.username);
+      userListOptions.value = [...usersList.value];
+    });
+};
 
 const setupDestinationData = () => {
   if (props.destination) {
@@ -372,7 +401,7 @@ const setupDestinationData = () => {
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
     formData.value.template = props.destination.template;
     formData.value.headers = props.destination.headers;
-    formData.value.emails = (props.destination.emails || []).join(", ");
+    formData.value.usernames = (props.destination.usernames || []).join(", ");
     formData.value.type = props.destination.type || "web_hook";
 
     if (Object.keys(formData.value.headers).length) {
@@ -432,9 +461,9 @@ const saveDestination = () => {
 
   if (formData.value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] = formData.value.emails
+    payload["usernames"] = formData.value.usernames
       .split(/[;,]/)
-      .map((email: string) => email.trim());
+      .map((username: string) => username.trim());
   }
 
   if (isUpdatingDestination.value) {
@@ -505,6 +534,19 @@ const createEmailTemplate = () => {
       type: "email",
       org_identifier: store.state.selectedOrganization.identifier,
     },
+  });
+};
+
+const filterFn = (val: string, update: any) => {
+  update(() => {
+    if (val === "") {
+      userListOptions.value = usersList.value;
+    } else {
+      const needle = val.toLowerCase();
+      userListOptions.value = usersList.value.filter(
+        (v: string) => v.toLowerCase().indexOf(needle) > -1,
+      );
+    }
   });
 };
 </script>
