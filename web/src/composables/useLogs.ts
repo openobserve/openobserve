@@ -3084,7 +3084,6 @@ const useLogs = () => {
           }
         }
       }
-      console.log(searchObj.data.resultGrid.columns,"result")
       extractFTSFields();
       evaluateWrapContentFlag();
     } catch (e: any) {
