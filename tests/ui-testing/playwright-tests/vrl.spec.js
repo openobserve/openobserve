@@ -507,8 +507,11 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
-   // await page.getByText("Asia/Dhaka").click();
-   await page.getByRole("option", { name: "Asia/Dhaka" }).click();
+
+
+   await page.locator('[data-test="datetime-timezone-select"]').press('Control+a');
+   await page.locator('[data-test="datetime-timezone-select"]').fill('Asia/Dhaka');
+   await page.getByRole('option', { name: 'Asia/Dhaka' }).locator('div').nth(2).click();
 
 
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -933,7 +936,7 @@ test.describe(" VRL UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
   });
 
-  test("should able to select the VRL from saved Function list ", async ({
+  test.skip("should able to select the VRL from saved Function list ", async ({
     page,
   }) => {
     const randomDashboardName = `Dashboard-${Math.floor(
@@ -978,7 +981,7 @@ test.describe(" VRL UI testcases", () => {
       .click();
     await page
       .locator('[data-test="dashboard-use-saved-vrl-function"]')
-      .fill("VRL_01");
+      .fill("VRL_01"); 
     await page.getByText("VRL_01").click();
 
     await expect(page.getByText("VRL_01 function applied")).toBeVisible();
@@ -1444,7 +1447,11 @@ test.describe(" VRL UI testcases", () => {
     await page.getByRole("button", { name: "8" }).last().click();
 
     await page.locator("#date-time-menu").getByText("arrow_drop_down").click();
-    await page.getByRole("option", { name: "Asia/Dubai" }).click();
+    await page.locator('[data-test="datetime-timezone-select"]').press('Control+a');
+    await page.locator('[data-test="datetime-timezone-select"]').fill('Asia/Dubai');
+    await page.getByRole('option', { name: 'Asia/Dubai' }).locator('div').nth(2).click();
+
+   // await page.getByRole("option", { name: "Asia/Dubai" }).click();
 
   //  await page.getByText("Asia/Dubai").click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -1472,4 +1479,104 @@ test.describe(" VRL UI testcases", () => {
     await dashboardDeleteButton.click(); // Click the delete button
     await page.locator('[data-test="confirm-button"]').click();
   });
+
+
+
+
+
+
+
+
+
+
+
+  test("1should able to select the VRL from saved Function list ", async ({
+    page,
+  }) => {
+    const randomDashboardName = `Dashboard-${Math.floor(
+      Math.random() * 10000
+    )}`;
+
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Streamarrow_drop_down" })
+      .locator("i")
+      .click();
+    await page.getByRole("option", { name: "e2e_automate" }).click();
+
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-y-data"]'
+      )
+      .click();
+    await page
+      .locator('[data-test="logs-search-bar-show-query-toggle-btn"] img')
+      .click();
+    await page
+      .locator('[data-test="dashboard-query"]')
+      .getByText("arrow_drop_down")
+      .click();
+    await page
+      .locator('[data-test="dashboard-use-saved-vrl-function"]')
+      .fill("VRL_01"); 
+    await page.getByText("VRL_01").click();
+
+    await expect(page.getByText("VRL_01 function applied")).toBeVisible();
+    await page.locator('[data-test="dashboard-apply"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+
+    await expect(
+      page.getByText("drag_indicatortext_fields percentage")
+    ).toBeVisible();
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-percentage"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
+    await page.locator('[data-test="dashboard-apply"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').click();
+    await page.locator('[data-test="dashboard-panel-name"]').fill("VRL");
+    await page.locator('[data-test="dashboard-panel-save"]').click();
+    await page
+      .locator('[data-test="dashboard-edit-panel-VRL-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-delete-panel"]').click();
+    await page.locator('[data-test="confirm-button"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+
+    // Debugging step to verify the dashboard name
+    console.log(`Deleting dashboard with name: ${randomDashboardName}`);
+    const dashboardNameLocator = await page.locator(
+      `//tr[.//td[text()="${randomDashboardName}"]]`
+    );
+    const dashboardDeleteButton = dashboardNameLocator.locator(
+      '[data-test="dashboard-delete"]'
+    );
+
+    await expect(dashboardNameLocator).toBeVisible(); // Verify the dashboard exists
+    await dashboardDeleteButton.click(); // Click the delete button
+    await page.locator('[data-test="confirm-button"]').click();
+  });
+
 });
