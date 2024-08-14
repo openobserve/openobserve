@@ -2864,8 +2864,20 @@ const useLogs = () => {
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
             }
+            //here we check whether timestamp field is present or not 
+            //as we append timestamp dynamically for userDefined schema we need to check this
+              if(userDefineSchemaSettings.includes(
+                store.state.zoConfig?.timestamp_column,
+              )){
+                searchObj.data.hasSearchDataTimestampField = true;
 
-            searchObj.data.hasSearchDataTimestampField = false;
+              }
+              else{
+                searchObj.data.hasSearchDataTimestampField = false;
+
+              }
+
+
             // check for user defined schema is false then only consider checking new fields from result set
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&
@@ -3000,6 +3012,7 @@ const useLogs = () => {
             store.state.zoConfig.timestamp_column,
           )
         ) {
+          console.log(searchObj.data.stream.selectedFields,"check")
           searchObj.data.resultGrid.columns.push({
             name: "@timestamp",
             field: (row: any) =>
@@ -3072,6 +3085,7 @@ const useLogs = () => {
           }
         }
       }
+      console.log(searchObj.data.resultGrid.columns,"result")
       extractFTSFields();
       evaluateWrapContentFlag();
     } catch (e: any) {
@@ -3505,6 +3519,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent = "";
       searchObj.loading = true;
       await getQueryData();
+      console.log(searchObj,"search obj")
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
