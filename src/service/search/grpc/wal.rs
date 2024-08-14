@@ -245,6 +245,7 @@ pub async fn search_parquet(
         let schema = schema_versions[ver]
             .clone()
             .with_metadata(std::collections::HashMap::new());
+        let schema = Arc::new(schema);
         let sql = sql.clone();
         let session = config::meta::search::Session {
             id: format!("{trace_id}-wal-{ver}"),
@@ -262,12 +263,12 @@ pub async fn search_parquet(
         let (schema, diff_fields) = if select_wildcard {
             generate_select_start_search_schema(
                 &sql,
-                &schema,
+                schema.clone(),
                 &schema_latest_map,
                 &defined_schema_fields,
             )?
         } else {
-            generate_search_schema(&sql, &schema, &schema_latest_map)?
+            generate_search_schema(&sql, schema.clone(), &schema_latest_map)?
         };
 
         let datafusion_span = info_span!(
@@ -469,12 +470,12 @@ pub async fn search_memtable(
         let (schema, diff_fields) = if select_wildcard {
             generate_select_start_search_schema(
                 &sql,
-                &schema,
+                schema.clone(),
                 &schema_latest_map,
                 &defined_schema_fields,
             )?
         } else {
-            generate_search_schema(&sql, &schema, &schema_latest_map)?
+            generate_search_schema(&sql, schema.clone(), &schema_latest_map)?
         };
 
         for batch in record_batches.iter_mut() {

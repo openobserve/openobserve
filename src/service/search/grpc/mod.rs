@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
-use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -24,10 +23,8 @@ use config::{
         search::ScanStats,
         stream::{FileKey, StreamType},
     },
-    utils::record_batch_ext::format_recordbatch_by_schema,
 };
 use futures::future::try_join_all;
-use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
 use tracing::Instrument;
@@ -140,47 +137,6 @@ pub async fn search(
         results.extend(batches.into_iter().flatten().filter(|v| v.num_rows() > 0));
     }
 
-    // format recordbatch with same schema
-    if !results.is_empty() {
-        let mut schema = results[0].schema();
-        let schema_fields = schema
-            .fields()
-            .iter()
-            .map(|f| f.name())
-            .collect::<HashSet<_>>();
-        let mut new_fields = HashSet::new();
-        let mut need_format = false;
-        for batch in results.iter() {
-            if batch.num_rows() == 0 {
-                continue;
-            }
-            if batch.schema().fields() != schema.fields() {
-                need_format = true;
-            }
-            for field in batch.schema().fields() {
-                if !schema_fields.contains(field.name()) {
-                    new_fields.insert(field.clone());
-                }
-            }
-        }
-        drop(schema_fields);
-        if !new_fields.is_empty() {
-            need_format = true;
-            let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
-            schema =
-                Arc::new(Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).unwrap());
-        }
-        if need_format {
-            let mut new_batches = Vec::new();
-            for batch in results {
-                if batch.num_rows() == 0 {
-                    continue;
-                }
-                new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
-            }
-            results = new_batches;
-        }
-    }
     log::info!("[trace_id {trace_id}] in node merge task finish");
 
     // clear session data
