@@ -558,4 +558,39 @@ test.describe(" visualize UI testcases", () => {
         .getByText('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC')
     ).toBeVisible();
   });
+  test.skip('should display an error if the VRL field is not updated from the Breakdown', async ({ page }) => {
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.vrlsanity=100');
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-vrlsanity"] [data-test="dashboard-add-b-data"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('div').filter({ hasText: /^\.vrlsanity=100$/ }).nth(3).click();
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').press('Control+a');
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  });
+
+  test('should update the data on the chart when changing the time after applying a VRL field', async ({ page }) => {
+
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.locator('#fnEditor > .monaco-editor > .overflow-guard > div:nth-child(2) > .lines-content > .view-lines > .view-line').click();
+    await page.locator('#fnEditor').getByLabel('Editor content;Press Alt+F1').fill('.vrl=123');
+
+    await page.waitForTimeout(3000);
+    
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  });
+
 });
