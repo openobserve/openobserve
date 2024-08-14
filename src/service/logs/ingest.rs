@@ -62,7 +62,7 @@ pub async fn ingest(
     let mut need_usage_report = true;
 
     // check stream
-    let mut stream_name = if cfg.common.skip_formatting_stream_name {
+    let stream_name = if cfg.common.skip_formatting_stream_name {
         get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, StreamType::Logs))
             .await?
     } else {
