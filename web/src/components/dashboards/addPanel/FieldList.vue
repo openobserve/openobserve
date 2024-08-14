@@ -1049,8 +1049,22 @@ export default defineComponent({
 
               dashboardPanelData.meta.stream.selectedStreamFields =
                 schemaFields ?? [];
-              dashboardPanelData.meta.stream.userDefinedSchema =
-                userDefineSchemaSettings ?? [];
+
+              // set user defined schema
+              // 1) Timestamp field
+              // 2) selected user defined schema fields
+              // 3) all_fields_name fields
+              dashboardPanelData.meta.stream.userDefinedSchema = [
+                {
+                  name: store.state.zoConfig?.timestamp_column,
+                  type: "Int64",
+                },
+                ...(userDefineSchemaSettings ?? []),
+                {
+                  name: store.state.zoConfig?.all_fields_name,
+                  type: "Utf8",
+                },
+              ];
             }
           }
         }
