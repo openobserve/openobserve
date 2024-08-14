@@ -1018,15 +1018,6 @@ export default defineComponent({
                 stream.schema = streamSchema;
               }
 
-              if (
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
-                stream.settings.defined_schema_fields.length > 0
-              ) {
-                dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
-              } else {
-                dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
-              }
-
               // create a schema field mapping based on field name to avoind iteration over object.
               // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
               for (const field of stream.schema) {
@@ -1049,8 +1040,31 @@ export default defineComponent({
 
               dashboardPanelData.meta.stream.selectedStreamFields =
                 schemaFields ?? [];
-              dashboardPanelData.meta.stream.userDefinedSchema =
-                userDefineSchemaSettings ?? [];
+
+              if (
+                stream.settings.hasOwnProperty("defined_schema_fields") &&
+                stream.settings.defined_schema_fields.length > 0
+              ) {
+                dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
+                // set user defined schema
+                // 1) Timestamp field
+                // 2) selected user defined schema fields
+                // 3) all_fields_name fields
+                dashboardPanelData.meta.stream.userDefinedSchema = [
+                  {
+                    name: store.state.zoConfig?.timestamp_column,
+                    type: "Int64",
+                  },
+                  ...(userDefineSchemaSettings ?? []),
+                  {
+                    name: store.state.zoConfig?.all_fields_name,
+                    type: "Utf8",
+                  },
+                ];
+              } else {
+                dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
+                dashboardPanelData.meta.stream.userDefinedSchema = [];
+              }
             }
           }
         }
