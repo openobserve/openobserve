@@ -51,7 +51,7 @@ use super::utils::generate_context_with_empty_table_scan;
 use crate::service::search::datafusion::distributed_plan::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     empty_exec::NewEmptyExec,
-    remote_exec::RemoteExecNode,
+    remote_exec::FlightSearchRequest,
 };
 
 #[derive(Default)]
@@ -76,13 +76,14 @@ impl FlightService for FlightServiceImpl {
         // 1. decnode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
-        let remote_node: RemoteExecNode = proto::cluster_rpc::RemoteExecNode::decode(&mut buf)
-            .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
-            .and_then(|node| node.try_into())
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let request: FlightSearchRequest =
+            proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
+                .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
+                .and_then(|node| node.try_into())
+                .map_err(|e| Status::internal(e.to_string()))?;
 
         // 2. generate context and register table
-        let ctx = generate_context_with_empty_table_scan(remote_node.get_path(), partitions)
+        let ctx = generate_context_with_empty_table_scan("todo", partitions)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
         let file_format = ParquetFormat::default().with_enable_pruning(true);
@@ -90,7 +91,7 @@ impl FlightService for FlightServiceImpl {
             .with_file_extension(".parquet")
             .with_target_partitions(partitions)
             .with_collect_stat(true);
-        let list_url = match ListingTableUrl::parse(remote_node.get_path()) {
+        let list_url = match ListingTableUrl::parse("todo") {
             Ok(url) => url,
             Err(e) => {
                 return Err(DataFusionError::Execution(format!(
@@ -112,7 +113,7 @@ impl FlightService for FlightServiceImpl {
             codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
         };
         let mut physical_plan =
-            physical_plan_from_bytes_with_extension_codec(remote_node.get_plan(), &ctx, &proto)
+            physical_plan_from_bytes_with_extension_codec(&request.plan, &ctx, &proto)
                 .map_err(|e| Status::internal(e.to_string()))?;
         let schema = physical_plan.schema();
 

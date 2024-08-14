@@ -2967,11 +2967,26 @@ pub struct NewEmptyExecNode {
     #[prost(uint64, optional, tag = "4")]
     pub limit: ::core::option::Option<u64>,
 }
+/// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RemoteExecNode {
-    #[prost(bytes = "vec", tag = "1")]
+pub struct FlightSearchRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(int32, tag = "2")]
+    pub partition: i32,
+    #[prost(string, tag = "3")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub stream_type: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "5")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, tag = "2")]
-    pub path: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "6")]
+    pub file_list: ::prost::alloc::vec::Vec<FileKey>,
+    #[prost(int64, tag = "7")]
+    pub timeout: i64,
+    #[prost(string, tag = "8")]
+    pub work_group: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "9")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
 }

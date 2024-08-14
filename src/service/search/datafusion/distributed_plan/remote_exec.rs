@@ -13,47 +13,59 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::FileKey;
 use proto::cluster_rpc;
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct RemoteExecNode {
-    plan: Vec<u8>,
-    path: String,
+pub struct FlightSearchRequest {
+    pub trace_id: String,
+    pub partition: i32,
+    pub org_id: String,
+    pub stream_type: String,
+    pub plan: Vec<u8>,
+    pub file_list: Vec<FileKey>,
+    pub timeout: i64,
+    pub work_group: String,
+    pub user_id: Option<String>,
 }
 
-impl RemoteExecNode {
-    pub fn new(plan: Vec<u8>, path: String) -> Self {
-        Self { plan, path }
-    }
-
-    pub fn get_plan(&self) -> &Vec<u8> {
-        &self.plan
-    }
-
-    pub fn get_path(&self) -> &String {
-        &self.path
-    }
-}
-
-impl TryInto<cluster_rpc::RemoteExecNode> for RemoteExecNode {
+impl TryInto<FlightSearchRequest> for cluster_rpc::FlightSearchRequest {
     type Error = datafusion::common::DataFusionError;
 
-    fn try_into(self) -> Result<cluster_rpc::RemoteExecNode, Self::Error> {
-        Ok(cluster_rpc::RemoteExecNode {
+    fn try_into(self) -> Result<FlightSearchRequest, Self::Error> {
+        Ok(FlightSearchRequest {
+            trace_id: self.trace_id,
+            partition: self.partition,
+            org_id: self.org_id,
+            stream_type: self.stream_type,
             plan: self.plan,
-            path: self.path,
+            file_list: self.file_list.iter().map(FileKey::from).collect(),
+            timeout: self.timeout,
+            work_group: self.work_group,
+            user_id: self.user_id,
         })
     }
 }
 
-impl TryInto<RemoteExecNode> for cluster_rpc::RemoteExecNode {
+impl TryInto<cluster_rpc::FlightSearchRequest> for FlightSearchRequest {
     type Error = datafusion::common::DataFusionError;
 
-    fn try_into(self) -> Result<RemoteExecNode, Self::Error> {
-        Ok(RemoteExecNode {
+    fn try_into(self) -> Result<cluster_rpc::FlightSearchRequest, Self::Error> {
+        Ok(cluster_rpc::FlightSearchRequest {
+            trace_id: self.trace_id,
+            partition: self.partition,
+            org_id: self.org_id,
+            stream_type: self.stream_type,
             plan: self.plan,
-            path: self.path,
+            file_list: self
+                .file_list
+                .iter()
+                .map(cluster_rpc::FileKey::from)
+                .collect(),
+            timeout: self.timeout,
+            work_group: self.work_group,
+            user_id: self.user_id,
         })
     }
 }
