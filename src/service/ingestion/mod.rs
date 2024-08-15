@@ -149,7 +149,8 @@ pub async fn get_stream_functions<'a>(
         if stream_after_functions_map.contains_key(&key)
             || stream_before_functions_map.contains_key(&key)
         {
-            return;
+            // functions for this stream already fetched
+            continue;
         }
         //   let mut _local_trans: Vec<StreamTransform> = vec![];
         // let local_stream_vrl_map;
