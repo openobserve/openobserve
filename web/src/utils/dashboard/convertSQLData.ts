@@ -134,7 +134,7 @@ export const convertSQLData = async (
       ...getZAxisKeys(),
       ...getBreakDownKeys(),
     ];
-    let timeBasedKey = keys?.find((key) =>
+    const timeBasedKey = keys?.find((key) =>
       isTimeSeries([searchQueryDataFirstEntry?.[key]]),
     );
 
@@ -241,7 +241,7 @@ export const convertSQLData = async (
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    let data =
+    const data =
       missingValueData?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
@@ -259,7 +259,7 @@ export const convertSQLData = async (
       keyArrays[key] = data.map((obj: any) => obj[key]);
     }
 
-    let result = keyArrays[key] || [];
+    const result = keyArrays[key] || [];
 
     return result;
   };
@@ -732,6 +732,7 @@ export const convertSQLData = async (
             name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
             name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
           }
+
           const hoverText: string[] = [];
           name.forEach((it: any) => {
             if (it.data != null) {
@@ -1457,7 +1458,7 @@ export const convertSQLData = async (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      let timeStringCache: any = {};
+      const timeStringCache: any = {};
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
@@ -1508,6 +1509,10 @@ export const convertSQLData = async (
 
         const date = new Date(name[0].data[0]);
 
+        name.sort((a: any, b: any) => {
+          return (b.value[1] || 0) - (a.value[1] || 0);
+        });
+
         // if hovered series is not null
         // then swap the hovered series to top in tooltip
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
@@ -1522,7 +1527,6 @@ export const convertSQLData = async (
           name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
           name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
         }
-
         const hoverText: string[] = [];
         name.forEach((it: any) => {
           if (it.data[1] != null) {
@@ -1739,9 +1743,9 @@ export const convertSQLData = async (
     );
     if (isYAxisExistInOrderBy) {
       // Calculate the total for each series and combine it with the corresponding x-axis label
-      let totals = new Map();
+      const totals = new Map();
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
-        let total = options?.series?.reduce(
+        const total = options?.series?.reduce(
           (sum: number, currentSeries: any) =>
             sum + currentSeries?.data[i] ?? 0,
           0,
@@ -1751,8 +1755,8 @@ export const convertSQLData = async (
 
       // Sort the indices by total in the specified order
       // ASC for ascending, DESC for descending
-      let sortedIndices = Array.from(totals.keys()).sort((a, b) => {
-        let diff = totals.get(a).total - totals.get(b).total;
+      const sortedIndices = Array.from(totals.keys()).sort((a, b) => {
+        const diff = totals.get(a).total - totals.get(b).total;
         return isYAxisExistInOrderBy == "ASC" ? diff : -diff;
       });
 
