@@ -389,7 +389,7 @@ pub fn apply_stream_functions(
                 vrl_runtime,
                 &value,
                 org_id,
-                &vec![stream_name.to_string()],
+                &[stream_name.to_string()],
             );
         }
     }

@@ -118,8 +118,7 @@ impl DisplayAs for NewEmptyExec {
                     self.schema
                         .fields()
                         .iter()
-                        .enumerate()
-                        .map(|(_, f)| f.name())
+                        .map(|f| f.name())
                         .collect::<Vec<_>>()
                 );
                 let filters_string = format!(

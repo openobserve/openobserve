@@ -713,7 +713,7 @@ async fn merge_grpc_result(
 
     // get the using schema
     let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-    let schema_latest = Arc::new(sql.schema.clone());
+    let schema_latest = sql.schema.clone();
     let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
     let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());

@@ -108,12 +108,12 @@ pub async fn search(
     let (schema_latest, _) = if select_wildcard {
         generate_select_start_search_schema(
             &sql,
-            &schema_latest,
+            schema_latest.clone(),
             &schema_latest_map,
             &defined_schema_fields,
         )?
     } else {
-        generate_search_schema(&sql, &schema_latest, &schema_latest_map)?
+        generate_search_schema(&sql, schema_latest.clone(), &schema_latest_map)?
     };
 
     // TODO the leader need check is_wildcard and defined_schema_fields to reduce the schema
