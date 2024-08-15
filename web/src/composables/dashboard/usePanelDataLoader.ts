@@ -33,7 +33,7 @@ import {
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { debounce } from 'lodash-es'
+import { debounce } from "lodash-es";
 
 export const usePanelDataLoader = (
   panelSchema: any,
@@ -44,9 +44,9 @@ export const usePanelDataLoader = (
   searchType: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (true) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
 
   const state = reactive({
@@ -157,7 +157,9 @@ export const usePanelDataLoader = (
         () => variablesData.value?.values,
         () => {
           if (ifPanelVariablesCompletedLoading()) {
-            log("waitForTheVariablesToLoad: variables are loaded (inside watch)");
+            log(
+              "waitForTheVariablesToLoad: variables are loaded (inside watch)",
+            );
             resolve();
             stopWatching(); // Stop watching once isVisible is true
           }
@@ -172,7 +174,7 @@ export const usePanelDataLoader = (
     });
   };
 
-  const loadDebouncedData = async () => {
+  const loadData = async () => {
     try {
       log("loadData: entering...");
 
@@ -378,16 +380,99 @@ export const usePanelDataLoader = (
     }
   };
 
-  const loadData = debounce(loadDebouncedData, 50, { leading: false, trailing: true });
+  // const loadData = debounce(loadDebouncedData, 50, { leading: false, trailing: true });
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
-    async () => {
+    () => [
+      panelSchema?.value,
+      selectedTimeObj?.value,
+      forceLoad.value,
+      variablesData.value?.values,
+    ],
+    async (newValues, oldValues) => {
+      const [
+        newPanelSchema,
+        newSelectedTimeObj,
+        newForceLoad,
+        newVariablesData,
+      ] = newValues;
+      const [
+        oldPanelSchema,
+        oldSelectedTimeObj,
+        oldForceLoad,
+        oldVariablesData,
+      ] = oldValues;
+
       log("PanelSchema/Time Wather: called");
-      loadData(); // Loading the data
+
+      if (
+        newPanelSchema !== oldPanelSchema ||
+        newSelectedTimeObj !== oldSelectedTimeObj ||
+        newForceLoad !== oldForceLoad
+      ) {
+        log('watcher: schema, time, forceLoad changed, loading data...');
+        loadData(); // Loading the data
+      } else {
+        log('watcher: variables values changed, check loading data...');
+        // variable value is triggering this function
+        const newDependentVariablesData = getDependentVariablesData();
+        const newDynamicVariablesData = getDynamicVariablesData();
+
+        if (
+          !newDependentVariablesData?.length &&
+          !newDynamicVariablesData?.length &&
+          !currentDependentVariablesData?.length &&
+          !currentDynamicVariablesData?.length
+        ) {
+          // go ahead and bravly load the data
+          log("Variables Watcher: no variables needed, returning false...");
+          return;
+        }
+
+        if (variablesDataUpdated()) {
+          loadData();
+        }
+      }
+
     },
   );
+
+  // check when the variables data changes
+  // 1. get the dependent variables
+  // 2. compare the dependent variables data with the old dependent variables Data
+  // 3. if the value of any current variable is changed, call the api
+  // watch(
+  //   () => variablesData.value?.values,
+  //   () => {
+  //     // console.log("inside watch variablesData");
+  //     // ensure the query is there
+  //     // if (!panelSchema.value.queries?.length) {
+  //     //   return;
+  //     // }
+
+  //     log("Variables Watcher: starting...");
+
+  //     const newDependentVariablesData = getDependentVariablesData();
+  //     const newDynamicVariablesData = getDynamicVariablesData();
+
+  //     if (
+  //       !newDependentVariablesData?.length &&
+  //       !newDynamicVariablesData?.length &&
+  //       !currentDependentVariablesData?.length &&
+  //       !currentDynamicVariablesData?.length
+  //     ) {
+  //       // go ahead and bravly load the data
+  //       log("Variables Watcher: no variables needed, returning false...");
+  //       return;
+  //     }
+
+  //     if (variablesDataUpdated()) {
+  //       loadData();
+  //     }
+  //   },
+  //   { deep: true },
+  // );
 
   /**
    * Replaces the query with the corresponding variable values.
@@ -634,42 +719,6 @@ export const usePanelDataLoader = (
     panelSchema.value.queries?.some((q: any) => q?.query);
 
   // [START] variables management
-
-  // check when the variables data changes
-  // 1. get the dependent variables
-  // 2. compare the dependent variables data with the old dependent variables Data
-  // 3. if the value of any current variable is changed, call the api
-  watch(
-    () => variablesData.value?.values,
-    () => {
-      // console.log("inside watch variablesData");
-      // ensure the query is there
-      // if (!panelSchema.value.queries?.length) {
-      //   return;
-      // }
-
-      log("Variables Watcher: starting...");
-
-      const newDependentVariablesData = getDependentVariablesData();
-      const newDynamicVariablesData = getDynamicVariablesData();
-
-      if (
-        !newDependentVariablesData?.length &&
-        !newDynamicVariablesData?.length &&
-        !currentDependentVariablesData?.length &&
-        !currentDynamicVariablesData?.length
-      ) {
-        // go ahead and bravly load the data
-        log("Variables Watcher: no variables needed, returning false...");
-        return;
-      }
-
-      if (variablesDataUpdated()) {
-        loadData();
-      }
-    },
-    { deep: true },
-  );
 
   // [START] Variables functions
   const areDynamicVariablesStillLoading = () =>
