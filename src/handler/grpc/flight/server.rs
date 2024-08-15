@@ -64,6 +64,8 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
             .map_err(|e| Status::internal(e.to_string()))?;
 
+        // println!("\nfollow request{:#?}\n", request);
+
         // 2. prepare dataufion context
         let (ctx, physical_plan) = grpcFlight::search(&request)
             .await

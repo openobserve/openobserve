@@ -28,7 +28,10 @@ use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
 use vector_enrichment::TableRegistry;
 
-use crate::common::meta::functions::VRLResultResolver;
+use crate::{
+    common::meta::functions::VRLResultResolver,
+    service::search::{cluster::flight_search, new_sql::NewSql},
+};
 
 #[tracing::instrument(
     name = "service:search:cluster",
@@ -42,10 +45,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     let track_total_hits = req.query.as_ref().unwrap().track_total_hits;
 
     // handle request time range
-    let meta = super::super::sql::Sql::new(&req).await?;
-    if meta.rewrite_sql != req.query.as_ref().unwrap().sql {
-        req.query.as_mut().unwrap().sql = meta.rewrite_sql.clone();
-    }
+    let meta = NewSql::new(&req).await?;
     let sql = Arc::new(meta);
 
     // set this value to null & use it later on results ,
@@ -56,10 +56,10 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
 
     // handle query function
     let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
-        super::search(&trace_id, sql.clone(), req).await?;
+        flight_search::flight_search(&trace_id, sql.clone(), req).await?;
 
     // final result
-    let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
+    let mut result = search::Response::new(sql.offset, sql.limit);
 
     // hits
     if !merge_batches.is_empty() {
@@ -110,7 +110,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                                     .collect(),
                             ),
                             &sql.org_id,
-                            &sql.stream_name,
+                            &sql.stream_names,
                         );
                         ret_val
                             .as_array()
@@ -133,7 +133,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                                     },
                                     &json::Value::Object(hit.clone()),
                                     &sql.org_id,
-                                    &sql.stream_name,
+                                    &sql.stream_names,
                                 );
                                 (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                             })
@@ -154,16 +154,16 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
             sources = super::handle_metrics_response(sources);
         }
 
-        if sql.uses_zo_fn {
-            for source in sources {
-                result
-                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
-            }
-        } else {
-            for source in sources {
-                result.add_hit(&source);
-            }
+        // if sql.uses_zo_fn {
+        //     for source in sources {
+        //         result
+        //             .add_hit(&flatten::flatten(source).map_err(|e|
+        // Error::Message(e.to_string()))?);     }
+        // } else {
+        for source in sources {
+            result.add_hit(&source);
         }
+        // }
     }
 
     let total = if !track_total_hits {
@@ -181,7 +181,8 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     };
 
     result.set_total(total);
-    result.set_histogram_interval(sql.histogram_interval);
+    // TODO: handle histogram
+    // result.set_histogram_interval(sql.histogram_interval);
     result.set_partial(is_partial);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);

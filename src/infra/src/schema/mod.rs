@@ -22,9 +22,10 @@ use config::{
     utils::{json, schema_ext::SchemaExt},
     RwAHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema};
 use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
+use serde::Serialize;
 
 use crate::{
     db as infra_db,
@@ -632,8 +633,9 @@ pub fn get_merge_schema_changes(
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct SchemaCache {
+    // TODO: add Arc
     schema: Schema,
     fields_map: HashMap<String, usize>,
     hash_key: String,
@@ -665,6 +667,16 @@ impl SchemaCache {
 
     pub fn fields_map(&self) -> &HashMap<String, usize> {
         &self.fields_map
+    }
+
+    pub fn contains_field(&self, field_name: &str) -> bool {
+        self.fields_map.contains_key(field_name)
+    }
+
+    pub fn field_with_name(&self, field_name: &str) -> Option<&FieldRef> {
+        self.fields_map
+            .get(field_name)
+            .and_then(|i| self.schema.fields().get(*i))
     }
 }
 

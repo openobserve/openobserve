@@ -16,7 +16,9 @@
 use std::sync::Arc;
 
 use ::datafusion::{
-    common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
+    common::tree_node::TreeNode,
+    datasource::TableProvider,
+    physical_plan::{displayable, ExecutionPlan},
     prelude::SessionContext,
 };
 use config::{
@@ -89,9 +91,15 @@ pub async fn search(
     };
     let mut physical_plan = physical_plan_from_bytes_with_extension_codec(&req.plan, &ctx, &proto)?;
 
+    let plan = displayable(physical_plan.as_ref())
+        .set_show_schema(false)
+        .indent(true)
+        .to_string();
+    println!("{}", plan);
+
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
-    if physical_plan.visit(&mut visitor).is_ok() || visitor.get_data().is_none() {
+    if physical_plan.visit(&mut visitor).is_err() || visitor.get_data().is_none() {
         return Err(Error::Message(
             "search->storage: physical plan visit error: there is no EmptyTable".to_string(),
         ));
@@ -123,7 +131,7 @@ pub async fn search(
     );
 
     // construct latest schema map
-    let schema_latest = physical_plan.schema();
+    let schema_latest = empty_exec.schema();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);

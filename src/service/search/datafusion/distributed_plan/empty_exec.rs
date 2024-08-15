@@ -112,23 +112,15 @@ impl DisplayAs for NewEmptyExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
+                let name_string = format!("name={:?}", self.name);
                 let projection_string = format!(
-                    "projection={:?}",
-                    self.projection
-                        .as_ref()
-                        .map(|p| {
-                            p.iter()
-                                .map(|p| {
-                                    format!(
-                                        "{}@{} AS {}",
-                                        self.schema.field(*p).name(),
-                                        p,
-                                        self.schema.field(*p).name()
-                                    )
-                                })
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default()
+                    ", projection={:?}",
+                    self.schema
+                        .fields()
+                        .iter()
+                        .enumerate()
+                        .map(|(_, f)| f.name())
+                        .collect::<Vec<_>>()
                 );
                 let filters_string = format!(
                     ", filters={:?}",
@@ -142,7 +134,11 @@ impl DisplayAs for NewEmptyExec {
                     .map_or_else(|| "".to_string(), |l| format!(", limit={}", l));
 
                 write!(f, "NewEmptyExec: ")?;
-                write!(f, "{}{}{}", projection_string, filters_string, limit_string)
+                write!(
+                    f,
+                    "{}{}{}{}",
+                    name_string, projection_string, filters_string, limit_string
+                )
             }
         }
     }

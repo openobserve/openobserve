@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::DateTime;
+use datafusion::{catalog_common::resolve_table_references, sql::parser::DFParser};
 use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
@@ -29,6 +30,17 @@ use crate::get_config;
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
+
+/// get stream name from a sql
+pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
+    let statement = DFParser::parse_sql(sql).unwrap().pop_back().unwrap();
+    let (table_refs, _) = resolve_table_references(&statement, true)?;
+    let mut tables = Vec::new();
+    for table in table_refs {
+        tables.push(table.table().to_string());
+    }
+    Ok(tables)
+}
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]

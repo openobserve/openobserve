@@ -59,6 +59,7 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod new_sql;
 pub(crate) mod sql;
 
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);

@@ -53,6 +53,7 @@ use crate::{
 };
 
 pub mod cacher;
+pub mod flight_search;
 pub mod grpc;
 pub mod http;
 #[cfg(feature = "enterprise")]

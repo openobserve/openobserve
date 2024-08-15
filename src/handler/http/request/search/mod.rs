@@ -22,6 +22,7 @@ use config::{
     get_config,
     meta::{
         search::SearchEventType,
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -149,8 +150,8 @@ pub async fn search(
     };
 
     // get stream name
-    let parsed_sql = match config::meta::sql::Sql::new(&req.query.sql) {
-        Ok(v) => v,
+    let stream_names = match resolve_stream_names(&req.query.sql) {
+        Ok(v) => v.clone(),
         Err(e) => {
             return Ok(
                 HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
@@ -160,20 +161,23 @@ pub async fn search(
             );
         }
     };
-    let stream_name = &parsed_sql.source;
 
     // get stream settings
-    if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
-                > max_query_range
+    for stream_name in stream_names {
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
-            req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
-            range_error = format!(
-                "Query duration is modified due to query range restriction of {} hours",
-                max_query_range
-            );
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
+                    > max_query_range
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "Query duration is modified due to query range restriction of {} hours",
+                    max_query_range
+                );
+            }
         }
     }
 
