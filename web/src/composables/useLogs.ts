@@ -2369,12 +2369,7 @@ const useLogs = () => {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
-        searchObj.data.histogram.errorCode = 429;
         notificationMsg.value = "Search operation was cancelled";
-        searchObj.data.histogram.errorMsg =
-          "Error while fetching histogram data.";
-        searchObj.data.histogram.errorDetail = "Search operation was cancelled";
-
         return;
       }
 
@@ -2442,47 +2437,43 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loadingHistogram = false;
             let trace_id = "";
-            searchObj.data.histogram.errorMsg =
-              typeof err == "string" && err
-                ? err
-                : "Error while processing histogram request.";
-            if (err.response != undefined) {
-              searchObj.data.histogram.errorMsg = err.response.data.error;
-              if (err.response.data.hasOwnProperty("trace_id")) {
-                trace_id = err.response.data?.trace_id;
+            
+            if (err?.request?.status != 429) {
+              searchObj.data.histogram.errorMsg =
+                typeof err == "string" && err
+                  ? err
+                  : "Error while processing histogram request.";
+              if (err.response != undefined) {
+                searchObj.data.histogram.errorMsg = err.response.data.error;
+                if (err.response.data.hasOwnProperty("trace_id")) {
+                  trace_id = err.response.data?.trace_id;
+                }
+              } else {
+                searchObj.data.histogram.errorMsg = err.message;
+                if (err.hasOwnProperty("trace_id")) {
+                  trace_id = err?.trace_id;
+                }
               }
-            } else {
-              searchObj.data.histogram.errorMsg = err.message;
-              if (err.hasOwnProperty("trace_id")) {
-                trace_id = err?.trace_id;
-              }
-            }
 
-            const customMessage = logsErrorMessage(err?.response?.data.code);
-            searchObj.data.histogram.errorCode = err?.response?.data.code;
-            searchObj.data.histogram.errorDetail =
-              err?.response?.data?.error_detail;
-
-            if (customMessage != "") {
-              searchObj.data.histogram.errorMsg = t(customMessage);
-            }
-
-            notificationMsg.value = searchObj.data.histogram.errorMsg;
-
-            if (err?.request?.status >= 429) {
-              notificationMsg.value = err?.response?.data?.message;
-              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
+              const customMessage = logsErrorMessage(err?.response?.data.code);
+              searchObj.data.histogram.errorCode = err?.response?.data.code;
               searchObj.data.histogram.errorDetail =
                 err?.response?.data?.error_detail;
-            }
 
-            if (trace_id) {
-              searchObj.data.histogram.errorMsg +=
-                " <br><span class='text-subtitle1'>TraceID:" +
-                trace_id +
-                "</span>";
-              notificationMsg.value += " TraceID:" + trace_id;
-              trace_id = "";
+              if (customMessage != "") {
+                searchObj.data.histogram.errorMsg = t(customMessage);
+              }
+
+              notificationMsg.value = searchObj.data.histogram.errorMsg;
+
+              if (trace_id) {
+                searchObj.data.histogram.errorMsg +=
+                  " <br><span class='text-subtitle1'>TraceID:" +
+                  trace_id +
+                  "</span>";
+                notificationMsg.value += " TraceID:" + trace_id;
+                trace_id = "";
+              }
             }
 
             reject(false);
@@ -2492,8 +2483,8 @@ const useLogs = () => {
           });
       } catch (e: any) {
         dismiss();
-        searchObj.data.histogram.errorMsg = e.message;
-        searchObj.data.histogram.errorCode = e.code;
+        // searchObj.data.histogram.errorMsg = e.message;
+        // searchObj.data.histogram.errorCode = e.code;
         searchObj.loadingHistogram = false;
         notificationMsg.value = searchObj.data.histogram.errorMsg;
         showErrorNotification("Error while fetching histogram data");
