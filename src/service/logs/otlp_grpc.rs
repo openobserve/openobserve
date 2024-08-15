@@ -36,6 +36,7 @@ use prost::Message;
 
 use crate::{
     common::meta::{
+        functions::{StreamTransform, VRLResultResolver},
         ingestion::{IngestionStatus, StreamStatus},
         stream::StreamParams,
     },
@@ -61,7 +62,7 @@ pub async fn handle_grpc_request(
     let started_at = Utc::now().timestamp_micros();
 
     // check stream
-    let mut stream_name = match in_stream_name {
+    let stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
@@ -71,15 +72,10 @@ pub async fn handle_grpc_request(
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();
 
-    // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let (before_local_trans, after_local_trans, stream_vrl_map) =
-        crate::service::ingestion::register_stream_functions(
-            org_id,
-            &StreamType::Logs,
-            &stream_name,
-        );
-    // End Register Transforms for stream
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
+    let mut stream_before_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_after_functions_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
@@ -110,6 +106,16 @@ pub async fn handle_grpc_request(
     )
     .await;
     // End get user defined schema
+
+    // Start Register functions for stream
+    crate::service::ingestion::get_stream_functions(
+        &stream_params,
+        &mut stream_before_functions_map,
+        &mut stream_after_functions_map,
+        &mut stream_vrl_map,
+    )
+    .await;
+    // End Register functions for index
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
@@ -196,23 +202,27 @@ pub async fn handle_grpc_request(
                                 .into();
                     }
                 };
+                let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
-                // Start row based transform
-                if !before_local_trans.is_empty() {
-                    rec = crate::service::ingestion::apply_stream_functions(
-                        &before_local_trans,
-                        rec,
-                        &stream_vrl_map,
-                        org_id,
-                        &stream_name,
-                        &mut runtime,
-                    )?;
+                // Start row based transform before flattening the value
+                if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
+                    if !transforms.is_empty() {
+                        rec = crate::service::ingestion::apply_stream_functions(
+                            transforms,
+                            rec,
+                            &stream_vrl_map,
+                            org_id,
+                            &stream_name,
+                            &mut runtime,
+                        )?;
+                    }
                 }
-                // end row based transform
+                // end row based transformation
 
                 // flattening
                 rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
+                let mut routed_stream_name = stream_name.clone();
                 // Start re-routing if exists
                 if let Some(routings) = stream_routing_map.get(&stream_name) {
                     if !routings.is_empty() {
@@ -226,7 +236,7 @@ pub async fn handle_grpc_request(
                                 }
                             }
                             if !val.is_empty() && is_routed {
-                                stream_name = route.destination.clone();
+                                routed_stream_name = route.destination.clone();
                                 break;
                             }
                         }
@@ -234,16 +244,20 @@ pub async fn handle_grpc_request(
                 }
                 // End re-routing
 
+                let key = format!("{org_id}/{}/{routed_stream_name}", StreamType::Logs);
+
                 // Start row based transform
-                if !after_local_trans.is_empty() {
-                    rec = crate::service::ingestion::apply_stream_functions(
-                        &after_local_trans,
-                        rec,
-                        &stream_vrl_map,
-                        org_id,
-                        &stream_name,
-                        &mut runtime,
-                    )?;
+                if let Some(transforms) = stream_after_functions_map.get(&key) {
+                    if !transforms.is_empty() {
+                        rec = crate::service::ingestion::apply_stream_functions(
+                            transforms,
+                            rec,
+                            &stream_vrl_map,
+                            org_id,
+                            &routed_stream_name,
+                            &mut runtime,
+                        )?;
+                    }
                 }
                 // end row based transform
 
@@ -253,15 +267,23 @@ pub async fn handle_grpc_request(
                     _ => unreachable!(),
                 };
 
-                if let Some(fields) = user_defined_schema_map.get(&stream_name) {
+                if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
+                let function_no = stream_before_functions_map
+                    .get(&main_stream_key)
+                    .map(|v| v.len())
+                    .unwrap_or_default()
+                    + stream_after_functions_map
+                        .get(&key)
+                        .map(|v| v.len())
+                        .unwrap_or_default();
                 let (ts_data, fn_num) = json_data_by_stream
-                    .entry(stream_name.clone())
+                    .entry(routed_stream_name.clone())
                     .or_insert((Vec::new(), None));
                 ts_data.push((timestamp, local_val));
-                *fn_num = Some(after_local_trans.len() + before_local_trans.len());
+                *fn_num = Some(function_no);
             }
         }
     }
