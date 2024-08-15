@@ -499,79 +499,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center q-mr-sm">
         <div
-          data-test="scheduled-alert-period-title"
-          class="text-bold flex items-center"
-          style="width: 190px"
-        >
-          {{ t("alerts.period") + " *" }}
-          <q-icon
-            :name="outlinedInfo"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="
-              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-            "
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-            >
-              <span style="font-size: 14px"
-                >Period for which the query should run.<br />
-                e.g. 10 minutes means that whenever the query will run it will
-                use the last 10 minutes of data. If the query runs at 4:00 PM
-                then it will use the data from 3:50 PM to 4:00 PM.</span
-              >
-            </q-tooltip>
-          </q-icon>
-        </div>
-        <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
-          >
-            <div
-              data-test="scheduled-alert-period-input"
-              style="width: 87px; margin-left: 0 !important"
-              class="silence-notification-input"
-            >
-              <q-input
-                v-model="triggerData.period"
-                type="number"
-                dense
-                filled
-                min="1"
-                style="background: none"
-                @update:model-value="updateTrigger"
-              />
-            </div>
-            <div
-              data-test="scheduled-alert-period-unit"
-              style="
-                min-width: 90px;
-                margin-left: 0 !important;
-                height: 40px;
-                font-weight: normal;
-              "
-              :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-              class="flex justify-center items-center"
-            >
-              {{ t("alerts.minutes") }}
-            </div>
-          </div>
-          <div
-            data-test="scheduled-alert-period-error-text"
-            v-if="!Number(triggerData.period)"
-            class="text-red-8 q-pt-xs"
-            style="font-size: 11px; line-height: 12px"
-          >
-            Field is required!
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center q-mr-sm">
-        <div
           data-test="scheduled-alert-cron-toggle-title"
           class="text-bold flex items-center"
           style="width: 190px"
@@ -683,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 min="1"
                 style="background: none"
-                @update:model-value="updateTrigger"
+                @update:model-value="updateFrequency"
               />
               <q-input
                 data-test="scheduled-alert-cron-input-field"
@@ -692,7 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 filled
                 style="background: none"
-                @update:model-value="updateTrigger"
+                @update:model-value="updateCron"
               />
             </div>
             <div
@@ -715,8 +642,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               (!Number(triggerData.frequency) &&
                 triggerData.frequency_type == 'minutes') ||
-              (triggerData.frequency_type == 'cron' && triggerData.cron == '')
+              (triggerData.frequency_type == 'cron' &&
+                triggerData.cron == '') ||
+              cronJobError
             "
+            class="text-red-8 q-pt-xs"
+            style="font-size: 11px; line-height: 12px"
+          >
+            {{ cronJobError || "Field is required!" }}
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center q-mr-sm">
+        <div
+          data-test="scheduled-alert-period-title"
+          class="text-bold flex items-center"
+          style="width: 190px"
+        >
+          {{ t("alerts.period") + " *" }}
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >Period for which the query should run.<br />
+                e.g. 10 minutes means that whenever the query will run it will
+                use the last 10 minutes of data. If the query runs at 4:00 PM
+                then it will use the data from 3:50 PM to 4:00 PM.</span
+              >
+            </q-tooltip>
+          </q-icon>
+        </div>
+        <div style="min-height: 58px">
+          <div
+            class="flex items-center q-mr-sm"
+            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+          >
+            <div
+              data-test="scheduled-alert-period-input"
+              style="width: 87px; margin-left: 0 !important"
+              class="silence-notification-input"
+            >
+              <q-input
+                v-model="triggerData.period"
+                type="number"
+                dense
+                filled
+                min="1"
+                style="background: none"
+                v-bind:readonly="triggerData.frequency_type == 'minutes'"
+                v-bind:disable="triggerData.frequency_type == 'minutes'"
+                @update:model-value="updateTrigger"
+              />
+            </div>
+            <div
+              data-test="scheduled-alert-period-unit"
+              style="
+                min-width: 90px;
+                margin-left: 0 !important;
+                height: 40px;
+                font-weight: normal;
+              "
+              :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+              class="flex justify-center items-center"
+            >
+              {{ t("alerts.minutes") }}
+            </div>
+          </div>
+          <div
+            data-test="scheduled-alert-period-error-text"
+            v-if="!Number(triggerData.period)"
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
           >
@@ -729,7 +733,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, type Ref, defineAsyncComponent } from "vue";
+import {
+  ref,
+  watch,
+  computed,
+  type Ref,
+  defineAsyncComponent,
+  nextTick,
+} from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -741,6 +752,7 @@ import { getImageURL } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar } from "quasar";
+import cronParser from "cron-parser";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -779,6 +791,7 @@ const emits = defineEmits([
   "update:vrl_function",
   "update:showVrlFunction",
   "validate-sql",
+  "update:frequency",
 ]);
 
 const { t } = useI18n();
@@ -831,6 +844,8 @@ const getNumericColumns = computed(() => {
     });
 });
 
+const cronJobError = ref("");
+
 const filteredNumericColumns = ref(getNumericColumns.value);
 
 const addField = () => {
@@ -855,6 +870,61 @@ const updateQueryValue = (value: string) => {
 };
 
 const updateTrigger = () => {
+  emits("update:trigger", triggerData.value);
+  emits("input:update", "period", triggerData.value);
+};
+
+const updateFrequency = async () => {
+  triggerData.value.period = Number(triggerData.value.frequency);
+
+  emits("update:trigger", triggerData.value);
+  emits("input:update", "period", triggerData.value);
+};
+
+function convertCronToMinutes(cronExpression: string) {
+  cronJobError.value = "";
+  // Parse the cron expression using cron-parser
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
+
+    // Calculate the difference in milliseconds
+    const diffInMs = secondExecution.getTime() - firstExecution.getTime();
+
+    // Convert milliseconds to minutes
+    const diffInMinutes = diffInMs / (1000 * 60);
+
+    return diffInMinutes;
+  } catch (err) {
+    cronJobError.value = "Invalid cron expression";
+    return -1;
+  }
+}
+
+const updateCron = () => {
+  let minutes = 0;
+  try {
+    minutes = convertCronToMinutes(triggerData.value.cron);
+
+    if (minutes < 0) return;
+
+    // Check if the number is a float by checking if the value has a decimal part
+    if (minutes % 1 !== 0) {
+      // If it's a float, fix it to 2 decimal places
+      minutes = Number(minutes.toFixed(2));
+    } else {
+      // If it's an integer, return it as is
+      minutes = Number(minutes.toString());
+    }
+  } catch (err) {
+    console.log(err);
+    return;
+  }
+
+  triggerData.value.period = minutes;
+
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
 };

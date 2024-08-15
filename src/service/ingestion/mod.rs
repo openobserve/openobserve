@@ -149,7 +149,8 @@ pub async fn get_stream_functions<'a>(
         if stream_after_functions_map.contains_key(&key)
             || stream_before_functions_map.contains_key(&key)
         {
-            return;
+            // functions for this stream already fetched
+            continue;
         }
         //   let mut _local_trans: Vec<StreamTransform> = vec![];
         // let local_stream_vrl_map;
@@ -586,7 +587,7 @@ pub async fn get_user_defined_schema(
 
 pub fn create_log_ingestion_req(
     ingestion_type: i32,
-    data: &actix_web::web::Bytes,
+    data: &bytes::Bytes,
 ) -> Result<IngestionRequest> {
     match IngestionType::try_from(ingestion_type) {
         Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),

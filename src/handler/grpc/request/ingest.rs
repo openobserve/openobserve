@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use actix_web::http::StatusCode;
 use config::utils::json;
 use proto::cluster_rpc::{ingest_server::Ingest, IngestionRequest, IngestionResponse, StreamType};
 use tonic::{Request, Response, Status};
@@ -63,22 +64,35 @@ impl Ingest for Ingester {
                             })
                             .collect()
                     });
-                crate::service::enrichment_table::save_enrichment_data(
+                match crate::service::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,
                     true,
                 )
                 .await
-                .map_or_else(
-                    |e| {
-                        Err(anyhow::anyhow!(
-                            "Internal gPRC ingestion service errors saving enrichment data: {}",
-                            e.to_string()
-                        ))
-                    },
-                    |_| Ok(()),
-                )
+                {
+                    Err(e) => Err(anyhow::anyhow!(
+                        "Internal gPRC ingestion service errors saving enrichment data: {}",
+                        e.to_string()
+                    )),
+                    Ok(res) => {
+                        if res.status() != StatusCode::OK {
+                            let status: StatusCode = res.status();
+                            log::error!(
+                                "Internal gPRC ingestion service errors saving enrichment data: code: {}, body: {:?}",
+                                status,
+                                res.into_body()
+                            );
+                            Err(anyhow::anyhow!(
+                                "Internal gPRC ingestion service errors saving enrichment data: http code {}",
+                                status
+                            ))
+                        } else {
+                            Ok(())
+                        }
+                    }
+                }
             }
             _ => Err(anyhow::anyhow!(
                 "Internal gPRC ingestion service currently only supports Logs and EnrichmentTables",

@@ -74,7 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   v-bind:readonly="beingUpdated"
                   v-bind:disable="beingUpdated"
-                  :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                  :rules="[
+                    (val: any) =>
+                      !!val
+                        ? isValidResourceName(val) ||
+                          `Characters like :, ?, /, #, and spaces are not allowed.`
+                        : t('common.nameRequired'),
+                  ]"
                   tabindex="0"
                   style="min-width: 480px"
                 />
@@ -448,6 +454,7 @@ import {
   getTimezoneOffset,
   b64EncodeUnicode,
   b64DecodeUnicode,
+  isValidResourceName,
 } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
@@ -1177,6 +1184,7 @@ export default defineComponent({
       validateSqlQuery,
       isValidSqlQuery,
       validateSqlQueryPromise,
+      isValidResourceName,
     };
   },
 

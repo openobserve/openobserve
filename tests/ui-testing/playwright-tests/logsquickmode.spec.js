@@ -53,6 +53,7 @@ async function ingestion(page) {
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page.locator('[data-test="log-search-index-list-select-stream"]').click({ force: true });
+  
   await page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
 
@@ -147,7 +148,7 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .getByText(/_timestamp/)
+        .getByText(/kubernetes_pod_id/)
         .first()
     ).toBeVisible();
   });
@@ -184,7 +185,7 @@ test.describe("Logs Quickmode testcases", () => {
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC')
+      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
     ).toBeVisible();
 
 
@@ -273,7 +274,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=SELECT kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC'
+          'text=SELECT kubernetes_pod_id FROM "e2e_automate"'
         )
     ).toBeVisible();
   });
