@@ -30,10 +30,9 @@ use datafusion::{
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
 pub struct NewEmptyExec {
-    /// The schema for the produced row
-    schema: SchemaRef,
-    /// Number of partitions
-    partitions: usize,
+    name: String,      // table name
+    schema: SchemaRef, // The schema for the produced row
+    partitions: usize, // Number of partitions
     cache: PlanProperties,
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
@@ -43,6 +42,7 @@ pub struct NewEmptyExec {
 impl NewEmptyExec {
     /// Create a new NewEmptyExec
     pub fn new(
+        name: &str,
         schema: SchemaRef,
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
@@ -50,6 +50,7 @@ impl NewEmptyExec {
     ) -> Self {
         let cache = Self::compute_properties(Arc::clone(&schema), 1);
         NewEmptyExec {
+            name: name.to_string(),
             schema,
             partitions: 1,
             cache,
@@ -88,6 +89,10 @@ impl NewEmptyExec {
             // Execution Mode
             ExecutionMode::Bounded,
         )
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn projection(&self) -> Option<&Vec<usize>> {

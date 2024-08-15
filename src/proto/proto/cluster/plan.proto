@@ -11,21 +11,25 @@ import "datafusion/datafusion.proto";
 import "cluster/common.proto";
 
 message NewEmptyExecNode {
-    datafusion_common.Schema schema = 1;
-    repeated uint64 projection = 2;
-    repeated datafusion.LogicalExprNode filters = 3;
-    optional uint64 limit = 4;
+    string                                 name = 1;
+    datafusion_common.Schema             schema = 2;
+    repeated uint64                  projection = 3;
+    repeated datafusion.LogicalExprNode filters = 4;
+    optional uint64                       limit = 5;
 }
 
 // Search request
 message FlightSearchRequest {
-    string                    trace_id = 1;
-    int32                    partition = 2;
-    string                      org_id = 3;
-    string                 stream_type = 4;
-    bytes                         plan = 5;
-    repeated FileKey         file_list = 6;
-    int64                      timeout = 7;
-    string                  work_group = 8;
-    optional string            user_id = 9;
+    string             trace_id = 1;
+    int32             partition = 2;
+    string               org_id = 3;
+    string          stream_type = 4;
+    SearchType      search_type = 5;
+    bytes                  plan = 6;
+    repeated FileKey  file_list = 7;
+    int64            start_time = 8;
+    int64              end_time = 9;
+    int64              timeout = 10;
+    string          work_group = 11;
+    optional string    user_id = 12;
 }

@@ -2958,13 +2958,15 @@ pub mod query_cache_server {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewEmptyExecNode {
-    #[prost(message, optional, tag = "1")]
+    #[prost(string, tag = "1")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
     pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
-    #[prost(uint64, repeated, tag = "2")]
+    #[prost(uint64, repeated, tag = "3")]
     pub projection: ::prost::alloc::vec::Vec<u64>,
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag = "4")]
     pub filters: ::prost::alloc::vec::Vec<::datafusion_proto::protobuf::LogicalExprNode>,
-    #[prost(uint64, optional, tag = "4")]
+    #[prost(uint64, optional, tag = "5")]
     pub limit: ::core::option::Option<u64>,
 }
 /// Search request
@@ -2979,14 +2981,20 @@ pub struct FlightSearchRequest {
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
     pub stream_type: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", tag = "5")]
+    #[prost(enumeration = "SearchType", tag = "5")]
+    pub search_type: i32,
+    #[prost(bytes = "vec", tag = "6")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
-    #[prost(message, repeated, tag = "6")]
+    #[prost(message, repeated, tag = "7")]
     pub file_list: ::prost::alloc::vec::Vec<FileKey>,
-    #[prost(int64, tag = "7")]
+    #[prost(int64, tag = "8")]
+    pub start_time: i64,
+    #[prost(int64, tag = "9")]
+    pub end_time: i64,
+    #[prost(int64, tag = "10")]
     pub timeout: i64,
-    #[prost(string, tag = "8")]
+    #[prost(string, tag = "11")]
     pub work_group: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "9")]
+    #[prost(string, optional, tag = "12")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
 }

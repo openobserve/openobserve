@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{convert::TryInto, io::Cursor, sync::Arc};
+use std::{io::Cursor, sync::Arc};
 
 use arrow::{
     array::RecordBatch,
@@ -25,19 +25,10 @@ use arrow_flight::{
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
 use datafusion::{
-    common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
-        DataFusionError, Result,
-    },
-    datasource::{
-        file_format::parquet::ParquetFormat,
-        listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
-        TableProvider,
-    },
+    common::{DataFusionError, Result},
     physical_plan::{collect, displayable, ExecutionPlan},
     prelude::SessionContext,
 };
-use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use futures::{stream::BoxStream, TryStreamExt};
 use prost::Message;
 use tokio::{
@@ -47,12 +38,7 @@ use tokio::{
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
-use super::utils::generate_context_with_empty_table_scan;
-use crate::service::search::datafusion::distributed_plan::{
-    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-    empty_exec::NewEmptyExec,
-    remote_exec::FlightSearchRequest,
-};
+use crate::service::search::grpc::flight as grpcFlight;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -71,85 +57,26 @@ impl FlightService for FlightServiceImpl {
         &self,
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
-        let partitions = 2;
-
         // 1. decnode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
-        let request: FlightSearchRequest =
-            proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
-                .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
-                .and_then(|node| node.try_into())
-                .map_err(|e| Status::internal(e.to_string()))?;
-
-        // 2. generate context and register table
-        let ctx = generate_context_with_empty_table_scan("todo", partitions)
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
-        let file_format = ParquetFormat::default().with_enable_pruning(true);
-        let list_options = ListingOptions::new(Arc::new(file_format))
-            .with_file_extension(".parquet")
-            .with_target_partitions(partitions)
-            .with_collect_stat(true);
-        let list_url = match ListingTableUrl::parse("todo") {
-            Ok(url) => url,
-            Err(e) => {
-                return Err(DataFusionError::Execution(format!(
-                    "ListingTableUrl error: {e}"
-                )))
-                .map_err(|e| Status::internal(e.to_string()));
-            }
-        };
-        let list_config = ListingTableConfig::new(list_url)
-            .with_listing_options(list_options)
-            .infer_schema(&ctx.state())
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
-        let table = ListingTable::try_new(list_config.clone())
+        let request = proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
+            .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        // 3. generate physical plan from bytes
-        let proto = ComposedPhysicalExtensionCodec {
-            codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-        };
-        let mut physical_plan =
-            physical_plan_from_bytes_with_extension_codec(&request.plan, &ctx, &proto)
-                .map_err(|e| Status::internal(e.to_string()))?;
+        // 2. prepare dataufion context
+        let (ctx, physical_plan) = grpcFlight::search(&request)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
         let schema = physical_plan.schema();
-
-        // 4. replace empty to parquetexec
-        let mut visitor = NewEmptyExecVisitor { data: None };
-        if physical_plan.visit(&mut visitor).is_ok() && visitor.data.is_some() {
-            let empty_exec = visitor
-                .data
-                .as_ref()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<NewEmptyExec>()
-                .unwrap();
-            let parquet_exec = table
-                .scan(
-                    &ctx.state(),
-                    empty_exec.projection(),
-                    empty_exec.filters(),
-                    empty_exec.limit(),
-                )
-                .await
-                .map_err(|e| Status::internal(e.to_string()))?;
-            let mut rewriter = ChangeTableScanExec::new(parquet_exec);
-            physical_plan = physical_plan
-                .rewrite(&mut rewriter)
-                .map_err(|e| Status::internal(e.to_string()))?
-                .data;
-        }
-
         let plan = displayable(physical_plan.as_ref())
             .set_show_schema(false)
             .indent(true)
             .to_string();
         println!("follow plan\n{}", plan);
 
-        // 5. send record batch to client
+        // 3. send record batch to client
         let (tx, rx) = channel(2);
         task::spawn(async {
             if let Err(e) = read_partition(physical_plan, ctx, tx).await {
@@ -261,52 +188,4 @@ async fn read_partition(
     }
 
     Ok(())
-}
-
-struct NewEmptyExecVisitor {
-    data: Option<Arc<dyn ExecutionPlan>>,
-}
-
-impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "NewEmptyExec" {
-            self.data = Some(node.clone());
-            Ok(TreeNodeRecursion::Stop)
-        } else {
-            Ok(TreeNodeRecursion::Continue)
-        }
-    }
-}
-
-#[allow(dead_code)]
-struct ChangeTableScanExec {
-    input: Arc<dyn ExecutionPlan>,
-}
-
-impl ChangeTableScanExec {
-    #[allow(dead_code)]
-    fn new(input: Arc<dyn ExecutionPlan>) -> Self {
-        Self { input }
-    }
-}
-
-impl TreeNodeRewriter for ChangeTableScanExec {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: Self::Node) -> Result<Transformed<Self::Node>> {
-        let name = node.name().to_string();
-        let mut transformed = if name == "NewEmptyExec" {
-            Transformed::yes(self.input.clone())
-        } else {
-            Transformed::no(node)
-        };
-        if name == "NewEmptyExec" {
-            transformed.tnr = TreeNodeRecursion::Stop;
-        } else {
-            transformed.tnr = TreeNodeRecursion::Continue;
-        }
-        Ok(transformed)
-    }
 }

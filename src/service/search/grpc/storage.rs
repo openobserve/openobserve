@@ -27,57 +27,50 @@ use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{
-        datafusion::exec,
-        generate_search_schema, generate_select_start_search_schema,
-        sql::{Sql, RE_SELECT_WILDCARD},
-    },
+    search::{datafusion::exec, generate_search_schema_diff, sql::Sql},
 };
 
 type CachedFiles = (usize, usize);
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
 pub async fn search(
-    trace_id: &str,
-    sql: Arc<Sql>,
-    file_list: &[FileKey],
+    query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
-    stream_type: StreamType,
-    work_group: &str,
+    file_list: &[FileKey],
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
-    log::info!("[trace_id {trace_id}] search->storage: enter");
+    log::info!("[trace_id {}] search->storage: enter", query.trace_id);
     // fetch all schema versions, group files by version
     let schema_versions = match infra::schema::get_versions(
-        &sql.org_id,
-        &sql.stream_name,
-        stream_type,
-        sql.meta.time_range,
+        &query.org_id,
+        &query.stream_name,
+        query.stream_type,
+        query.time_range,
     )
     .instrument(enter_span.clone())
     .await
     {
         Ok(versions) => versions,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            log::error!("[trace_id {}] get schema error: {}", query.trace_id, err);
             return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                sql.stream_name.clone(),
+                query.stream_name.clone(),
             )));
         }
     };
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, get schema versions num {}",
-        &sql.org_id,
-        stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, get schema versions num {}",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         schema_versions.len()
     );
     if schema_versions.is_empty() {
@@ -85,23 +78,23 @@ pub async fn search(
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+    // let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    // let partition_time_level =
+    //     unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
+    // let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let files = match file_list.is_empty() {
         true => {
-            get_file_list(
-                trace_id,
-                &sql,
-                stream_type,
-                partition_time_level,
-                &stream_settings.partition_keys,
-            )
-            .instrument(enter_span.clone())
-            .await?
+            // TODO: get file list from remote object storage
+            vec![]
+            // get_file_list(
+            //     query.clone(),
+            //     partition_time_level,
+            //     &stream_settings.partition_keys,
+            // )
+            // .instrument(enter_span.clone())
+            // .await?
         }
         false => file_list.to_vec(),
     };
@@ -109,10 +102,11 @@ pub async fn search(
         return Ok((vec![], vec![], ScanStats::default()));
     }
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load file_list num {}",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         files.len(),
     );
 
@@ -125,7 +119,11 @@ pub async fn search(
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
             Err(err) => {
-                log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
+                log::error!(
+                    "[trace_id {}] calculate files size error: {}",
+                    query.trace_id,
+                    err
+                );
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
                 )));
@@ -148,7 +146,8 @@ pub async fn search(
                 Some(id) => id,
                 None => {
                     log::error!(
-                        "[trace_id {trace_id}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        "[trace_id {}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        query.trace_id,
                         &file.key,
                         file.meta.min_ts,
                         file.meta.max_ts
@@ -163,22 +162,23 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size
     );
 
     if cfg.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
+        super::check_memory_circuit_breaker(&query.trace_id, &scan_stats)?;
     }
 
     // load files to local cache
     let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) =
-        cache_parquet_files(trace_id, &files, &scan_stats)
+        cache_parquet_files(&query.trace_id, &files, &scan_stats)
             .instrument(enter_span.clone())
             .await?;
     if !deleted_files.is_empty() {
@@ -191,10 +191,11 @@ pub async fn search(
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
-        &sql.org_id,
-        &stream_type,
-        &sql.stream_name,
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
@@ -219,7 +220,6 @@ pub async fn search(
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     let mut tables = Vec::new();
     for (ver, files) in files_group {
@@ -228,37 +228,22 @@ pub async fn search(
         }
         let schema = schema_versions[ver].clone();
         let schema = schema.with_metadata(std::collections::HashMap::new());
-        let sql = sql.clone();
         let session = config::meta::search::Session {
-            id: format!("{trace_id}-{ver}"),
+            id: format!("{}-{ver}", query.trace_id),
             storage_type: StorageType::Memory,
-            search_type: if !sql.meta.group_by.is_empty() {
-                SearchType::Aggregation
-            } else {
-                SearchType::Normal
-            },
-            work_group: Some(work_group.to_string()),
+            search_type: SearchType::Normal, // TODO: add search_type to query
+            work_group: Some(query.work_group.to_string()),
             target_partitions,
         };
 
-        // cacluate the diff between latest schema and group schema
-        let (_, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(
-                &sql,
-                &schema,
-                &schema_latest_map,
-                &defined_schema_fields,
-            )?
-        } else {
-            generate_search_schema(&sql, &schema, &schema_latest_map)?
-        };
-
+        // TODO: leader need to match source file_list by partition key
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
         let table = exec::create_parquet_table(
             &session,
             schema_latest.clone(),
             &files,
             diff_fields,
-            &sql.meta.order_by,
+            &[], // TODO: add order_by to query
         )
         .await?;
         tables.push(table);

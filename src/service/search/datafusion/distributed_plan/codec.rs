@@ -71,6 +71,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             )
         };
         Ok(Arc::new(NewEmptyExec::new(
+            &proto.name,
             schema,
             projection.as_ref(),
             &filters,
@@ -85,6 +86,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
         let extension_codec = DefaultLogicalExtensionCodec {};
         let filters = serialize_exprs(node.filters(), &extension_codec)?;
         let proto = cluster_rpc::NewEmptyExecNode {
+            name: node.name().to_string(),
             schema: Some(node.schema().as_ref().try_into()?),
             projection: match node.projection() {
                 Some(v) => v.iter().map(|v| *v as u64).collect(),
@@ -174,6 +176,7 @@ mod tests {
     async fn test_datafusion_codec() -> Result<()> {
         let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
+            "test",
             Arc::new(schema),
             Some(&vec![0]),
             &[],
@@ -193,6 +196,7 @@ mod tests {
         let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 
         // check
+        assert_eq!(plan.name(), plan2.name());
         assert_eq!(plan.schema(), plan2.schema());
         assert_eq!(plan.projection(), plan2.projection());
         assert_eq!(plan.filters(), plan2.filters());
