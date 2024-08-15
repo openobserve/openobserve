@@ -57,7 +57,7 @@ export function useWorker() {
       );
 
       // Create a worker from the blob
-      const worker = new Worker(URL.createObjectURL(blob));
+      const worker = new Worker(URL.createObjectURL(blob), { type: "module" });
 
       console.log("Worker created", URL.createObjectURL(blob));
 
