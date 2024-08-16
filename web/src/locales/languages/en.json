@@ -685,7 +685,7 @@
     "scheduledAlert": "Scheduled alerts",
     "rtAlert": "Real time alerts",
     "noData": "No Data Ingested",
-    "findIngestion": "Find how to ingest logs >>",
+    "findIngestion": "Find how to ingest data >>",
     "ingestionMsg": "Looks like you have not ingested any data to selected organization, there are various ways in which data can be ingested, like fluentbit.",
     "inestedInSearch": "Try Log Search",
     "searchInDemoOrg": "You can explore search capbilities by switching to demo organization, to switch to demo organization, select 'Demo Organization' using organization dropdown on top.We keep ingesting dummy data to Demo Organization."
