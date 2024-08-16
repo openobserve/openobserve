@@ -453,11 +453,8 @@ impl Visitor for FieldNameVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
-        match expr {
-            Expr::Identifier(ident) => {
-                self.field_names.insert(ident.value.clone());
-            }
-            _ => {}
+        if let Expr::Identifier(ident) = expr {
+            self.field_names.insert(ident.value.clone());
         }
         ControlFlow::Continue(())
     }
