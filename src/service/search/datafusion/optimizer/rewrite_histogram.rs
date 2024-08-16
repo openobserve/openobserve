@@ -143,11 +143,11 @@ impl TreeNodeRewriter for HistogramToDatebin {
                                 Expr::Literal(ScalarValue::from(interval)),
                                 DataType::Interval(IntervalUnit::MonthDayNano),
                             )
-                        } else if let Expr::Literal(ScalarValue::IntervalDayTime(_))
-                        | Expr::Literal(ScalarValue::IntervalMonthDayNano(_))
-                        | Expr::Literal(ScalarValue::IntervalYearMonth(_)) = &args[1]
-                        {
-                            args[1].clone()
+                        } else if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
+                            cast(
+                                args[1].clone(),
+                                DataType::Interval(IntervalUnit::MonthDayNano),
+                            )
                         } else {
                             return Err(DataFusionError::Internal(format!(
                                 "Unexpected argument type in histogram function: {:?}",
@@ -220,17 +220,17 @@ mod tests {
                 ],
             ),
             (
-                "select histogram(_timestamp, INTERVAL '30 second') from t",
+                "select histogram(_timestamp, '30 second') from t",
                 vec![
-                    "+-----------------------------------------------------------------------------------------------------------------------+",
-                    "| histogram(t._timestamp,IntervalMonthDayNano(\"IntervalMonthDayNano { months: 0, days: 0, nanoseconds: 30000000000 }\")) |",
-                    "+-----------------------------------------------------------------------------------------------------------------------+",
-                    "| 1970-01-01T00:00:00                                                                                                   |",
-                    "| 1970-01-01T00:00:00                                                                                                   |",
-                    "| 1970-01-01T00:00:00                                                                                                   |",
-                    "| 1970-01-01T00:00:00                                                                                                   |",
-                    "| 1970-01-01T00:00:00                                                                                                   |",
-                    "+-----------------------------------------------------------------------------------------------------------------------+",
+                    "+-------------------------------------------+",
+                    "| histogram(t._timestamp,Utf8(\"30 second\")) |",
+                    "+-------------------------------------------+",
+                    "| 1970-01-01T00:00:00                       |",
+                    "| 1970-01-01T00:00:00                       |",
+                    "| 1970-01-01T00:00:00                       |",
+                    "| 1970-01-01T00:00:00                       |",
+                    "| 1970-01-01T00:00:00                       |",
+                    "+-------------------------------------------+",
                 ],
             ),
             (
