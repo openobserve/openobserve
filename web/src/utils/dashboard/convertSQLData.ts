@@ -174,6 +174,9 @@ export const convertSQLData = async (
   };
 
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
+
+  const processedData = processData(searchQueryData);
+
   const missingValue = () => {
     // Get the interval in minutes
     const interval = resultMetaData.value.map(
@@ -185,7 +188,7 @@ export const convertSQLData = async (
       !metadata.queries ||
       !["area-stacked", "line", "area"].includes(panelSchema.type)
     ) {
-      return JSON.parse(JSON.stringify(searchQueryData[0]));
+      return JSON.parse(JSON.stringify(processedData));
     }
 
     // Extract and process metaDataStartTime
@@ -200,7 +203,7 @@ export const convertSQLData = async (
     const intervalMillis = interval * 1000;
 
     // Identify the time-based key
-    const searchQueryDataFirstEntry = searchQueryData[0][0];
+    const searchQueryDataFirstEntry = processedData[0];
 
     const keys = [
       ...getXAxisKeys(),
@@ -213,7 +216,7 @@ export const convertSQLData = async (
     );
 
     if (!timeBasedKey) {
-      return JSON.parse(JSON.stringify(searchQueryData[0]));
+      return JSON.parse(JSON.stringify(processedData));
     }
 
     // Extract and process metaDataEndTime
@@ -235,14 +238,14 @@ export const convertSQLData = async (
 
     // Create a set of unique xAxis values
     const uniqueXAxisValues = new Set(
-      searchQueryData[0].map((d: any) => d[uniqueKey]),
+      processedData.map((d: any) => d[uniqueKey]),
     );
 
     const filledData: any = [];
     let currentTime = binnedDate;
     // Create a map of existing data
     const searchDataMap = new Map();
-    searchQueryData[0]?.forEach((d: any) => {
+    processedData?.forEach((d: any) => {
       const key =
         xAxisKeysWithoutTimeStamp.length > 0 ||
         breakdownAxisKeysWithoutTimeStamp.length > 0
