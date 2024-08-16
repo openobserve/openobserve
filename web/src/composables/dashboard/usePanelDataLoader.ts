@@ -408,10 +408,10 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value], async () => {
-
-        log('watcher: schema, time, forceLoad changed, loading data...');
-        loadData(); // Loading the data
+    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
+    async () => {
+      log("PanelSchema/Time Wather: called");
+      loadData(); // Loading the data
     },
   );
 
