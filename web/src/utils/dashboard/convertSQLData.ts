@@ -33,6 +33,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
+
 export const convertSQLData = async (
   panelSchema: any,
   searchQueryData: any,
@@ -478,7 +479,8 @@ export const convertSQLData = async (
       }
 
       return {
-        type: "category",
+        type: "log",
+        logBase: 10,
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
         // inverse data for h-stacked and h-bar
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
