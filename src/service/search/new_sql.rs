@@ -85,23 +85,32 @@ impl NewSql {
         // TODO: handle select * from table, because we want only register used field to datafusion
         // 3. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
-        for (table_name, schema) in total_schemas.iter() {
-            let mut columns = column_visitor.columns.get(table_name).unwrap().clone();
-            if !columns.contains(&get_config().common.column_timestamp) {
-                columns.insert(get_config().common.column_timestamp.clone());
-            }
-            let mut fields = Vec::with_capacity(columns.len());
-            for column in columns {
-                if let Some(field) = schema.field_with_name(&column) {
-                    fields.push(field.clone());
+        if column_visitor.is_wildcard {
+            used_schemas = total_schemas;
+        } else {
+            for (table_name, schema) in total_schemas.iter() {
+                let mut columns = match column_visitor.columns.get(table_name) {
+                    Some(columns) => columns.clone(),
+                    None => {
+                        used_schemas.insert(table_name.to_string(), schema.clone());
+                        continue;
+                    }
+                };
+                if !columns.contains(&get_config().common.column_timestamp) {
+                    columns.insert(get_config().common.column_timestamp.clone());
                 }
+                let mut fields = Vec::with_capacity(columns.len());
+                for column in columns {
+                    if let Some(field) = schema.field_with_name(&column) {
+                        fields.push(field.clone());
+                    }
+                }
+                let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+                used_schemas.insert(table_name.to_string(), Arc::new(SchemaCache::new(schema)));
             }
-            let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
-            used_schemas.insert(table_name.to_string(), Arc::new(SchemaCache::new(schema)));
         }
-
         // 3. get partition column value
-        let mut partition_column_visitor = PartitionColumnVisitor::new(&total_schemas);
+        let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         statement.visit(&mut partition_column_visitor);
 
         // 4. get match_all() value
@@ -179,6 +188,7 @@ fn generate_filter_from_equal_items(
 struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
+    is_wildcard: bool,
 }
 
 impl<'a> ColumnVisitor<'a> {
@@ -186,6 +196,7 @@ impl<'a> ColumnVisitor<'a> {
         Self {
             columns: HashMap::new(),
             schemas,
+            is_wildcard: false,
         }
     }
 }
@@ -230,6 +241,17 @@ impl<'a> Visitor for ColumnVisitor<'a> {
             _ => {}
         }
         ControlFlow::Continue(())
+    }
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            for select_item in select.projection.iter() {
+                if let sqlparser::ast::SelectItem::Wildcard(_) = select_item {
+                    self.is_wildcard = true;
+                }
+            }
+        }
+        ControlFlow::Break(())
     }
 }
 
