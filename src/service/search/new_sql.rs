@@ -185,6 +185,27 @@ impl NewSql {
     }
 }
 
+impl std::fmt::Display for NewSql {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "sql: {} \ntime_range: {:?} \norg_id: {} \nstream_type: {:?} \nstream_names: {:?} \nmatch_items: {:?} \nequal_items: {:?} \naliases: {:?} \nlimit: {} \noffset: {} \ngroup_by: {:?} \norder_by: {:?}\n",
+            self.sql,
+            self.time_range,
+            self.org_id,
+            self.stream_type,
+            self.stream_names,
+            self.match_items,
+            self.equal_items,
+            self.aliases,
+            self.limit,
+            self.offset,
+            self.group_by,
+            self.order_by
+        )
+    }
+}
+
 /// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
 /// after [("a", ["3", "4"]), ("b", ["5", "6"])]
 fn generate_filter_from_equal_items(

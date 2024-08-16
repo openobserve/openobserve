@@ -32,7 +32,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::functions::VRLResultResolver,
-    service::search::{cluster::flight_search, new_sql::NewSql},
+    service::search::{cluster::flight, new_sql::NewSql},
 };
 
 // Checks for #ResultArray#
@@ -62,7 +62,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
 
     // handle query function
     let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
-        flight_search::flight_search(&trace_id, sql.clone(), req).await?;
+        flight::search(&trace_id, sql.clone(), req).await?;
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);

@@ -54,13 +54,14 @@ use crate::{
 pub mod super_cluster;
 
 #[async_recursion]
-pub async fn flight_search(
-    _trace_id: &str,
+pub async fn search(
+    trace_id: &str,
     meta: Arc<NewSql>,
     req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
-    println!("\n\nreach flight search\n\n");
-    println!("\n\n{:?}\n\n", meta);
+    log::info!("[trace_id {trace_id}] start flight search");
+    log::info!("[trace_id {trace_id}] sql: {}", meta);
+
     let _start = std::time::Instant::now();
     let group = req
         .search_event_type
@@ -75,10 +76,6 @@ pub async fn flight_search(
     if querier_num == 0 {
         log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
-    }
-
-    for node in nodes.iter() {
-        println!("\n\nnode: {:?}\n\n", node.grpc_addr);
     }
 
     // 2. get file list
@@ -101,8 +98,6 @@ pub async fn flight_search(
     let plan = ctx.state().create_logical_plan(&meta.sql).await?;
 
     // println!("\n\nlogical plan: {:?}\n\n", plan);
-
-    let plan = ctx.state().optimize(&plan)?;
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     // println!("\n\nphysical plan: {:?}\n\n", physical_plan);
@@ -110,11 +105,16 @@ pub async fn flight_search(
     let mut rewrite = RemoteScanRewriter::new(req, partition_file_lists, nodes.clone());
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
-    let plan = displayable(physical_plan.as_ref())
-        .set_show_schema(false)
-        .indent(true)
-        .to_string();
-    println!("{}", plan);
+    if cfg.common.print_key_sql {
+        let plan = displayable(physical_plan.as_ref())
+            .set_show_schema(false)
+            .indent(true)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("leader physical plan");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
 
     let data = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx()).await?;
 

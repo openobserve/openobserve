@@ -59,6 +59,7 @@ pub async fn search(
     let work_group = req.work_group.clone();
 
     let trace_id = Arc::new(req.trace_id.to_string());
+    // TODO: timeout
     // let timeout = if req.timeout > 0 {
     //     req.timeout as u64
     // } else {
@@ -123,7 +124,7 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] grpc->search in: part_id: {}, stream: {}/{}/{}",
+        "[trace_id {trace_id}] flight->search: part_id: {}, stream: {}/{}/{}",
         req.partition,
         org_id,
         stream_type,
@@ -233,6 +234,12 @@ pub async fn search(
         .await?;
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+
+    // TODO: release wal files
+    // clear session data
+    // datafusion::storage::file_list::clear(&trace_id);
+    // release wal lock files
+    // crate::common::infra::wal::release_files(&wal_lock_files).await;
 
     Ok((ctx, physical_plan))
 }

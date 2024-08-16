@@ -57,6 +57,9 @@ impl FlightService for FlightServiceImpl {
         &self,
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
+        let _start = std::time::Instant::now();
+        let cfg = config::get_config();
+
         // 1. decnode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
@@ -64,7 +67,7 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        // println!("\nfollow request{:#?}\n", request);
+        log::info!("[trace_id {}] flight->search: do_get", request.trace_id);
 
         // 2. prepare dataufion context
         let (ctx, physical_plan) = grpcFlight::search(&request)
@@ -72,11 +75,17 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let schema = physical_plan.schema();
-        let plan = displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("follow plan\n{}", plan);
+
+        if cfg.common.print_key_sql {
+            let plan = displayable(physical_plan.as_ref())
+                .set_show_schema(false)
+                .indent(true)
+                .to_string();
+            println!("+---------------------------+----------+");
+            println!("follow physical plan");
+            println!("+---------------------------+----------+");
+            println!("{}", plan);
+        }
 
         // 3. send record batch to client
         let (tx, rx) = channel(2);
