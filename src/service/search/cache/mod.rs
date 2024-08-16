@@ -18,6 +18,7 @@ use config::{
     get_config,
     meta::{
         search,
+        sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -62,14 +63,13 @@ pub async fn search(
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let parsed_sql = match config::meta::sql::Sql::new(&origin_sql) {
-        Ok(v) => v,
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // TODO: check this
+        Ok(v) => v[0].clone(),
         Err(e) => {
             return Err(Error::Message(e.to_string()));
         }
     };
-
-    let stream_name = &parsed_sql.source;
 
     let mut req = in_req.clone();
     let mut query_fn = req
@@ -265,7 +265,7 @@ pub async fn search(
     report_request_usage_stats(
         req_stats,
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::Logs,
         UsageType::Search,
         num_fn,
