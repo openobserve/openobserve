@@ -33,7 +33,6 @@ import {
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { debounce } from "lodash-es";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -49,9 +48,9 @@ export const usePanelDataLoader = (
   searchType: any,
 ) => {
   const log = (...args: any[]) => {
-    if (true) {
-      console.log(panelSchema?.value?.title + ": ", ...args);
-    }
+    // if (true) {
+    //   console.log(panelSchema?.value?.title + ": ", ...args);
+    // }
   };
 
   const state = reactive({
