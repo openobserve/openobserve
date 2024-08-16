@@ -479,8 +479,7 @@ export const convertSQLData = async (
       }
 
       return {
-        type: "log",
-        logBase: 10,
+        type: "category",
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
         // inverse data for h-stacked and h-bar
         inverse: ["h-stacked", "h-bar"].includes(panelSchema.type),
@@ -813,6 +812,7 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
+          barMinHeight: 1,
         };
         return seriesObj;
       });
