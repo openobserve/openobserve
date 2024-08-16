@@ -31,7 +31,7 @@ use infra::{errors::Error, schema::SchemaCache};
 use proto::cluster_rpc;
 use serde::Serialize;
 use sqlparser::{
-    ast::{BinaryOperator, Expr, FunctionArguments, Query, Visit, Visitor},
+    ast::{BinaryOperator, Expr, FunctionArguments, GroupByExpr, Query, Visit, Visitor},
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -47,10 +47,13 @@ pub struct NewSql {
     pub stream_names: Vec<String>,
     pub match_items: Option<Vec<String>>, // only for single stream
     pub equal_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
+    pub aliases: Vec<(String, String)>,   // field_name, alias
     pub schemas: HashMap<String, Arc<SchemaCache>>,
     pub limit: i64,
     pub offset: i64,
     pub time_range: Option<(i64, i64)>,
+    pub group_by: Vec<String>,
+    pub order_by: Vec<(String, bool)>,
 }
 
 impl NewSql {
@@ -74,7 +77,7 @@ impl NewSql {
             total_schemas.insert(stream_name.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
-        // 2. get column name
+        // 2. get column name, alias, group by, order by
         let statement = Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
@@ -82,7 +85,13 @@ impl NewSql {
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         statement.visit(&mut column_visitor);
 
-        println!("\n\n{:?}\n\n", column_visitor.columns);
+        let aliases = column_visitor
+            .columns_alias
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let group_by = column_visitor.group_by;
+        let order_by = column_visitor.order_by;
 
         // TODO: handle select * from table, because we want only register used field to datafusion
         // 3. generate used schema
@@ -129,10 +138,13 @@ impl NewSql {
                 .is_empty()
                 .then_some(match_visitor.match_items),
             equal_items: partition_column_visitor.equal_items,
+            aliases,
             schemas: used_schemas,
             limit,
             offset,
             time_range: Some((query.start_time, query.end_time)),
+            group_by,
+            order_by,
         })
     }
 
@@ -189,16 +201,22 @@ fn generate_filter_from_equal_items(
 /// TODO: handle subquery without (table.field_name) perfix
 struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
+    columns_alias: HashSet<(String, String)>,
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
     is_wildcard: bool,
+    group_by: Vec<String>,
+    order_by: Vec<(String, bool)>, // field_name, asc
 }
 
 impl<'a> ColumnVisitor<'a> {
     fn new(schemas: &'a HashMap<String, Arc<SchemaCache>>) -> Self {
         Self {
             columns: HashMap::new(),
+            columns_alias: HashSet::new(),
             schemas,
             is_wildcard: false,
+            group_by: Vec::new(),
+            order_by: Vec::new(),
         }
     }
 }
@@ -246,10 +264,43 @@ impl<'a> Visitor for ColumnVisitor<'a> {
     }
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        if let Some(order_by) = query.order_by.as_ref() {
+            for order in order_by.exprs.iter() {
+                let mut name_visitor = FieldNameVisitor::new();
+                order.expr.visit(&mut name_visitor);
+                if name_visitor.field_names.len() == 1 {
+                    let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
+                    self.order_by.push((expr_name, order.asc.unwrap_or(true)));
+                }
+            }
+        }
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
             for select_item in select.projection.iter() {
-                if let sqlparser::ast::SelectItem::Wildcard(_) = select_item {
-                    self.is_wildcard = true;
+                match select_item {
+                    sqlparser::ast::SelectItem::ExprWithAlias { expr, alias } => {
+                        let mut name_visitor = FieldNameVisitor::new();
+                        expr.visit(&mut name_visitor);
+                        if name_visitor.field_names.len() == 1 {
+                            let expr_name =
+                                name_visitor.field_names.iter().next().unwrap().to_string();
+                            self.columns_alias
+                                .insert((expr_name, alias.value.to_string()));
+                        }
+                    }
+                    sqlparser::ast::SelectItem::Wildcard(_) => {
+                        self.is_wildcard = true;
+                    }
+                    _ => {}
+                }
+            }
+            if let GroupByExpr::Expressions(exprs, _) = &select.group_by {
+                for expr in exprs.iter() {
+                    let mut name_visitor = FieldNameVisitor::new();
+                    expr.visit(&mut name_visitor);
+                    if name_visitor.field_names.len() == 1 {
+                        let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
+                        self.group_by.push(expr_name);
+                    }
                 }
             }
         }
@@ -381,6 +432,32 @@ impl Visitor for MatchVisitor {
                     }
                 }
             }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+struct FieldNameVisitor {
+    pub field_names: HashSet<String>,
+}
+
+impl FieldNameVisitor {
+    fn new() -> Self {
+        Self {
+            field_names: HashSet::new(),
+        }
+    }
+}
+
+impl Visitor for FieldNameVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            Expr::Identifier(ident) => {
+                self.field_names.insert(ident.value.clone());
+            }
+            _ => {}
         }
         ControlFlow::Continue(())
     }
