@@ -82,6 +82,79 @@ export const convertSQLData = async (
       ? panelSchema?.queries[0]?.fields?.breakdown.map((it: any) => it.alias)
       : [];
   };
+  console.log("getBreakDownKeys", getBreakDownKeys());
+
+  const processData = (data: any[]) => {
+    // Ensure data exists and is in the expected format
+    if (!data || data.length === 0 || !Array.isArray(data[0])) {
+      console.log("No valid data available");
+      return [];
+    }
+
+    const innerDataArray = data[0];
+
+    console.log("processData", innerDataArray);
+
+    // Step 1: Count occurrences of each breakdown value
+    const breakdown: Record<string, number> = {};
+    innerDataArray.forEach((item) => {
+      const bk = item.breakdown_1 || "-";
+      const yvalue = parseInt(item.y_axis_1, 10) || 0;
+      breakdown[bk] = (breakdown[bk] || 0) + yvalue;
+    });
+
+    console.log("breakdown", breakdown);
+
+    // Step 2: Convert the breakdown counts to an array and sort by value descending
+    let countArray = Object.entries(breakdown).map(([key, value]) => ({
+      key,
+      value,
+    }));
+    countArray.sort((a, b) => b.value - a.value); // Sort by value descending
+
+    console.log("sorted countArray", countArray);
+
+    // Step 3: Extract top 2 keys
+    const topKeys = countArray.slice(0, 2).map((item) => item.key);
+    console.log("topKeys", topKeys);
+
+    // Step 4: Initialize result and other_series sums
+    const resultArray: any[] = [];
+    const othersObj: Record<string, number> = {};
+
+    // Step 5: Process the inner data array
+    innerDataArray.forEach((item) => {
+      const match = topKeys.includes(item.breakdown_1);
+
+      if (match) {
+        resultArray.push(item);
+      } else {
+        const xAxisValue = String(item.x_axis_1);
+        const yvalue = parseInt(item.y_axis_1, 10) || 0;
+        othersObj[xAxisValue] = (othersObj[xAxisValue] || 0) + yvalue;
+      }
+    });
+
+    console.log("resultArray", resultArray);
+    console.log("othersObj", othersObj);
+
+    // Step 6: Convert the 'othersObj' to an array of objects and add to resultArray
+    Object.keys(othersObj).forEach((key) => {
+      resultArray.push({
+        breakdown_1: "others",
+        x_axis_1: key,
+        y_axis_1: othersObj[key],
+      });
+    });
+
+    console.log("final resultArray", resultArray);
+
+    return resultArray;
+  };
+  console.time("processData");
+
+  console.log("processData", processData(searchQueryData));
+  console.timeEnd("processData");
 
   const getMarkLineData = (panelSchema: any) => {
     return (
@@ -274,6 +347,7 @@ export const convertSQLData = async (
   const zAxisKeys = getZAxisKeys();
 
   const breakDownKeys = getBreakDownKeys();
+  console.log("breakDownKeys-------", breakDownKeys);
 
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
