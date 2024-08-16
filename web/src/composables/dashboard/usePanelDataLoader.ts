@@ -34,6 +34,11 @@ import {
 } from "@/utils/dashboard/variables/variablesUtils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
+/**
+ * debounce time in milliseconds for panel data loader
+ */
+const PANEL_DATA_LOADER_DEBOUCE_TIME = 50;
+
 export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
@@ -110,6 +115,23 @@ export const usePanelDataLoader = (
   let abortController = new AbortController();
 
   // [START] --------- New Functions ------------------------------------------
+
+  // This function acts as a debounce and helps to reduce to continue execution
+  // with old values when too many frequent updates are made to schema
+  const waitForTimeout = (signal: AbortSignal) => {
+    return new Promise<void>((resolve, reject) => {
+      // wait for timeout
+      // and abort if abort signal received
+      const timeoutId = setTimeout(resolve, PANEL_DATA_LOADER_DEBOUCE_TIME);
+
+      // Listen to the abort signal
+      signal.addEventListener("abort", () => {
+        clearTimeout(timeoutId);
+        reject(new Error("Aborted waiting for loading"));
+      });
+    })
+  };
+
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
@@ -143,8 +165,10 @@ export const usePanelDataLoader = (
   // an async function that waits for the variables to load
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
+      log("waitForTheVariablesToLoad: entering...");
       // Immediately resolve if variables are already loaded
       if (ifPanelVariablesCompletedLoading()) {
+        log("waitForTheVariablesToLoad: variables are already loaded");
         resolve();
         return;
       }
@@ -154,6 +178,9 @@ export const usePanelDataLoader = (
         () => variablesData.value?.values,
         () => {
           if (ifPanelVariablesCompletedLoading()) {
+            log(
+              "waitForTheVariablesToLoad: variables are loaded (inside watch)",
+            );
             resolve();
             stopWatching(); // Stop watching once isVisible is true
           }
@@ -173,7 +200,7 @@ export const usePanelDataLoader = (
       log("loadData: entering...");
 
       if (abortController) {
-        log("logData: aborting previous function call (if any)");
+        log("loadData: aborting previous function call (if any)");
         abortController.abort();
       }
 
@@ -188,6 +215,10 @@ export const usePanelDataLoader = (
         state.metadata = {};
         return;
       }
+
+      log("loadData: now waiting for the timeout to avoid frequent updates");
+
+      await waitForTimeout(abortController.signal)
 
       log("loadData: now waiting for the panel to become visible");
 
