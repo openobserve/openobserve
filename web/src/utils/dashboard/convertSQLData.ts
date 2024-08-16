@@ -115,7 +115,7 @@ export const convertSQLData = async (
     console.log("sorted countArray", countArray);
 
     // Step 3: Extract top 2 keys
-    const topKeys = countArray.slice(0, 2).map((item) => item.key);
+    const topKeys = countArray.slice(0, 4).map((item) => item.key);
     console.log("topKeys", topKeys);
 
     // Step 4: Initialize result and other_series sums
@@ -151,10 +151,6 @@ export const convertSQLData = async (
 
     return resultArray;
   };
-  console.time("processData");
-
-  console.log("processData", processData(searchQueryData));
-  console.timeEnd("processData");
 
   const getMarkLineData = (panelSchema: any) => {
     return (
@@ -175,7 +171,9 @@ export const convertSQLData = async (
 
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
 
+  console.time("processData Time");
   const processedData = processData(searchQueryData);
+  console.timeEnd("processData Time");
 
   const missingValue = () => {
     // Get the interval in minutes
