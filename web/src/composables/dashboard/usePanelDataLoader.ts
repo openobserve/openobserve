@@ -405,7 +405,6 @@ export const usePanelDataLoader = (
     }
   };
 
-
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
@@ -414,7 +413,6 @@ export const usePanelDataLoader = (
       loadData(); // Loading the data
     },
   );
-
 
   /**
    * Replaces the query with the corresponding variable values.
