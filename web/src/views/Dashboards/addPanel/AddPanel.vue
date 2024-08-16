@@ -420,21 +420,18 @@ export default defineComponent({
     // let isVariablesLoadedInitially = false
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
-      console.log("variablesDataUpdated", JSON.stringify(variablesData, null, 2));
-      
+
       // when this is called 1st time, we need to set the data for the updated variables data as well
       // from the second time, it will only be updated after the apply button is clicked
       if (
         !updatedVariablesData?.values?.length    // Previous value of variables is empty
         && variablesData?.values?.length > 0       // new values of variables is NOT empty
-        && variablesData?.isVariablesLoading === false  // new values indicate that values are loaded
-        && variablesData?.values?.every((v: any) => v?.isVariableLoadingPending === false)
-      ) { // and all dependent are also loaded
-          // assing the variables values so the panel can load for the first time
+      ) {
+          // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
           Object.assign(updatedVariablesData, variablesData);
-
       }
     };
+
     const currentDashboardData: any = reactive({
       data: {},
     });
