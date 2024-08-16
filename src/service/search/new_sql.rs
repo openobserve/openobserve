@@ -82,6 +82,8 @@ impl NewSql {
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         statement.visit(&mut column_visitor);
 
+        println!("\n\n{:?}\n\n", column_visitor.columns);
+
         // TODO: handle select * from table, because we want only register used field to datafusion
         // 3. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
@@ -251,7 +253,7 @@ impl<'a> Visitor for ColumnVisitor<'a> {
                 }
             }
         }
-        ControlFlow::Break(())
+        ControlFlow::Continue(())
     }
 }
 
