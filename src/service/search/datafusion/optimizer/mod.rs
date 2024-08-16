@@ -50,8 +50,15 @@ pub fn generate_optimizer_rules(
     req: &cluster_rpc::SearchRequest,
 ) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
     let query = req.query.as_ref().unwrap();
-    // TODO: check limit
-    let limit = query.size as usize;
+    let limit = if query.size > config::QUERY_WITH_NO_LIMIT {
+        if query.size > 0 {
+            Some(query.size as usize)
+        } else {
+            Some(config::get_config().limit.query_default_limit as usize)
+        }
+    } else {
+        None
+    };
     let offest = query.from as usize;
     let start_time = query.start_time;
     let end_time = query.end_time;
@@ -66,48 +73,52 @@ pub fn generate_optimizer_rules(
         fields.insert(name.clone(), fts_fields);
     }
 
-    vec![
-        Arc::new(EliminateNestedUnion::new()),
-        Arc::new(SimplifyExpressions::new()),
-        Arc::new(UnwrapCastInComparison::new()),
-        Arc::new(ReplaceDistinctWithAggregate::new()),
-        Arc::new(EliminateJoin::new()),
-        Arc::new(DecorrelatePredicateSubquery::new()),
-        Arc::new(ScalarSubqueryToJoin::new()),
-        Arc::new(ExtractEquijoinPredicate::new()),
-        // simplify expressions does not simplify expressions in subqueries, so we
-        // run it again after running the optimizations that potentially converted
-        // subqueries to joins
-        Arc::new(SimplifyExpressions::new()),
-        Arc::new(RewriteDisjunctivePredicate::new()),
-        Arc::new(EliminateDuplicatedExpr::new()),
-        Arc::new(EliminateFilter::new()),
-        Arc::new(EliminateCrossJoin::new()),
-        Arc::new(CommonSubexprEliminate::new()),
-        Arc::new(EliminateLimit::new()),
-        Arc::new(PropagateEmptyRelation::new()),
-        // Must be after PropagateEmptyRelation
-        Arc::new(EliminateOneUnion::new()),
-        Arc::new(FilterNullJoinKeys::default()),
-        Arc::new(EliminateOuterJoin::new()),
-        // *********** custom rules ***********
-        Arc::new(RewriteHistogram::new(start_time, end_time)),
-        Arc::new(RewriteMatch::new(fields)),
-        Arc::new(AddSortAndLimitRule::new(limit, offest)),
-        Arc::new(AddTimestampRule::new(start_time, end_time)),
-        // ************************************
+    let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
+    rules.push(Arc::new(EliminateNestedUnion::new()));
+    rules.push(Arc::new(SimplifyExpressions::new()));
+    rules.push(Arc::new(UnwrapCastInComparison::new()));
+    rules.push(Arc::new(ReplaceDistinctWithAggregate::new()));
+    rules.push(Arc::new(EliminateJoin::new()));
+    rules.push(Arc::new(DecorrelatePredicateSubquery::new()));
+    rules.push(Arc::new(ScalarSubqueryToJoin::new()));
+    rules.push(Arc::new(ExtractEquijoinPredicate::new()));
+    // simplify expressions does not simplify expressions in subqueries, so we
+    // run it again after running the optimizations that potentially converted
+    // subqueries to joins
+    rules.push(Arc::new(SimplifyExpressions::new()));
+    rules.push(Arc::new(RewriteDisjunctivePredicate::new()));
+    rules.push(Arc::new(EliminateDuplicatedExpr::new()));
+    rules.push(Arc::new(EliminateFilter::new()));
+    rules.push(Arc::new(EliminateCrossJoin::new()));
+    rules.push(Arc::new(CommonSubexprEliminate::new()));
+    rules.push(Arc::new(EliminateLimit::new()));
+    rules.push(Arc::new(PropagateEmptyRelation::new()));
+    // Must be after PropagateEmptyRelation
+    rules.push(Arc::new(EliminateOneUnion::new()));
+    rules.push(Arc::new(FilterNullJoinKeys::default()));
+    rules.push(Arc::new(EliminateOuterJoin::new()));
 
-        // Filters can't be pushed down past Limits, we should do PushDownFilter after
-        // PushDownLimit
-        Arc::new(PushDownLimit::new()),
-        Arc::new(PushDownFilter::new()),
-        Arc::new(SingleDistinctToGroupBy::new()),
-        // The previous optimizations added expressions and projections,
-        // that might benefit from the following rules
-        Arc::new(SimplifyExpressions::new()),
-        Arc::new(UnwrapCastInComparison::new()),
-        Arc::new(CommonSubexprEliminate::new()),
-        Arc::new(EliminateGroupByConstant::new()),
-        Arc::new(OptimizeProjections::new()),
-    ]
+    // *********** custom rules ***********
+    rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
+    rules.push(Arc::new(RewriteMatch::new(fields)));
+    if let Some(limit) = limit {
+        rules.push(Arc::new(AddSortAndLimitRule::new(limit, offest)));
+    };
+    rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
+    // ************************************
+
+    // Filters can't be pushed down past Limits, we should do PushDownFilter after
+    // PushDownLimit
+    rules.push(Arc::new(PushDownLimit::new()));
+    rules.push(Arc::new(PushDownFilter::new()));
+    rules.push(Arc::new(SingleDistinctToGroupBy::new()));
+    // The previous optimizations added expressions and projections,
+    // that might benefit from the following rules
+    rules.push(Arc::new(SimplifyExpressions::new()));
+    rules.push(Arc::new(UnwrapCastInComparison::new()));
+    rules.push(Arc::new(CommonSubexprEliminate::new()));
+    rules.push(Arc::new(EliminateGroupByConstant::new()));
+    rules.push(Arc::new(OptimizeProjections::new()));
+
+    rules
 }

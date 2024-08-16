@@ -100,7 +100,16 @@ pub async fn search(
     // println!("\n\nlogical plan: {:?}\n\n", plan);
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
-    // println!("\n\nphysical plan: {:?}\n\n", physical_plan);
+    if cfg.common.print_key_sql {
+        let plan = displayable(physical_plan.as_ref())
+            .set_show_schema(false)
+            .indent(true)
+            .to_string();
+        println!("+---------------------------+----------+");
+        println!("leader physical plan before rewrite");
+        println!("+---------------------------+----------+");
+        println!("{}", plan);
+    }
 
     let mut rewrite = RemoteScanRewriter::new(req, partition_file_lists, nodes.clone());
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
@@ -111,7 +120,7 @@ pub async fn search(
             .indent(true)
             .to_string();
         println!("+---------------------------+----------+");
-        println!("leader physical plan");
+        println!("leader physical plan after rewrite");
         println!("+---------------------------+----------+");
         println!("{}", plan);
     }

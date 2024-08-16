@@ -61,6 +61,9 @@ impl TableProvider for NewUnionTable {
         if self.tables.is_empty() {
             return Ok(Arc::new(EmptyExec::new(self.schema())));
         }
+        if self.tables.len() == 1 {
+            return self.tables[0].scan(state, projection, filters, limit).await;
+        }
         let mut table_plans = Vec::new();
         for table in self.tables.iter() {
             let plan = table.scan(state, projection, filters, limit).await?;

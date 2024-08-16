@@ -60,6 +60,10 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
+        if self.limit == 0 {
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        }
+
         let is_complex = plan.exists(|plan| Ok(is_complex_query(plan)))?;
         let mut is_stop = true;
         let (mut transformed, schema) = match plan {
