@@ -263,7 +263,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             }
         }
     } else {
-        log::debug!(
+        log::info!(
             "Alert conditions not satisfied, org: {}, module_key: {}",
             &new_trigger.org,
             &new_trigger.module_key
@@ -376,7 +376,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     let now = Utc::now().timestamp_micros();
     match report.send_subscribers().await {
         Ok(_) => {
-            log::debug!("Report send_subscribers done, report: {}", report_name);
+            log::info!("Report {} sent to destination", report_name);
             // Report generation successful, update the trigger
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
@@ -566,13 +566,13 @@ async fn handle_derived_stream_triggers(
             .map(json::Value::Object)
             .collect::<Vec<_>>();
         if local_val.is_empty() {
-            log::debug!(
-                "DerivedStream conditions not satisfied, org: {}, module_key: {}",
+            log::info!(
+                "DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
                 &new_trigger.org,
                 &new_trigger.module_key
             );
             db::scheduler::update_trigger(new_trigger).await?;
-            trigger_data_stream.status = TriggerDataStatus::Completed;
+            trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
         } else {
             // Ingest result into destination stream
             let (org_id, stream_name, stream_type): (String, String, i32) = {
@@ -632,7 +632,7 @@ async fn handle_derived_stream_triggers(
             }
         }
     } else {
-        log::debug!(
+        log::info!(
             "DerivedStream conditions not satisfied, org: {}, module_key: {}",
             &new_trigger.org,
             &new_trigger.module_key
