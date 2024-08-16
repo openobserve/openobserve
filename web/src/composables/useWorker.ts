@@ -40,8 +40,6 @@ export function useWorker() {
       // Convert the function to a string
       const functionString = workerFunction.toString();
 
-      console.log("Creating worker", functionString);
-
       // Create a blob with the worker's code
       const blob = new Blob(
         [
@@ -58,8 +56,6 @@ export function useWorker() {
 
       // Create a worker from the blob
       const worker = new Worker(URL.createObjectURL(blob), { type: "module" });
-
-      console.log("Worker created", URL.createObjectURL(blob));
 
       // Send the data to the worker
       worker.postMessage(data);
