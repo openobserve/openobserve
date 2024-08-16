@@ -417,7 +417,6 @@ export default defineComponent({
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
 
-    // let isVariablesLoadedInitially = false
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
 
