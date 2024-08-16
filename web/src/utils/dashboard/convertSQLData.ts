@@ -1515,8 +1515,6 @@ export const convertSQLData = async (
           return (b.value[1] || 0) - (a.value[1] || 0);
         });
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
@@ -1524,10 +1522,15 @@ export const convertSQLData = async (
               it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // if hovered series index is not -1 then take it to very first position
+          if (currentSeriesIndex != -1) {
+            // shift all series to next position and place current series at first position
+            const temp = name[currentSeriesIndex];
+            for (let i = currentSeriesIndex; i > 0; i--) {
+              name[i] = name[i - 1];
+            }
+            name[0] = temp;
+          }
         }
         const hoverText: string[] = [];
         name.forEach((it: any) => {
