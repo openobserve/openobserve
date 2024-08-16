@@ -118,16 +118,15 @@ export const usePanelDataLoader = (
 
   // This function acts as a debounce and helps to reduce to continue execution
   // with old values when too many frequent updates are made to schema
-  const waitForTimeout = (signal: any) => {
+  const waitForTimeout = (signal: AbortSignal) => {
     return new Promise<void>((resolve, reject) => {
       // wait for timeout
       // and abort if abort signal received
-      setTimeout(() => {
-          resolve();
-      }, PANEL_DATA_LOADER_DEBOUCE_TIME);
+      const timeoutId = setTimeout(resolve, PANEL_DATA_LOADER_DEBOUCE_TIME);
 
       // Listen to the abort signal
       signal.addEventListener("abort", () => {
+        clearTimeout(timeoutId);
         reject(new Error("Aborted waiting for loading"));
       });
     })
