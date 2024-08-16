@@ -180,7 +180,7 @@ fn generate_limit_and_sort_plan(
     limit: usize,
     skip: usize,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let (sort, schema) = generate_sort_plan(input, limit);
+    let (sort, schema) = generate_sort_plan(input, limit + skip);
     (
         LogicalPlan::Limit(Limit {
             skip,

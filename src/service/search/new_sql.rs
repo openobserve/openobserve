@@ -19,9 +19,12 @@ use std::{
     sync::Arc,
 };
 
-use config::meta::{
-    sql::resolve_stream_names,
-    stream::{FileKey, StreamPartition, StreamType},
+use config::{
+    get_config,
+    meta::{
+        sql::resolve_stream_names,
+        stream::{FileKey, StreamPartition, StreamType},
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{errors::Error, schema::SchemaCache};
@@ -83,10 +86,13 @@ impl NewSql {
         // 3. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         for (table_name, schema) in total_schemas.iter() {
-            let columns = column_visitor.columns.get(table_name).unwrap();
+            let mut columns = column_visitor.columns.get(table_name).unwrap().clone();
+            if !columns.contains(&get_config().common.column_timestamp) {
+                columns.insert(get_config().common.column_timestamp.clone());
+            }
             let mut fields = Vec::with_capacity(columns.len());
             for column in columns {
-                if let Some(field) = schema.field_with_name(column) {
+                if let Some(field) = schema.field_with_name(&column) {
                     fields.push(field.clone());
                 }
             }

@@ -66,7 +66,6 @@ impl OptimizerRule for RewriteMatch {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        println!("\n\n start rewrite \n\n");
         match plan {
             LogicalPlan::Filter(_) => {
                 if plan
