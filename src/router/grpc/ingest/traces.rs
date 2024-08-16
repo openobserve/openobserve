@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use config::ider::uuid;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_client::TraceServiceClient, trace_service_server::TraceService,
     ExportTraceServiceRequest, ExportTraceServiceResponse,
@@ -33,7 +34,7 @@ impl TraceService for TraceServer {
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
         let start = std::time::Instant::now();
-        let (metadata, extensions, message) = request.into_parts();
+        let (mut metadata, extensions, message) = request.into_parts();
 
         let cfg = config::get_config();
         // basic validation
@@ -43,7 +44,8 @@ impl TraceService for TraceServer {
                 &cfg.grpc.org_header_key
             )));
         }
-
+        let trace_id = uuid();
+        metadata.insert("in_trace_id", trace_id.parse().unwrap());
         // call ingester
         let mut request = Request::from_parts(metadata, extensions, message);
         opentelemetry::global::get_text_map_propagator(|propagator| {
@@ -80,7 +82,7 @@ impl TraceService for TraceServer {
             }
             Err(e) => {
                 let time = start.elapsed().as_millis() as usize;
-                log::error!("[Router:TRACES] export status: {e}, took: {time} ms");
+                log::error!("[Router:TRACES] [{trace_id}] export status: {e}, took: {time} ms");
                 Err(e)
             }
         }

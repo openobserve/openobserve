@@ -399,6 +399,13 @@ pub async fn write_file(
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
 ) -> RequestStats {
+    let mut in_trace_id = "";
+    let mut stream_name = stream_name;
+    if stream_name.contains("@") {
+        let s: Vec<_> = stream_name.split('@').collect();
+        stream_name = s[0];
+        in_trace_id = s[1];
+    }
     let mut req_stats = RequestStats::default();
     for (hour_key, entry) in buf {
         if entry.records.is_empty() {
@@ -416,6 +423,7 @@ pub async fn write_file(
                     data_size: entry.records_size,
                 },
                 false,
+                in_trace_id,
             )
             .await
         {

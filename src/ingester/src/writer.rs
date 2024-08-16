@@ -110,7 +110,7 @@ pub async fn check_ttl() -> Result<()> {
         let w = w.read().await;
         for r in w.values() {
             // check writer
-            r.write(Arc::new(Schema::empty()), Entry::default(), true)
+            r.write(Arc::new(Schema::empty()), Entry::default(), true, "")
                 .await?;
         }
     }
@@ -173,6 +173,7 @@ impl Writer {
         schema: Arc<Schema>,
         mut entry: Entry,
         check_ttl: bool,
+        in_trace_id: &str,
     ) -> Result<()> {
         if entry.data.is_empty() && !check_ttl {
             return Ok(());
@@ -187,11 +188,14 @@ impl Writer {
         let start = std::time::Instant::now();
         let mut wal = self.wal.lock().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
+        log::info!("[{in_trace_id}] wal lock done: {wal_lock_time}",);
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
+
         let mut mem = self.memtable.write().await;
         let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
+        log::info!("[{in_trace_id}] mem lock done: {mem_lock_time}",);
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
@@ -207,7 +211,7 @@ impl Writer {
                 .join("logs")
                 .join(self.idx.to_string());
             log::info!(
-                "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
+                "[INGESTER:MEM] [{in_trace_id}] create file: {}/{}/{}/{}.wal",
                 wal_dir.display().to_string(),
                 &self.key.org_id,
                 &self.key.stream_type,
@@ -233,19 +237,28 @@ impl Writer {
             let path = old_wal.path().clone();
             let path_str = path.display().to_string();
             let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-            log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
+            log::info!(
+                "[INGESTER:MEM] [{in_trace_id}] start add to IMMUTABLES, file: {}",
+                path_str,
+            );
             IMMUTABLES.write().await.insert(path, table);
-            log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
+            log::info!(
+                "[INGESTER:MEM] [{in_trace_id}] dones add to IMMUTABLES, file: {}",
+                path_str
+            );
         }
 
         if !check_ttl {
             // write into wal
+            log::info!("[check_ttl] [{in_trace_id}] start wal write");
             wal.write(&entry_bytes, false).context(WalSnafu)?;
+            log::info!("[check_ttl] [{in_trace_id}] end wal write");
             // write into memtable
             let Some(entry_batch) = entry_batch else {
                 return Ok(());
             };
             mem.write(schema, entry, entry_batch)?;
+            log::info!("[check_ttl] [{in_trace_id}] start mem write");
         }
 
         Ok(())

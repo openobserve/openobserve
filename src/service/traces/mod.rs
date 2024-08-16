@@ -72,6 +72,7 @@ pub async fn handle_trace_request(
     request: ExportTraceServiceRequest,
     is_grpc: bool,
     in_stream_name: Option<&str>,
+    in_trace_id: &str,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -304,13 +305,14 @@ pub async fn handle_trace_request(
         return format_response(partial_success);
     }
 
-    let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error while writing traces: {}", e);
-            return format_response(partial_success);
-        }
-    };
+    let mut req_stats =
+        match write_traces(org_id, &traces_stream_name, json_data, in_trace_id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error while writing traces: {}", e);
+                return format_response(partial_success);
+            }
+        };
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
@@ -409,6 +411,7 @@ async fn write_traces(
     org_id: &str,
     stream_name: &str,
     json_data: Vec<(i64, json::Map<String, json::Value>)>,
+    in_trace_id: &str,
 ) -> Result<RequestStats, Error> {
     let cfg = get_config();
     // get schema and stream settings
@@ -551,14 +554,17 @@ async fn write_traces(
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-
+    log::info!("[{in_trace_id}]get_writer writer start");
     // write data to wal
     let writer = ingester::get_writer(org_id, &StreamType::Traces.to_string(), stream_name).await;
-    let req_stats = write_file(&writer, stream_name, data_buf).await;
+    log::info!("[{in_trace_id}]get_writer writer end");
+    let stream_name = format!("{stream_name}@{in_trace_id}");
+    let req_stats = write_file(&writer, stream_name.as_str(), data_buf).await;
+    log::info!("[{in_trace_id}]write_file end");
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-
+    log::info!("[{in_trace_id}]writer sync end");
     // send distinct_values
     if !distinct_values.is_empty() {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {

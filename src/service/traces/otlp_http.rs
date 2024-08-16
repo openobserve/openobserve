@@ -56,7 +56,7 @@ pub async fn traces_proto(
             )));
         }
     };
-    super::handle_trace_request(org_id, request, false, in_stream_name).await
+    super::handle_trace_request(org_id, request, false, in_stream_name, "").await
 }
 
 pub async fn traces_json(
@@ -376,7 +376,8 @@ pub async fn traces_json(
         return format_response(partial_success);
     }
 
-    let mut req_stats = match super::write_traces(org_id, &traces_stream_name, json_data).await {
+    let mut req_stats = match super::write_traces(org_id, &traces_stream_name, json_data, "").await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error while writing traces: {}", e);

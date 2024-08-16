@@ -349,7 +349,7 @@ async fn query_range(
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!("parse time error: {}, query: {:?}", e, req.query);
                 return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
                     status: promql::Status::Error,
                     data: None,
@@ -364,7 +364,11 @@ async fn query_range(
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!(
+                    "parse time error: {}, req start: {start} query: {:?}",
+                    e,
+                    req.query
+                );
                 return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
                     status: promql::Status::Error,
                     data: None,
@@ -374,12 +378,17 @@ async fn query_range(
             }
         },
     };
+
     let mut step = match req.step {
         None => 0,
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v * 1_000) as i64,
             Err(e) => {
-                log::error!("parse time error: {}", e);
+                log::error!(
+                    "parse time error: {}, req start: {start} end: {end} query: {:?}",
+                    e,
+                    req.query
+                );
                 return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
                     status: promql::Status::Error,
                     data: None,

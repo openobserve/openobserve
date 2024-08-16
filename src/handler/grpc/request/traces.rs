@@ -16,7 +16,7 @@
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
-use tonic::{codegen::*, Response, Status};
+use tonic::{codegen::*, metadata::MetadataValue, Response, Status};
 
 use crate::service::traces::handle_trace_request;
 
@@ -50,12 +50,20 @@ impl TraceService for TraceServer {
         if let Some(stream_name) = stream_name {
             in_stream_name = Some(stream_name.to_str().unwrap());
         };
-
+        let t = config::ider::uuid()
+            .parse::<MetadataValue<tonic::metadata::Ascii>>()
+            .unwrap();
+        let in_trace_id = metadata
+            .get("in_trace_id")
+            .unwrap_or(&t)
+            .to_str()
+            .unwrap_or("");
         let resp = handle_trace_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             true,
             in_stream_name,
+            in_trace_id,
         )
         .await;
         if resp.is_ok() {
