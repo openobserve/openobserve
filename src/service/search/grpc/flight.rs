@@ -72,7 +72,7 @@ pub async fn search(
     let sort_by_timestamp_desc = false;
     let target_partitions = cfg.limit.cpu_num; // TODO: need to calculate by if we can cache all the  parquet file 
     let limit = None;
-    let mut ctx = prepare_datafusion_context(
+    let ctx = prepare_datafusion_context(
         Some(work_group.clone()),
         &search_type,
         without_optimizer,
@@ -83,7 +83,7 @@ pub async fn search(
     .await?;
 
     // register UDF
-    register_udf(&mut ctx, &org_id).await;
+    register_udf(&ctx, &org_id).await;
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {

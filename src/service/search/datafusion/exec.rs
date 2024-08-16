@@ -85,7 +85,7 @@ pub async fn _sql(
 
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
-    let mut ctx = if !file_type.eq(&FileType::ARROW) {
+    let ctx = if !file_type.eq(&FileType::ARROW) {
         register_table(
             session,
             schema.clone(),
@@ -120,7 +120,7 @@ pub async fn _sql(
     };
 
     // register UDF
-    register_udf(&mut ctx, &sql.org_id).await;
+    register_udf(&ctx, &sql.org_id).await;
 
     // query sql
     let result = exec_query(&ctx, session, sql).await?;
@@ -222,11 +222,10 @@ pub async fn merge_partitions(
         return Ok(vec![]);
     }
 
-    let mut ctx =
-        prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None).await?;
 
     // register UDF
-    register_udf(&mut ctx, org_id).await;
+    register_udf(&ctx, org_id).await;
 
     // Debug SQL
     let cfg = get_config();
@@ -648,7 +647,7 @@ pub async fn prepare_datafusion_context(
     }
 }
 
-pub async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
+pub async fn register_udf(ctx: &SessionContext, _org_id: &str) {
     ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
     ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
@@ -666,6 +665,10 @@ pub async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::udf::cast_to_arr_udf::CAST_TO_ARR_UDF.clone());
     ctx.register_udf(super::udf::spath_udf::SPATH_UDF.clone());
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
+    ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
 
     {
         let udf_list = get_all_transform(_org_id).await;
@@ -813,7 +816,7 @@ pub async fn query_tables(
     let start = std::time::Instant::now();
     let trace_id = session.id.clone();
 
-    let mut ctx = prepare_datafusion_context(
+    let ctx = prepare_datafusion_context(
         session.work_group.clone(),
         &session.search_type,
         false,
@@ -824,7 +827,7 @@ pub async fn query_tables(
     .await?;
 
     // register UDF
-    register_udf(&mut ctx, &sql.org_id).await;
+    register_udf(&ctx, &sql.org_id).await;
 
     // regsiter union table
     let union_table = Arc::new(NewUnionTable::try_new(schema, tables)?);

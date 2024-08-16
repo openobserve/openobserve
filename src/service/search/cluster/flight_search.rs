@@ -28,7 +28,10 @@ use config::{
     },
 };
 use datafusion::{
-    common::tree_node::TreeNode, physical_plan::displayable, prelude::SessionContext,
+    common::tree_node::TreeNode,
+    execution::{runtime_env::RuntimeEnv, session_state::SessionStateBuilder},
+    physical_plan::displayable,
+    prelude::SessionContext,
 };
 use infra::{
     errors::{Error, Result},
@@ -40,8 +43,8 @@ use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
         datafusion::{
-            distributed_plan::rewrite::RemoteScanRewriter,
-            table_provider::empty_table::NewEmptyTable,
+            distributed_plan::rewrite::RemoteScanRewriter, exec::register_udf,
+            optimizer::generate_optimizer_rules, table_provider::empty_table::NewEmptyTable,
         },
         new_sql::NewSql,
     },
@@ -89,7 +92,7 @@ pub async fn flight_search(
     // println!("\n\n partition file lists: {:?}\n\n", partition_file_lists);
 
     // 4. construct physical plan
-    let ctx = generate_context(&req, cfg.limit.cpu_num).await?;
+    let ctx = generate_context(&req, &meta, cfg.limit.cpu_num).await?;
 
     // 5. register table
     register_table(&ctx, &meta).await?;
@@ -329,7 +332,8 @@ pub(crate) async fn partition_file_by_hash(
 }
 
 pub async fn generate_context(
-    _req: &SearchRequest,
+    req: &SearchRequest,
+    meta: &Arc<NewSql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
     let mut session_config =
@@ -339,7 +343,19 @@ pub async fn generate_context(
         .execution
         .listing_table_ignore_subdirectory = false;
     session_config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
-    Ok(SessionContext::new_with_config(session_config))
+
+    let runtime = Arc::new(RuntimeEnv::default());
+    let state = SessionStateBuilder::new()
+        .with_config(session_config)
+        .with_runtime_env(runtime)
+        .with_default_features()
+        .with_optimizer_rules(generate_optimizer_rules(meta, req))
+        .build();
+    let ctx = SessionContext::new_with_state(state);
+
+    register_udf(&ctx, &req.org_id).await;
+
+    Ok(ctx)
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
