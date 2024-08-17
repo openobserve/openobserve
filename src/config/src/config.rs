@@ -288,6 +288,37 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
+pub static SNS_CLIENT: Lazy<aws_sdk_sns::Client> = Lazy::new(|| {
+    let cfg = get_config();
+
+    let region = aws_config::Region::new(cfg.sns.region_name.clone());
+    let mut config_builder = aws_sdk_sns::config::Builder::new()
+        .region(region)
+        .endpoint_url(cfg.sns.endpoint.clone());
+
+    if !cfg.sns.use_default_credentials {
+        let credentials = aws_sdk_sns::config::Credentials::new(
+            cfg.sns.access_key.clone(),
+            cfg.sns.secret_key.clone(),
+            None,              // Session token
+            None,              // Expiration
+            "openobserve-sns", // Provider name
+        );
+        config_builder = config_builder.credentials_provider(credentials);
+    }
+
+    config_builder = config_builder.timeout_config(
+        aws_config::timeout::TimeoutConfig::builder()
+            .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
+            .operation_timeout(std::time::Duration::from_secs(cfg.sns.operation_timeout))
+            .build(),
+    );
+
+    let config = config_builder.build();
+
+    aws_sdk_sns::Client::from_conf(config)
+});
+
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
     let blocked_streams = get_config()
         .common
@@ -314,6 +345,7 @@ pub struct Config {
     pub etcd: Etcd,
     pub nats: Nats,
     pub s3: S3,
+    pub sns: Sns,
     pub tcp: TCP,
     pub prom: Prometheus,
     pub profiling: Pyroscope,
@@ -1169,6 +1201,28 @@ pub struct S3 {
 }
 
 #[derive(Debug, EnvConfig)]
+pub struct Sns {
+    #[env_config(name = "ZO_SNS_REGION_NAME", default = "")]
+    pub region_name: String,
+    #[env_config(name = "ZO_SNS_ACCESS_KEY", default = "")]
+    pub access_key: String,
+    #[env_config(name = "ZO_SNS_SECRET_KEY", default = "")]
+    pub secret_key: String,
+    #[env_config(name = "ZO_SNS_ENDPOINT", default = "")]
+    pub endpoint: String,
+    #[env_config(name = "ZO_SNS_CONNECT_TIMEOUT", default = 10)] // seconds
+    pub connect_timeout: u64,
+    #[env_config(name = "ZO_SNS_OPERATION_TIMEOUT", default = 30)] // seconds
+    pub operation_timeout: u64,
+    #[env_config(name = "ZO_SNS_MAX_RETRIES", default = 3)]
+    pub max_retries: u32,
+    #[env_config(name = "ZO_SNS_USE_DEFAULT_CREDENTIALS", default = true)]
+    pub use_default_credentials: bool,
+    #[env_config(name = "ZO_SNS_ALLOW_INVALID_CERTIFICATES", default = false)]
+    pub allow_invalid_certificates: bool,
+}
+
+#[derive(Debug, EnvConfig)]
 pub struct Prometheus {
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
@@ -1306,6 +1360,11 @@ pub fn init() -> Config {
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
+    }
+
+    // check sns config
+    if let Err(e) = check_sns_config(&mut cfg) {
+        panic!("sns config error: {e}");
     }
 
     cfg
@@ -1673,6 +1732,69 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // Validate and set default region if not provided
+    if cfg.sns.region_name.is_empty() {
+        cfg.sns.region_name = "us-east-1".to_string(); // Default to us-east-1 if not specified
+        log::warn!("SNS region not specified, defaulting to us-east-1");
+    }
+
+    // Validate endpoint URL if provided
+    if !cfg.sns.endpoint.is_empty() {
+        if !cfg.sns.endpoint.starts_with("http://") && !cfg.sns.endpoint.starts_with("https://") {
+            return Err(anyhow::anyhow!(
+                "Invalid SNS endpoint URL. It must start with http:// or https://"
+            ));
+        }
+    } else {
+        // Set default endpoint based on region if not provided
+        cfg.sns.endpoint = format!("https://sns.{}.amazonaws.com", cfg.sns.region_name);
+    }
+
+    // Check if we're using default credentials
+    if cfg.sns.use_default_credentials {
+        if !cfg.sns.access_key.is_empty() || !cfg.sns.secret_key.is_empty() {
+            log::warn!(
+                "SNS is set to use default credentials, but access key or secret key is provided. These will be ignored."
+            );
+        }
+        cfg.sns.access_key = String::new();
+        cfg.sns.secret_key = String::new();
+    } else {
+        // Validate access key and secret key if not using default credentials
+        if cfg.sns.access_key.is_empty() || cfg.sns.secret_key.is_empty() {
+            return Err(anyhow::anyhow!(
+                "SNS access key and secret key must be provided when not using default credentials"
+            ));
+        }
+    }
+
+    // Validate timeouts
+    if cfg.sns.connect_timeout == 0 {
+        cfg.sns.connect_timeout = 10; // Default to 10 seconds if not set
+        log::warn!("SNS connect timeout not specified, defaulting to 10 seconds");
+    }
+    if cfg.sns.operation_timeout == 0 {
+        cfg.sns.operation_timeout = 30; // Default to 30 seconds if not set
+        log::warn!("SNS operation timeout not specified, defaulting to 30 seconds");
+    }
+
+    // Validate max retries
+    if cfg.sns.max_retries == 0 {
+        cfg.sns.max_retries = 3; // Default to 3 retries if not set
+        log::warn!("SNS max retries not specified, defaulting to 3");
+    }
+
+    // Warn about allowing invalid certificates
+    if cfg.sns.allow_invalid_certificates {
+        log::warn!(
+            "SNS is configured to allow invalid SSL certificates. This is not recommended for production use."
+        );
+    }
+
+    Ok(())
+}
+
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.s3.bucket_prefix.is_empty() && !cfg.s3.bucket_prefix.ends_with('/') {
         cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
@@ -1740,6 +1862,54 @@ mod tests {
         cfg.s3.provider = "".to_string();
         check_s3_config(&mut cfg).unwrap();
         assert_eq!(cfg.s3.provider, "aws");
+
+        // Test default region
+        cfg.sns.region_name = "".to_string();
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.region_name, "us-east-1");
+
+        // Test custom region
+        cfg.sns.region_name = "us-west-2".to_string();
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.region_name, "us-west-2");
+
+        // Test endpoint URL validation
+        cfg.sns.endpoint = "invalid-url".to_string();
+        assert!(check_sns_config(&mut cfg).is_err());
+
+        cfg.sns.endpoint = "https://sns.us-west-2.amazonaws.com".to_string();
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
+
+        // Test default credentials usage
+        cfg.sns.use_default_credentials = true;
+        cfg.sns.access_key = "test".to_string();
+        cfg.sns.secret_key = "test".to_string();
+        check_sns_config(&mut cfg).unwrap();
+        assert!(cfg.sns.access_key.is_empty());
+        assert!(cfg.sns.secret_key.is_empty());
+
+        // Test credential validation when not using default credentials
+        cfg.sns.use_default_credentials = false;
+        cfg.sns.access_key = "".to_string();
+        cfg.sns.secret_key = "".to_string();
+        assert!(check_sns_config(&mut cfg).is_err());
+
+        cfg.sns.access_key = "valid_key".to_string();
+        cfg.sns.secret_key = "valid_secret".to_string();
+        check_sns_config(&mut cfg).unwrap();
+
+        // Test timeout defaults
+        cfg.sns.connect_timeout = 0;
+        cfg.sns.operation_timeout = 0;
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.connect_timeout, 10);
+        assert_eq!(cfg.sns.operation_timeout, 30);
+
+        // Test max retries default
+        cfg.sns.max_retries = 0;
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.max_retries, 3);
 
         cfg.memory_cache.max_size = 1024;
         cfg.memory_cache.release_size = 1024;

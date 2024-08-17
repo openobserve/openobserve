@@ -27,7 +27,7 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT,
+    SMTP_CLIENT, SNS_CLIENT,
 };
 use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
@@ -401,6 +401,7 @@ pub async fn send_notification(
     match dest.destination_type {
         DestinationType::Http => send_http_notification(dest, msg.clone()).await,
         DestinationType::Email => send_email_notification(&alert.name, dest, msg).await,
+        DestinationType::Sns => send_sns_notification(&alert.name, dest, msg).await,
     }
 }
 
@@ -486,6 +487,35 @@ pub async fn send_email_notification(
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
+}
+
+pub async fn send_sns_notification(
+    alert_name: &str,
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<(), anyhow::Error> {
+    let mut message_attributes = HashMap::new();
+    message_attributes.insert(
+        "AlertName".to_string(),
+        aws_sdk_sns::types::MessageAttributeValue::builder()
+            .data_type("String")
+            .string_value(alert_name)
+            .build()?,
+    );
+
+    SNS_CLIENT
+        .publish()
+        .topic_arn(
+            dest.sns_topic_arn
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("SNS Topic ARN is missing"))?,
+        )
+        .message(msg)
+        .set_message_attributes(Some(message_attributes))
+        .send()
+        .await?;
+
+    Ok(())
 }
 
 fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
