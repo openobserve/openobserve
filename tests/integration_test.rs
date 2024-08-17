@@ -1505,9 +1505,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("{:#?}", resp.into_body());
-        // assert!(resp.status().is_success());
-        assert!(true);
+        assert!(resp.status().is_success());
     }
 
     async fn e2e_delete_alert_with_sns_destination() {
