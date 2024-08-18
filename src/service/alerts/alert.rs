@@ -27,7 +27,7 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT, SNS_CLIENT,
+    SMTP_CLIENT,
 };
 use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
@@ -503,7 +503,9 @@ pub async fn send_sns_notification(
             .build()?,
     );
 
-    SNS_CLIENT
+    let sns_client = config::get_sns_client().await;
+
+    sns_client
         .publish()
         .topic_arn(
             dest.sns_topic_arn

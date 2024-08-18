@@ -288,36 +288,34 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
-pub static SNS_CLIENT: Lazy<aws_sdk_sns::Client> = Lazy::new(|| {
+static SNS_CLIENT: tokio::sync::OnceCell<aws_sdk_sns::Client> = tokio::sync::OnceCell::const_new();
+
+async fn init_sns_client() -> aws_sdk_sns::Client {
     let cfg = get_config();
 
-    let region = aws_config::Region::new(cfg.sns.region_name.clone());
-    let mut config_builder = aws_sdk_sns::config::Builder::new()
-        .region(region)
-        .endpoint_url(cfg.sns.endpoint.clone());
+    let credentials_provider =
+        aws_config::default_provider::credentials::DefaultCredentialsChain::builder()
+            .build()
+            .await;
 
-    if !cfg.sns.use_default_credentials {
-        let credentials = aws_sdk_sns::config::Credentials::new(
-            cfg.sns.access_key.clone(),
-            cfg.sns.secret_key.clone(),
-            None,              // Session token
-            None,              // Expiration
-            "openobserve-sns", // Provider name
-        );
-        config_builder = config_builder.credentials_provider(credentials);
-    }
-
-    config_builder = config_builder.timeout_config(
-        aws_config::timeout::TimeoutConfig::builder()
-            .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
-            .operation_timeout(std::time::Duration::from_secs(cfg.sns.operation_timeout))
-            .build(),
-    );
-
-    let config = config_builder.build();
+    let config = aws_sdk_sns::config::Builder::new()
+        .region(aws_config::Region::new(cfg.sns.region_name.clone()))
+        .endpoint_url(cfg.sns.endpoint.clone())
+        .credentials_provider(credentials_provider)
+        .timeout_config(
+            aws_config::timeout::TimeoutConfig::builder()
+                .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
+                .operation_timeout(std::time::Duration::from_secs(cfg.sns.operation_timeout))
+                .build(),
+        )
+        .build();
 
     aws_sdk_sns::Client::from_conf(config)
-});
+}
+
+pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
+    SNS_CLIENT.get_or_init(init_sns_client).await
+}
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
     let blocked_streams = get_config()
@@ -1204,10 +1202,6 @@ pub struct S3 {
 pub struct Sns {
     #[env_config(name = "ZO_SNS_REGION_NAME", default = "")]
     pub region_name: String,
-    #[env_config(name = "ZO_SNS_ACCESS_KEY", default = "")]
-    pub access_key: String,
-    #[env_config(name = "ZO_SNS_SECRET_KEY", default = "")]
-    pub secret_key: String,
     #[env_config(name = "ZO_SNS_ENDPOINT", default = "")]
     pub endpoint: String,
     #[env_config(name = "ZO_SNS_CONNECT_TIMEOUT", default = 10)] // seconds
@@ -1216,8 +1210,6 @@ pub struct Sns {
     pub operation_timeout: u64,
     #[env_config(name = "ZO_SNS_MAX_RETRIES", default = 3)]
     pub max_retries: u32,
-    #[env_config(name = "ZO_SNS_USE_DEFAULT_CREDENTIALS", default = true)]
-    pub use_default_credentials: bool,
     #[env_config(name = "ZO_SNS_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
 }
@@ -1751,24 +1743,6 @@ fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.sns.endpoint = format!("https://sns.{}.amazonaws.com", cfg.sns.region_name);
     }
 
-    // Check if we're using default credentials
-    if cfg.sns.use_default_credentials {
-        if !cfg.sns.access_key.is_empty() || !cfg.sns.secret_key.is_empty() {
-            log::warn!(
-                "SNS is set to use default credentials, but access key or secret key is provided. These will be ignored."
-            );
-        }
-        cfg.sns.access_key = String::new();
-        cfg.sns.secret_key = String::new();
-    } else {
-        // Validate access key and secret key if not using default credentials
-        if cfg.sns.access_key.is_empty() || cfg.sns.secret_key.is_empty() {
-            return Err(anyhow::anyhow!(
-                "SNS access key and secret key must be provided when not using default credentials"
-            ));
-        }
-    }
-
     // Validate timeouts
     if cfg.sns.connect_timeout == 0 {
         cfg.sns.connect_timeout = 10; // Default to 10 seconds if not set
@@ -1880,24 +1854,6 @@ mod tests {
         cfg.sns.endpoint = "https://sns.us-west-2.amazonaws.com".to_string();
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
-
-        // Test default credentials usage
-        cfg.sns.use_default_credentials = true;
-        cfg.sns.access_key = "test".to_string();
-        cfg.sns.secret_key = "test".to_string();
-        check_sns_config(&mut cfg).unwrap();
-        assert!(cfg.sns.access_key.is_empty());
-        assert!(cfg.sns.secret_key.is_empty());
-
-        // Test credential validation when not using default credentials
-        cfg.sns.use_default_credentials = false;
-        cfg.sns.access_key = "".to_string();
-        cfg.sns.secret_key = "".to_string();
-        assert!(check_sns_config(&mut cfg).is_err());
-
-        cfg.sns.access_key = "valid_key".to_string();
-        cfg.sns.secret_key = "valid_secret".to_string();
-        check_sns_config(&mut cfg).unwrap();
 
         // Test timeout defaults
         cfg.sns.connect_timeout = 0;
