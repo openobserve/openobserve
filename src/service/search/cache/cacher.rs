@@ -28,7 +28,10 @@ use infra::cache::{
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
     service::search::{
-        cache::result_utils::{get_ts_value, round_down_to_nearest_minute},
+        cache::{
+            result_utils::{get_ts_value, round_down_to_nearest_minute},
+            MultiCachedQueryResponse,
+        },
         sql::{generate_histogram_interval, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
@@ -47,7 +50,7 @@ pub async fn check_cache(
     file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
-) -> CachedQueryResponse {
+) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -55,14 +58,14 @@ pub async fn check_cache(
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
-            return CachedQueryResponse::default();
+            return MultiCachedQueryResponse::default();
         }
     };
 
     // skip the queries with no timestamp column
     let mut result_ts_col = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
     if result_ts_col.is_none() && (is_aggregate || !meta.meta.group_by.is_empty()) {
-        return CachedQueryResponse::default();
+        return MultiCachedQueryResponse::default();
     }
 
     // skip the count queries & queries first order by is not _timestamp field
@@ -74,7 +77,7 @@ pub async fn check_cache(
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
     {
-        return CachedQueryResponse::default();
+        return MultiCachedQueryResponse::default();
     }
 
     // Hack select for _timestamp
@@ -137,7 +140,7 @@ pub async fn check_cache(
         }
     }
 
-    let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
+    let mut multi_res = crate::service::search::cluster::multi::get_cached_results(
         query_key.to_owned(),
         file_path.to_string(),
         trace_id.to_owned(),
@@ -150,58 +153,44 @@ pub async fn check_cache(
             is_descending,
         },
     )
-    .await
-    {
-        Some(mut cached_resp) => {
-            let mut deltas = vec![];
-            calculate_deltas_v1(
-                &ResultCacheMeta {
-                    start_time: cached_resp.response_start_time,
-                    end_time: cached_resp.response_end_time,
-                    is_aggregate,
-                    is_descending,
-                },
-                req.query.start_time,
-                req.query.end_time,
-                &mut deltas,
-            );
+    .await;
 
-            let search_delta: Vec<QueryDelta> = deltas
-                .iter()
-                .filter(|d| !d.delta_removed_hits)
-                .cloned()
-                .collect();
-            if search_delta.is_empty() {
-                log::debug!("cached response found");
-                *should_exec_query = false;
-            };
+    multi_res.sort_by_key(|meta| meta.response_start_time);
 
-            if cached_resp.cached_response.total == (meta.meta.limit as usize)
-                && cached_resp.response_end_time == req.query.end_time
-            {
-                *should_exec_query = false;
-                cached_resp.deltas = vec![];
-            } else {
-                cached_resp.deltas = search_delta;
-            }
+    println!("fetched {:?}", multi_res.len());
 
-            cached_resp.cached_response.took = start.elapsed().as_millis() as usize;
-            cached_resp
+    let deltas = calculate_deltas_multi(&multi_res, req.query.start_time, req.query.end_time);
+
+    let mut multi_resp = MultiCachedQueryResponse::default();
+
+    for res in multi_res {
+        if res.has_cached_data {
+            multi_resp.has_cached_data = true;
+            multi_resp.cached_response.push(res.cached_response);
         }
-        None => {
-            // since there is no cache & will be cached in the end we should return the response
-            log::debug!("cached response not found");
-            CachedQueryResponse {
-                is_descending,
-                ..Default::default()
-            }
-        }
-    };
-    c_resp.cache_query_response = true;
+    }
 
-    c_resp.limit = meta.meta.limit as i64;
-    c_resp.ts_column = result_ts_col;
-    c_resp
+    if !deltas.is_empty() {
+        let search_delta: Vec<QueryDelta> = deltas
+            .iter()
+            .filter(|d| !d.delta_removed_hits)
+            .cloned()
+            .collect();
+        if search_delta.is_empty() {
+            log::debug!("cached response found");
+            *should_exec_query = false;
+        } else {
+            multi_resp.deltas = search_delta;
+        }
+    }
+
+    multi_resp.cache_query_response = true;
+    multi_resp.is_descending = is_descending;
+
+    multi_resp.limit = meta.meta.limit as i64;
+    multi_resp.ts_column = result_ts_col;
+    multi_resp.took = start.elapsed().as_millis() as usize;
+    multi_resp
 }
 
 pub async fn get_cached_results(
@@ -271,7 +260,7 @@ pub async fn get_cached_results(
                         );
 
                         let (hits_allowed_start_time,hits_allowed_end_time) =if cache_req.discard_interval > 0{
-                            // calcualtion in line with date bin of datafusion
+                            // calculation in line with date bin of datafusion
                             (cache_req.q_start_time - (cache_req.q_start_time%cache_req.discard_interval) , cache_req.q_end_time - (cache_req.q_end_time%cache_req.discard_interval))
                         }else{
                             (cache_req.q_start_time,cache_req.q_end_time)
@@ -349,7 +338,7 @@ pub async fn get_cached_results(
     }
 }
 
-pub fn calculate_deltas_v1(
+pub fn _calculate_deltas_v1(
     result_meta: &ResultCacheMeta,
     start_time: i64,
     end_time: i64,
@@ -510,4 +499,55 @@ fn handle_historgram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) 
         caps.get(0).unwrap().as_str(),
         &format!("histogram(_timestamp,'{}')", interval),
     );
+}
+
+fn calculate_deltas_multi(
+    results: &[CachedQueryResponse],
+    start_time: i64,
+    end_time: i64,
+) -> Vec<QueryDelta> {
+    let mut deltas = Vec::new();
+
+    // if results.is_empty() {
+    //     // If no metas are selected, the entire range is a delta
+    //     deltas.push(QueryDelta {
+    //         delta_start_time: start_time,
+    //         delta_end_time: end_time,
+    //         delta_removed_hits: false,
+    //     });
+    //     return deltas;
+    // }
+
+    // Track the current end of coverage
+    let mut current_end_time = start_time;
+
+    for meta in results {
+        println!(
+            "meta time {} - {} - records {}",
+            meta.response_start_time,
+            meta.response_end_time,
+            meta.cached_response.hits.len()
+        );
+        if meta.response_start_time > current_end_time {
+            // There is a gap (delta) between current coverage and the next meta
+            deltas.push(QueryDelta {
+                delta_start_time: current_end_time,
+                delta_end_time: meta.response_start_time,
+                delta_removed_hits: false,
+            });
+        }
+        // Update the current end time to the end of the current meta
+        current_end_time = meta.response_end_time;
+    }
+
+    // Check if there is a gap at the end
+    if current_end_time < end_time {
+        deltas.push(QueryDelta {
+            delta_start_time: current_end_time,
+            delta_end_time: end_time,
+            delta_removed_hits: false,
+        });
+    }
+
+    deltas
 }
