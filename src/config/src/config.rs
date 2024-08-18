@@ -292,16 +292,10 @@ static SNS_CLIENT: tokio::sync::OnceCell<aws_sdk_sns::Client> = tokio::sync::Onc
 
 async fn init_sns_client() -> aws_sdk_sns::Client {
     let cfg = get_config();
+    let shared_config = aws_config::load_from_env().await;
 
-    let credentials_provider =
-        aws_config::default_provider::credentials::DefaultCredentialsChain::builder()
-            .build()
-            .await;
-
-    let config = aws_sdk_sns::config::Builder::new()
-        .region(aws_config::Region::new(cfg.sns.region_name.clone()))
+    let sns_config = aws_sdk_sns::config::Builder::from(&shared_config)
         .endpoint_url(cfg.sns.endpoint.clone())
-        .credentials_provider(credentials_provider)
         .timeout_config(
             aws_config::timeout::TimeoutConfig::builder()
                 .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
@@ -310,7 +304,7 @@ async fn init_sns_client() -> aws_sdk_sns::Client {
         )
         .build();
 
-    aws_sdk_sns::Client::from_conf(config)
+    aws_sdk_sns::Client::from_conf(sns_config)
 }
 
 pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
@@ -1200,8 +1194,6 @@ pub struct S3 {
 
 #[derive(Debug, EnvConfig)]
 pub struct Sns {
-    #[env_config(name = "ZO_SNS_REGION_NAME", default = "")]
-    pub region_name: String,
     #[env_config(name = "ZO_SNS_ENDPOINT", default = "")]
     pub endpoint: String,
     #[env_config(name = "ZO_SNS_CONNECT_TIMEOUT", default = 10)] // seconds
@@ -1725,12 +1717,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    // Validate and set default region if not provided
-    if cfg.sns.region_name.is_empty() {
-        cfg.sns.region_name = "us-east-1".to_string(); // Default to us-east-1 if not specified
-        log::warn!("SNS region not specified, defaulting to us-east-1");
-    }
-
     // Validate endpoint URL if provided
     if !cfg.sns.endpoint.is_empty() {
         if !cfg.sns.endpoint.starts_with("http://") && !cfg.sns.endpoint.starts_with("https://") {
@@ -1738,9 +1724,6 @@ fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 "Invalid SNS endpoint URL. It must start with http:// or https://"
             ));
         }
-    } else {
-        // Set default endpoint based on region if not provided
-        cfg.sns.endpoint = format!("https://sns.{}.amazonaws.com", cfg.sns.region_name);
     }
 
     // Validate timeouts
@@ -1837,35 +1820,47 @@ mod tests {
         check_s3_config(&mut cfg).unwrap();
         assert_eq!(cfg.s3.provider, "aws");
 
-        // Test default region
-        cfg.sns.region_name = "".to_string();
+        // SNS configuration tests
+        // Test default values
         check_sns_config(&mut cfg).unwrap();
-        assert_eq!(cfg.sns.region_name, "us-east-1");
+        assert_eq!(cfg.sns.connect_timeout, 10);
+        assert_eq!(cfg.sns.operation_timeout, 30);
+        assert_eq!(cfg.sns.max_retries, 3);
+        assert!(cfg.sns.endpoint.is_empty());
 
-        // Test custom region
-        cfg.sns.region_name = "us-west-2".to_string();
-        check_sns_config(&mut cfg).unwrap();
-        assert_eq!(cfg.sns.region_name, "us-west-2");
-
-        // Test endpoint URL validation
-        cfg.sns.endpoint = "invalid-url".to_string();
-        assert!(check_sns_config(&mut cfg).is_err());
-
+        // Test custom endpoint
         cfg.sns.endpoint = "https://sns.us-west-2.amazonaws.com".to_string();
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
 
-        // Test timeout defaults
+        // Test invalid endpoint
+        cfg.sns.endpoint = "invalid-url".to_string();
+        assert!(check_sns_config(&mut cfg).is_err());
+
+        // Test custom timeouts
+        cfg.sns.connect_timeout = 15;
+        cfg.sns.operation_timeout = 45;
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.connect_timeout, 15);
+        assert_eq!(cfg.sns.operation_timeout, 45);
+
+        // Test custom max retries
+        cfg.sns.max_retries = 5;
+        check_sns_config(&mut cfg).unwrap();
+        assert_eq!(cfg.sns.max_retries, 5);
+
+        // Test zero values (should set to defaults)
         cfg.sns.connect_timeout = 0;
         cfg.sns.operation_timeout = 0;
+        cfg.sns.max_retries = 0;
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.connect_timeout, 10);
         assert_eq!(cfg.sns.operation_timeout, 30);
-
-        // Test max retries default
-        cfg.sns.max_retries = 0;
-        check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.max_retries, 3);
+
+        // Test endpoint URL validation
+        cfg.sns.endpoint = "invalid-url".to_string();
+        assert!(check_sns_config(&mut cfg).is_err());
 
         cfg.memory_cache.max_size = 1024;
         cfg.memory_cache.release_size = 1024;
