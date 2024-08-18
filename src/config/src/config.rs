@@ -1200,10 +1200,6 @@ pub struct Sns {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_SNS_OPERATION_TIMEOUT", default = 30)] // seconds
     pub operation_timeout: u64,
-    #[env_config(name = "ZO_SNS_MAX_RETRIES", default = 3)]
-    pub max_retries: u32,
-    #[env_config(name = "ZO_SNS_ALLOW_INVALID_CERTIFICATES", default = false)]
-    pub allow_invalid_certificates: bool,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1736,19 +1732,6 @@ fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         log::warn!("SNS operation timeout not specified, defaulting to 30 seconds");
     }
 
-    // Validate max retries
-    if cfg.sns.max_retries == 0 {
-        cfg.sns.max_retries = 3; // Default to 3 retries if not set
-        log::warn!("SNS max retries not specified, defaulting to 3");
-    }
-
-    // Warn about allowing invalid certificates
-    if cfg.sns.allow_invalid_certificates {
-        log::warn!(
-            "SNS is configured to allow invalid SSL certificates. This is not recommended for production use."
-        );
-    }
-
     Ok(())
 }
 
@@ -1825,7 +1808,6 @@ mod tests {
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.connect_timeout, 10);
         assert_eq!(cfg.sns.operation_timeout, 30);
-        assert_eq!(cfg.sns.max_retries, 3);
         assert!(cfg.sns.endpoint.is_empty());
 
         // Test custom endpoint
@@ -1844,19 +1826,12 @@ mod tests {
         assert_eq!(cfg.sns.connect_timeout, 15);
         assert_eq!(cfg.sns.operation_timeout, 45);
 
-        // Test custom max retries
-        cfg.sns.max_retries = 5;
-        check_sns_config(&mut cfg).unwrap();
-        assert_eq!(cfg.sns.max_retries, 5);
-
         // Test zero values (should set to defaults)
         cfg.sns.connect_timeout = 0;
         cfg.sns.operation_timeout = 0;
-        cfg.sns.max_retries = 0;
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.connect_timeout, 10);
         assert_eq!(cfg.sns.operation_timeout, 30);
-        assert_eq!(cfg.sns.max_retries, 3);
 
         // Test endpoint URL validation
         cfg.sns.endpoint = "invalid-url".to_string();
