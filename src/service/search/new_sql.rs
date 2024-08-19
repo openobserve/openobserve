@@ -503,6 +503,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let SetExpr::Select(select) = query.body.as_mut() {
+            select.group_by = GroupByExpr::Expressions(vec![], vec![]);
             select.projection = vec![SelectItem::ExprWithAlias {
                 expr: Expr::Function(Function {
                     name: ObjectName(vec![Ident::new("count")]),
