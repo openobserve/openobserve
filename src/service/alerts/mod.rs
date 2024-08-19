@@ -99,8 +99,8 @@ impl QueryCondition {
                 if v.is_empty() {
                     return Ok((None, now));
                 }
-                let start = if start_time.is_some() {
-                    start_time.unwrap()
+                let start = if let Some(start_time) = start_time {
+                    start_time
                 } else {
                     now - Duration::try_minutes(trigger_condition.period)
                         .unwrap()
@@ -186,8 +186,8 @@ impl QueryCondition {
                 } else {
                     std::cmp::max(100, trigger_condition.threshold)
                 },
-                start_time: if start_time.is_some() {
-                    start_time.unwrap()
+                start_time: if let Some(start_time) = start_time {
+                    start_time
                 } else {
                     now - Duration::try_minutes(trigger_condition.period)
                         .unwrap()

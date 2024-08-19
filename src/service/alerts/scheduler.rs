@@ -520,10 +520,10 @@ async fn handle_derived_stream_triggers(
         None
     } else {
         let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
-        if last_data.is_err() {
-            None
+        if let Ok(last_data) = last_data {
+            Some(last_data.period_end_time + 1)
         } else {
-            Some(last_data.unwrap().period_end_time + 1)
+            None
         }
     };
     let mut new_trigger = db::scheduler::Trigger {
@@ -593,14 +593,14 @@ async fn handle_derived_stream_triggers(
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: if start_time.is_none() {
+        start_time: if let Some(start_time) = start_time {
+            start_time
+        } else {
             end_time
                 - Duration::try_minutes(derived_stream.trigger_condition.period)
                     .unwrap()
                     .num_microseconds()
                     .unwrap()
-        } else {
-            start_time.unwrap()
         },
         end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
