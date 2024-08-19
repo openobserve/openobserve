@@ -106,8 +106,8 @@ self.addEventListener("fetch", function (event) {
                 clients.forEach((client) => {
                   staleFlag = true;
                   if (staleFlag) {
-                    self.skipWaiting();
-                    caches.delete("cache-name");
+                    // self.skipWaiting();
+                    // caches.delete("cache-name");
                     client.postMessage("staledata");
                   }
                 });
