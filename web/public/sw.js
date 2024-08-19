@@ -28,6 +28,14 @@ self.addEventListener("install", function (event) {
           manifest[key]?.file.indexOf(".js") > -1
         ) {
           filesToCache.push(`/web/${manifest[key]["file"]}`);
+          filesToCache.push("/web/sw.js");
+        }
+        if (
+          typeof manifest[key] == "object" &&
+          manifest[key]?.file &&
+          manifest[key]?.file.indexOf(".js") > -1
+        ) {
+          filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
         }
       });
 
@@ -62,7 +70,7 @@ self.addEventListener("install", function (event) {
 
 self.addEventListener('activate', function(event) {
   event.waitUntil(
-    caches.keys().then(function(cacheNames) {
+    caches.keys().then(function (cacheNames) {
       return Promise.all(
         cacheNames.filter(function(cacheName) {
           // Check if cacheName starts with the cacheVersion or contains it as part of the name
