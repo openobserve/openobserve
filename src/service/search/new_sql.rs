@@ -41,7 +41,10 @@ use sqlparser::{
 };
 
 use super::match_source;
-use crate::common::meta::stream::StreamParams;
+use crate::{
+    common::meta::stream::StreamParams,
+    service::search::sql::{convert_histogram_interval_to_seconds, generate_histogram_interval},
+};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct NewSql {
@@ -58,6 +61,7 @@ pub struct NewSql {
     pub time_range: Option<(i64, i64)>,
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, bool)>,
+    pub histogram_interval: Option<i64>,
 }
 
 impl NewSql {
@@ -139,6 +143,11 @@ impl NewSql {
         let mut match_visitor = MatchVisitor::new();
         statement.visit(&mut match_visitor);
 
+        // 7. pick up histogram interval
+        let mut histogram_interval_visitor =
+            HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
+        statement.visit(&mut histogram_interval_visitor);
+
         Ok(NewSql {
             sql: statement.to_string(),
             org_id,
@@ -153,6 +162,7 @@ impl NewSql {
             time_range: Some((query.start_time, query.end_time)),
             group_by,
             order_by,
+            histogram_interval: histogram_interval_visitor.interval,
         })
     }
 
@@ -490,6 +500,52 @@ impl VisitorMut for FieldNameVisitor {
     }
 }
 
+struct HistogramIntervalVistor {
+    pub interval: Option<i64>,
+    time_range: Option<(i64, i64)>,
+}
+
+impl HistogramIntervalVistor {
+    fn new(time_range: Option<(i64, i64)>) -> Self {
+        Self {
+            interval: None,
+            time_range,
+        }
+    }
+}
+
+impl VisitorMut for HistogramIntervalVistor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr {
+            if func.name.to_string().to_lowercase() == "histogram" {
+                if let FunctionArguments::List(list) = &func.args {
+                    let mut args = list.args.iter();
+                    // first is field
+                    let _ = args.next();
+                    // second is interval
+                    let interval = if let Some(interval) = args.next() {
+                        let interval = interval
+                            .to_string()
+                            .trim_matches(|v| v == '\'' || v == '"')
+                            .to_string();
+                        match interval.parse::<u16>() {
+                            Ok(v) => generate_histogram_interval(self.time_range, v),
+                            Err(_) => interval,
+                        }
+                    } else {
+                        generate_histogram_interval(self.time_range, 0)
+                    };
+                    self.interval =
+                        Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
+                }
+            }
+        }
+        ControlFlow::Break(())
+    }
+}
+
 struct TrackTotalHitsVisitor {}
 
 impl TrackTotalHitsVisitor {
@@ -522,7 +578,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 alias: Ident::new("zo_sql_num"),
             }];
         }
-        ControlFlow::Continue(())
+        ControlFlow::Break(())
     }
 }
 
