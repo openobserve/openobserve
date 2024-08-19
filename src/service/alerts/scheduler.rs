@@ -593,7 +593,15 @@ async fn handle_derived_stream_triggers(
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: TriggerDataStatus::Completed,
-        start_time: trigger.start_time.unwrap_or_default(),
+        start_time: if start_time.is_none() {
+            end_time
+                - Duration::try_minutes(derived_stream.trigger_condition.period)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
+        } else {
+            start_time.unwrap()
+        },
         end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
         error: None,
