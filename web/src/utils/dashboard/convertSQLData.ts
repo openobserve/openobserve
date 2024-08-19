@@ -831,7 +831,6 @@ export const convertSQLData = async (
             data: getMarkLineData(panelSchema),
           },
           data: getAxisDataFromKey(key),
-          barMinHeight: 1,
         };
         return seriesObj;
       });
