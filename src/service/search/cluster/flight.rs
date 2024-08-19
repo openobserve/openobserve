@@ -81,12 +81,12 @@ pub async fn search(
     // 2. get file list
     let file_lists = get_file_lists(&req, meta.clone()).await?;
 
-    // println!("\n\n file lists: {:?}\n\n", file_lists);
+    println!("\n\n file lists: {:?}\n\n", file_lists);
 
     // 3. partition file list
     let partition_file_lists = partition_filt_lists(file_lists, &nodes, group).await?;
 
-    // println!("\n\n partition file lists: {:?}\n\n", partition_file_lists);
+    println!("\n\n partition file lists: {:?}\n\n", partition_file_lists);
 
     // 4. construct physical plan
     let ctx = generate_context(&req, &meta, cfg.limit.cpu_num).await?;
@@ -254,7 +254,6 @@ pub async fn partition_filt_list(
     group: Option<RoleGroup>,
 ) -> Result<Vec<Vec<FileKey>>> {
     let cfg = get_config();
-    let file_num = file_list.len();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     let mut partition_strategy =
         QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
@@ -262,14 +261,7 @@ pub async fn partition_filt_list(
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
     match partition_strategy {
-        QueryPartitionStrategy::FileNum => {
-            let offest = if querier_num >= file_num {
-                1
-            } else {
-                (file_num / querier_num) + 1
-            };
-            Ok(partition_file_by_nums(file_list, querier_num, offest))
-        }
+        QueryPartitionStrategy::FileNum => Ok(partition_file_by_nums(file_list, querier_num)),
         QueryPartitionStrategy::FileSize => Ok(partition_file_by_bytes(file_list, querier_num)),
         QueryPartitionStrategy::FileHash => {
             Ok(partition_file_by_hash(file_list, nodes, group).await)
@@ -280,13 +272,31 @@ pub async fn partition_filt_list(
 pub(crate) fn partition_file_by_nums(
     file_keys: Vec<FileKey>,
     querier_num: usize,
-    offest: usize,
 ) -> Vec<Vec<FileKey>> {
+    let file_distribute = distribute(file_keys.len(), querier_num);
+
     let mut partitions = vec![Vec::new(); querier_num];
-    for (i, fk) in file_keys.into_iter().enumerate() {
-        partitions[i / offest].push(fk);
+
+    for (i, num) in file_distribute.iter().enumerate() {
+        if *num == 0 {
+            break;
+        }
+        let start = file_distribute.iter().take(i).sum::<usize>();
+        let end = start + num;
+        partitions[i] = file_keys[start..end].to_vec();
     }
+
     partitions
+}
+
+fn distribute(total: usize, n: usize) -> Vec<usize> {
+    let base_value = total / n;
+    let remainder = total % n;
+    let mut buckets = vec![base_value; n];
+    for i in 0..remainder {
+        buckets[i] += 1;
+    }
+    buckets
 }
 
 pub(crate) fn partition_file_by_bytes(
