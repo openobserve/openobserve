@@ -129,7 +129,7 @@ pub async fn search(
 
     let req_query = req.clone().query.unwrap();
 
-    let res = {
+    let handle = tokio::task::spawn(async move {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
             cluster::super_cluster::search(req, req_regions, req_clusters).await
@@ -140,7 +140,13 @@ pub async fn search(
         {
             cluster::http::search(req).await
         }
+    });
+    let res = match handle.await {
+        Ok(Ok(res)) => Ok(res),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(Error::Message(e.to_string())),
     };
+    log::info!("[trace_id {trace_id}] in leader task finish");
 
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
