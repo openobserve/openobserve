@@ -26,8 +26,6 @@ import dotenv from "dotenv";
 import fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
 import visualizer from "rollup-plugin-visualizer";
-import manifest from "vite-plugin-manifest";
-
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
