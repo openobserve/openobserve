@@ -81,12 +81,8 @@ pub async fn search(
     // 2. get file list
     let file_lists = get_file_lists(&req, meta.clone()).await?;
 
-    println!("\n\n file lists: {:?}\n\n", file_lists);
-
     // 3. partition file list
     let partition_file_lists = partition_filt_lists(file_lists, &nodes, group).await?;
-
-    println!("\n\n partition file lists: {:?}\n\n", partition_file_lists);
 
     // 4. construct physical plan
     let ctx = generate_context(&req, &meta, cfg.limit.cpu_num).await?;
