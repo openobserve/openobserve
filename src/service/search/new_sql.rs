@@ -31,7 +31,11 @@ use infra::{errors::Error, schema::SchemaCache};
 use proto::cluster_rpc;
 use serde::Serialize;
 use sqlparser::{
-    ast::{BinaryOperator, Expr, FunctionArguments, GroupByExpr, Query, Visit, Visitor},
+    ast::{
+        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
+        FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem, SetExpr, VisitMut,
+        VisitorMut,
+    },
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -77,11 +81,18 @@ impl NewSql {
             total_schemas.insert(stream_name.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
-        // 2. get column name, alias, group by, order by
-        let statement = Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
             .unwrap();
+
+        // 2. rewrite track_total_hits
+        if query.track_total_hits {
+            let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
+            statement.visit(&mut trace_total_hits_visitor);
+        }
+
+        // 3. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         statement.visit(&mut column_visitor);
 
@@ -94,7 +105,7 @@ impl NewSql {
         let order_by = column_visitor.order_by;
 
         // TODO: handle select * from table, because we want only register used field to datafusion
-        // 3. generate used schema
+        // 4. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             used_schemas = total_schemas;
@@ -120,16 +131,16 @@ impl NewSql {
                 used_schemas.insert(table_name.to_string(), Arc::new(SchemaCache::new(schema)));
             }
         }
-        // 3. get partition column value
+        // 5. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         statement.visit(&mut partition_column_visitor);
 
-        // 4. get match_all() value
+        // 6. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         statement.visit(&mut match_visitor);
 
         Ok(NewSql {
-            sql,
+            sql: statement.to_string(),
             org_id,
             stream_type,
             stream_names,
@@ -239,10 +250,10 @@ impl<'a> ColumnVisitor<'a> {
     }
 }
 
-impl<'a> Visitor for ColumnVisitor<'a> {
+impl<'a> VisitorMut for ColumnVisitor<'a> {
     type Break = ();
 
-    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         match expr {
             Expr::Identifier(ident) => {
                 let mut count = 0;
@@ -281,9 +292,9 @@ impl<'a> Visitor for ColumnVisitor<'a> {
         ControlFlow::Continue(())
     }
 
-    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_ref() {
-            for order in order_by.exprs.iter() {
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let Some(order_by) = query.order_by.as_mut() {
+            for order in order_by.exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
@@ -292,10 +303,10 @@ impl<'a> Visitor for ColumnVisitor<'a> {
                 }
             }
         }
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            for select_item in select.projection.iter() {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
+            for select_item in select.projection.iter_mut() {
                 match select_item {
-                    sqlparser::ast::SelectItem::ExprWithAlias { expr, alias } => {
+                    SelectItem::ExprWithAlias { expr, alias } => {
                         let mut name_visitor = FieldNameVisitor::new();
                         expr.visit(&mut name_visitor);
                         if name_visitor.field_names.len() == 1 {
@@ -305,14 +316,14 @@ impl<'a> Visitor for ColumnVisitor<'a> {
                                 .insert((expr_name, alias.value.to_string()));
                         }
                     }
-                    sqlparser::ast::SelectItem::Wildcard(_) => {
+                    SelectItem::Wildcard(_) => {
                         self.is_wildcard = true;
                     }
                     _ => {}
                 }
             }
-            if let GroupByExpr::Expressions(exprs, _) = &select.group_by {
-                for expr in exprs.iter() {
+            if let GroupByExpr::Expressions(exprs, _) = &mut select.group_by {
+                for expr in exprs.iter_mut() {
                     let mut name_visitor = FieldNameVisitor::new();
                     expr.visit(&mut name_visitor);
                     if name_visitor.field_names.len() == 1 {
@@ -341,10 +352,10 @@ impl<'a> PartitionColumnVisitor<'a> {
     }
 }
 
-impl<'a> Visitor for PartitionColumnVisitor<'a> {
+impl<'a> VisitorMut for PartitionColumnVisitor<'a> {
     type Break = ();
 
-    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
             if let Some(expr) = select.selection.as_ref() {
                 let exprs = split_conjunction(expr);
@@ -426,10 +437,10 @@ impl MatchVisitor {
     }
 }
 
-impl Visitor for MatchVisitor {
+impl VisitorMut for MatchVisitor {
     type Break = ();
 
-    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
             if let Some(expr) = select.selection.as_ref() {
                 let exprs = split_conjunction(expr);
@@ -468,12 +479,46 @@ impl FieldNameVisitor {
     }
 }
 
-impl Visitor for FieldNameVisitor {
+impl VisitorMut for FieldNameVisitor {
     type Break = ();
 
-    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Identifier(ident) = expr {
             self.field_names.insert(ident.value.clone());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+struct TrackTotalHitsVisitor {}
+
+impl TrackTotalHitsVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for TrackTotalHitsVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            select.projection = vec![SelectItem::ExprWithAlias {
+                expr: Expr::Function(Function {
+                    name: ObjectName(vec![Ident::new("count")]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![],
+                }),
+                alias: Ident::new("zo_sql_num"),
+            }];
         }
         ControlFlow::Continue(())
     }
