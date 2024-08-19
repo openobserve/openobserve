@@ -129,11 +129,6 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             args[0]
                         )));
                     };
-                    let case_insensitive = if name == MATCH_ALL_RAW_UDF_NAME {
-                        true
-                    } else {
-                        false
-                    };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
                     let item = Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))));
                     for field in self.fields.iter() {
@@ -142,7 +137,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             expr: Box::new(Expr::Column(Column::new_unqualified(field))),
                             pattern: Box::new(item.clone()),
                             escape_char: None,
-                            case_insensitive,
+                            case_insensitive: name != MATCH_ALL_RAW_UDF_NAME,
                         });
                         expr_list.push(new_expr);
                     }
