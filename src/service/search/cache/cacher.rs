@@ -141,7 +141,7 @@ pub async fn check_cache(
     }
     let mut multi_resp = MultiCachedQueryResponse::default();
     if get_config().common.use_multi_result_cache {
-        let mut multi_res = crate::service::search::cluster::multi::get_cached_results(
+        let mut multi_res = crate::service::search::cluster::cache_multi::get_cached_results(
             query_key.to_owned(),
             file_path.to_string(),
             trace_id.to_owned(),

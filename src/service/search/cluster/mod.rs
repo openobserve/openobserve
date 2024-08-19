@@ -57,10 +57,10 @@ use crate::{
     },
 };
 
+pub mod cache_multi;
 pub mod cacher;
 pub mod grpc;
 pub mod http;
-pub mod multi;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
 
