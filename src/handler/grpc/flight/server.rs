@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, sync::Arc};
+use std::{
+    io::Cursor,
+    task::{Context, Poll},
+};
 
 use arrow::{
     array::RecordBatch,
@@ -26,16 +29,11 @@ use arrow_flight::{
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::{collect, displayable, ExecutionPlan},
-    prelude::SessionContext,
+    execution::SendableRecordBatchStream,
+    physical_plan::{displayable, execute_stream},
 };
-use futures::{stream::BoxStream, TryStreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use prost::Message;
-use tokio::{
-    sync::mpsc::{channel, error::SendError, Sender},
-    task,
-};
-use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::service::search::grpc::flight as grpcFlight;
@@ -87,21 +85,16 @@ impl FlightService for FlightServiceImpl {
             println!("{}", plan);
         }
 
-        // 3. send record batch to client
-        let (tx, rx) = channel(2);
-        task::spawn(async {
-            if let Err(e) = read_partition(physical_plan, ctx, tx).await {
-                println!("Error reading partition: {:?}", e);
-            }
-        });
-
         let write_options: IpcWriteOptions = IpcWriteOptions::default()
             .try_with_compression(Some(CompressionType::LZ4_FRAME))
             .map_err(|e| Status::internal(e.to_string()))?;
         let flight_data_stream = FlightDataEncoderBuilder::new()
             .with_schema(schema)
             .with_options(write_options)
-            .build(ReceiverStream::new(rx))
+            .build(FlightSenderStream::new(
+                execute_stream(physical_plan, ctx.task_ctx().clone())
+                    .map_err(|e| Status::internal(e.to_string()))?,
+            ))
             .map_err(|err| Status::from_error(Box::new(err)));
 
         Ok(Response::new(
@@ -173,30 +166,30 @@ impl FlightService for FlightServiceImpl {
     }
 }
 
-async fn read_partition(
-    plan: Arc<dyn ExecutionPlan>,
-    ctx: SessionContext,
-    tx: Sender<Result<RecordBatch, FlightError>>,
-) -> Result<(), FlightError> {
-    if tx.is_closed() {
-        return Err(FlightError::Tonic(Status::internal(
-            "Can't send a batch, channel is closed",
-        )));
+struct FlightSenderStream {
+    stream: SendableRecordBatchStream,
+}
+
+impl FlightSenderStream {
+    fn new(stream: SendableRecordBatchStream) -> Self {
+        Self { stream }
     }
+}
 
-    let data = collect(plan, ctx.task_ctx())
-        .await
-        .map_err(|e| FlightError::Tonic(Status::internal(e.to_string())))?;
+impl Stream for FlightSenderStream {
+    type Item = Result<RecordBatch, FlightError>;
 
-    for batch in data {
-        tx.send(Ok(batch)).await.map_err(|err| {
-            if let SendError(Err(err)) = err {
-                err
-            } else {
-                FlightError::Tonic(Status::internal("Can't send a batch, something went wrong"))
-            }
-        })?
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        match self.stream.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(FlightError::Tonic(
+                Status::internal(e.to_string()),
+            )))),
+        }
     }
-
-    Ok(())
 }
