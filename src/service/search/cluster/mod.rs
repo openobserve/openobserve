@@ -558,25 +558,35 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, mut scan_stats, is_partial) =
-        match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
-            Ok(v) => v,
-            Err(e) => {
-                // search done, release lock
-                #[cfg(not(feature = "enterprise"))]
-                dist_lock::unlock(&locker).await?;
-                #[cfg(feature = "enterprise")]
-                {
-                    work_group
-                        .as_ref()
-                        .unwrap()
-                        .done(trace_id, user_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                }
-                return Err(e);
+    let trace_id_span = trace_id.to_string();
+    let meta_span = meta.clone();
+    let handle = match tokio::task::spawn(async move {
+        merge_grpc_result(&trace_id_span, meta_span, results, is_final_phase).await
+    })
+    .await
+    {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(Error::Message(e.to_string())),
+    };
+    let (merge_batches, mut scan_stats, is_partial) = match handle {
+        Ok(v) => v,
+        Err(e) => {
+            // search done, release lock
+            #[cfg(not(feature = "enterprise"))]
+            dist_lock::unlock(&locker).await?;
+            #[cfg(feature = "enterprise")]
+            {
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
             }
-        };
+            return Err(e);
+        }
+    };
     log::info!("[trace_id {trace_id}] final merge task finish");
 
     // search done, release lock
