@@ -1589,47 +1589,6 @@ pub mod search_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        pub async fn search(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/Search");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "Search"));
-            self.inner.unary(req, path, codec).await
-        }
-        pub async fn cluster_search(
-            &mut self,
-            request: impl tonic::IntoRequest<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/cluster.Search/ClusterSearch",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.Search", "ClusterSearch"));
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn query_status(
             &mut self,
             request: impl tonic::IntoRequest<super::QueryStatusRequest>,
@@ -1714,14 +1673,6 @@ pub mod search_server {
     /// Generated trait containing gRPC methods that should be implemented for use with SearchServer.
     #[async_trait]
     pub trait Search: Send + Sync + 'static {
-        async fn search(
-            &self,
-            request: tonic::Request<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
-        async fn cluster_search(
-            &self,
-            request: tonic::Request<super::SearchRequest>,
-        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
         async fn query_status(
             &self,
             request: tonic::Request<super::QueryStatusRequest>,
@@ -1823,94 +1774,6 @@ pub mod search_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/cluster.Search/Search" => {
-                    #[allow(non_camel_case_types)]
-                    struct SearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
-                    for SearchSvc<T> {
-                        type Response = super::SearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::SearchRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Search>::search(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = SearchSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/cluster.Search/ClusterSearch" => {
-                    #[allow(non_camel_case_types)]
-                    struct ClusterSearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
-                    for ClusterSearchSvc<T> {
-                        type Response = super::SearchResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::SearchRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Search>::cluster_search(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = ClusterSearchSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
                 "/cluster.Search/QueryStatus" => {
                     #[allow(non_camel_case_types)]
                     struct QueryStatusSvc<T: Search>(pub Arc<T>);

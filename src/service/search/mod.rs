@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashSet, sync::Arc};
+use std::{cmp::max, sync::Arc};
 
 use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col;
@@ -28,13 +28,13 @@ use config::{
     },
     metrics,
     utils::{sql::is_aggregate_query, str::find},
-    FxIndexSet,
 };
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
+use new_sql::NewSql;
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
@@ -234,19 +234,24 @@ pub async fn search_partition(
         query: Some(query),
         ..Default::default()
     };
-    let meta = sql::Sql::new(&search_req).await?;
+    let sql = NewSql::new(&search_req).await?;
 
-    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let files = cluster::get_file_list(
-        trace_id,
-        &meta,
-        stream_type,
-        partition_time_level,
-        &stream_settings.partition_keys,
-    )
-    .await;
+    let mut files = Vec::new();
+    for (stream, schema) in sql.schemas.iter() {
+        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
+        let partition_time_level =
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        let stream_files = cluster::get_file_list(
+            trace_id,
+            &sql,
+            stream,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
+        )
+        .await;
+        files.extend(stream_files);
+    }
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -278,7 +283,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    if get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate).is_none() {
+    if get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate).is_none() {
         resp.partitions.push([req.start_time, req.end_time]);
         return Ok(resp);
     }
@@ -311,7 +316,7 @@ pub async fn search_partition(
     if partitions.is_empty() {
         partitions.push([req.start_time, req.end_time]);
     }
-    if let Some((field, sort)) = meta.meta.order_by.first() {
+    if let Some((field, sort)) = sql.order_by.first() {
         if field == &cfg.common.column_timestamp && !sort {
             partitions.reverse();
         }
@@ -755,141 +760,6 @@ fn generate_search_schema_diff(
     }
 
     Ok(diff_fields)
-}
-
-// generate parquet file search schema
-fn generate_search_schema(
-    sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-    let mut new_fields = Vec::new();
-
-    for field in generate_used_fields_in_query(sql).iter() {
-        let group_field = schema.field_with_name(field).ok();
-        let latest_field = schema_latest_map.get(field).map(|f| f.as_ref());
-
-        match (group_field, latest_field) {
-            // When group_field is None and latest_field is Some, clone latest_field
-            (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
-
-            // When both group_field and latest_field are Some, compare their data types
-            (Some(group_field), Some(latest_field)) => {
-                if group_field.data_type() != latest_field.data_type() {
-                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
-                }
-                new_fields.push(Arc::new(group_field.clone()));
-            }
-
-            // should we return error
-            _ => {}
-        }
-    }
-
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-
-    let mut schema = Schema::new(new_fields);
-    let timestamp = &get_config().common.column_timestamp;
-    if schema.field_with_name(timestamp).is_err() {
-        // self add timestamp column if no exist
-        let field = Arc::new(Field::new(timestamp, DataType::Int64, false));
-        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
-    }
-
-    Ok((Arc::new(schema), diff_fields))
-}
-
-// generate parquet file search schema
-fn generate_select_start_search_schema(
-    sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-    defined_schema_fields: &[String],
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    let schema_fields_map = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-    for field in schema.fields().iter() {
-        if let Some(f) = schema_latest_map.get(field.name()) {
-            if f.data_type() != field.data_type() {
-                diff_fields.insert(field.name().clone(), f.data_type().clone());
-            }
-        }
-    }
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-    // add not exists field in group schema but used in sql
-    let mut new_fields = Vec::new();
-    for field in generate_used_fields_in_query(sql).iter() {
-        if schema_fields_map.get(field).is_none() {
-            if let Some(field) = schema_latest_map.get(field) {
-                new_fields.push(Arc::new(field.as_ref().clone()));
-            }
-        }
-    }
-    // add not exists field in group schema but defined in latest schema
-    for (name, field) in schema_latest_map.iter() {
-        if schema_fields_map.get(name).is_none() {
-            new_fields.push(Arc::new(field.as_ref().clone()));
-        }
-    }
-    let cfg = get_config();
-    let schema = if !defined_schema_fields.is_empty() {
-        let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-        if !fields.contains(&cfg.common.column_timestamp) {
-            fields.insert(cfg.common.column_timestamp.to_string());
-        }
-        if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
-            fields.insert(cfg.common.column_all.to_string());
-        }
-        let new_fields = fields
-            .iter()
-            .filter_map(|f| match schema_fields_map.get(f) {
-                Some(f) => Some((*f).clone()),
-                None => schema_latest_map.get(f).map(|f| (*f).clone()),
-            })
-            .collect::<Vec<_>>();
-        Arc::new(Schema::new(new_fields))
-    } else if !new_fields.is_empty() {
-        let new_schema = Schema::new(new_fields);
-        Arc::new(Schema::try_merge(vec![
-            schema.as_ref().to_owned(),
-            new_schema,
-        ])?)
-    } else {
-        schema.clone()
-    };
-    Ok((schema, diff_fields))
-}
-
-fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {
-    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
-
-    // note field name maybe equal to alias name
-    let used_fields: FxIndexSet<_> = sql
-        .meta
-        .group_by
-        .iter()
-        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
-        .filter(|f| !alias_map.contains(*f))
-        .chain(&sql.meta.fields)
-        .cloned()
-        .collect();
-
-    used_fields.into_iter().collect()
 }
 
 #[cfg(test)]

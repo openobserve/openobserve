@@ -20,17 +20,17 @@ use config::meta::stream::StreamType;
 use infra::errors::Result;
 use proto::cluster_rpc;
 
-pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::SearchResponse> {
+use crate::service::search::{cluster::flight, new_sql::NewSql};
+
+// TODO for super cluster
+pub async fn _search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::SearchResponse> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
     let stream_type = StreamType::from(req.stream_type.as_str());
     let job = req.job.clone();
 
     // handle request time range
-    let meta = super::super::sql::Sql::new(&req).await?;
-    if meta.rewrite_sql != req.query.as_ref().unwrap().sql {
-        req.query.as_mut().unwrap().sql = meta.rewrite_sql.clone();
-    }
+    let meta = NewSql::new(&req).await?;
     let sql = Arc::new(meta);
 
     // set this value to null & use it later on results ,
@@ -40,17 +40,17 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     log::info!(
-        "[trace_id {trace_id}] grpc->cluster_search in: part_id: {}, stream: {}/{}/{}, time range: {:?}",
+        "[trace_id {trace_id}] grpc->cluster_search in: part_id: {}, stream: {}/{}/{:?}, time range: {:?}",
         req.job.as_ref().unwrap().partition,
         sql.org_id,
         stream_type,
-        sql.stream_name,
-        sql.meta.time_range
+        sql.stream_names,
+        sql.time_range
     );
 
     // handle query function
     let (merge_results, scan_stats, _, is_partial, idx_took) =
-        super::search(&trace_id, sql.clone(), req).await?;
+        flight::search(&trace_id, sql.clone(), req).await?;
 
     // final result
     let mut hits_buf = Vec::new();
@@ -90,8 +90,8 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
         job,
         took: start.elapsed().as_millis() as i32,
         idx_took: idx_took as i32,
-        from: sql.meta.offset as i32,
-        size: sql.meta.limit as i32,
+        from: sql.offset as i32,
+        size: sql.limit as i32,
         total: hits_total as i64,
         hits: hits_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),

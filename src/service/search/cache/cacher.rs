@@ -29,6 +29,7 @@ use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
     service::search::{
         cache::result_utils::{get_ts_value, round_down_to_nearest_minute},
+        new_sql::NewSql,
         sql::{generate_histogram_interval, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
@@ -51,7 +52,7 @@ pub async fn check_cache(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
+    let sql = match NewSql::new(rpc_req).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
@@ -60,13 +61,13 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let mut result_ts_col = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
-    if result_ts_col.is_none() && (is_aggregate || !meta.meta.group_by.is_empty()) {
+    let mut result_ts_col = get_ts_col(&sql, &cfg.common.column_timestamp, is_aggregate);
+    if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
         return CachedQueryResponse::default();
     }
 
     // skip the count queries & queries first order by is not _timestamp field
-    let order_by = meta.meta.order_by;
+    let order_by = sql.order_by;
     if req.query.track_total_hits
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
@@ -78,10 +79,7 @@ pub async fn check_cache(
     }
 
     // Hack select for _timestamp
-    if !is_aggregate
-        && meta.meta.group_by.is_empty()
-        && order_by.is_empty()
-        && !origin_sql.contains('*')
+    if !is_aggregate && sql.group_by.is_empty() && order_by.is_empty() && !origin_sql.contains('*')
     {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
@@ -101,7 +99,7 @@ pub async fn check_cache(
 
     let result_ts_col = result_ts_col.unwrap();
     let mut discard_interval = -1;
-    if let Some(interval) = meta.histogram_interval {
+    if let Some(interval) = sql.histogram_interval {
         *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
@@ -109,13 +107,12 @@ pub async fn check_cache(
             req_time_range.1 = chrono::Utc::now().timestamp_micros();
         }
 
-        let meta_time_range_is_empty =
-            meta.meta.time_range.is_none() || meta.meta.time_range == Some((0, 0));
+        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
                 Some(req_time_range)
             } else {
-                meta.meta.time_range
+                sql.time_range
             };
         handle_historgram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
@@ -176,7 +173,7 @@ pub async fn check_cache(
                 *should_exec_query = false;
             };
 
-            if cached_resp.cached_response.total == (meta.meta.limit as usize)
+            if cached_resp.cached_response.total == (sql.limit as usize)
                 && cached_resp.response_end_time == req.query.end_time
             {
                 *should_exec_query = false;
@@ -199,7 +196,7 @@ pub async fn check_cache(
     };
     c_resp.cache_query_response = true;
 
-    c_resp.limit = meta.meta.limit as i64;
+    c_resp.limit = sql.limit as i64;
     c_resp.ts_column = result_ts_col;
     c_resp
 }
@@ -432,18 +429,17 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-pub fn get_ts_col(
-    parsed_sql: &config::meta::sql::Sql,
-    ts_col: &str,
-    is_aggregate: bool,
-) -> Option<String> {
-    for (original, alias) in &parsed_sql.field_alias {
+pub fn get_ts_col(parsed_sql: &NewSql, ts_col: &str, is_aggregate: bool) -> Option<String> {
+    for (original, alias) in &parsed_sql.aliases {
         if original.contains("histogram") {
             return Some(alias.clone());
         }
     }
     if !is_aggregate
-        && (parsed_sql.fields.contains(&ts_col.to_owned())
+        && (parsed_sql
+            .columns
+            .iter()
+            .any(|(_, v)| v.contains(&ts_col.to_owned()))
             || parsed_sql.order_by.iter().any(|v| v.0.eq(&ts_col)))
     {
         return Some(ts_col.to_string());

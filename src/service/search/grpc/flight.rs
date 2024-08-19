@@ -34,7 +34,6 @@ use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
 
-use super::datafusion;
 use crate::service::{
     db,
     search::datafusion::{
@@ -164,7 +163,7 @@ pub async fn search(
                 Ok(v) => v,
                 Err(e) => {
                     // clear session data
-                    datafusion::storage::file_list::clear(&trace_id);
+                    super::super::datafusion::storage::file_list::clear(&trace_id);
                     log::error!(
                         "[trace_id {}] search->storage: search storage parquet error: {}",
                         trace_id,
@@ -185,7 +184,7 @@ pub async fn search(
                 Ok(v) => v,
                 Err(e) => {
                     // clear session data
-                    datafusion::storage::file_list::clear(&trace_id);
+                    super::super::datafusion::storage::file_list::clear(&trace_id);
                     log::error!(
                         "[trace_id {}] search->storage: search wal parquet error: {}",
                         trace_id,
@@ -206,7 +205,7 @@ pub async fn search(
                 Ok(v) => v,
                 Err(e) => {
                     // clear session data
-                    datafusion::storage::file_list::clear(&trace_id);
+                    super::super::datafusion::storage::file_list::clear(&trace_id);
                     // release wal lock files
                     crate::common::infra::wal::release_files(&wal_lock_files).await;
                     log::error!(

@@ -52,8 +52,9 @@ pub struct NewSql {
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_names: Vec<String>,
-    pub match_items: Option<Vec<String>>, // only for single stream
+    pub match_items: Option<Vec<String>>, // match_all, only for single stream
     pub equal_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
+    pub columns: HashMap<String, HashSet<String>>, // table_name -> [field_name]
     pub aliases: Vec<(String, String)>,   // field_name, alias
     pub schemas: HashMap<String, Arc<SchemaCache>>,
     pub limit: i64,
@@ -100,6 +101,7 @@ impl NewSql {
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         statement.visit(&mut column_visitor);
 
+        let columns = column_visitor.columns.clone();
         let aliases = column_visitor
             .columns_alias
             .iter()
@@ -155,6 +157,7 @@ impl NewSql {
             stream_names,
             match_items: match_visitor.match_items,
             equal_items: partition_column_visitor.equal_items,
+            columns,
             aliases,
             schemas: used_schemas,
             limit,

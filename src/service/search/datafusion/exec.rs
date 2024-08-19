@@ -22,10 +22,7 @@ use config::{
         search::{SearchType, Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{
-        parquet::new_parquet_writer, record_batch_ext::format_recordbatch_by_schema,
-        schema_ext::SchemaExt,
-    },
+    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -33,9 +30,8 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::{tree_node::TreeNode, Column},
+    common::Column,
     datasource::{
-        empty::EmptyTable,
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
@@ -49,303 +45,22 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
         session_state::SessionStateBuilder,
     },
-    physical_plan::{collect, collect_partitioned},
     prelude::{Expr, SessionContext},
 };
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
 
 use super::{
     file_type::{FileType, GetExt},
     storage::file_list,
-    table_provider::{memtable::NewMemTable, uniontable::NewUnionTable, NewListingTable},
+    table_provider::NewListingTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::service::search::{
-    datafusion::{plan::UpdateOffsetExec, ExtLimit},
-    sql::{Sql, RE_SELECT_WILDCARD},
-};
+use crate::service::search::{datafusion::ExtLimit, sql::RE_SELECT_WILDCARD};
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
-
-pub async fn _sql(
-    session: &SearchSession,
-    schema: Arc<Schema>,
-    rules: HashMap<String, DataType>,
-    sql: &Arc<Sql>,
-    files: &[FileKey],
-    in_records_batches: Option<Vec<RecordBatch>>,
-    file_type: FileType,
-) -> Result<Vec<Vec<RecordBatch>>> {
-    if files.is_empty() && in_records_batches.is_none() {
-        return Ok(vec![]);
-    }
-
-    let start = std::time::Instant::now();
-    let trace_id = session.id.clone();
-    let ctx = if !file_type.eq(&FileType::ARROW) {
-        register_table(
-            session,
-            schema.clone(),
-            "tbl",
-            files,
-            file_type.clone(),
-            rules.clone(),
-            false,
-            &sql.meta.order_by,
-            Some(sql.meta.limit as usize),
-        )
-        .await?
-    } else {
-        let ctx = prepare_datafusion_context(
-            session.work_group.clone(),
-            &session.search_type,
-            false,
-            false,
-            session.target_partitions,
-            None,
-        )
-        .await?;
-        let record_batches = in_records_batches.unwrap();
-        let mem_table = Arc::new(NewMemTable::try_new(
-            schema.clone(),
-            vec![record_batches],
-            rules.clone(),
-        )?);
-        // Register the MemTable as a table in the DataFusion context
-        ctx.register_table("tbl", mem_table)?;
-        ctx
-    };
-
-    // register UDF
-    register_udf(&ctx, &sql.org_id).await;
-
-    // query sql
-    let result = exec_query(&ctx, session, sql).await?;
-
-    // drop table
-    ctx.deregister_table("tbl")?;
-    log::info!(
-        "[trace_id {trace_id}] Query all took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok(result)
-}
-
-async fn exec_query(
-    ctx: &SessionContext,
-    session: &SearchSession,
-    sql: &Arc<Sql>,
-) -> Result<Vec<Vec<RecordBatch>>> {
-    let sql: &str = sql.origin_sql.as_ref();
-    let start = std::time::Instant::now();
-    let trace_id = session.id.clone();
-    let cfg = get_config();
-
-    // Debug SQL
-    if cfg.common.print_key_sql {
-        log::info!("[trace_id {trace_id}] Query sql: {}", sql);
-    }
-
-    // Hack for limit 0
-    if sql.ends_with("LIMIT 0") {
-        return Ok(vec![]);
-    }
-
-    let plan = ctx.state().create_logical_plan(sql).await?;
-    if cfg.common.print_key_sql {
-        println!("+---------------------------+----------+");
-        println!("logic plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-    }
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("physical plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-    }
-
-    let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
-        Some(plan) => plan,
-        None => super::plan::get_empty_partial_plan(&physical_plan),
-    };
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(partial_paln.as_ref())
-            .set_show_schema(false)
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("partial plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-    }
-
-    let data = match collect_partitioned(partial_paln, ctx.task_ctx()).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] query sql execute failed, session: {:?}, sql: {}, err: {:?}",
-                session,
-                sql,
-                e
-            );
-            return Err(e);
-        }
-    };
-
-    log::info!(
-        "[trace_id {trace_id}] Query took {} ms",
-        start.elapsed().as_millis()
-    );
-    Ok(data)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn merge_partitions(
-    org_id: &str,
-    offset: i64,
-    limit: i64,
-    sql: &str,
-    schema: Arc<Schema>,
-    batches: Vec<RecordBatch>,
-) -> Result<Vec<RecordBatch>> {
-    if batches.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None).await?;
-
-    // register UDF
-    register_udf(&ctx, org_id).await;
-
-    // Debug SQL
-    let cfg = get_config();
-    if cfg.common.print_key_sql {
-        log::info!("Merge sql: {sql}");
-    }
-
-    let memtable = Arc::new(EmptyTable::new(schema).with_partitions(cfg.limit.cpu_num));
-    ctx.register_table("tbl", memtable)?;
-
-    let plan = ctx.state().create_logical_plan(sql).await?;
-    if cfg.common.print_key_sql {
-        println!("+---------------------------+----------+");
-        println!("logic plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-    }
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("physical plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-    }
-
-    // get partial plan schema and format all the record batches
-    let partial_paln = match super::plan::get_partial_plan(&physical_plan)? {
-        Some(plan) => plan,
-        None => super::plan::get_empty_partial_plan(&physical_plan),
-    };
-    let mut schema_exec = partial_paln.schema();
-    let schema_fields = schema_exec
-        .fields()
-        .iter()
-        .map(|f| f.name())
-        .collect::<HashSet<_>>();
-    let mut new_fields = HashSet::new();
-    let mut need_format = false;
-    for batch in batches.iter() {
-        if batch.num_rows() == 0 {
-            continue;
-        }
-        if batch.schema().fields() != schema_exec.fields() {
-            need_format = true;
-        }
-        for field in batch.schema().fields() {
-            if !schema_fields.contains(field.name()) {
-                new_fields.insert(field.clone());
-            }
-        }
-    }
-    drop(schema_fields);
-    if !new_fields.is_empty() {
-        need_format = true;
-        let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
-        schema_exec =
-            Arc::new(Schema::try_merge(vec![schema_exec.as_ref().clone(), new_schema]).unwrap());
-    }
-    let batches = if need_format {
-        let mut new_batches = Vec::new();
-        for batch in batches {
-            if batch.num_rows() == 0 {
-                continue;
-            }
-            new_batches.push(format_recordbatch_by_schema(schema_exec.clone(), batch));
-        }
-        new_batches
-    } else {
-        batches
-    };
-
-    // repartition batches
-    let chunk_size = std::cmp::max(1, (batches.len() + cfg.limit.cpu_num) / cfg.limit.cpu_num);
-    let mut new_batches: Vec<Vec<RecordBatch>> = Vec::with_capacity(batches.len() / chunk_size);
-    for batch in batches {
-        if new_batches.last().is_none() || new_batches.last().unwrap().len() >= chunk_size {
-            let mut v = Vec::with_capacity(chunk_size);
-            v.push(batch);
-            new_batches.push(v);
-        } else {
-            new_batches.last_mut().unwrap().push(batch);
-        }
-    }
-    let batches = new_batches;
-
-    // get final physical plan
-    let final_plan = match super::plan::get_final_plan(&physical_plan, &batches) {
-        Ok((Some(plan), v)) => {
-            if v {
-                plan
-            } else {
-                super::plan::get_empty_final_plan(
-                    &plan,
-                    &batches,
-                    ctx.state().config().batch_size(),
-                )
-            }
-        }
-        _ => physical_plan.clone(),
-    };
-    let mut update_offset_rewriter = UpdateOffsetExec::new(offset as usize, limit as usize);
-    let final_plan = final_plan.rewrite(&mut update_offset_rewriter)?.data;
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(final_plan.as_ref())
-            .set_show_schema(false)
-            .indent(true)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("final plan");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
-        println!("+---------------------------+----------+");
-    }
-    let data = collect(final_plan, ctx.task_ctx()).await?;
-    Ok(data)
-}
 
 pub async fn convert_parquet_file(
     trace_id: &str,
@@ -801,49 +516,6 @@ pub async fn register_table(
     ctx.register_table(table_name, Arc::new(table))?;
 
     Ok(ctx)
-}
-
-pub async fn query_tables(
-    session: &SearchSession,
-    sql: &Arc<Sql>,
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
-) -> Result<Vec<Vec<RecordBatch>>> {
-    if tables.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let start = std::time::Instant::now();
-    let trace_id = session.id.clone();
-
-    let ctx = prepare_datafusion_context(
-        session.work_group.clone(),
-        &session.search_type,
-        false,
-        false,
-        session.target_partitions,
-        None,
-    )
-    .await?;
-
-    // register UDF
-    register_udf(&ctx, &sql.org_id).await;
-
-    // regsiter union table
-    let union_table = Arc::new(NewUnionTable::try_new(schema, tables)?);
-    ctx.register_table("tbl", union_table)?;
-
-    // query sql
-    let data = exec_query(&ctx, session, sql).await?;
-
-    // drop table
-    ctx.deregister_table("tbl")?;
-    log::info!(
-        "[trace_id {trace_id}] Query all took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok(data)
 }
 
 pub async fn create_parquet_table(

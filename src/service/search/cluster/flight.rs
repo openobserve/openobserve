@@ -293,8 +293,8 @@ fn distribute(total: usize, n: usize) -> Vec<usize> {
     let base_value = total / n;
     let remainder = total % n;
     let mut buckets = vec![base_value; n];
-    for i in 0..remainder {
-        buckets[i] += 1;
+    for item in buckets.iter_mut().take(remainder) {
+        *item += 1;
     }
     buckets
 }
@@ -388,4 +388,174 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
         ctx.register_table(stream_name, table)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_partition_file_by_bytes() {
+        use config::meta::stream::FileMeta;
+
+        let vec = vec![
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 100,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 1,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 200,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 30,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 90,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 5,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 150,
+                    compressed_size: -1,
+                    flattened: false,
+                },
+                false,
+            ),
+        ];
+        let expected: Vec<Vec<i64>> = vec![
+            vec![256, 256, 100],
+            vec![256, 1, 256],
+            vec![200, 30, 90, 256, 5, 150],
+        ];
+        let byte = partition_file_by_bytes(vec, 3);
+        for value in byte
+            .iter()
+            .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
+            .enumerate()
+        {
+            assert_eq!(value.1, expected.get(value.0).unwrap().clone());
+        }
+    }
 }
