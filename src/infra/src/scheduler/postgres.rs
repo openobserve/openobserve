@@ -58,12 +58,21 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP
+    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
+    data         TEXT not null
 );
             "#,
         )
         .execute(&pool)
         .await?;
+
+        // create start_dt column for old version <= 0.9.2
+        let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
+            .fetch_one(&pool)
+            .await?;
+        if has_data_column == 0 {
+            add_data_column().await?;
+        }
         Ok(())
     }
 
@@ -116,8 +125,8 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time, data)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT DO NOTHING;
         "#,
         )
@@ -131,6 +140,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(trigger.next_run_at)
         .bind(0)
         .bind(0)
+        .bind(&trigger.data)
         .execute(&mut *tx)
         .await
         {
@@ -426,4 +436,19 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
         Ok(())
     }
+}
+
+async fn add_data_column() -> Result<()> {
+    log::info!("[POSTGRES] Adding data column to scheduled_jobs table");
+    let pool = CLIENT.clone();
+    if let Err(e) = sqlx::query(
+        r#"ALTER TABLE scheduled_jobs ADD COLUMN IF NOT EXISTS data TEXT NOT NULL DEFAULT '';"#,
+    )
+    .execute(&pool)
+    .await
+    {
+        log::error!("[POSTGRES] Error in adding column data: {}", e);
+        return Err(e.into());
+    }
+    Ok(())
 }

@@ -645,7 +645,7 @@ async fn handle_derived_stream_triggers(
                             &new_trigger.org,
                             new_trigger.module,
                             &new_trigger.module_key,
-                            db::scheduler::TriggerStatus::Waiting,
+                            db::scheduler::TriggerStatus::Waiting, // TODO: update data
                             trigger.retries + 1,
                         )
                         .await?;
