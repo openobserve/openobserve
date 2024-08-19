@@ -32,7 +32,7 @@ use crate::{
     common::meta::{alerts::FrequencyType, dashboards::reports::ReportFrequencyType},
     service::{
         alerts::alert::{get_alert_start_end_time, get_row_column_map},
-        db,
+        db::{self, scheduler::DerivedTriggerData},
         ingestion::ingestion_service,
         usage::publish_triggers_usage,
     },
@@ -516,7 +516,16 @@ async fn handle_derived_stream_triggers(
             name,
         ));
     };
-
+    let start_time = if trigger.data.is_empty() {
+        None
+    } else {
+        let last_data: Result<DerivedTriggerData, json::Error> = json::from_str(&trigger.data);
+        if last_data.is_err() {
+            None
+        } else {
+            Some(last_data.unwrap().period_end_time + 1)
+        }
+    };
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_silenced: false,
@@ -525,7 +534,7 @@ async fn handle_derived_stream_triggers(
     };
 
     // evaluate trigger and configure trigger next run time
-    let (ret, _) = derived_stream.evaluate(None).await?;
+    let (ret, end_time) = derived_stream.evaluate(None, start_time).await?;
     if ret.is_some() {
         log::info!(
             "DerivedStream conditions satisfied, org: {}, module_key: {}",
@@ -533,6 +542,11 @@ async fn handle_derived_stream_triggers(
             new_trigger.module_key
         );
     }
+    // Store the last used derived stream period end time
+    new_trigger.data = json::to_string(&DerivedTriggerData {
+        period_end_time: end_time,
+    })
+    .unwrap();
     if ret.is_some() && derived_stream.trigger_condition.silence > 0 {
         if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
@@ -645,7 +659,7 @@ async fn handle_derived_stream_triggers(
                             &new_trigger.org,
                             new_trigger.module,
                             &new_trigger.module_key,
-                            db::scheduler::TriggerStatus::Waiting, // TODO: update data
+                            db::scheduler::TriggerStatus::Waiting,
                             trigger.retries + 1,
                         )
                         .await?;

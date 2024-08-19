@@ -120,7 +120,7 @@ pub async fn save(
     }
 
     // test derived_stream
-    if let Err(e) = &derived_stream.evaluate(None).await {
+    if let Err(e) = &derived_stream.evaluate(None, None).await {
         return Err(anyhow::anyhow!(
             "DerivedStream not saved due to failed test run caused by {}",
             e.to_string()
@@ -185,12 +185,18 @@ impl DerivedStreamMeta {
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition
-                .evaluate_scheduled(&self.source, &self.trigger_condition, &self.query_condition)
+                .evaluate_scheduled(
+                    &self.source,
+                    &self.trigger_condition,
+                    &self.query_condition,
+                    start_time,
+                )
                 .await
         }
     }
