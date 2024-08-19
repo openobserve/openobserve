@@ -122,7 +122,7 @@ def test_e2e_validhistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
     }
 
@@ -152,7 +152,7 @@ def test_e2e_histogramwithlimit(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
     }
 
@@ -210,7 +210,7 @@ def test_e2e_matchallindexhistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
 } 
 
@@ -240,7 +240,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
 } 
 
@@ -264,7 +264,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
             "from": 0,
             "size": 0,
             "quick_mode": True,
-            "track_total_hits": True
+            "track_total_hits": False
         }
 } 
 
@@ -357,7 +357,7 @@ def test_e2e_matchallcount(create_session, base_url):
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "size": -1,
-                        "track_total_hits": True,
+                        "track_total_hits": False
                 },
             }
     json_data2 = {
@@ -366,7 +366,7 @@ def test_e2e_matchallcount(create_session, base_url):
                         "start_time": one_min_ago,
                         "end_time": end_time,
                         "size": -1,
-                        "track_total_hits": True,
+                        "track_total_hits": False
                 },
             }
 

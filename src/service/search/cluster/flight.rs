@@ -59,6 +59,14 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] start flight search");
     log::info!("[trace_id {trace_id}] sql: {}", meta);
 
+    if meta
+        .schemas
+        .iter()
+        .any(|(_, schema)| schema.schema().fields().is_empty())
+    {
+        return Ok((vec![], ScanStats::new(), 0, false, 0));
+    }
+
     let _start = std::time::Instant::now();
     let group = req
         .search_event_type
