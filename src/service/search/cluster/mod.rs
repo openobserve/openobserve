@@ -30,6 +30,12 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::errors::Result;
 use proto::cluster_rpc;
+#[cfg(feature = "enterprise")]
+use {
+    config::metrics,
+    infra::dist_lock,
+    infra::errors::{Error, ErrorCodes},
+};
 
 use super::new_sql::NewSql;
 use crate::{common::infra::cluster as infra_cluster, service::file_list};

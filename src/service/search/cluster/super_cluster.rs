@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
-    meta::{cluster::Node, search},
+    meta::search,
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -28,12 +28,12 @@ use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
 use vector_enrichment::TableRegistry;
 
-use crate::common::meta::functions::VRLResultResolver;
+use crate::{common::meta::functions::VRLResultResolver, service::search::new_sql::NewSql};
 
 pub async fn search(
     mut req: cluster_rpc::SearchRequest,
-    req_regions: Vec<String>,
-    req_clusters: Vec<String>,
+    _req_regions: Vec<String>,
+    _req_clusters: Vec<String>,
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
@@ -41,32 +41,37 @@ pub async fn search(
     let track_total_hits = req.query.as_ref().unwrap().track_total_hits;
 
     // handle request time range
-    let meta = super::super::sql::Sql::new(&req).await?;
-    if meta.rewrite_sql != req.query.as_ref().unwrap().sql {
-        req.query.as_mut().unwrap().sql = meta.rewrite_sql.clone();
-    }
-    let sql = Arc::new(meta);
+    let sql = NewSql::new(&req).await?;
+    let sql = Arc::new(sql);
 
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
+    let uses_zo_fn = req.query.as_ref().unwrap().uses_zo_fn;
     let mut query_fn = req.query.as_ref().unwrap().query_fn.clone();
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (_took, grpc_results) =
-        o2_enterprise::enterprise::super_cluster::search(req, req_regions, req_clusters).await?;
+    // let (_took, grpc_results) =
+    //     o2_enterprise::enterprise::super_cluster::search(req, req_regions, req_clusters).await?;
 
     // handle query function
-    let grpc_results = grpc_results
-        .into_iter()
-        .map(|v| (Node::default(), v))
-        .collect();
-    let (merge_batches, scan_stats, is_partial) =
-        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
+    // let grpc_results = grpc_results
+    //     .into_iter()
+    //     .map(|v| (Node::default(), v))
+    //     .collect();
+    // let (merge_batches, scan_stats, is_partial) =
+    //     super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
+
+    // TODO super cluster, we don't need merge here, we need call flight
+    let (merge_batches, scan_stats, is_partial) = (
+        Vec::<RecordBatch>::new(),
+        search::ScanStats::default(),
+        false,
+    );
 
     // final result
-    let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
+    let mut result = search::Response::new(sql.offset, sql.limit);
 
     // hits
     if !merge_batches.is_empty() {
@@ -117,7 +122,7 @@ pub async fn search(
                                     .collect(),
                             ),
                             &sql.org_id,
-                            &sql.stream_name,
+                            &sql.stream_names,
                         );
                         ret_val
                             .as_array()
@@ -140,7 +145,7 @@ pub async fn search(
                                     },
                                     &json::Value::Object(hit.clone()),
                                     &sql.org_id,
-                                    &sql.stream_name,
+                                    &sql.stream_names,
                                 );
                                 (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                             })
@@ -161,7 +166,7 @@ pub async fn search(
             sources = super::handle_metrics_response(sources);
         }
 
-        if sql.uses_zo_fn {
+        if uses_zo_fn {
             for source in sources {
                 result
                     .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);

@@ -44,6 +44,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
+    std::collections::HashSet,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
     tracing::{info_span, Instrument},
 };

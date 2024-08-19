@@ -50,9 +50,6 @@ use crate::{
     },
 };
 
-#[cfg(feature = "enterprise")]
-pub mod super_cluster;
-
 #[async_recursion]
 pub async fn search(
     trace_id: &str,

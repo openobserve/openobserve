@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::O2_CONFIG,
-    search::{QueryManager, TaskStatus, WorkGroup},
-};
+use config::metrics;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
     search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
     QueryStatusResponse,
@@ -169,6 +168,8 @@ impl Search for Searcher {
         &self,
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        use crate::service::search as SearchService;
+
         let trace_id = req.into_inner().trace_id;
         match SearchService::cancel_query("", &trace_id).await {
             Ok(ret) => Ok(Response::new(CancelQueryResponse {
