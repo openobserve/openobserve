@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
@@ -64,16 +64,26 @@ pub fn generate_optimizer_rules(
     let end_time = query.end_time;
 
     // get full text search fields
-    let mut fields = HashMap::new();
-    let stream_names = &meta.stream_names;
-    for name in stream_names {
-        let schema = meta.schemas.get(name).unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-        fields.insert(name.clone(), fts_fields);
-    }
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
+
+    if meta.match_items.is_some() && meta.stream_names.len() == 1 {
+        let mut fields = Vec::new();
+        let stream_name = &meta.stream_names[0];
+        let schema = meta.schemas.get(stream_name).unwrap();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+        for fts_field in fts_fields {
+            if schema.field_with_name(&fts_field).is_none() {
+                continue;
+            }
+            fields.push(fts_field);
+        }
+        // *********** custom rules ***********
+        rules.push(Arc::new(RewriteMatch::new(fields)));
+        // ************************************
+    }
+
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
     rules.push(Arc::new(UnwrapCastInComparison::new()));
@@ -100,7 +110,6 @@ pub fn generate_optimizer_rules(
 
     // *********** custom rules ***********
     rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
-    rules.push(Arc::new(RewriteMatch::new(fields)));
     if let Some(limit) = limit {
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offest)));
     };

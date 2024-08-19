@@ -133,10 +133,7 @@ impl NewSql {
             org_id,
             stream_type,
             stream_names,
-            match_items: match_visitor
-                .match_items
-                .is_empty()
-                .then_some(match_visitor.match_items),
+            match_items: match_visitor.match_items,
             equal_items: partition_column_visitor.equal_items,
             aliases,
             schemas: used_schemas,
@@ -420,14 +417,12 @@ impl<'a> Visitor for PartitionColumnVisitor<'a> {
 
 /// get all item from match_all functions
 struct MatchVisitor {
-    pub match_items: Vec<String>, // filed = value
+    pub match_items: Option<Vec<String>>, // filed = value
 }
 
 impl MatchVisitor {
     fn new() -> Self {
-        Self {
-            match_items: Vec::new(),
-        }
+        Self { match_items: None }
     }
 }
 
@@ -447,7 +442,10 @@ impl Visitor for MatchVisitor {
                         {
                             if let FunctionArguments::List(list) = &func.args {
                                 let value = trim_quotes(list.args[0].to_string().as_str());
-                                self.match_items.push(value);
+                                match &mut self.match_items {
+                                    Some(items) => items.push(value),
+                                    None => self.match_items = Some(vec![value]),
+                                }
                             }
                         }
                     }

@@ -17,7 +17,7 @@ use std::any::Any;
 
 use arrow::datatypes::DataType;
 use datafusion::{
-    common::Result,
+    common::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
 };
 use once_cell::sync::Lazy;
@@ -66,7 +66,9 @@ impl ScalarUDFImpl for MatchAllRawUdf {
     }
 
     fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        unreachable!()
+        Err(DataFusionError::Internal(
+            "match_all_raw function don't support sql with multiple streams".to_string(),
+        ))
     }
 }
 
@@ -101,7 +103,9 @@ impl ScalarUDFImpl for MatchAllUdf {
     }
 
     fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        unreachable!()
+        Err(DataFusionError::Internal(
+            "match_all function don't support sql with multiple streams".to_string(),
+        ))
     }
 }
 
@@ -136,6 +140,9 @@ impl ScalarUDFImpl for MatchAllRawIgnoreCaseUdf {
     }
 
     fn invoke(&self, _args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        unreachable!()
+        Err(DataFusionError::Internal(
+            "match_all_raw_ignore_case function don't support sql with multiple streams"
+                .to_string(),
+        ))
     }
 }

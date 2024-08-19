@@ -13,18 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use datafusion::{
     self,
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Column, Result,
     },
     error::DataFusionError,
     logical_expr::{
-        expr::ScalarFunction, expr_rewriter::rewrite_preserving_name, utils::disjunction,
-        BinaryExpr, Expr, LogicalPlan, Operator,
+        expr::ScalarFunction, expr_rewriter::rewrite_preserving_name, utils::disjunction, Expr,
+        Like, LogicalPlan,
     },
     optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
     scalar::ScalarValue,
@@ -38,12 +36,12 @@ use crate::service::search::datafusion::udf::match_all_udf::{
 #[derive(Default)]
 pub struct RewriteMatch {
     #[allow(dead_code)]
-    fields: HashMap<String, Vec<String>>,
+    fields: Vec<String>,
 }
 
 impl RewriteMatch {
     #[allow(missing_docs)]
-    pub fn new(fields: HashMap<String, Vec<String>>) -> Self {
+    pub fn new(fields: Vec<String>) -> Self {
         Self { fields }
     }
 }
@@ -74,9 +72,9 @@ impl OptimizerRule for RewriteMatch {
                     .map(|expr| expr.exists(|expr| Ok(is_match_all(expr))).unwrap())
                     .any(|x| x)
                 {
-                    let name = get_table_name(&plan);
-                    let fields = self.fields.get(&name).unwrap().clone();
-                    let mut expr_rewriter = MatchToFullTextMatch { fields };
+                    let mut expr_rewriter = MatchToFullTextMatch {
+                        fields: self.fields.clone(),
+                    };
                     plan.map_expressions(|expr| {
                         let new_expr = rewrite_preserving_name(expr, &mut expr_rewriter)?;
                         Ok(Transformed::yes(new_expr))
@@ -93,50 +91,12 @@ impl OptimizerRule for RewriteMatch {
 fn is_match_all(expr: &Expr) -> bool {
     match expr {
         Expr::ScalarFunction(ScalarFunction { func, .. }) => {
-            func.name() == MATCH_ALL_UDF_NAME
+            func.name().to_lowercase() == MATCH_ALL_UDF_NAME
                 || func.name() == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
                 || func.name() == MATCH_ALL_RAW_UDF_NAME
         }
         _ => false,
     }
-}
-
-// get table name from logical plan
-fn get_table_name(plan: &LogicalPlan) -> String {
-    let mut visitor = TableNameVisitor::new();
-    plan.visit(&mut visitor).unwrap();
-    strip_prefix(visitor.name)
-}
-
-struct TableNameVisitor {
-    name: String,
-}
-
-impl TableNameVisitor {
-    pub fn new() -> Self {
-        Self {
-            name: "".to_string(),
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
-    type Node = LogicalPlan;
-
-    fn f_up(&mut self, plan: &'n LogicalPlan) -> Result<TreeNodeRecursion> {
-        match plan {
-            LogicalPlan::TableScan(scan) => {
-                self.name = scan.table_name.to_string();
-                Ok(TreeNodeRecursion::Stop)
-            }
-            _ => Ok(TreeNodeRecursion::Continue),
-        }
-    }
-}
-
-// strip the catalog and schema prefix
-fn strip_prefix(name: String) -> String {
-    name.split('.').last().unwrap().to_string()
 }
 
 // Rewriter for match_all() to str_match()
@@ -169,18 +129,20 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             args[0]
                         )));
                     };
-                    let operator = if name == MATCH_ALL_RAW_UDF_NAME {
-                        Operator::LikeMatch
+                    let case_insensitive = if name == MATCH_ALL_RAW_UDF_NAME {
+                        true
                     } else {
-                        Operator::ILikeMatch
+                        false
                     };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
                     let item = Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))));
                     for field in self.fields.iter() {
-                        let new_expr = Expr::BinaryExpr(BinaryExpr {
-                            left: Box::new(Expr::Column(Column::new_unqualified(field))),
-                            op: operator,
-                            right: Box::new(item.clone()),
+                        let new_expr = Expr::Like(Like {
+                            negated: false,
+                            expr: Box::new(Expr::Column(Column::new_unqualified(field))),
+                            pattern: Box::new(item.clone()),
+                            escape_char: None,
+                            case_insensitive,
                         });
                         expr_list.push(new_expr);
                     }
@@ -197,7 +159,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc};
+    use std::sync::Arc;
 
     use arrow::array::{Int64Array, StringArray};
     use arrow_schema::DataType;
@@ -298,8 +260,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut fields = HashMap::new();
-        fields.insert("t".to_string(), vec!["name".to_string(), "log".to_string()]);
+        let fields = vec!["name".to_string(), "log".to_string()];
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
