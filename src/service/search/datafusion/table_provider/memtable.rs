@@ -18,7 +18,6 @@ use std::{any::Any, sync::Arc};
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
-use config::get_config;
 use datafusion::{
     catalog::Session,
     common::{project_schema, Constraints, Result},
@@ -37,6 +36,7 @@ use hashbrown::HashMap;
 pub(crate) struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
+    sorted_by_time: bool,
 }
 
 impl NewMemTable {
@@ -45,11 +45,13 @@ impl NewMemTable {
         schema: SchemaRef,
         partitions: Vec<Vec<RecordBatch>>,
         rules: HashMap<String, DataType>,
+        sorted_by_time: bool,
     ) -> Result<Self> {
         let mem = MemTable::try_new(schema, partitions)?;
         Ok(Self {
             mem_table: mem,
             diff_rules: rules,
+            sorted_by_time,
         })
     }
 }
@@ -86,25 +88,11 @@ impl TableProvider for NewMemTable {
 
         // add the diff rules to the execution plan
         if self.diff_rules.is_empty() {
-            // create sort exec
-            let index = memory_exec
-                .schema()
-                .index_of(&get_config().common.column_timestamp);
-            let exec = match index {
-                Ok(index) => {
-                    let ordering = vec![PhysicalSortExpr {
-                        expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
-                        options: SortOptions {
-                            descending: true,
-                            nulls_first: false,
-                        },
-                    }];
-                    Arc::new(SortExec::new(ordering, memory_exec)) as Arc<dyn ExecutionPlan>
-                }
-                Err(_) => memory_exec as Arc<dyn ExecutionPlan>,
-            };
-            return Ok(exec);
-            // return Ok(memory_exec);
+            return Ok(if self.sorted_by_time {
+                wrap_sort(memory_exec)
+            } else {
+                memory_exec
+            });
         }
 
         let projected_schema = project_schema(&self.schema(), projection)?;
@@ -120,26 +108,11 @@ impl TableProvider for NewMemTable {
             }
         }
         let projection_exec = Arc::new(ProjectionExec::try_new(exprs, memory_exec)?);
-
-        // create sort exec
-        let index = projection_exec
-            .schema()
-            .index_of(&get_config().common.column_timestamp);
-        let exec = match index {
-            Ok(index) => {
-                let ordering = vec![PhysicalSortExpr {
-                    expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
-                    options: SortOptions {
-                        descending: true,
-                        nulls_first: false,
-                    },
-                }];
-                Arc::new(SortExec::new(ordering, projection_exec)) as Arc<dyn ExecutionPlan>
-            }
-            Err(_) => projection_exec as Arc<dyn ExecutionPlan>,
-        };
-
-        Ok(exec)
+        Ok(if self.sorted_by_time {
+            wrap_sort(projection_exec)
+        } else {
+            projection_exec
+        })
     }
 
     async fn insert_into(
@@ -154,4 +127,23 @@ impl TableProvider for NewMemTable {
     fn get_column_default(&self, column: &str) -> Option<&Expr> {
         self.mem_table.get_column_default(column)
     }
+}
+
+// create sort exec by _timestamp
+fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+    let column_timestamp = config::get_config().common.column_timestamp.to_string();
+    let index = exec.schema().index_of(&column_timestamp);
+    (match index {
+        Ok(index) => {
+            let ordering = vec![PhysicalSortExpr {
+                expr: Arc::new(Column::new(&column_timestamp, index)),
+                options: SortOptions {
+                    descending: true,
+                    nulls_first: false,
+                },
+            }];
+            Arc::new(SortExec::new(ordering, exec))
+        }
+        Err(_) => exec,
+    }) as _
 }

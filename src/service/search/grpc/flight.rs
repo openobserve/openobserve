@@ -200,22 +200,27 @@ pub async fn search(
 
     // search in WAL memory
     if LOCAL_NODE.is_ingester() {
-        let (tbls, _, stats) =
-            match super::wal::search_memtable(query_params.clone(), schema_latest.clone()).await {
-                Ok(v) => v,
-                Err(e) => {
-                    // clear session data
-                    super::super::datafusion::storage::file_list::clear(&trace_id);
-                    // release wal lock files
-                    crate::common::infra::wal::release_files(&wal_lock_files).await;
-                    log::error!(
-                        "[trace_id {}] search->storage: search wal memtable error: {}",
-                        trace_id,
-                        e
-                    );
-                    return Err(e);
-                }
-            };
+        let (tbls, _, stats) = match super::wal::search_memtable(
+            query_params.clone(),
+            schema_latest.clone(),
+            empty_exec.sorted_by_time(),
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                super::super::datafusion::storage::file_list::clear(&trace_id);
+                // release wal lock files
+                crate::common::infra::wal::release_files(&wal_lock_files).await;
+                log::error!(
+                    "[trace_id {}] search->storage: search wal memtable error: {}",
+                    trace_id,
+                    e
+                );
+                return Err(e);
+            }
+        };
         tables.extend(tbls);
         scan_stats.add(&stats);
     }

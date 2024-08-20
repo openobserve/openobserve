@@ -39,6 +39,7 @@ pub struct NewEmptyExec {
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
+    sorted_by_time: bool,
 }
 
 impl NewEmptyExec {
@@ -49,8 +50,9 @@ impl NewEmptyExec {
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
+        sorted_by_time: bool,
     ) -> Self {
-        let cache = Self::compute_properties(Arc::clone(&schema), 1);
+        let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
         NewEmptyExec {
             name: name.to_string(),
             schema,
@@ -59,6 +61,7 @@ impl NewEmptyExec {
             projection: projection.cloned(),
             filters: filters.to_owned(),
             limit,
+            sorted_by_time,
         }
     }
 
@@ -81,20 +84,28 @@ impl NewEmptyExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
+    fn compute_properties(
+        schema: SchemaRef,
+        n_partitions: usize,
+        sorted_by_time: bool,
+    ) -> PlanProperties {
         let index = schema.index_of(&get_config().common.column_timestamp);
-        let eq_properties = match index {
-            Ok(index) => {
-                let ordering = vec![vec![PhysicalSortExpr {
-                    expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
-                    options: SortOptions {
-                        descending: true,
-                        nulls_first: false,
-                    },
-                }]];
-                EquivalenceProperties::new_with_orderings(schema, &ordering)
+        let eq_properties = if !sorted_by_time {
+            EquivalenceProperties::new(schema)
+        } else {
+            match index {
+                Ok(index) => {
+                    let ordering = vec![vec![PhysicalSortExpr {
+                        expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
+                        options: SortOptions {
+                            descending: true,
+                            nulls_first: false,
+                        },
+                    }]];
+                    EquivalenceProperties::new_with_orderings(schema, &ordering)
+                }
+                Err(_) => EquivalenceProperties::new(schema),
             }
-            Err(_) => EquivalenceProperties::new(schema),
         };
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         PlanProperties::new(
@@ -121,6 +132,10 @@ impl NewEmptyExec {
     pub fn limit(&self) -> Option<usize> {
         self.limit
     }
+
+    pub fn sorted_by_time(&self) -> bool {
+        self.sorted_by_time
+    }
 }
 
 impl DisplayAs for NewEmptyExec {
@@ -146,12 +161,21 @@ impl DisplayAs for NewEmptyExec {
                 let limit_string = self
                     .limit
                     .map_or_else(|| "".to_string(), |l| format!(", limit={}", l));
+                let sorted_by_time_string = if self.sorted_by_time {
+                    ", sorted_by_time=true"
+                } else {
+                    ""
+                };
 
                 write!(f, "NewEmptyExec: ")?;
                 write!(
                     f,
-                    "{}{}{}{}",
-                    name_string, projection_string, filters_string, limit_string
+                    "{}{}{}{}{}",
+                    name_string,
+                    projection_string,
+                    filters_string,
+                    limit_string,
+                    sorted_by_time_string
                 )
             }
         }

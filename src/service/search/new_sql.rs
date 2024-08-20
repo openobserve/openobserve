@@ -67,6 +67,7 @@ pub struct NewSql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, bool)>,
     pub histogram_interval: Option<i64>,
+    pub sorted_by_time: bool, // if only order by _timestamp
 }
 
 impl NewSql {
@@ -112,7 +113,21 @@ impl NewSql {
             .cloned()
             .collect::<Vec<_>>();
         let group_by = column_visitor.group_by;
-        let order_by = column_visitor.order_by;
+        let mut order_by = column_visitor.order_by;
+
+        // check if need sort by time
+        if order_by.is_empty()
+            && !query.track_total_hits
+            && stream_names.len() == 1
+            && group_by.is_empty()
+            && !column_visitor.has_function
+            && !column_visitor.is_distinct
+        {
+            order_by.push((get_config().common.column_timestamp.clone(), false));
+        }
+        let need_sort_by_time = order_by.len() == 1
+            && order_by[0].0 == get_config().common.column_timestamp
+            && !order_by[0].1;
 
         // 4. get match_all() value
         let mut match_visitor = MatchVisitor::new();
@@ -163,6 +178,7 @@ impl NewSql {
             group_by,
             order_by,
             histogram_interval: histogram_interval_visitor.interval,
+            sorted_by_time: need_sort_by_time,
         })
     }
 
@@ -207,7 +223,17 @@ impl std::fmt::Display for NewSql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {} \ntime_range: {:?} \norg_id: {} \nstream_type: {:?} \nstream_names: {:?} \nmatch_items: {:?} \nequal_items: {:?} \naliases: {:?} \nlimit: {} \noffset: {} \ngroup_by: {:?} \norder_by: {:?}\n",
+            r#"sql: {}
+time_range: {:?}
+stream: {}/{:?}/{:?}
+match_items: {:?}
+equal_items: {:?}
+aliases: {:?}
+limit: {}  offset: {}
+group_by: {:?}
+order_by: {:?}
+histogram_interval: {:?}
+sorted_by_time: {}"#,
             self.sql,
             self.time_range,
             self.org_id,
@@ -219,7 +245,9 @@ impl std::fmt::Display for NewSql {
             self.limit,
             self.offset,
             self.group_by,
-            self.order_by
+            self.order_by,
+            self.histogram_interval,
+            self.sorted_by_time
         )
     }
 }
@@ -320,6 +348,8 @@ struct ColumnVisitor<'a> {
     columns_alias: HashSet<(String, String)>,
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
     is_wildcard: bool,
+    is_distinct: bool,
+    has_function: bool,
     group_by: Vec<String>,
     order_by: Vec<(String, bool)>, // field_name, asc
 }
@@ -331,6 +361,8 @@ impl<'a> ColumnVisitor<'a> {
             columns_alias: HashSet::new(),
             schemas,
             is_wildcard: false,
+            is_distinct: false,
+            has_function: false,
             group_by: Vec::new(),
             order_by: Vec::new(),
         }
@@ -373,6 +405,9 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
                         .or_default()
                         .insert(filed_name);
                 }
+            }
+            Expr::Function(_) => {
+                self.has_function = true;
             }
             _ => {}
         }
@@ -418,6 +453,9 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
                         self.group_by.push(expr_name);
                     }
                 }
+            }
+            if select.distinct.is_some() {
+                self.is_distinct = true;
             }
         }
         ControlFlow::Continue(())

@@ -16,7 +16,6 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use arrow::array::RecordBatch;
-use async_recursion::async_recursion;
 use config::{
     get_config,
     meta::{
@@ -52,16 +51,15 @@ use crate::{
     },
 };
 
-#[async_recursion]
 pub async fn search(
     trace_id: &str,
-    meta: Arc<NewSql>,
+    sql: Arc<NewSql>,
     req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     log::info!("[trace_id {trace_id}] start flight search");
-    log::info!("[trace_id {trace_id}] sql: {}", meta);
+    log::info!("[trace_id {trace_id}] sql: {}", sql);
 
-    if meta
+    if sql
         .schemas
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
@@ -86,19 +84,19 @@ pub async fn search(
     }
 
     // 2. get file list
-    let file_lists = get_file_lists(&req, meta.clone()).await?;
+    let file_lists = get_file_lists(&req, sql.clone()).await?;
 
     // 3. partition file list
     let partition_file_lists = partition_filt_lists(file_lists, &nodes, group).await?;
 
     // 4. construct physical plan
-    let ctx = generate_context(&req, &meta, cfg.limit.cpu_num).await?;
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
 
     // 5. register table
-    register_table(&ctx, &meta).await?;
+    register_table(&ctx, &sql).await?;
 
     // 5. create physical plan
-    let plan = ctx.state().create_logical_plan(&meta.sql).await?;
+    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
@@ -118,7 +116,7 @@ pub async fn search(
 
     // add remote scan exec to top if physical plan is not changed
     if !rewrite.is_changed {
-        let table_name = meta.stream_names.first().unwrap();
+        let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             rewrite.file_lists.get(table_name).unwrap().clone(),
@@ -396,7 +394,9 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
     for (stream_name, schema) in &sql.schemas {
         let schema = schema.schema().clone();
         let table = Arc::new(
-            NewEmptyTable::new(stream_name, Arc::new(schema)).with_partitions(cfg.limit.cpu_num),
+            NewEmptyTable::new(stream_name, Arc::new(schema))
+                .with_partitions(cfg.limit.cpu_num)
+                .with_sorted_by_time(sql.sorted_by_time),
         );
         ctx.register_table(stream_name, table)?;
     }

@@ -3160,6 +3160,8 @@ pub struct NewEmptyExecNode {
     pub filters: ::prost::alloc::vec::Vec<::datafusion_proto::protobuf::LogicalExprNode>,
     #[prost(uint64, optional, tag = "5")]
     pub limit: ::core::option::Option<u64>,
+    #[prost(bool, tag = "6")]
+    pub sorted_by_time: bool,
 }
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]

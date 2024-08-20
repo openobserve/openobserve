@@ -34,6 +34,7 @@ pub struct NewEmptyTable {
     name: String,
     schema: SchemaRef,
     partitions: usize,
+    sorted_by_time: bool,
 }
 
 impl NewEmptyTable {
@@ -43,12 +44,19 @@ impl NewEmptyTable {
             name: name.to_string(),
             schema,
             partitions: 1,
+            sorted_by_time: false,
         }
     }
 
     /// Creates a new EmptyTable with specified partition number.
     pub fn with_partitions(mut self, partitions: usize) -> Self {
         self.partitions = partitions;
+        self
+    }
+
+    /// Creates a new EmptyTable with specified sorted_by_time.
+    pub fn with_sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
         self
     }
 }
@@ -77,8 +85,15 @@ impl TableProvider for NewEmptyTable {
         // even though there is no data, projections apply
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
-            NewEmptyExec::new(&self.name, projected_schema, projection, filters, limit)
-                .with_partitions(self.partitions),
+            NewEmptyExec::new(
+                &self.name,
+                projected_schema,
+                projection,
+                filters,
+                limit,
+                self.sorted_by_time,
+            )
+            .with_partitions(self.partitions),
         ))
     }
 

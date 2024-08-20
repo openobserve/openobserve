@@ -16,6 +16,7 @@ message NewEmptyExecNode {
     repeated uint64                  projection = 3;
     repeated datafusion.LogicalExprNode filters = 4;
     optional uint64                       limit = 5;
+    bool                         sorted_by_time = 6;
 }
 
 // Search request

@@ -285,6 +285,7 @@ pub async fn search_parquet(
 pub async fn search_memtable(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
+    sorted_by_time: bool,
 ) -> super::SearchTable {
     // let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     // let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
@@ -370,6 +371,7 @@ pub async fn search_memtable(
             schema_latest.clone(),
             vec![record_batches],
             diff_fields,
+            sorted_by_time,
         )?);
         tables.push(table as _);
     }

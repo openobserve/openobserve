@@ -76,6 +76,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             projection.as_ref(),
             &filters,
             proto.limit.map(|v| v as usize),
+            proto.sorted_by_time,
         )))
     }
 
@@ -94,6 +95,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             },
             filters,
             limit: node.limit().map(|v| v as u64),
+            sorted_by_time: node.sorted_by_time(),
         };
         proto.encode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -181,6 +183,7 @@ mod tests {
             Some(&vec![0]),
             &[],
             Some(10),
+            false,
         ));
 
         // encode
