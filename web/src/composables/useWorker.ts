@@ -35,7 +35,10 @@ export function useWorker() {
    * @returns
    */
 
-  function runWorker(data: any, workerFunction: Function) {
+  function runWorker<T, R>(
+    data: T,
+    workerFunction: (data: T) => R,
+  ): Promise<R> {
     return new Promise((resolve, reject) => {
       // Convert the function to a string
       const functionString = workerFunction.toString();
