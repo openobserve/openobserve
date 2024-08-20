@@ -84,71 +84,70 @@ export const convertSQLData = async (
   };
   console.log("getBreakDownKeys", getBreakDownKeys());
 
-  const processData = (data: any[]) => {
-    // Ensure data exists and is in the expected format
-    if (!data || data.length === 0 || !Array.isArray(data[0])) {
-      console.log("No valid data available");
+  const processData = (data: any[], panelSchema: any) => {
+    console.log("Processing data...");
+    console.log("Data:", data);
+    console.log("Panel schema:", panelSchema);
+    
+    if (!data.length || !Array.isArray(data[0])) {
+      console.log("No data or invalid data format. Returning empty array.");
       return [];
     }
 
+    const { top_results, top_results_others } = panelSchema.config;
     const innerDataArray = data[0];
+    if (!top_results) {
+      console.log("No top results configured. Returning inner data array.");
+      return innerDataArray;
+    }
 
-    console.log("processData", innerDataArray);
+    // Step 1: Aggregate y_axis_1 values by breakdown_1, ignoring items without a breakdown_1 key
+    console.log("Aggregating data...");
+    const breakdown = innerDataArray.reduce(
+      (acc, { breakdown_1, y_axis_1 }) => {
+        if (breakdown_1) {
+          acc[breakdown_1] = (acc[breakdown_1] || 0) + (+y_axis_1 || 0);
+        }
+        return acc;
+      },
+      {},
+    );
+    console.log("Breakdown:", breakdown);
 
-    // Step 1: Count occurrences of each breakdown value
-    const breakdown: Record<string, number> = {};
+    // Step 2: Sort and extract the top keys based on the configured number of top results
+    console.log("Sorting and extracting top keys...");
+    const topKeys = Object.entries(breakdown)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, top_results)
+      .map(([key]) => key);
+    console.log("Top keys:", topKeys);
+
+    // Step 3: Initialize result array and others object for aggregation
+    console.log("Initializing result array and others object...");
+    const resultArray: any = [];
+    const othersObj: any = {};
+
     innerDataArray.forEach((item) => {
-      const bk = item.breakdown_1 || "-";
-      const yvalue = parseInt(item.y_axis_1, 10) || 0;
-      breakdown[bk] = (breakdown[bk] || 0) + yvalue;
-    });
-
-    console.log("breakdown", breakdown);
-
-    // Step 2: Convert the breakdown counts to an array and sort by value descending
-    let countArray = Object.entries(breakdown).map(([key, value]) => ({
-      key,
-      value,
-    }));
-    countArray.sort((a, b) => b.value - a.value); // Sort by value descending
-
-    console.log("sorted countArray", countArray);
-
-    // Step 3: Extract top 2 keys
-    const topKeys = countArray.slice(0, 4).map((item) => item.key);
-    console.log("topKeys", topKeys);
-
-    // Step 4: Initialize result and other_series sums
-    const resultArray: any[] = [];
-    const othersObj: Record<string, number> = {};
-
-    // Step 5: Process the inner data array
-    innerDataArray.forEach((item) => {
-      const match = topKeys.includes(item.breakdown_1);
-
-      if (match) {
+      if (topKeys.includes(item.breakdown_1)) {
+        console.log("Adding item to result array:", item);
         resultArray.push(item);
-      } else {
+      } else if (top_results_others) {
         const xAxisValue = String(item.x_axis_1);
-        const yvalue = parseInt(item.y_axis_1, 10) || 0;
-        othersObj[xAxisValue] = (othersObj[xAxisValue] || 0) + yvalue;
+        othersObj[xAxisValue] =
+          (othersObj[xAxisValue] || 0) + (+item.y_axis_1 || 0);
       }
     });
 
-    console.log("resultArray", resultArray);
-    console.log("othersObj", othersObj);
-
-    // Step 6: Convert the 'othersObj' to an array of objects and add to resultArray
-    Object.keys(othersObj).forEach((key) => {
-      resultArray.push({
-        breakdown_1: "others",
-        x_axis_1: key,
-        y_axis_1: othersObj[key],
+    // Step 4: Add 'others' aggregation to the result array if enabled
+    if (top_results_others) {
+      console.log("Adding 'others' aggregation to the result array...");
+      Object.entries(othersObj).forEach(([x_axis_1, y_axis_1]) => {
+        console.log("Adding item to result array:", { breakdown_1: "others", x_axis_1, y_axis_1 });
+        resultArray.push({ breakdown_1: "others", x_axis_1, y_axis_1 });
       });
-    });
+    }
 
-    console.log("final resultArray", resultArray);
-
+    console.log("Result array:", resultArray);
     return resultArray;
   };
 
@@ -172,7 +171,7 @@ export const convertSQLData = async (
   const noValueConfigOption = panelSchema.config?.no_value_replacement;
 
   console.time("processData Time");
-  const processedData = processData(searchQueryData);
+  const processedData = processData(searchQueryData, panelSchema);
   console.timeEnd("processData Time");
 
   const missingValue = () => {
