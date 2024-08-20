@@ -15,14 +15,16 @@
 
 use std::{any::Any, sync::Arc};
 
+use arrow_schema::SortOptions;
+use config::get_config;
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{internal_err, Result, Statistics},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        common, memory::MemoryStream, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-        PlanProperties,
+        common, expressions::Column, memory::MemoryStream, DisplayAs, DisplayFormatType,
+        ExecutionMode, ExecutionPlan, PlanProperties,
     },
     prelude::Expr,
 };
@@ -80,7 +82,20 @@ impl NewEmptyExec {
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
     fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
-        let eq_properties = EquivalenceProperties::new(schema);
+        let index = schema.index_of(&get_config().common.column_timestamp);
+        let eq_properties = match index {
+            Ok(index) => {
+                let ordering = vec![vec![PhysicalSortExpr {
+                    expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
+                    options: SortOptions {
+                        descending: true,
+                        nulls_first: false,
+                    },
+                }]];
+                EquivalenceProperties::new_with_orderings(schema, &ordering)
+            }
+            Err(_) => EquivalenceProperties::new(schema),
+        };
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
         PlanProperties::new(
             eq_properties,
