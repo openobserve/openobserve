@@ -34,7 +34,7 @@ use tracing::Instrument;
 
 use crate::{
     common::{
-        meta::search::{CachedQueryResponse, QueryDelta},
+        meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::functions,
     },
     service::{
@@ -44,6 +44,7 @@ use crate::{
 };
 
 pub mod cacher;
+pub mod multi;
 pub mod result_utils;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
@@ -96,7 +97,7 @@ pub async fn search(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
     );
-    let mut c_resp: CachedQueryResponse = if use_cache {
+    let mut c_resp: MultiCachedQueryResponse = if use_cache {
         check_cache(
             trace_id,
             &rpc_req,
@@ -108,7 +109,7 @@ pub async fn search(
         )
         .await
     } else {
-        CachedQueryResponse::default()
+        MultiCachedQueryResponse::default()
     };
 
     // No cache data present, add delta for full query
@@ -133,7 +134,15 @@ pub async fn search(
     // Result caching check ends, start search
     let mut results = Vec::new();
     let mut res = if !should_exec_query {
-        c_resp.cached_response
+        merge_response(
+            trace_id,
+            &mut c_resp.cached_response,
+            &mut vec![],
+            &c_resp.ts_column,
+            c_resp.limit,
+            c_resp.is_descending,
+            c_resp.took,
+        )
     } else {
         if let Some(vrl_function) = &query_fn {
             if !vrl_function.trim().ends_with('.') {
@@ -221,12 +230,12 @@ pub async fn search(
             merge_response(
                 trace_id,
                 &mut c_resp.cached_response,
-                &results,
+                &mut results,
                 &c_resp.ts_column,
                 c_resp.limit,
                 c_resp.is_descending,
-            );
-            c_resp.cached_response
+                c_resp.took,
+            )
         } else {
             let mut reps = results[0].clone();
             sort_response(c_resp.is_descending, &mut reps, &c_resp.ts_column);
@@ -300,15 +309,39 @@ pub async fn search(
 // or end to cache response
 fn merge_response(
     trace_id: &str,
-    cache_response: &mut config::meta::search::Response,
-    search_response: &Vec<config::meta::search::Response>,
+    cache_responses: &mut Vec<config::meta::search::Response>,
+    search_response: &mut Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
     is_descending: bool,
-) {
-    if cache_response.hits.is_empty() && search_response.is_empty() {
-        return;
+    cache_took: usize,
+) -> config::meta::search::Response {
+    cache_responses.retain(|res| !res.hits.is_empty());
+
+    search_response.retain(|res| !res.hits.is_empty());
+
+    if cache_responses.is_empty() && search_response.is_empty() {
+        return config::meta::search::Response::default();
     }
+
+    let mut cache_response = if cache_responses.is_empty() {
+        config::meta::search::Response::default()
+    } else {
+        let mut resp = config::meta::search::Response::default();
+        for res in cache_responses {
+            resp.total += res.total;
+            resp.scan_size += res.scan_size;
+
+            resp.scan_records += res.scan_records;
+
+            if res.hits.is_empty() {
+                continue;
+            }
+            resp.hits.extend(res.hits.clone());
+        }
+        resp.took = cache_took;
+        resp
+    };
 
     if cache_response.hits.is_empty()
         && search_response.is_empty()
@@ -320,7 +353,7 @@ fn merge_response(
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
         }
-        return;
+        return cache_response;
     }
     let cache_hits_len = cache_response.hits.len();
 
@@ -329,7 +362,7 @@ fn merge_response(
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
 
-    for res in search_response {
+    for res in search_response.clone() {
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
@@ -342,7 +375,7 @@ fn merge_response(
         }
         cache_response.hits.extend(res.hits.clone());
     }
-    sort_response(is_descending, cache_response, ts_column);
+    sort_response(is_descending, &mut cache_response, ts_column);
 
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
@@ -355,6 +388,7 @@ fn merge_response(
     );
     cache_response.result_cache_ratio =
         (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+    cache_response
 }
 
 fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_column: &str) {

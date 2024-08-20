@@ -40,6 +40,7 @@ use {
 use super::new_sql::NewSql;
 use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
+pub mod cache_multi;
 pub mod cacher;
 pub mod flight;
 pub mod grpc;
