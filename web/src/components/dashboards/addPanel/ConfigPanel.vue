@@ -518,6 +518,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-slot
         placeholder="ALL"
         :type="'number'"
+        :disable="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.breakdown.length == 0
+        "
         data-test="dashboard-config-top_results"
         ><template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -553,6 +558,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.data.config.top_results_others"
           label="Add 'others' series"
           data-test="dashboard-config-top_results_others"
+          :disable="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown.length == 0
+          "
         />
 
         <q-icon
