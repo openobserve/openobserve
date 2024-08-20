@@ -344,21 +344,6 @@ export const usePanelDataLoader = (
           const { traceparent } = generateTraceContext();
 
           try {
-            const res = await queryService.partition({
-              org_identifier: store.state.selectedOrganization.identifier,
-              query: {
-                sql: query,
-                sql_mode: "full",
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                size: -1,
-              },
-              page_type: pageType,
-              traceparent,
-            });
-
-            const partitionArr = res?.data?.partitions ?? [];
-
             // default histogram interval is 10 second
             let histogramInterval = "10 second";
 
@@ -383,6 +368,21 @@ export const usePanelDataLoader = (
             if (endISOTimestamp - startISOTimestamp >= 1000000 * 86400 * 30) {
               histogramInterval = "1 day";
             }
+
+            const res = await queryService.partition({
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                sql: changeHistogramInterval(query, histogramInterval),
+                sql_mode: "full",
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                size: -1,
+              },
+              page_type: pageType,
+              traceparent,
+            });
+
+            const partitionArr = res?.data?.partitions ?? [];
 
             // reset old state data
             state.data = [];
