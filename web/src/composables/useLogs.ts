@@ -164,7 +164,7 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 1,
       columns: <any>[],
-      colOrder : <any> {},
+      colOrder: <any>{},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -2068,14 +2068,18 @@ const useLogs = () => {
       searchObj.data.resultGrid.colOrder.hasOwnProperty(
         searchObj.data.stream.selectedStream,
       ) &&
-      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream][0].length > 0 &&
+      searchObj.data.resultGrid.colOrder[
+        searchObj.data.stream.selectedStream
+      ][0].length > 0 &&
       searchObj.data.stream.selectedFields.length > 0
     ) {
       searchObj.data.stream.selectedFields = [];
-      const colOrderObject = searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream];
+      const colOrderObject =
+        searchObj.data.resultGrid.colOrder[
+          searchObj.data.stream.selectedStream
+        ];
 
-      const colOrderArray : any = Object.values(colOrderObject);
-   
+      const colOrderArray: any = Object.values(colOrderObject);
 
       searchObj.data.stream.selectedFields = colOrderArray[0];
     }
@@ -3050,7 +3054,6 @@ const useLogs = () => {
             header: t("search.timestamp") + ` (${store.state.timezone})`,
             align: "left",
             sortable: true,
-            size: 250,
             enableResizing: false,
             meta: {
               closable: false,
@@ -3100,7 +3103,6 @@ const useLogs = () => {
             align: "left",
             sortable: true,
             enableResizing: false,
-            size: 250,
             meta: {
               closable: false,
               showWrap: false,
@@ -3109,8 +3111,11 @@ const useLogs = () => {
             size: 225,
           });
         }
+
+        //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
         //@ts-ignore
-        const sizes = searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
+        const sizes =
+          searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
 
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
