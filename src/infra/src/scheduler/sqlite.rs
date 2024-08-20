@@ -234,14 +234,15 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         let client = client.lock().await;
         sqlx::query(
             r#"UPDATE scheduled_jobs
-SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5
-WHERE org = $6 AND module_key = $7 AND module = $8;"#,
+SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
+WHERE org = $7 AND module_key = $8 AND module = $9;"#,
         )
         .bind(&trigger.status)
         .bind(trigger.retries)
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
+        .bind(&trigger.data)
         .bind(&trigger.org)
         .bind(&trigger.module_key)
         .bind(&trigger.module)

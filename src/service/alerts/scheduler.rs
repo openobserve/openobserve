@@ -530,6 +530,7 @@ async fn handle_derived_stream_triggers(
         next_run_at: Utc::now().timestamp_micros(),
         is_silenced: false,
         status: db::scheduler::TriggerStatus::Waiting,
+        retries: 0,
         ..trigger.clone()
     };
 

@@ -225,7 +225,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         let pool = CLIENT.clone();
         sqlx::query(
             r#"UPDATE scheduled_jobs
-SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?
+SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
 WHERE org = ? AND module_key = ? AND module = ?;"#,
         )
         .bind(trigger.status)
@@ -233,6 +233,7 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         .bind(trigger.next_run_at)
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
+        .bind(&trigger.data)
         .bind(&trigger.org)
         .bind(&trigger.module_key)
         .bind(&trigger.module)
@@ -480,7 +481,7 @@ async fn add_data_column() -> Result<()> {
     log::info!("[MYSQL] Adding data column to scheduled_jobs table");
     let pool = CLIENT.clone();
     if let Err(e) =
-        sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data TEXT NOT NULL DEFAULT '';"#)
+        sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data TEXT NOT NULL DEFAULT ('');"#)
             .execute(&pool)
             .await
     {

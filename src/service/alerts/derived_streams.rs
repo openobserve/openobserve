@@ -15,7 +15,7 @@
 
 use std::str::FromStr;
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use config::{
     get_config,
     utils::json::{Map, Value},
@@ -128,11 +128,7 @@ pub async fn save(
     };
 
     // Save the trigger to db
-    let next_run_at = Utc::now().timestamp_micros()
-        + Duration::try_minutes(derived_stream.trigger_condition.frequency)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+    let next_run_at = Utc::now().timestamp_micros();
     let trigger = db::scheduler::Trigger {
         org: derived_stream.source.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
