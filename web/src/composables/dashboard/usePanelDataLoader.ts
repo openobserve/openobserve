@@ -60,7 +60,9 @@ export const usePanelDataLoader = (
     data: [] as any,
     loading: false,
     errorDetail: "",
-    metadata: {},
+    metadata: {
+      queries: [] as any,
+    },
     resultMetaData: [] as any,
   });
 
@@ -215,7 +217,9 @@ export const usePanelDataLoader = (
         log("loadData: there are no queries to execute");
         state.loading = false;
         state.data = [];
-        state.metadata = {};
+        state.metadata = {
+          queries: [],
+        };
         return;
       }
 
@@ -301,11 +305,11 @@ export const usePanelDataLoader = (
         );
 
         // Wait for all query promises to resolve
-        const queryResults = await Promise.all(queryPromises);
+        const queryResults: any = await Promise.all(queryPromises);
         state.loading = false;
         state.data = queryResults.map((it: any) => it?.result);
         state.metadata = {
-          queries: queryResults.map((it) => it?.metadata),
+          queries: queryResults.map((it: any) => it?.metadata),
         };
       } else {
         // Call search API
@@ -313,157 +317,295 @@ export const usePanelDataLoader = (
         // Get the page type from the first query in the panel schema
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
-        const sqlqueryPromise = panelSchema.value.queries?.map(
-          async (it: any) => {
-            const { query: query1, metadata: metadata1 } = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType,
-            );
+        // Handle each query sequentially
+        for (const it of panelSchema.value.queries) {
+          const { query: query1, metadata: metadata1 } = replaceQueryValue(
+            it.query,
+            startISOTimestamp,
+            endISOTimestamp,
+            panelSchema.value.queryType,
+          );
 
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } =
+            await applyDynamicVariables(query1, panelSchema.value.queryType);
 
-            const query = query2;
+          const query = query2;
 
-            const metadata = {
-              originalQuery: it.query,
-              query: query,
-              startTime: startISOTimestamp,
-              endTime: endISOTimestamp,
-              queryType: panelSchema.value.queryType,
-              variables: [...(metadata1 || []), ...(metadata2 || [])],
+          const metadata: any = {
+            originalQuery: it.query,
+            query: query,
+            startTime: startISOTimestamp,
+            endTime: endISOTimestamp,
+            queryType: panelSchema.value.queryType,
+            variables: [...(metadata1 || []), ...(metadata2 || [])],
+          };
+
+          // partition api call
+          const { traceparent } = generateTraceContext();
+
+          try {
+            const res = await queryService.partition({
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                sql: query,
+                sql_mode: "full",
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                size: -1,
+              },
+              page_type: pageType,
+              traceparent,
+            });
+
+            const partitionArr = res?.data?.partitions ?? [];
+
+            // default histogram interval is 10 second
+            let histogramInterval = "10 second";
+
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 30) {
+              histogramInterval = "15 second";
+            }
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 60) {
+              histogramInterval = "30 second";
+            }
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 2) {
+              histogramInterval = "1 minute";
+            }
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 6) {
+              histogramInterval = "5 minute";
+            }
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 24) {
+              histogramInterval = "30 minute";
+            }
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 86400 * 7) {
+              histogramInterval = "1 hour";
+            }
+            if (endISOTimestamp - startISOTimestamp >= 1000000 * 86400 * 30) {
+              histogramInterval = "1 day";
+            }
+
+            // reset old state data
+            state.data = [];
+            state.metadata = {
+              queries: [],
             };
+            state.resultMetaData = [];
 
-            // partition api call
-            const { traceparent } = generateTraceContext();
+            // loop on all partitions and call search api for each partition
+            for (const it of panelSchema.value.queries) {
+              const partitionResult: any = [];
+              const responseMetaData: any = {};
 
-            return await queryService
-              .partition({
-                org_identifier: store.state.selectedOrganization.identifier,
-                query: {
-                  sql: query,
-                  sql_mode: "full",
-                  start_time: startISOTimestamp,
-                  end_time: endISOTimestamp,
-                  size: -1,
-                },
-                page_type: pageType,
-                traceparent,
-              })
-              .then(async (res: any) => {
-                const partitionArr = res?.data?.partitions ?? [];
+              // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
+              state.data.push([]);
+              state.metadata.queries.push({});
+              state.resultMetaData.push({});
 
-                const partitionResult: any = [];
+              const currentQueryIndex = state.data.length - 1;
 
-                const responseMetaData: any = {};
-
-                // default histogram interval is 10 second
-                let histogramInterval = "10 second";
-
-                if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 30) {
-                  histogramInterval = "15 second";
-                }
-                if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 60) {
-                  histogramInterval = "30 second";
-                }
-                if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 2) {
-                  histogramInterval = "1 minute";
-                }
-                if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 6) {
-                  histogramInterval = "5 minute";
-                }
-                if (
-                  endISOTimestamp - startISOTimestamp >=
-                  1000000 * 3600 * 24
-                ) {
-                  histogramInterval = "30 minute";
-                }
-                if (
-                  endISOTimestamp - startISOTimestamp >=
-                  1000000 * 86400 * 7
-                ) {
-                  histogramInterval = "1 hour";
-                }
-                if (
-                  endISOTimestamp - startISOTimestamp >=
-                  1000000 * 86400 * 30
-                ) {
-                  histogramInterval = "1 day";
-                }
-
-                // loop on all partitions and call search api for each partition
-                for (const partition of partitionArr) {
-                  await queryService
-                    .search(
-                      {
-                        org_identifier:
-                          store.state.selectedOrganization.identifier,
-                        query: {
-                          query: {
-                            sql: changeHistogramInterval(
-                              query,
-                              histogramInterval,
-                            ),
-                            query_fn: it.vrlFunctionQuery
-                              ? b64EncodeUnicode(it.vrlFunctionQuery)
-                              : null,
-                            sql_mode: "full",
-                            start_time: partition[0],
-                            end_time: partition[1],
-                            size: -1,
-                          },
-                        },
-                        page_type: pageType,
+              for (const partition of partitionArr) {
+                const searchRes = await queryService.search(
+                  {
+                    org_identifier: store.state.selectedOrganization.identifier,
+                    query: {
+                      query: {
+                        sql: changeHistogramInterval(query, histogramInterval),
+                        query_fn: it.vrlFunctionQuery
+                          ? b64EncodeUnicode(it.vrlFunctionQuery)
+                          : null,
+                        sql_mode: "full",
+                        start_time: partition[0],
+                        end_time: partition[1],
+                        size: -1,
                       },
-                      searchType.value ?? "Dashboards",
-                    )
-                    .then((res) => {
-                      // Set searchQueryData.data to the API response hits
-                      // state.data = res.data.hits;
-                      state.errorDetail = "";
-                      // console.log("API response received");
+                    },
+                    page_type: pageType,
+                  },
+                  searchType.value ?? "Dashboards",
+                );
 
-                      // if there is an error in vrl function, throw error
-                      if (res.data.function_error) {
-                        throw new Error(
-                          `Function error: ${res.data.function_error}`,
-                        );
-                      }
+                partitionResult.push(...searchRes.data.hits);
+                Object.assign(responseMetaData, searchRes.data);
 
-                      partitionResult.push(...res.data.hits);
-                      Object.assign(responseMetaData, res.data);
-                    })
-                    .catch((error) => {
-                      // Process API error for "sql"
-                      processApiError(error, "sql");
-                      return { result: null, metadata: metadata };
-                    });
-                }
+                // Update the state with the new data after each partition API call
+                state.data[currentQueryIndex] = JSON.parse(
+                  JSON.stringify(partitionResult),
+                );
 
-                return {
-                  result: partitionResult,
-                  metadata: metadata,
-                  resultMetaData: responseMetaData,
-                };
-              })
-              .catch((error) => {
-                // Process API error for "sql"
-                processApiError(error, "sql");
-                return { result: null, metadata: metadata };
-              });
-          },
-        );
-        // Wait for all query promises to resolve
-        const sqlqueryResults = await Promise.all(sqlqueryPromise);
+                // Update the metadata and resultMetaData after each partition API call
+                Object.assign(
+                  state.metadata.queries[currentQueryIndex],
+                  metadata,
+                );
+                Object.assign(
+                  state.resultMetaData[currentQueryIndex],
+                  responseMetaData,
+                );
+              }
+            }
+
+            state.loading = false;
+          } catch (error) {
+            // Process API error for "sql"
+            processApiError(error, "sql");
+            return { result: null, metadata: metadata };
+          }
+        }
+
         state.loading = false;
-        state.data = sqlqueryResults.map((it) => it?.result);
-        state.metadata = {
-          queries: sqlqueryResults.map((it) => it?.metadata),
-        };
 
-        state.resultMetaData = sqlqueryResults.map((it) => it?.resultMetaData);
+        // const sqlqueryPromise = panelSchema.value.queries?.map(
+        //   async (it: any) => {
+        //     const { query: query1, metadata: metadata1 } = replaceQueryValue(
+        //       it.query,
+        //       startISOTimestamp,
+        //       endISOTimestamp,
+        //       panelSchema.value.queryType,
+        //     );
+
+        //     const { query: query2, metadata: metadata2 } =
+        //       await applyDynamicVariables(query1, panelSchema.value.queryType);
+
+        //     const query = query2;
+
+        //     const metadata = {
+        //       originalQuery: it.query,
+        //       query: query,
+        //       startTime: startISOTimestamp,
+        //       endTime: endISOTimestamp,
+        //       queryType: panelSchema.value.queryType,
+        //       variables: [...(metadata1 || []), ...(metadata2 || [])],
+        //     };
+
+        //     // partition api call
+        //     const { traceparent } = generateTraceContext();
+
+        //     return await queryService
+        //       .partition({
+        //         org_identifier: store.state.selectedOrganization.identifier,
+        //         query: {
+        //           sql: query,
+        //           sql_mode: "full",
+        //           start_time: startISOTimestamp,
+        //           end_time: endISOTimestamp,
+        //           size: -1,
+        //         },
+        //         page_type: pageType,
+        //         traceparent,
+        //       })
+        //       .then(async (res: any) => {
+        //         const partitionArr = res?.data?.partitions ?? [];
+
+        //         const partitionResult: any = [];
+
+        //         const responseMetaData: any = {};
+
+        //         // default histogram interval is 10 second
+        //         let histogramInterval = "10 second";
+
+        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 30) {
+        //           histogramInterval = "15 second";
+        //         }
+        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 60) {
+        //           histogramInterval = "30 second";
+        //         }
+        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 2) {
+        //           histogramInterval = "1 minute";
+        //         }
+        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 6) {
+        //           histogramInterval = "5 minute";
+        //         }
+        //         if (
+        //           endISOTimestamp - startISOTimestamp >=
+        //           1000000 * 3600 * 24
+        //         ) {
+        //           histogramInterval = "30 minute";
+        //         }
+        //         if (
+        //           endISOTimestamp - startISOTimestamp >=
+        //           1000000 * 86400 * 7
+        //         ) {
+        //           histogramInterval = "1 hour";
+        //         }
+        //         if (
+        //           endISOTimestamp - startISOTimestamp >=
+        //           1000000 * 86400 * 30
+        //         ) {
+        //           histogramInterval = "1 day";
+        //         }
+
+        //         // loop on all partitions and call search api for each partition
+        //         for (const partition of partitionArr) {
+        //           await queryService
+        //             .search(
+        //               {
+        //                 org_identifier:
+        //                   store.state.selectedOrganization.identifier,
+        //                 query: {
+        //                   query: {
+        //                     sql: changeHistogramInterval(
+        //                       query,
+        //                       histogramInterval,
+        //                     ),
+        //                     query_fn: it.vrlFunctionQuery
+        //                       ? b64EncodeUnicode(it.vrlFunctionQuery)
+        //                       : null,
+        //                     sql_mode: "full",
+        //                     start_time: partition[0],
+        //                     end_time: partition[1],
+        //                     size: -1,
+        //                   },
+        //                 },
+        //                 page_type: pageType,
+        //               },
+        //               searchType.value ?? "Dashboards",
+        //             )
+        //             .then((res) => {
+        //               // Set searchQueryData.data to the API response hits
+        //               // state.data = res.data.hits;
+        //               state.errorDetail = "";
+        //               // console.log("API response received");
+
+        //               // if there is an error in vrl function, throw error
+        //               if (res.data.function_error) {
+        //                 throw new Error(
+        //                   `Function error: ${res.data.function_error}`,
+        //                 );
+        //               }
+
+        //               partitionResult.push(...res.data.hits);
+        //               Object.assign(responseMetaData, res.data);
+        //             })
+        //             .catch((error) => {
+        //               // Process API error for "sql"
+        //               processApiError(error, "sql");
+        //               return { result: null, metadata: metadata };
+        //             });
+        //         }
+
+        //         return {
+        //           result: partitionResult,
+        //           metadata: metadata,
+        //           resultMetaData: responseMetaData,
+        //         };
+        //       })
+        //       .catch((error) => {
+        //         // Process API error for "sql"
+        //         processApiError(error, "sql");
+        //         return { result: null, metadata: metadata };
+        //       });
+        //   },
+        // );
+
+        // Wait for all query promises to resolve
+        // const sqlqueryResults = await Promise.all(sqlqueryPromise);
+        // state.loading = false;
+        // state.data = sqlqueryResults.map((it: any) => it?.result);
+        // state.metadata = {
+        //   queries: sqlqueryResults.map((it: any) => it?.metadata),
+        // };
+
+        // state.resultMetaData = sqlqueryResults.map((it) => it?.resultMetaData);
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
