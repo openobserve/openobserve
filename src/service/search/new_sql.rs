@@ -539,10 +539,12 @@ impl VisitorMut for MatchVisitor {
                             || name == "match_all_raw_ignore_case"
                         {
                             if let FunctionArguments::List(list) = &func.args {
-                                let value = trim_quotes(list.args[0].to_string().as_str());
-                                match &mut self.match_items {
-                                    Some(items) => items.push(value),
-                                    None => self.match_items = Some(vec![value]),
+                                if list.args.len() == 1 {
+                                    let value = trim_quotes(list.args[0].to_string().as_str());
+                                    match &mut self.match_items {
+                                        Some(items) => items.push(value),
+                                        None => self.match_items = Some(vec![value]),
+                                    }
                                 }
                             }
                         }
