@@ -3114,8 +3114,9 @@ const useLogs = () => {
 
         //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
         //@ts-ignore
-        const sizes =
-          searchObj.data.resultGrid[searchObj.data.stream.selectedStream];
+        const sizes = (searchObj.data.resultGrid as any)[
+          searchObj.data.stream.selectedStream
+        ];
 
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
