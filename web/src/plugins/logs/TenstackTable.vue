@@ -638,6 +638,10 @@ const handleDataRowClick = (row: any, index: number) => {
     emits("click:dataRow", row, actualIndex);
   }
 };
+
+defineExpose({
+  parentRef,
+});
 </script>
 <style scoped lang="scss">
 .resizer {

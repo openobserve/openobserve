@@ -126,278 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ searchObj.data.histogram.errorMsg }}
         </h6>
       </div>
-      <!-- <q-virtual-scroll
-        data-test="logs-search-result-logs-table"
-        id="searchGridComponent"
-        type="table"
-        ref="searchTableRef"
-        class="logs-search-result-table"
-        :virtual-scroll-item-size="25"
-        :virtual-scroll-sticky-size-start="0"
-        :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="100"
-        :virtual-scroll-slice-ratio-before="100"
-        :items="searchObj.data.queryResults.filteredHit"
-        :wrap-cells="
-          searchObj.meta.toggleSourceWrap && searchObj.meta.flagWrapContent
-            ? true
-            : false
-        "
-        :style="{
-          wordBreak: 'break-word',
-          height: !searchObj.meta.showHistogram
-            ? 'calc(100% - 40px)'
-            : 'calc(100% - 140px)',
-        }"
-      >
-        <template v-slot:before>
-          <thead class="thead-sticky text-left">
-            <tr>
-              <th
-                v-for="(col, index) in searchObj.data.resultGrid.columns"
-                :key="'result_' + index"
-                class="table-header"
-                :data-test="`log-search-result-table-th-${col.label}`"
-                :style="col.wrapContent ? { 'max-width': '200px' } : {}"
-              >
-                <div class="flex items-center no-wrap table-head-chip q-dark">
-                  <span
-                    :class="
-                      store.state.theme === 'dark' ? 'text-white' : 'text-dark'
-                    "
-                    class="header-col-title"
-                  >
-                    {{ col.label }}</span
-                  >
-                  <div
-                    class="flex items-center no-wrap field_overlay"
-                    :class="
-                      store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                    "
-                    style="left: 0 !important"
-                    v-if="col.closable || col.showWrap"
-                  >
-                    <span
-                      v-if="col.showWrap"
-                      style="font-weight: normal"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-white'
-                          : 'text-grey-9'
-                      "
-                      >{{ t("common.wrap") }}</span
-                    >
-                    <q-toggle
-                      v-if="col.showWrap"
-                      class="text-normal q-ml-xs q-mr-sm"
-                      :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
-                      v-model="col.wrapContent"
-                      color="primary"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-white'
-                          : 'text-grey-7'
-                      "
-                      size="xs"
-                      dense
-                    />
-
-                    <q-icon
-                      v-if="col.closable"
-                      :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
-                      name="cancel"
-                      class="q-ma-none close-icon cursor-pointer"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-white'
-                          : 'text-grey-7'
-                      "
-                      :title="t('common.close')"
-                      size="18px"
-                      @click="closeColumn(col)"
-                    >
-                    </q-icon>
-                  </div>
-                </div>
-              </th>
-            </tr>
-            <tr v-if="searchObj.loading == true">
-              <td
-                :colspan="searchObj.data.resultGrid.columns.length"
-                class="text-bold"
-                style="opacity: 0.7"
-              >
-                <div class="text-subtitle2 text-weight-bold">
-                  <q-spinner-hourglass size="20px" />
-                  {{ t("confirmDialog.loading") }}
-                </div>
-              </td>
-            </tr>
-            <tr
-              v-if="
-                searchObj.loading == false &&
-                searchObj.data.missingStreamMessage != ''
-              "
-            >
-              <td
-                :colspan="searchObj.data.resultGrid.columns.length"
-                class="text-bold"
-                style="opacity: 0.7"
-              >
-                <div class="text-subtitle2 text-weight-bold bg-warning">
-                  <q-icon size="xs" name="warning" class="q-mr-xs" />
-                  {{ searchObj.data.missingStreamMessage }}
-                </div>
-              </td>
-            </tr>
-          </thead>
-          <tr
-            data-test="log-search-result-function-error"
-            v-if="searchObj.data.functionError != ''"
-          >
-            <td
-              :colspan="searchObj.data.resultGrid.columns.length"
-              class="text-bold"
-              style="opacity: 0.6"
-            >
-              <div class="text-subtitle2 text-weight-bold bg-warning">
-                <q-btn
-                  :icon="expandedLogs['-1'] ? 'expand_more' : 'chevron_right'"
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  data-test="table-row-expand-menu"
-                  @click.stop="expandLog('function_error', -1)"
-                ></q-btn
-                ><b>
-                  <q-icon name="warning" size="15px"></q-icon>
-                  {{ t("search.functionErrorLabel") }}</b
-                >
-              </div>
-            </td>
-          </tr>
-          <q-tr v-if="expandedLogs['-1']">
-            <td
-              :colspan="searchObj.data.resultGrid.columns.length"
-              class="bg-warning"
-              style="opacity: 0.7"
-            >
-              <pre>{{ searchObj.data.functionError }}</pre>
-            </td>
-          </q-tr>
-        </template>
-        <template v-slot="{ item: row, index }">
-          <q-tr
-            :data-test="`logs-search-result-detail-${
-              row[store.state.zoConfig.timestamp_column]
-            }`"
-            :key="'expand_' + index"
-            @click="expandRowDetail(row, index)"
-            style="cursor: pointer"
-            class="pointer"
-            :style="
-              row[store.state.zoConfig.timestamp_column] ==
-              searchObj.data.searchAround.indexTimestamp
-                ? 'background-color:lightgray'
-                : ''
-            "
-          >
-            <q-td
-              v-for="(column, colIndex) in searchObj.data.resultGrid.columns"
-              :key="index + '-' + column.name"
-              :data-test="'log-table-column-' + index + '-' + column.name"
-              class="field_list ellipsis"
-              style="cursor: pointer"
-              :style="column.wrapContent ? { 'max-width': '200px' } : {}"
-            >
-              <div class="flex row items-center no-wrap">
-                <q-btn
-                  v-if="colIndex == 0"
-                  :icon="
-                    expandedLogs[index.toString()]
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  data-test="table-row-expand-menu"
-                  @click.stop="expandLog(row, index)"
-                ></q-btn>
-                <span class="ellipsis" :title="column.prop(row, column.name)">{{
-                  column.prop(row, column.name)
-                }}</span>
-              </div>
-              <div
-                v-if="column.closable && row[column.name]"
-                class="field_overlay"
-                :class="
-                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                "
-                :title="row.name"
-                :data-test="`log-add-data-from-column-${row[column.name]}`"
-              >
-                <q-btn
-                  class="q-mr-xs"
-                  size="6px"
-                  @click.prevent.stop="
-                    copyLogToClipboard(
-                      column.prop(row, column.name).toString(),
-                      false,
-                    )
-                  "
-                  title="Copy"
-                  round
-                  icon="content_copy"
-                />
-                <q-btn
-                  class="q-mr-xs"
-                  size="6px"
-                  @click.prevent.stop="
-                    addSearchTerm(`${column.name}='${row[column.name]}'`)
-                  "
-                  :data-test="`log-details-include-field-${row[column.name]}`"
-                  title="Include Term"
-                  round
-                >
-                  <q-icon color="currentColor">
-                    <EqualIcon></EqualIcon>
-                  </q-icon>
-                </q-btn>
-                <q-btn
-                  size="6px"
-                  @click.prevent.stop="
-                    addSearchTerm(`${column.name}!='${row[column.name]}'`)
-                  "
-                  title="Exclude Term"
-                  :data-test="`log-details-exclude-field-${row[column.name]}`"
-                  round
-                >
-                  <q-icon color="currentColor">
-                    <NotEqualIcon></NotEqualIcon>
-                  </q-icon>
-                </q-btn>
-              </div>
-            </q-td>
-          </q-tr>
-          <q-tr v-if="expandedLogs[index.toString()]">
-            <td :colspan="searchObj.data.resultGrid.columns.length">
-              <json-preview
-                :value="searchObj.data.queryResults.hits[index]"
-                show-copy-button
-                @copy="copyLogToClipboard"
-                @add-field-to-table="addFieldToTable"
-                @add-search-term="addSearchTerm"
-                @view-trace="
-                  redirectToTraces(searchObj.data.queryResults.hits[index])
-                "
-              />
-            </td>
-          </q-tr>
-        </template>
-      </q-virtual-scroll> -->
       <tenstack-table
         ref="searchTableRef"
         :columns="searchObj.data.resultGrid.columns"
@@ -518,20 +246,21 @@ export default defineComponent({
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
       //@ts-ignore
-      this.searchObj.data.resultGrid[this.searchObj.data.stream.selectedStream] = [newColSizes];
+      this.searchObj.data.resultGrid[
+        this.searchObj.data.stream.selectedStream
+      ] = [newColSizes];
     },
     handleColumnOrderUpdate(newColOrder: any) {
-      if(this.searchObj.data.stream?.selectedStream.length === 1){
+      if (this.searchObj.data.stream?.selectedStream.length === 1) {
         const colOrderToStore = newColOrder.slice(1);
-      this.searchObj.data.resultGrid.colOrder[
-        this.searchObj.data.stream.selectedStream
-      ] = [colOrderToStore];
-      }
-      else{
         this.searchObj.data.resultGrid.colOrder[
-        this.searchObj.data.stream.selectedStream
-      ] = [newColOrder];      }
-     
+          this.searchObj.data.stream.selectedStream
+        ] = [colOrderToStore];
+      } else {
+        this.searchObj.data.resultGrid.colOrder[
+          this.searchObj.data.stream.selectedStream
+        ] = [newColOrder];
+      }
     },
 
     getPageData(actionType: string) {
@@ -541,7 +270,7 @@ export default defineComponent({
             this.searchObj.data.resultGrid.currentPage - 1;
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
           this.$emit("update:scroll");
-          this.searchTableRef.scrollTo(0);
+          this.scrollTableToTop(0);
         }
       } else if (actionType == "next") {
         if (
@@ -555,14 +284,14 @@ export default defineComponent({
             this.searchObj.data.resultGrid.currentPage + 1;
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
           this.$emit("update:scroll");
-          this.searchTableRef.scrollTo(0);
+          this.scrollTableToTop(0);
         }
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
         this.refreshPartitionPagination(true);
         this.$emit("update:recordsPerPage");
-        this.searchTableRef.scrollTo(0);
+        this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
         if (
           this.pageNumberInput >
@@ -582,7 +311,7 @@ export default defineComponent({
 
         this.searchObj.data.resultGrid.currentPage = this.pageNumberInput;
         this.$emit("update:scroll");
-        this.searchTableRef.scrollTo(0);
+        this.scrollTableToTop(0);
       }
     },
     closeColumn(col: any) {
@@ -785,6 +514,10 @@ export default defineComponent({
       },
     );
 
+    const scrollTableToTop = (value: number) => {
+      searchTableRef.value?.parentRef.scrollTo({ top: value });
+    };
+
     return {
       t,
       store,
@@ -818,6 +551,7 @@ export default defineComponent({
       disableMoreErrorDetails,
       redirectToTraces,
       getTableWidth,
+      scrollTableToTop,
     };
   },
   computed: {
