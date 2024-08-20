@@ -25,7 +25,10 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
+import {
+  addLabelsToSQlQuery,
+  changeHistogramInterval,
+} from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
@@ -129,7 +132,7 @@ export const usePanelDataLoader = (
         clearTimeout(timeoutId);
         reject(new Error("Aborted waiting for loading"));
       });
-    })
+    });
   };
 
   // an async function that waits for the panel to become visible
@@ -218,7 +221,7 @@ export const usePanelDataLoader = (
 
       log("loadData: now waiting for the timeout to avoid frequent updates");
 
-      await waitForTimeout(abortController.signal)
+      await waitForTimeout(abortController.signal);
 
       log("loadData: now waiting for the panel to become visible");
 
@@ -356,6 +359,40 @@ export const usePanelDataLoader = (
 
                 const responseMetaData: any = {};
 
+                // default histogram interval is 10 second
+                let histogramInterval = "10 second";
+
+                if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 30) {
+                  histogramInterval = "15 second";
+                }
+                if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 60) {
+                  histogramInterval = "30 second";
+                }
+                if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 2) {
+                  histogramInterval = "1 minute";
+                }
+                if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 6) {
+                  histogramInterval = "5 minute";
+                }
+                if (
+                  endISOTimestamp - startISOTimestamp >=
+                  1000000 * 3600 * 24
+                ) {
+                  histogramInterval = "30 minute";
+                }
+                if (
+                  endISOTimestamp - startISOTimestamp >=
+                  1000000 * 86400 * 7
+                ) {
+                  histogramInterval = "1 hour";
+                }
+                if (
+                  endISOTimestamp - startISOTimestamp >=
+                  1000000 * 86400 * 30
+                ) {
+                  histogramInterval = "1 day";
+                }
+
                 // loop on all partitions and call search api for each partition
                 for (const partition of partitionArr) {
                   await queryService
@@ -365,7 +402,10 @@ export const usePanelDataLoader = (
                           store.state.selectedOrganization.identifier,
                         query: {
                           query: {
-                            sql: query,
+                            sql: changeHistogramInterval(
+                              query,
+                              histogramInterval,
+                            ),
                             query_fn: it.vrlFunctionQuery
                               ? b64EncodeUnicode(it.vrlFunctionQuery)
                               : null,
