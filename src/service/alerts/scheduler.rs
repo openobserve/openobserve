@@ -86,12 +86,13 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     );
     let columns = trigger.module_key.split('/').collect::<Vec<&str>>();
     assert_eq!(columns.len(), 3);
-    let org_id = &trigger.org;
+    let org_id = trigger.org.clone();
     let stream_type: StreamType = columns[0].into();
     let stream_name = columns[1];
     let alert_name = columns[2];
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
+    let triggered_at = trigger.start_time.unwrap_or_default();
 
     if is_realtime && is_silenced {
         log::debug!(
@@ -111,7 +112,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
-    let alert = match super::alert::get(org_id, stream_type, stream_name, alert_name).await? {
+    let alert = match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
         Some(alert) => alert,
         None => {
             return Err(anyhow::anyhow!(
@@ -186,7 +187,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     let mut trigger_data_stream = TriggerData {
-        _timestamp: trigger.start_time.unwrap_or_default(),
+        _timestamp: triggered_at,
         org: trigger.org,
         module: TriggerDataType::Alert,
         key: trigger.module_key.clone(),
@@ -272,6 +273,31 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 
+    // Check if the alert has been disabled in the mean time
+    let mut old_alert =
+        match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
+            Some(alert) => alert,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "alert not found: {}/{}/{}/{}",
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    alert_name
+                ));
+            }
+        };
+    old_alert.last_triggered_at = Some(triggered_at);
+    if let Err(e) = db::alerts::alert::set_without_updating_trigger(
+        &org_id,
+        stream_type,
+        stream_name,
+        &old_alert,
+    )
+    .await
+    {
+        log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+    }
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
 
@@ -358,8 +384,9 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
     }
 
+    let triggered_at = trigger.start_time.unwrap_or_default();
     let mut trigger_data_stream = TriggerData {
-        _timestamp: trigger.start_time.unwrap_or_default(),
+        _timestamp: triggered_at,
         org: trigger.org.clone(),
         module: TriggerDataType::Report,
         key: trigger.module_key.clone(),
@@ -373,7 +400,6 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         error: None,
     };
 
-    let now = Utc::now().timestamp_micros();
     match report.send_subscribers().await {
         Ok(_) => {
             log::info!("Report {} sent to destination", report_name);
@@ -414,13 +440,13 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
     }
 
-    report.last_triggered_at = Some(now);
     // Check if the report has been disabled in the mean time
-    let old_report = db::dashboards::reports::get(org_id, report_name).await?;
-    if !old_report.enabled {
-        report.enabled = old_report.enabled;
+    let mut old_report = db::dashboards::reports::get(org_id, report_name).await?;
+    if old_report.enabled {
+        old_report.enabled = report.enabled;
     }
-    let result = db::dashboards::reports::set_without_updating_trigger(org_id, &report).await;
+    old_report.last_triggered_at = Some(triggered_at);
+    let result = db::dashboards::reports::set_without_updating_trigger(org_id, &old_report).await;
     if result.is_err() {
         log::error!(
             "Failed to update report: {report_name} after trigger: {}",
