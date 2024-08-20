@@ -117,7 +117,7 @@ pub async fn sql(
     register_udf(&mut ctx, &sql.org_id).await;
 
     // create table
-    let real_table: Arc<dyn TableProvider> = if !file_type.eq(&FileType::ARROW) {
+    let (real_table, is_memtable) = if !file_type.eq(&FileType::ARROW) {
         let mut table = create_parquet_table(
             session,
             schema.clone(),
@@ -130,18 +130,22 @@ pub async fn sql(
         if session.storage_type != StorageType::Tmpfs {
             table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
         }
-        Arc::new(table) as _
+        (Arc::new(table) as Arc<dyn TableProvider>, false)
     } else {
         let record_batches = in_records_batches.unwrap();
-        Arc::new(NewMemTable::try_new(
-            schema.clone(),
-            vec![record_batches],
-            rules.clone(),
-        )?)
+        (
+            Arc::new(NewMemTable::try_new(
+                schema.clone(),
+                vec![record_batches],
+                rules.clone(),
+            )?) as Arc<dyn TableProvider>,
+            true,
+        )
     };
 
     // register empty table
-    let empty_table = NewEmptyTable::new("tbl", schema.clone()).with_partitions(cfg.limit.cpu_num);
+    let empty_table =
+        NewEmptyTable::new("tbl", schema.clone(), is_memtable).with_partitions(cfg.limit.cpu_num);
     ctx.register_table("tbl", Arc::new(empty_table))?;
 
     // query sql
@@ -588,7 +592,6 @@ pub fn create_session_config(
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
     if sort_by_timestamp_desc {
-        println!("---------------- sort_by_timestamp_desc ----------------");
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
         config = config.with_round_robin_repartition(false);
         config = config.with_coalesce_batches(false);
