@@ -286,8 +286,8 @@ pub async fn search(
     if cfg.common.result_cache_enabled
         && should_exec_query
         && c_resp.cache_query_response
-        && (!results.first().is_some() && !results.first().unwrap().hits.is_empty()
-            || !results.last().is_some() && !results.last().unwrap().hits.is_empty())
+        && (results.first().is_some() && !results.first().unwrap().hits.is_empty()
+            || results.last().is_some() && !results.last().unwrap().hits.is_empty())
     {
         write_results(
             trace_id,
