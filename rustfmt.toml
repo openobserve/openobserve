@@ -14,3 +14,5 @@ use_field_init_shorthand = true
 use_try_shorthand = true
 imports_granularity = "Crate"
 group_imports = "StdExternalCrate"
+
+ignore = ["src/proto/src/generated/*.rs"]
