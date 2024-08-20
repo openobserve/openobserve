@@ -19,6 +19,7 @@ use std::{
     sync::Arc,
 };
 
+use arrow_schema::FieldRef;
 use config::{
     get_config,
     meta::{
@@ -27,7 +28,10 @@ use config::{
     },
 };
 use datafusion::arrow::datatypes::Schema;
-use infra::{errors::Error, schema::SchemaCache};
+use infra::{
+    errors::Error,
+    schema::{get_stream_setting_fts_fields, unwrap_stream_settings, SchemaCache},
+};
 use proto::cluster_rpc;
 use serde::Serialize;
 use sqlparser::{
@@ -110,40 +114,33 @@ impl NewSql {
         let group_by = column_visitor.group_by;
         let order_by = column_visitor.order_by;
 
-        // TODO: handle select * from table, because we want only register used field to datafusion
-        // 4. generate used schema
+        // 4. get match_all() value
+        let mut match_visitor = MatchVisitor::new();
+        statement.visit(&mut match_visitor);
+
+        // 5. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
-            used_schemas = total_schemas;
+            used_schemas = generate_select_star_schema(total_schemas);
         } else {
             for (table_name, schema) in total_schemas.iter() {
-                let mut columns = match column_visitor.columns.get(table_name) {
+                let columns = match column_visitor.columns.get(table_name) {
                     Some(columns) => columns.clone(),
                     None => {
                         used_schemas.insert(table_name.to_string(), schema.clone());
                         continue;
                     }
                 };
-                if !columns.contains(&get_config().common.column_timestamp) {
-                    columns.insert(get_config().common.column_timestamp.clone());
-                }
-                let mut fields = Vec::with_capacity(columns.len());
-                for column in columns {
-                    if let Some(field) = schema.field_with_name(&column) {
-                        fields.push(field.clone());
-                    }
-                }
+                let fields =
+                    generate_schema_fields(columns, schema, match_visitor.match_items.is_some());
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 used_schemas.insert(table_name.to_string(), Arc::new(SchemaCache::new(schema)));
             }
         }
-        // 5. get partition column value
+
+        // 6. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         statement.visit(&mut partition_column_visitor);
-
-        // 6. get match_all() value
-        let mut match_visitor = MatchVisitor::new();
-        statement.visit(&mut match_visitor);
 
         // 7. pick up histogram interval
         let mut histogram_interval_visitor =
@@ -225,6 +222,83 @@ impl std::fmt::Display for NewSql {
             self.order_by
         )
     }
+}
+
+fn generate_select_star_schema(
+    schemas: HashMap<String, Arc<SchemaCache>>,
+) -> HashMap<String, Arc<SchemaCache>> {
+    let mut used_schemas = HashMap::new();
+    for (name, schema) in schemas {
+        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
+        let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+        // check if it is user defined schema
+        if defined_schema_fields.is_empty() {
+            used_schemas.insert(name, schema);
+        } else {
+            used_schemas.insert(
+                name,
+                generate_user_defined_schema(schema.as_ref(), defined_schema_fields),
+            );
+        }
+    }
+    used_schemas
+}
+
+fn generate_user_defined_schema(
+    schema: &SchemaCache,
+    defined_schema_fields: Vec<String>,
+) -> Arc<SchemaCache> {
+    let cfg = get_config();
+    let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
+    if !fields.contains(&cfg.common.column_timestamp) {
+        fields.insert(cfg.common.column_timestamp.to_string());
+    }
+    if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
+        fields.insert(cfg.common.column_all.to_string());
+    }
+    let new_fields = fields
+        .iter()
+        .filter_map(|name| schema.field_with_name(name).cloned())
+        .collect::<Vec<_>>();
+
+    Arc::new(SchemaCache::new(
+        Schema::new(new_fields).with_metadata(schema.schema().metadata().clone()),
+    ))
+}
+
+// add field from full text search
+fn generate_schema_fields(
+    columns: HashSet<String>,
+    schema: &SchemaCache,
+    has_match_all: bool,
+) -> Vec<FieldRef> {
+    let mut columns = columns;
+
+    // 1. add timestamp field
+    if !columns.contains(&get_config().common.column_timestamp) {
+        columns.insert(get_config().common.column_timestamp.clone());
+    }
+
+    // 2. add field from full text search
+    if has_match_all {
+        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+        for fts_field in fts_fields {
+            if schema.field_with_name(&fts_field).is_none() {
+                continue;
+            }
+            columns.insert(fts_field);
+        }
+    }
+
+    // 3. generate fields
+    let mut fields = Vec::with_capacity(columns.len());
+    for column in columns {
+        if let Some(field) = schema.field_with_name(&column) {
+            fields.push(field.clone());
+        }
+    }
+    fields
 }
 
 /// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
