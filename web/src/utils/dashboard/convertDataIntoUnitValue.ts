@@ -112,15 +112,15 @@ export const getUnitValue = (
   ) {
     const numericValue = parseFloat(value) || 0;
     const formattedNumber = numericValue.toFixed(decimals);
-  
-    const localeMap :any = {
-      "currency-dollar": "en-US",  // US Dollar
-      "currency-euro": "de-DE",    // Euro
-      "currency-pound": "en-GB",   // British Pound
-      "currency-yen": "ja-JP",     // Japanese Yen
-      "currency-rupee": "en-IN",   // Indian Rupee
+
+    const localeMap: any = {
+      "currency-dollar": "en-US", // US Dollar
+      "currency-euro": "de-DE", // Euro
+      "currency-pound": "en-GB", // British Pound
+      "currency-yen": "ja-JP", // Japanese Yen
+      "currency-rupee": "en-IN", // Indian Rupee
     };
-  
+
     formattedValue = new Intl.NumberFormat(localeMap[unit], {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
@@ -242,17 +242,7 @@ export const getUnitValue = (
 export const formatUnitValue = (obj: any) => {
   const { unit } = obj;
 
-  if (
-    [
-      "$",
-      "€",
-      "£",
-      "¥",
-      "₹",
-    ].includes(unit)
-  ) {
-    console.log(obj);
-
+  if (["$", "€", "£", "¥", "₹"].includes(unit)) {
     return `${obj.unit}${obj.value}`;
   }
   return `${obj.value}${obj.unit}`;
