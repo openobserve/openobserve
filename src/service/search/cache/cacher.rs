@@ -32,6 +32,7 @@ use crate::{
             result_utils::{get_ts_value, round_down_to_nearest_minute},
             MultiCachedQueryResponse,
         },
+        new_sql::NewSql,
         sql::{generate_histogram_interval, RE_HISTOGRAM, RE_SELECT_FROM},
     },
 };
@@ -178,7 +179,7 @@ pub async fn check_cache(
         }
         multi_resp.cache_query_response = true;
         multi_resp.is_descending = is_descending;
-        multi_resp.limit = meta.meta.limit as i64;
+        multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp
@@ -222,7 +223,7 @@ pub async fn check_cache(
                     *should_exec_query = false;
                 };
 
-                if cached_resp.cached_response.total == (meta.meta.limit as usize)
+                if cached_resp.cached_response.total == (sql.limit as usize)
                     && cached_resp.response_end_time == req.query.end_time
                 {
                     *should_exec_query = false;
@@ -249,7 +250,7 @@ pub async fn check_cache(
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.deltas = c_resp.deltas;
         multi_resp.cache_query_response = true;
-        multi_resp.limit = meta.meta.limit as i64;
+        multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp
     }

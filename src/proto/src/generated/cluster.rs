@@ -2804,22 +2804,28 @@ pub mod query_cache_client {
         pub async fn get_multiple_cached_result(
             &mut self,
             request: impl tonic::IntoRequest<super::QueryCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::MultiQueryCacheResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> std::result::Result<
+            tonic::Response<super::MultiQueryCacheResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/cluster.QueryCache/GetMultipleCachedResult");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.QueryCache/GetMultipleCachedResult",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new(
-                "cluster.QueryCache",
-                "GetMultipleCachedResult",
-            ));
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("cluster.QueryCache", "GetMultipleCachedResult"),
+                );
             self.inner.unary(req, path, codec).await
         }
         pub async fn delete_result_cache(
@@ -2859,11 +2865,17 @@ pub mod query_cache_server {
         async fn get_cached_result(
             &self,
             request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::QueryCacheResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::QueryCacheResponse>,
+            tonic::Status,
+        >;
         async fn get_multiple_cached_result(
             &self,
             request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<tonic::Response<super::MultiQueryCacheResponse>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<super::MultiQueryCacheResponse>,
+            tonic::Status,
+        >;
         async fn delete_result_cache(
             &self,
             request: tonic::Request<super::DeleteResultCacheRequest>,
@@ -3000,18 +3012,26 @@ pub mod query_cache_server {
                 "/cluster.QueryCache/GetMultipleCachedResult" => {
                     #[allow(non_camel_case_types)]
                     struct GetMultipleCachedResultSvc<T: QueryCache>(pub Arc<T>);
-                    impl<T: QueryCache> tonic::server::UnaryService<super::QueryCacheRequest>
-                        for GetMultipleCachedResultSvc<T>
-                    {
+                    impl<
+                        T: QueryCache,
+                    > tonic::server::UnaryService<super::QueryCacheRequest>
+                    for GetMultipleCachedResultSvc<T> {
                         type Response = super::MultiQueryCacheResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::QueryCacheRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as QueryCache>::get_multiple_cached_result(&inner, request).await
+                                <T as QueryCache>::get_multiple_cached_result(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
