@@ -40,10 +40,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RepartitionExec"
-            || node.name() == "CoalescePartitionsExec"
-            || node.name() == "SortPreservingMergeExec"
-        {
+        if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
             if visitor.is_remote_scan {
@@ -57,18 +54,37 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     self.req.clone(),
                     self.nodes.clone(),
                 ));
-                // TODO: should check node is querier
                 let partitioning = Partitioning::RoundRobinBatch(self.nodes.len());
                 let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
                 let new_node = node.with_new_children(vec![repartition])?;
                 self.is_changed = true;
-                Ok(Transformed::yes(new_node))
-            } else {
-                Ok(Transformed::no(node))
+                return Ok(Transformed::yes(new_node));
             }
-        } else {
-            Ok(Transformed::no(node))
+        } else if node.name() == "SortPreservingMergeExec" {
+            let mut visitor = TableNameVisitor::new();
+            node.visit(&mut visitor)?;
+            if visitor.is_remote_scan {
+                let follow_merge_node = node.clone();
+                let new_input =
+                    follow_merge_node.with_new_children(vec![node.children()[0].clone()])?;
+
+                let remote_scan = Arc::new(RemoteScanExec::new(
+                    new_input,
+                    self.file_lists
+                        .get(&visitor.table_name.clone().unwrap())
+                        .unwrap()
+                        .clone(),
+                    self.req.clone(),
+                    self.nodes.clone(),
+                ));
+                let partitioning = Partitioning::RoundRobinBatch(self.nodes.len());
+                let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
+                let new_node = node.with_new_children(vec![repartition])?;
+                self.is_changed = true;
+                return Ok(Transformed::yes(new_node));
+            }
         }
+        Ok(Transformed::no(node))
     }
 }
 
