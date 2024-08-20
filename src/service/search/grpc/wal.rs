@@ -27,7 +27,10 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
 };
-use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
+use datafusion::{
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
+    execution::cache::cache_manager::FileStatisticsCache,
+};
 use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
@@ -52,6 +55,7 @@ use crate::{
 pub async fn search_parquet(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
+    file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
@@ -265,6 +269,7 @@ pub async fn search_parquet(
             &files,
             diff_fields,
             &[], // TODO: add order_by to query
+            file_stat_cache.clone(),
         )
         .await
         {

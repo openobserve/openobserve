@@ -144,26 +144,31 @@ pub async fn search(
     // get all tables
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
+    let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
     // search in object storage
     if req.search_type != cluster_rpc::SearchType::WalOnly as i32 {
         let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-        let (tbls, _, stats) =
-            match super::storage::search(query_params.clone(), schema_latest.clone(), &file_list)
-                .await
-            {
-                Ok(v) => v,
-                Err(e) => {
-                    // clear session data
-                    super::super::datafusion::storage::file_list::clear(&trace_id);
-                    log::error!(
-                        "[trace_id {}] search->storage: search storage parquet error: {}",
-                        trace_id,
-                        e
-                    );
-                    return Err(e);
-                }
-            };
+        let (tbls, _, stats) = match super::storage::search(
+            query_params.clone(),
+            schema_latest.clone(),
+            &file_list,
+            file_stats_cache.clone(),
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                super::super::datafusion::storage::file_list::clear(&trace_id);
+                log::error!(
+                    "[trace_id {}] search->storage: search storage parquet error: {}",
+                    trace_id,
+                    e
+                );
+                return Err(e);
+            }
+        };
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
@@ -171,20 +176,25 @@ pub async fn search(
     // search in WAL parquet
     let mut wal_lock_files = Vec::new();
     if LOCAL_NODE.is_ingester() {
-        let (tbls, lock_files, stats) =
-            match super::wal::search_parquet(query_params.clone(), schema_latest.clone()).await {
-                Ok(v) => v,
-                Err(e) => {
-                    // clear session data
-                    super::super::datafusion::storage::file_list::clear(&trace_id);
-                    log::error!(
-                        "[trace_id {}] search->storage: search wal parquet error: {}",
-                        trace_id,
-                        e
-                    );
-                    return Err(e);
-                }
-            };
+        let (tbls, lock_files, stats) = match super::wal::search_parquet(
+            query_params.clone(),
+            schema_latest.clone(),
+            file_stats_cache.clone(),
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                super::super::datafusion::storage::file_list::clear(&trace_id);
+                log::error!(
+                    "[trace_id {}] search->storage: search wal parquet error: {}",
+                    trace_id,
+                    e
+                );
+                return Err(e);
+            }
+        };
         tables.extend(tbls);
         scan_stats.add(&stats);
         wal_lock_files = lock_files;

@@ -100,7 +100,7 @@ impl NewSql {
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
             statement.visit(&mut trace_total_hits_visitor);
-         }
+        }
 
         // 3. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);

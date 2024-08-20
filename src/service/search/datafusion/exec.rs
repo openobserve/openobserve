@@ -30,16 +30,16 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
+    catalog::TableProvider,
     common::Column,
     datasource::{
         file_format::{json::JsonFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
-        TableProvider,
     },
     error::{DataFusionError, Result},
     execution::{
-        cache::cache_manager::CacheManagerConfig,
+        cache::cache_manager::{CacheManagerConfig, FileStatisticsCache},
         context::SessionConfig,
         memory_pool::{FairSpillPool, GreedyMemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
@@ -399,7 +399,6 @@ pub async fn register_table(
     schema: Arc<Schema>,
     table_name: &str,
     files: &[FileKey],
-    file_type: FileType,
     rules: HashMap<String, DataType>,
     without_optimizer: bool,
     sort_key: &[(String, bool)],
@@ -420,100 +419,16 @@ pub async fn register_table(
     )
     .await?;
 
-    // Configure listing options
-    let mut listing_options = match file_type {
-        FileType::PARQUET => {
-            let file_format = ParquetFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(ctx.state().config().target_partitions())
-                .with_collect_stat(true)
-        }
-        FileType::JSON => {
-            let file_format = JsonFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(ctx.state().config().target_partitions())
-                .with_collect_stat(true)
-        }
-        _ => {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {file_type:?}",
-            )));
-        }
-    };
-
-    if sort_by_timestamp_desc {
-        // specify sort columns for parquet file
-        listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
-            datafusion::logical_expr::SortExpr {
-                expr: Box::new(Expr::Column(Column::new_unqualified(
-                    cfg.common.column_timestamp.clone(),
-                ))),
-                asc: false,
-                nulls_first: false,
-            },
-        )]]);
-    }
-
-    let schema_key = schema.hash_key();
-    let prefix = if session.storage_type == StorageType::Memory {
-        file_list::set(&session.id, &schema_key, files).await;
-        format!("memory:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Wal {
-        file_list::set(&session.id, &schema_key, files).await;
-        format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Tmpfs {
-        format!("tmpfs:///{}/", session.id)
-    } else {
-        return Err(DataFusionError::Execution(format!(
-            "Unsupported file type scheme {file_type:?}",
-        )));
-    };
-    let prefix = match ListingTableUrl::parse(prefix) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}",
-            )));
-        }
-    };
-
-    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    if cfg.common.feature_query_infer_schema
-        && (cfg.limit.query_optimization_num_fields > 0
-            && schema.fields().len() > cfg.limit.query_optimization_num_fields)
-    {
-        config = config.infer_schema(&ctx.state()).await?;
-    } else {
-        let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
-        let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
-            let new_fields = schema
-                .fields()
-                .iter()
-                .map(|x| {
-                    if x.name() == &cfg.common.column_timestamp {
-                        Arc::new(Field::new(
-                            cfg.common.column_timestamp.clone(),
-                            DataType::Int64,
-                            false,
-                        ))
-                    } else {
-                        x.clone()
-                    }
-                })
-                .collect::<Vec<_>>();
-            Arc::new(Schema::new(new_fields))
-        } else {
-            schema
-        };
-        config = config.with_schema(schema);
-    }
-    let mut table = NewListingTable::try_new(config, rules)?;
-    if session.storage_type != StorageType::Tmpfs {
-        table = table.with_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache());
-    }
-    ctx.register_table(table_name, Arc::new(table))?;
+    let table = create_parquet_table(
+        session,
+        schema.clone(),
+        files,
+        rules.clone(),
+        sort_key,
+        ctx.runtime_env().cache_manager.get_file_statistic_cache(),
+    )
+    .await?;
+    ctx.register_table(table_name, table)?;
 
     Ok(ctx)
 }
@@ -524,6 +439,7 @@ pub async fn create_parquet_table(
     files: &[FileKey],
     rules: HashMap<String, DataType>,
     sort_key: &[(String, bool)],
+    file_stat_cache: Option<FileStatisticsCache>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
     let target_partitions = if session.target_partitions == 0 {
@@ -603,6 +519,9 @@ pub async fn create_parquet_table(
         schema
     };
     config = config.with_schema(schema);
-    let table = NewListingTable::try_new(config, rules)?;
+    let mut table = NewListingTable::try_new(config, rules)?;
+    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
+        table = table.with_cache(file_stat_cache);
+    }
     Ok(Arc::new(table))
 }

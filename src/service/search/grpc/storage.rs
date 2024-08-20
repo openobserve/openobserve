@@ -23,6 +23,7 @@ use config::{
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
 };
+use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
@@ -44,6 +45,7 @@ pub async fn search(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
     file_list: &[FileKey],
+    file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {}] search->storage: enter", query.trace_id);
@@ -245,6 +247,7 @@ pub async fn search(
             &files,
             diff_fields,
             &[], // TODO: add order_by to query
+            file_stat_cache.clone(),
         )
         .await?;
         tables.push(table);
