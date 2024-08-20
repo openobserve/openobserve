@@ -16,16 +16,19 @@
 use std::{any::Any, sync::Arc};
 
 use arrow::array::RecordBatch;
-use arrow_schema::{DataType, SchemaRef};
+use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
+use config::get_config;
 use datafusion::{
     catalog::Session,
     common::{project_schema, Constraints, Result},
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
+    physical_expr::PhysicalSortExpr,
     physical_plan::{
         expressions::{CastExpr, Column},
         projection::ProjectionExec,
+        sorts::sort::SortExec,
         ExecutionPlan, PhysicalExpr,
     },
 };
@@ -83,8 +86,27 @@ impl TableProvider for NewMemTable {
 
         // add the diff rules to the execution plan
         if self.diff_rules.is_empty() {
-            return Ok(memory_exec);
+            // create sort exec
+            let index = memory_exec
+                .schema()
+                .index_of(&get_config().common.column_timestamp);
+            let exec = match index {
+                Ok(index) => {
+                    let ordering = vec![PhysicalSortExpr {
+                        expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
+                        options: SortOptions {
+                            descending: true,
+                            nulls_first: false,
+                        },
+                    }];
+                    Arc::new(SortExec::new(ordering, memory_exec)) as Arc<dyn ExecutionPlan>
+                }
+                Err(_) => memory_exec as Arc<dyn ExecutionPlan>,
+            };
+            return Ok(exec);
+            // return Ok(memory_exec);
         }
+        
         let projected_schema = project_schema(&self.schema(), projection)?;
         let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
             Vec::with_capacity(projected_schema.fields().len());
@@ -97,8 +119,27 @@ impl TableProvider for NewMemTable {
                 exprs.push((col, name));
             }
         }
-        let projection_exec = ProjectionExec::try_new(exprs, memory_exec)?;
-        Ok(Arc::new(projection_exec))
+        let projection_exec = Arc::new(ProjectionExec::try_new(exprs, memory_exec)?);
+
+        // create sort exec
+        let index = projection_exec
+            .schema()
+            .index_of(&get_config().common.column_timestamp);
+        let exec = match index {
+            Ok(index) => {
+                let ordering = vec![PhysicalSortExpr {
+                    expr: Arc::new(Column::new(&get_config().common.column_timestamp, index)),
+                    options: SortOptions {
+                        descending: true,
+                        nulls_first: false,
+                    },
+                }];
+                Arc::new(SortExec::new(ordering, projection_exec)) as Arc<dyn ExecutionPlan>
+            }
+            Err(_) => projection_exec as Arc<dyn ExecutionPlan>,
+        };
+
+        Ok(exec)
     }
 
     async fn insert_into(
