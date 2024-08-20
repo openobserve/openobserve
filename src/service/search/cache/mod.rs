@@ -286,7 +286,8 @@ pub async fn search(
     if cfg.common.result_cache_enabled
         && should_exec_query
         && c_resp.cache_query_response
-        && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
+        && (results.first().is_some_and(|res| !res.hits.is_empty())
+            || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
         write_results(
             trace_id,
@@ -380,7 +381,9 @@ fn merge_response(
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
     }
-    cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    if !search_response.is_empty() {
+        cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    }
     log::info!(
         "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
         cache_hits_len,

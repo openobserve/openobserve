@@ -981,6 +981,27 @@ export default defineComponent({
         value: "percent",
       },
       {
+        label: t("dashboard.currencyDollar"),
+        value: "currency-dollar",
+      },
+      {
+        label: t("dashboard.currencyEuro"),
+        value: "currency-euro",
+      },
+      {
+        label: t("dashboard.currencyPound"),
+        value: "currency-pound",
+      },
+      {
+        label: t("dashboard.currencyYen"),
+        value: "currency-yen",
+      },
+      {
+        label: t("dashboard.currencyRupees"),
+        value: "currency-rupee",
+      },
+
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },
