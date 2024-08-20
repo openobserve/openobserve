@@ -380,7 +380,9 @@ fn merge_response(
     if cache_response.hits.len() > limit as usize {
         cache_response.hits.truncate(limit as usize);
     }
-    cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    if !search_response.is_empty() {
+        cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    }
     log::info!(
         "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
         cache_hits_len,
