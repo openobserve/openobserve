@@ -16,9 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::{
-    common::tree_node::TreeNode,
-    datasource::TableProvider,
-    physical_plan::{displayable, ExecutionPlan},
+    common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
 use config::{
@@ -90,12 +88,6 @@ pub async fn search(
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
     };
     let mut physical_plan = physical_plan_from_bytes_with_extension_codec(&req.plan, &ctx, &proto)?;
-
-    let plan = displayable(physical_plan.as_ref())
-        .set_show_schema(false)
-        .indent(true)
-        .to_string();
-    println!("{}", plan);
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();

@@ -100,7 +100,7 @@ impl NewSql {
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
             statement.visit(&mut trace_total_hits_visitor);
-        }
+         }
 
         // 3. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
@@ -678,6 +678,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
         if let SetExpr::Select(select) = query.body.as_mut() {
             select.group_by = GroupByExpr::Expressions(vec![], vec![]);
             select.having = None;
+            select.sort_by = vec![];
             select.projection = vec![SelectItem::ExprWithAlias {
                 expr: Expr::Function(Function {
                     name: ObjectName(vec![Ident::new("count")]),
@@ -694,6 +695,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 }),
                 alias: Ident::new("zo_sql_num"),
             }];
+            query.order_by = None;
         }
         ControlFlow::Break(())
     }
