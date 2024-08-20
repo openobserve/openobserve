@@ -14,9 +14,9 @@ use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
-    req: SearchRequest,
-    nodes: Vec<Node>,
-    file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+    pub req: SearchRequest,
+    pub nodes: Vec<Node>,
+    pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
     pub is_changed: bool,
 }
 

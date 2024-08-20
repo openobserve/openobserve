@@ -106,7 +106,7 @@ impl TableProvider for NewMemTable {
             return Ok(exec);
             // return Ok(memory_exec);
         }
-        
+
         let projected_schema = project_schema(&self.schema(), projection)?;
         let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
             Vec::with_capacity(projected_schema.fields().len());

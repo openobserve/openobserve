@@ -43,8 +43,10 @@ use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
         datafusion::{
-            distributed_plan::rewrite::RemoteScanRewriter, exec::register_udf,
-            optimizer::generate_optimizer_rules, table_provider::empty_table::NewEmptyTable,
+            distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
+            exec::register_udf,
+            optimizer::generate_optimizer_rules,
+            table_provider::empty_table::NewEmptyTable,
         },
         new_sql::NewSql,
     },
@@ -97,8 +99,6 @@ pub async fn search(
 
     // 5. create physical plan
     let plan = ctx.state().create_logical_plan(&meta.sql).await?;
-
-    // println!("\n\nlogical plan: {:?}\n\n", plan);
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
@@ -112,8 +112,20 @@ pub async fn search(
         println!("{}", plan);
     }
 
-    let mut rewrite = RemoteScanRewriter::new(req, partition_file_lists, nodes.clone());
+    // 6. rewrite physical plan
+    let mut rewrite = RemoteScanRewriter::new(req, partition_file_lists, nodes);
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+
+    // add remote scan exec to top if physical plan is not changed
+    if !rewrite.is_changed {
+        let table_name = meta.stream_names.first().unwrap();
+        physical_plan = Arc::new(RemoteScanExec::new(
+            physical_plan,
+            rewrite.file_lists.get(table_name).unwrap().clone(),
+            rewrite.req,
+            rewrite.nodes,
+        ));
+    }
 
     if cfg.common.print_key_sql {
         let plan = displayable(physical_plan.as_ref())
