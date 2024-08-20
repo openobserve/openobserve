@@ -583,14 +583,7 @@ export const convertPromQLData = async (
                   return {
                     type: "text",
                     style: {
-                      text: ["$", "€", "£", "¥", "₹"].includes(unitValue.unit)
-                        ? unitValue?.unit +
-                          (parseFloat(unitValue?.value)?.toFixed(
-                            panelSchema?.config?.decimals ?? 2,
-                          ) ?? 0)
-                        : (parseFloat(unitValue?.value)?.toFixed(
-                            panelSchema?.config?.decimals ?? 2,
-                          ) ?? 0) + unitValue?.unit,
+                      text: formatUnitValue(unitValue),
                       fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
