@@ -38,10 +38,7 @@ use crate::{
     common::meta::stream::StreamParams,
     service::{
         db, file_list,
-        search::{
-            datafusion::{exec::register_table, file_type::FileType},
-            match_source,
-        },
+        search::{datafusion::exec::register_table, match_source},
     },
 };
 
@@ -166,7 +163,6 @@ pub(crate) async fn create_context(
         schema.clone(),
         stream_name,
         &files,
-        FileType::PARQUET,
         HashMap::default(),
         false,
         &[],
