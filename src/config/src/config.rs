@@ -754,6 +754,12 @@ pub struct Common {
     )]
     pub result_cache_enabled: bool,
     #[env_config(
+        name = "ZO_USE_MULTIPLE_RESULT_CACHE",
+        default = false,
+        help = "Enable to use mulple result caches for query results"
+    )]
+    pub use_multi_result_cache: bool,
+    #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
         default = "60",
         help = "Discard data of last n seconds from cached results"

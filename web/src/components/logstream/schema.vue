@@ -106,7 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 min="0"
                 round
                 class="q-mr-sm data-retention-input"
-                :rules="[(val: any) => (!!val && val > 0) || 'Retention period must be at least 1 day']"
+                :rules="[
+                  (val: any) =>
+                    (!!val && val > 0) ||
+                    'Retention period must be at least 1 day',
+                ]"
                 @change="formDirtyFlag = true"
               ></q-input>
               <div>
@@ -489,7 +493,7 @@ export default defineComponent({
         .deleteFields(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
-          selectedFields.value.map((field) => field.name)
+          selectedFields.value.map((field) => field.name),
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -505,7 +509,7 @@ export default defineComponent({
               indexData.value.name,
               indexData.value.stream_type,
               true,
-              true
+              true,
             );
             getSchema();
           } else {
@@ -557,11 +561,11 @@ export default defineComponent({
       if (
         settings.partition_keys &&
         Object.values(settings.partition_keys).some(
-          (v) => !v.disabled && v.field === property.name
+          (v) => !v.disabled && v.field === property.name,
         )
       ) {
         const [level, partition] = Object.entries(settings.partition_keys).find(
-          ([, partition]) => partition["field"] === property.name
+          ([, partition]) => partition["field"] === property.name,
         );
 
         property.level = level;
@@ -605,11 +609,11 @@ export default defineComponent({
 
       indexData.value.stats.doc_time_max = date.formatDate(
         parseInt(streamResponse.stats.doc_time_max) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ"
+        "YYYY-MM-DDTHH:mm:ss:SSZ",
       );
       indexData.value.stats.doc_time_min = date.formatDate(
         parseInt(streamResponse.stats.doc_time_min) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ"
+        "YYYY-MM-DDTHH:mm:ss:SSZ",
       );
 
       indexData.value.defined_schema_fields =
@@ -703,8 +707,8 @@ export default defineComponent({
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
-          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
-        )
+          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+        ),
       );
 
       // Push unique and normalized field names to settings.defined_schema_fields
@@ -772,14 +776,14 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           indexData.value.name,
           indexData.value.stream_type,
-          settings
+          settings,
         )
         .then(async (res) => {
           await getStream(
             indexData.value.name,
             indexData.value.stream_type,
             true,
-            true
+            true,
           ).then((streamResponse) => {
             setSchema(streamResponse);
             loadingState.value = false;
@@ -815,13 +819,13 @@ export default defineComponent({
     });
 
     const showFullTextSearchColumn = computed(
-      () => modelValue.stream_type !== "enrichment_tables"
+      () => modelValue.stream_type !== "enrichment_tables",
     );
 
     const showDataRetention = computed(
       () =>
         !!(store.state.zoConfig.data_retention_days || false) &&
-        modelValue.stream_type !== "enrichment_tables"
+        modelValue.stream_type !== "enrichment_tables",
     );
 
     const disableOptions = (schema, option) => {
@@ -929,13 +933,19 @@ export default defineComponent({
       markFormDirty();
 
       const selectedFieldsSet = new Set(
-        selectedFields.value.map((field) => field.name)
+        selectedFields.value.map((field) => field.name),
       );
+
+      if (selectedFieldsSet.has(allFieldsName.value))
+        selectedFieldsSet.delete(allFieldsName.value);
+
+      if (selectedFieldsSet.has(store.state.zoConfig.timestamp_column))
+        selectedFieldsSet.delete(store.state.zoConfig.timestamp_column);
 
       if (activeTab.value === "schemaFields") {
         indexData.value.defined_schema_fields =
           indexData.value.defined_schema_fields.filter(
-            (field) => !selectedFieldsSet.has(field)
+            (field) => !selectedFieldsSet.has(field),
           );
 
         if (!indexData.value.defined_schema_fields.length) {
@@ -952,8 +962,6 @@ export default defineComponent({
 
       selectedFields.value = [];
     };
-
-    const onSelection = () => {};
 
     return {
       t,
@@ -995,7 +1003,6 @@ export default defineComponent({
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,
-      onSelection,
     };
   },
   created() {
