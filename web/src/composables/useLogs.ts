@@ -1727,15 +1727,18 @@ const useLogs = () => {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
-                setTimeout(async () => {
-                  await generateHistogramData();
-                  refreshPartitionPagination(true);
-                }, 100);
+                if(partitions.length > 1) {
+                  setTimeout(async () => {
+                    await generateHistogramData();
+                    refreshPartitionPagination(true);
+                  }, 100);
+                }
               }
               searchObj.loadingHistogram = false;
             }
           }
-          refreshPartitionPagination(true);
+          await generateHistogramData();
+          refreshPartitionPagination(true);          
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
             xData: [],
