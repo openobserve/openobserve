@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.showHistogram
         "
       >
-        <h6 class="text-center" v-if="searchObj.data.histogram.errorCode != 0">
+        <h6 class="text-center" style="margin:30px 0px" v-if="searchObj.data.histogram.errorCode != 0">
           <q-icon name="warning" color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
           <q-btn
