@@ -68,9 +68,13 @@ impl FlightService for FlightServiceImpl {
         log::info!("[trace_id {}] flight->search: do_get", request.trace_id);
 
         // 2. prepare dataufion context
-        let (ctx, physical_plan) = grpcFlight::search(&request)
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let (ctx, physical_plan) = grpcFlight::search(&request).await.map_err(|e| {
+            log::error!(
+                "[trace_id {}] flight->search: do_get physical plan generate error: {e:?}",
+                request.trace_id,
+            );
+            Status::internal(e.to_string())
+        })?;
 
         let schema = physical_plan.schema();
 
@@ -92,8 +96,13 @@ impl FlightService for FlightServiceImpl {
             .with_schema(schema)
             .with_options(write_options)
             .build(FlightSenderStream::new(
-                execute_stream(physical_plan, ctx.task_ctx().clone())
-                    .map_err(|e| Status::internal(e.to_string()))?,
+                execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
+                    log::error!(
+                        "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
+                        request.trace_id,
+                    );
+                    Status::internal(e.to_string())
+                })?,
             ))
             .map_err(|err| Status::from_error(Box::new(err)));
 

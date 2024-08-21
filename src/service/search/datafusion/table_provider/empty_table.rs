@@ -82,13 +82,13 @@ impl TableProvider for NewEmptyTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        // even though there is no data, projections apply
+        // TODO: remove projection in protobuf
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
             NewEmptyExec::new(
                 &self.name,
                 projected_schema,
-                projection,
+                None,
                 filters,
                 limit,
                 self.sorted_by_time,

@@ -266,7 +266,11 @@ async fn get_batch(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
-    let mut stream = client.do_get(request).await.unwrap().into_inner();
+    let mut stream = client
+        .do_get(request)
+        .await
+        .map_err(|e| DataFusionError::Execution(e.to_string()))?
+        .into_inner();
 
     // the schema should be the first message returned, else client should error
     let flight_data = stream.message().await.unwrap().unwrap();

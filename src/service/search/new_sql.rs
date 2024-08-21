@@ -373,20 +373,14 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         match expr {
             Expr::Identifier(ident) => {
-                let mut count = 0;
                 let field_name = ident.value.clone();
-                let mut table_name = "".to_string();
                 for (name, schema) in self.schemas.iter() {
                     if schema.contains_field(&field_name) {
-                        count += 1;
-                        table_name = name.to_string();
+                        self.columns
+                            .entry(name.clone())
+                            .or_default()
+                            .insert(field_name.clone());
                     }
-                }
-                if count == 1 {
-                    self.columns
-                        .entry(table_name)
-                        .or_default()
-                        .insert(field_name);
                 }
             }
             Expr::CompoundIdentifier(idents) => {
@@ -394,14 +388,15 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
                     .iter()
                     .map(|ident| ident.value.clone())
                     .collect::<Vec<_>>();
-                let table_name = name[0].clone();
-                let filed_name = name[1].clone();
+                let field_name = name.last().unwrap().clone();
                 // check if table_name is in schemas, otherwise the table_name maybe is a alias
-                if self.schemas.contains_key(&table_name) {
-                    self.columns
-                        .entry(table_name)
-                        .or_default()
-                        .insert(filed_name);
+                for (name, schema) in self.schemas.iter() {
+                    if schema.contains_field(&field_name) {
+                        self.columns
+                            .entry(name.clone())
+                            .or_default()
+                            .insert(field_name.clone());
+                    }
                 }
             }
             Expr::Function(_) => {

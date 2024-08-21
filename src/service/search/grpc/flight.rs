@@ -247,5 +247,7 @@ pub async fn search(
     // release wal lock files
     // crate::common::infra::wal::release_files(&wal_lock_files).await;
 
+    log::info!("[trace_id {trace_id}] flight->search: finish generate physical plan",);
+
     Ok((ctx, physical_plan))
 }
