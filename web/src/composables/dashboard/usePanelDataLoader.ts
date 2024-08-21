@@ -434,6 +434,9 @@ export const usePanelDataLoader = (
                   searchType.value ?? "Dashboards",
                 );
 
+                if (abortControllerRef?.signal?.aborted) {
+                  break;
+                }
                 partitionResult.push(...searchRes.data.hits);
                 Object.assign(responseMetaData, searchRes.data);
 
@@ -463,159 +466,6 @@ export const usePanelDataLoader = (
         }
 
         state.loading = false;
-
-        // const sqlqueryPromise = panelSchema.value.queries?.map(
-        //   async (it: any) => {
-        //     const { query: query1, metadata: metadata1 } = replaceQueryValue(
-        //       it.query,
-        //       startISOTimestamp,
-        //       endISOTimestamp,
-        //       panelSchema.value.queryType,
-        //     );
-
-        //     const { query: query2, metadata: metadata2 } =
-        //       await applyDynamicVariables(query1, panelSchema.value.queryType);
-
-        //     const query = query2;
-
-        //     const metadata = {
-        //       originalQuery: it.query,
-        //       query: query,
-        //       startTime: startISOTimestamp,
-        //       endTime: endISOTimestamp,
-        //       queryType: panelSchema.value.queryType,
-        //       variables: [...(metadata1 || []), ...(metadata2 || [])],
-        //     };
-
-        //     // partition api call
-        //     const { traceparent } = generateTraceContext();
-
-        //     return await queryService
-        //       .partition({
-        //         org_identifier: store.state.selectedOrganization.identifier,
-        //         query: {
-        //           sql: query,
-        //           sql_mode: "full",
-        //           start_time: startISOTimestamp,
-        //           end_time: endISOTimestamp,
-        //           size: -1,
-        //         },
-        //         page_type: pageType,
-        //         traceparent,
-        //       })
-        //       .then(async (res: any) => {
-        //         const partitionArr = res?.data?.partitions ?? [];
-
-        //         const partitionResult: any = [];
-
-        //         const responseMetaData: any = {};
-
-        //         // default histogram interval is 10 second
-        //         let histogramInterval = "10 second";
-
-        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 30) {
-        //           histogramInterval = "15 second";
-        //         }
-        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 60 * 60) {
-        //           histogramInterval = "30 second";
-        //         }
-        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 2) {
-        //           histogramInterval = "1 minute";
-        //         }
-        //         if (endISOTimestamp - startISOTimestamp >= 1000000 * 3600 * 6) {
-        //           histogramInterval = "5 minute";
-        //         }
-        //         if (
-        //           endISOTimestamp - startISOTimestamp >=
-        //           1000000 * 3600 * 24
-        //         ) {
-        //           histogramInterval = "30 minute";
-        //         }
-        //         if (
-        //           endISOTimestamp - startISOTimestamp >=
-        //           1000000 * 86400 * 7
-        //         ) {
-        //           histogramInterval = "1 hour";
-        //         }
-        //         if (
-        //           endISOTimestamp - startISOTimestamp >=
-        //           1000000 * 86400 * 30
-        //         ) {
-        //           histogramInterval = "1 day";
-        //         }
-
-        //         // loop on all partitions and call search api for each partition
-        //         for (const partition of partitionArr) {
-        //           await queryService
-        //             .search(
-        //               {
-        //                 org_identifier:
-        //                   store.state.selectedOrganization.identifier,
-        //                 query: {
-        //                   query: {
-        //                     sql: changeHistogramInterval(
-        //                       query,
-        //                       histogramInterval,
-        //                     ),
-        //                     query_fn: it.vrlFunctionQuery
-        //                       ? b64EncodeUnicode(it.vrlFunctionQuery)
-        //                       : null,
-        //                     sql_mode: "full",
-        //                     start_time: partition[0],
-        //                     end_time: partition[1],
-        //                     size: -1,
-        //                   },
-        //                 },
-        //                 page_type: pageType,
-        //               },
-        //               searchType.value ?? "Dashboards",
-        //             )
-        //             .then((res) => {
-        //               // Set searchQueryData.data to the API response hits
-        //               // state.data = res.data.hits;
-        //               state.errorDetail = "";
-        //               // console.log("API response received");
-
-        //               // if there is an error in vrl function, throw error
-        //               if (res.data.function_error) {
-        //                 throw new Error(
-        //                   `Function error: ${res.data.function_error}`,
-        //                 );
-        //               }
-
-        //               partitionResult.push(...res.data.hits);
-        //               Object.assign(responseMetaData, res.data);
-        //             })
-        //             .catch((error) => {
-        //               // Process API error for "sql"
-        //               processApiError(error, "sql");
-        //               return { result: null, metadata: metadata };
-        //             });
-        //         }
-
-        //         return {
-        //           result: partitionResult,
-        //           metadata: metadata,
-        //           resultMetaData: responseMetaData,
-        //         };
-        //       })
-        //       .catch((error) => {
-        //         // Process API error for "sql"
-        //         processApiError(error, "sql");
-        //         return { result: null, metadata: metadata };
-        //       });
-        //   },
-        // );
-
-        // Wait for all query promises to resolve
-        // const sqlqueryResults = await Promise.all(sqlqueryPromise);
-        // state.loading = false;
-        // state.data = sqlqueryResults.map((it: any) => it?.result);
-        // state.metadata = {
-        //   queries: sqlqueryResults.map((it: any) => it?.metadata),
-        // };
-
-        // state.resultMetaData = sqlqueryResults.map((it) => it?.resultMetaData);
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
