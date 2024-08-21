@@ -111,17 +111,24 @@ export const convertSQLData = async (
       return innerDataArray;
     }
 
-    // Step 1: Aggregate y_axis_1 values by breakdown_1, ignoring items without a breakdown_1 key
-    console.log("Aggregating data...");
-    const breakdown = innerDataArray.reduce(
-      (acc, { breakdown_1, y_axis_1 }) => {
-        if (breakdown_1) {
-          acc[breakdown_1] = (acc[breakdown_1] || 0) + (+y_axis_1 || 0);
-        }
-        return acc;
-      },
-      {},
+    const breakdownKey = breakDownKeys[0];
+    const yAxisKey = yAxisKeys[0];
+    const xAxisKey = xAxisKeys[0];
+
+    console.log(
+      `Using xAxisKey: ${xAxisKey}, yAxisKey: ${yAxisKey}, breakdownKey: ${breakdownKey}`,
     );
+
+    // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
+    console.log("Aggregating data...");
+    const breakdown = innerDataArray.reduce((acc, item) => {
+      const breakdownValue = item[breakdownKey];
+      const yAxisValue = item[yAxisKey];
+      if (breakdownValue) {
+        acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
+      }
+      return acc;
+    }, {});
     console.log("Breakdown:", breakdown);
 
     // Step 2: Sort and extract the top keys based on the configured number of top results
@@ -134,30 +141,35 @@ export const convertSQLData = async (
 
     // Step 3: Initialize result array and others object for aggregation
     console.log("Initializing result array and others object...");
-    const resultArray: any = [];
+    const resultArray: any[] = [];
     const othersObj: any = {};
 
     innerDataArray.forEach((item) => {
-      if (topKeys.includes(item.breakdown_1)) {
+      const breakdownValue = item[breakdownKey];
+      if (topKeys.includes(breakdownValue)) {
         console.log("Adding item to result array:", item);
         resultArray.push(item);
       } else if (top_results_others) {
-        const xAxisValue = String(item.x_axis_1);
+        const xAxisValue = String(item[xAxisKey]);
         othersObj[xAxisValue] =
-          (othersObj[xAxisValue] || 0) + (+item.y_axis_1 || 0);
+          (othersObj[xAxisValue] || 0) + (+item[yAxisKey] || 0);
       }
     });
 
     // Step 4: Add 'others' aggregation to the result array if enabled
     if (top_results_others) {
       console.log("Adding 'others' aggregation to the result array...");
-      Object.entries(othersObj).forEach(([x_axis_1, y_axis_1]) => {
+      Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
         console.log("Adding item to result array:", {
-          breakdown_1: "others",
-          x_axis_1,
-          y_axis_1,
+          [breakdownKey]: "others",
+          [xAxisKey]: xAxisValue,
+          [yAxisKey]: yAxisValue,
         });
-        resultArray.push({ breakdown_1: "others", x_axis_1, y_axis_1 });
+        resultArray.push({
+          [breakdownKey]: "others",
+          [xAxisKey]: xAxisValue,
+          [yAxisKey]: yAxisValue,
+        });
       });
     }
 
