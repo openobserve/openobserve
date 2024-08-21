@@ -19,8 +19,10 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::{
-        meta::{alerts::alert::Alert, http::HttpResponse as MetaHttpResponse},
-        utils::http::get_stream_type_from_request,
+        meta::{
+            alerts::alert::Alert, dashboards::datetime_now, http::HttpResponse as MetaHttpResponse,
+        },
+        utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
     service::alerts::alert,
 };
@@ -47,12 +49,16 @@ use crate::{
 pub async fn save_alert(
     path: web::Path<(String, String)>,
     alert: web::Json<Alert>,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
+    alert.owner = Some(user_email.user_id.clone());
+    alert.last_edited_by = Some(user_email.user_id);
+    alert.updated_at = Some(datetime_now());
 
     match alert::save(&org_id, &stream_name, "", alert, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
@@ -83,12 +89,15 @@ pub async fn save_alert(
 pub async fn update_alert(
     path: web::Path<(String, String, String)>,
     alert: web::Json<Alert>,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
+    alert.last_edited_by = Some(user_email.user_id);
+    alert.updated_at = Some(datetime_now());
     match alert::save(&org_id, &stream_name, &name, alert, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
