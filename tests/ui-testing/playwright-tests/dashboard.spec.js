@@ -1077,7 +1077,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page.getByRole("option", { name: "=", exact: true }).click();
     await page.getByLabel("Value").click();
-    await page.getByLabel("Value").fill("kubernetes_docker_Id");
+    await page.getByLabel("Value").fill("kubernetes_docker_id");
     await page.locator('[data-test="dashboard-apply"]').click();
 
     // Apply "Is Not Null" filter
