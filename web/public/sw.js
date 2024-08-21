@@ -1,7 +1,7 @@
 // sw.js
 
 // Version identifier for cache and update management
-const cacheVersion = "O2-cache";
+const cacheVersion = `O2-cache-v10`;
 // Function to fetch the asset manifest
 async function fetchManifest() {
   const response = await fetch("/web/manifest.json");
@@ -10,7 +10,6 @@ async function fetchManifest() {
 self.addEventListener("install", function (event) {
   event.waitUntil(
     (async () => {
-      // const cache = await caches.open(cacheVersion);
       const manifest = await fetchManifest();
 
       // List of files to cache
@@ -28,51 +27,59 @@ self.addEventListener("install", function (event) {
           manifest[key]?.file &&
           manifest[key]?.file.indexOf(".js") > -1
         ) {
-          filesToCache.push(`/web/assets/${manifest[key]["file"]}`);
+          filesToCache.push(`/web/${manifest[key]["file"]}`);
         }
       });
 
+      // Open the cache
+      const cache = await caches.open(cacheVersion);
+
+      // Fetch and cache the files
       await Promise.all(
-        caches.open('cache-name').then((cache) => {
-          filesToCache.map(async (file) => {
-            try {
-              const response = await fetch(file);
-              if (!response.ok) {
-                throw new Error(
-                  `Request for ${file} failed with status ${response.status}`,
-                );
-              }
-
-              await cache.put(file, response);
-            } catch (error) {
-              console.error(`Failed to cache ${file}:`, error);
+        filesToCache.map(async (file) => {
+          try {
+            const response = await fetch(file);
+            if (!response.ok) {
+              throw new Error(
+                `Request for ${file} failed with status ${response.status}`
+              );
             }
-          });
-        }),
+            console.log(file, "added to cache with a res", response.clone());
+
+
+            await cache.put(file, response.clone());
+          } catch (error) {
+            console.error(`Failed to cache ${file}:`, error);
+          }
+        })
       );
 
-      // self.skipWaiting();
-    })(),
+      // self.skipWaiting(); // Uncomment if you want the SW to take control immediately
+    })()
   );
 });
 
-self.addEventListener("activate", function (event) {
-  // Clean up old caches if any
-  console.log("activate");
+
+self.addEventListener('activate', function(event) {
   event.waitUntil(
-    caches.keys().then(function (cacheNames) {
+    caches.keys().then(function(cacheNames) {
       return Promise.all(
-        cacheNames
-          .filter(function (cacheName) {
-            return cacheName !== cacheVersion;
-          })
-          .map(function (cacheName) {
-            return caches.delete(cacheName);
-          }),
+        cacheNames.filter(function(cacheName) {
+          // Check if cacheName starts with the cacheVersion or contains it as part of the name
+          return !cacheName.startsWith(cacheVersion);
+        }).map(function(cacheName) {
+          console.log('Deleting cache:', cacheName); // Debug: Log cache being deleted
+          return caches.delete(cacheName);
+        })
       );
-    }),
+    }).then(function() {
+      // Claim clients immediately for the updated service worker
+      return self.clients.claim();
+    })
   );
 });
+
+
 
 // self.addEventListener('fetch', function(event) {
 //   // Intercept fetch requests and serve from cache if available
@@ -83,68 +90,87 @@ self.addEventListener("activate", function (event) {
 //   );
 // });
 
-self.addEventListener("fetch", function (event) {
-  event.respondWith(
-    console.log("event.request", event.request)
+  self.addEventListener("fetch", function (event) {
+    console.log(event.request,"event request")
     caches
-      .open("cache-name")
-      .match(event.request)
-      .then(function (response) {
-        if (response) {
-          return response;
-        }
-        var fetchRequest = event.request;
-        return fetch(fetchRequest)
-          .then(function (response) {
-            if (
-              !response ||
-              response.status !== 200 ||
-              response.type !== "basic"
-            ) {
-              let staleFlag = false;
-              self.clients.matchAll().then((clients) => {
-                clients.forEach((client) => {
-                  staleFlag = true;
-                  if (staleFlag) {
-                    // self.skipWaiting();
-                    // caches.delete("cache-name");
-                    client.postMessage("staledata");
-                  }
-                });
-              });
-              return response;
-            }
-            var responseToCache = response.clone();
-            caches
-              .open("cache-name")
-              .then(function (cache) {
-                cache
-                  .put(event.request, responseToCache)
-                  .catch(function (error) {
-                    console.error("Cache put failed:", error);
+        .open(cacheVersion).then(function (cache) {
+          console.log(cache,"cache")
+        })
+    
+    event.respondWith(
+      caches
+        .open(cacheVersion).then(function (cache) {
+          return cache.match(event.request);
+        })
+        .then(function (response) {
+          if (response) {
+            console.log(response,"res in fetch")
+            return response.clone();
+          }
+          var fetchRequest = event.request;
+          return fetch(fetchRequest)
+            .then(function (response) {
+              if (
+                !response ||
+                response.status !== 200 ||
+                response.type !== "basic"
+              ) {
+                let staleFlag = false;
+                self.clients.matchAll().then((clients) => {
+                  clients.forEach((client) => {
+                    staleFlag = true;
+                    if (staleFlag) {
+                      // self.skipWaiting();
+                      // caches.delete("cache-name");
+                      client.postMessage("staledata");
+                    }
                   });
-              })
-              .catch(function (error) {
-                console.error("Cache open failed:", error);
-              });
-            return response;
-          })
-          .catch(function (error) {
-            console.error("Fetch failed:", error);
-            throw error;
-          });
-      })
-      .catch(function (error) {
-        console.error("Caches match failed:", error);
-        throw error;
-      }),
-  );
-});
+                });
+                console.log(response, "res 2 in fetch");
+                return response;
+              }
+              if (event.request.method === 'POST') {
+                // Do not cache POST requests
+                event.respondWith(
+                  fetch(event.request).catch(function(error) {
+                    console.error('Fetch failed:', error);
+                    throw error;
+                  })
+                );
+                return;
+              }
+              var responseToCache = response.clone();
+              console.log(responseToCache, "res 3 in fetch");
+              caches
+                .open(cacheVersion)
+                .then(function (cache) {
+                  cache
+                    .put(event.request, responseToCache)
+                    .catch(function (error) {
+                      console.error("Cache put failed:", error);
+                    });
+                })
+                .catch(function (error) {
+                  console.error("Cache open failed:", error);
+                });
+              return response;
+            })
+            .catch(function (error) {
+              console.error("Fetch failed:", error);
+              throw error;
+            });
+        })
+        .catch(function (error) {
+          console.error("Caches match failed:", error);
+          throw error;
+        }),
+    );
+  });
 
 self.addEventListener("message", function (event) {
   console.log(event.data);
   if (event.data === "skipWaiting") {
-    caches.delete("cache-name");
+    caches.delete(cacheVersion);
     self.skipWaiting();
   }
 });
