@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::{DateTime, FixedOffset};
 use config::meta::stream::StreamType;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -49,6 +50,15 @@ pub struct Alert {
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
+    #[serde(default)]
+    pub last_triggered_at: Option<i64>,
+    #[serde(default)]
+    pub owner: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String, format = DateTime)]
+    pub updated_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    pub last_edited_by: Option<String>,
 }
 
 impl PartialEq for Alert {
@@ -75,6 +85,10 @@ impl Default for Alert {
             description: "".to_string(),
             enabled: false,
             tz_offset: 0, // UTC
+            last_triggered_at: None,
+            owner: None,
+            updated_at: None,
+            last_edited_by: None,
         }
     }
 }
