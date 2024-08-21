@@ -75,10 +75,12 @@ pub async fn save(
     alert.row_template = alert.row_template.trim().to_string();
 
     match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
-        Ok(Some(_)) => {
+        Ok(Some(old_alert)) => {
             if create {
                 return Err(anyhow::anyhow!("Alert already exists"));
             }
+            alert.last_triggered_at = old_alert.last_triggered_at;
+            alert.owner = old_alert.owner;
         }
         Ok(None) => {
             if !create {
