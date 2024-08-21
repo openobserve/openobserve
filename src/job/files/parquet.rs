@@ -588,10 +588,10 @@ async fn merge_files(
         .defined_schema_fields
         .unwrap_or_default();
     let schema = if !defined_schema_fields.is_empty() {
-        let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
+        let latest_schema = SchemaCache::new_from_arc(latest_schema.clone());
         let latest_schema =
             generate_schema_for_defined_schema_fields(&latest_schema, &defined_schema_fields);
-        Arc::new(latest_schema.schema().clone())
+        latest_schema.schema().clone()
     } else {
         latest_schema.clone()
     };

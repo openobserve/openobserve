@@ -369,6 +369,7 @@ pub async fn remote_write(
                 .get(&metric_name)
                 .unwrap()
                 .schema()
+                .as_ref()
                 .clone()
                 .with_metadata(HashMap::new());
             let schema_key = schema.hash_key();

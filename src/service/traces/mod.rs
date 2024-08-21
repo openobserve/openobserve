@@ -468,6 +468,7 @@ async fn write_traces(
         .get(stream_name)
         .unwrap()
         .schema()
+        .as_ref()
         .clone()
         .with_metadata(HashMap::new());
     let record_schema = Arc::new(record_schema);

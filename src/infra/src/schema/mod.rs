@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::Utc;
 use config::{
@@ -22,7 +22,7 @@ use config::{
     utils::{json, schema_ext::SchemaExt},
     RwAHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -57,7 +57,7 @@ pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Re
 
     let r = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.schema.clone());
+        return Ok(schema.schema().as_ref().clone());
     }
     drop(r);
     // if not found in cache, get from db
@@ -635,14 +635,17 @@ pub fn get_merge_schema_changes(
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SchemaCache {
-    // TODO: add Arc
-    schema: Schema,
+    schema: SchemaRef,
     fields_map: HashMap<String, usize>,
     hash_key: String,
 }
 
 impl SchemaCache {
     pub fn new(schema: Schema) -> Self {
+        Self::new_from_arc(Arc::new(schema))
+    }
+
+    pub fn new_from_arc(schema: Arc<Schema>) -> Self {
         let hash_key = schema.hash_key();
         let fields_map = schema
             .fields()
@@ -661,7 +664,7 @@ impl SchemaCache {
         &self.hash_key
     }
 
-    pub fn schema(&self) -> &Schema {
+    pub fn schema(&self) -> &Arc<Schema> {
         &self.schema
     }
 

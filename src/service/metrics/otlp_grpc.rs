@@ -338,6 +338,7 @@ pub async fn handle_grpc_request(
                         .get(local_metric_name)
                         .unwrap()
                         .schema()
+                        .as_ref()
                         .clone()
                         .with_metadata(HashMap::new());
                     let schema_key = schema.hash_key();

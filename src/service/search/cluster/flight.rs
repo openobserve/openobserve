@@ -392,9 +392,8 @@ pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
     // TODO replace schema to Arc<schema>
     let cfg = get_config();
     for (stream_name, schema) in &sql.schemas {
-        let schema = schema.schema().clone();
         let table = Arc::new(
-            NewEmptyTable::new(stream_name, Arc::new(schema))
+            NewEmptyTable::new(stream_name, schema.schema().clone())
                 .with_partitions(cfg.limit.cpu_num)
                 .with_sorted_by_time(sql.sorted_by_time),
         );
