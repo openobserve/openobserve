@@ -65,7 +65,7 @@ pub async fn search(
     origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
     let stream_name = match resolve_stream_names(&origin_sql) {
-        // TODO: check this
+        // TODO: cache don't not support multiple stream names
         Ok(v) => v[0].clone(),
         Err(e) => {
             return Err(Error::Message(e.to_string()));

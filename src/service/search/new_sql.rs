@@ -74,13 +74,11 @@ impl NewSql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<NewSql, Error> {
         let query = req.query.as_ref().unwrap();
         let sql = query.sql.clone();
-        // TODO: distribute plan to multiple nodes, remoteScan in the top
         let limit = query.size as i64;
         let offset = query.from as i64;
         let org_id = req.org_id.clone();
         let stream_type = StreamType::from(req.stream_type.as_str());
 
-        // TODO: should check if two tables have same names
         // 1. get table name
         let stream_names = resolve_stream_names(&sql).unwrap();
         let mut total_schemas = HashMap::with_capacity(stream_names.len());

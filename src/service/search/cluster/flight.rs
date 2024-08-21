@@ -389,7 +389,6 @@ pub async fn generate_context(
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
-    // TODO replace schema to Arc<schema>
     let cfg = get_config();
     for (stream_name, schema) in &sql.schemas {
         let table = Arc::new(
