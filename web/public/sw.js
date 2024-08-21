@@ -183,7 +183,6 @@ self.addEventListener("fetch", function (event) {
                 return;
               }
               var responseToCache = response.clone();
-
               caches
                 .open(cacheVersion)
                 .then(function (cache) {
