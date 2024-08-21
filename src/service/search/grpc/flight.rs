@@ -123,6 +123,24 @@ pub async fn search(
         schema_latest_map.insert(field.name(), field);
     }
 
+    // construct partition filters
+    let search_partition_keys = req
+        .partition_keys
+        .iter()
+        .find(|v| v.stream_name == stream_name)
+        .map(|v| {
+            v.fields
+                .iter()
+                .filter_map(|v| {
+                    if schema_latest_map.contains_key(&v.key) {
+                        Some((v.key.to_string(), v.value.to_string()))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<(String, String)>>()
+        });
+
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.to_string(),
@@ -170,6 +188,7 @@ pub async fn search(
         let (tbls, lock_files, stats) = match super::wal::search_parquet(
             query_params.clone(),
             schema_latest.clone(),
+            search_partition_keys.clone(),
             file_stats_cache.clone(),
         )
         .await

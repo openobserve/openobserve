@@ -40,12 +40,13 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 
 use crate::{
-    common::infra::wal,
+    common::{infra::wal, meta::stream::StreamParams},
     service::{
         db, file_list,
         search::{
             datafusion::{exec, table_provider::memtable::NewMemTable},
-            generate_search_schema_diff,
+            generate_search_schema_diff, match_source,
+            new_sql::generate_filter_from_equal_items,
         },
     },
 };
@@ -55,18 +56,20 @@ use crate::{
 pub async fn search_parquet(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
+    search_partition_keys: Option<Vec<(String, String)>>,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
-    // let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let files = get_file_list(
         query.clone(),
         &partition_time_level,
         &stream_settings.partition_keys,
+        query.time_range,
+        search_partition_keys,
     )
     .await?;
     if files.is_empty() {
@@ -242,9 +245,6 @@ pub async fn search_parquet(
         schema_latest_map.insert(field.name(), field);
     }
 
-    // TODO select_wildcard
-    // let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
-
     let mut tables = Vec::new();
     for (ver, files) in files_group {
         if files.is_empty() {
@@ -292,9 +292,6 @@ pub async fn search_memtable(
     schema: Arc<Schema>,
     sorted_by_time: bool,
 ) -> super::SearchTable {
-    // let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    // let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
-
     let mut scan_stats = ScanStats::new();
 
     let mut batches = ingester::read_from_memtable(
@@ -356,8 +353,6 @@ pub async fn search_memtable(
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    // TODO; select_wildcard
-    // let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
     let mut tables = Vec::new();
     for (schema, mut record_batches) in batch_groups {
@@ -365,7 +360,6 @@ pub async fn search_memtable(
             continue;
         }
 
-        // TODO: leader need to match source file_list by partition key
         let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
 
         for batch in record_batches.iter_mut() {
@@ -389,6 +383,8 @@ async fn get_file_list_inner(
     query: Arc<super::QueryParams>,
     _partition_time_level: &PartitionTimeLevel,
     _partition_keys: &[StreamPartition],
+    time_range: Option<(i64, i64)>,
+    search_partition_keys: Option<Vec<(String, String)>>,
     wal_dir: &str,
     file_ext: &str,
 ) -> Result<Vec<FileKey>, Error> {
@@ -431,6 +427,10 @@ async fn get_file_list_inner(
         .collect::<Vec<_>>();
     wal::lock_files(&files).await;
 
+    let stream_params = StreamParams::new(&query.org_id, &query.stream_name, query.stream_type);
+    let search_partition_keys = search_partition_keys.unwrap_or_default();
+    let search_partition_keys = generate_filter_from_equal_items(&search_partition_keys);
+
     let mut result = Vec::with_capacity(files.len());
     let (min_ts, max_ts) = query.time_range.unwrap_or((0, 0));
     for file in files.iter() {
@@ -451,16 +451,20 @@ async fn get_file_list_inner(
                 continue;
             }
         }
-        // TODO: match source
-        result.push(file_key);
-        // if sql
-        //     .match_source(&file_key, false, true, stream_type, partition_keys)
-        //     .await
-        // {
-        //     result.push(file_key);
-        // } else {
-        //     wal::release_files(&[file.clone()]).await;
-        // }
+        if match_source(
+            stream_params.clone(),
+            time_range,
+            &search_partition_keys,
+            &file_key,
+            false,
+            true,
+        )
+        .await
+        {
+            result.push(file_key);
+        } else {
+            wal::release_files(&[file.clone()]).await;
+        }
     }
     Ok(result)
 }
@@ -472,11 +476,15 @@ async fn get_file_list(
     query: Arc<super::QueryParams>,
     partition_time_level: &PartitionTimeLevel,
     partition_keys: &[StreamPartition],
+    time_range: Option<(i64, i64)>,
+    search_partition_keys: Option<Vec<(String, String)>>,
 ) -> Result<Vec<FileKey>, Error> {
     get_file_list_inner(
         query,
         partition_time_level,
         partition_keys,
+        time_range,
+        search_partition_keys,
         &get_config().common.data_wal_dir,
         "parquet",
     )

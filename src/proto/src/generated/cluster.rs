@@ -3181,14 +3181,34 @@ pub struct FlightSearchRequest {
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(message, repeated, tag = "7")]
     pub file_list: ::prost::alloc::vec::Vec<FileKey>,
-    #[prost(int64, tag = "8")]
-    pub start_time: i64,
-    #[prost(int64, tag = "9")]
-    pub end_time: i64,
+    #[prost(message, repeated, tag = "8")]
+    pub partition_keys: ::prost::alloc::vec::Vec<PartitionKeys>,
+    #[prost(string, repeated, tag = "9")]
+    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(int64, tag = "10")]
+    pub start_time: i64,
+    #[prost(int64, tag = "11")]
+    pub end_time: i64,
+    #[prost(int64, tag = "12")]
     pub timeout: i64,
-    #[prost(string, tag = "11")]
+    #[prost(string, tag = "13")]
     pub work_group: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "12")]
+    #[prost(string, optional, tag = "14")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PartitionKeys {
+    #[prost(string, tag = "1")]
+    pub stream_name: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "2")]
+    pub fields: ::prost::alloc::vec::Vec<KvPair>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KvPair {
+    #[prost(string, tag = "1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub value: ::prost::alloc::string::String,
 }

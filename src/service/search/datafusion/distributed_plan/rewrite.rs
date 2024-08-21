@@ -23,7 +23,7 @@ use datafusion::{
     },
     physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
 };
-use proto::cluster_rpc::SearchRequest;
+use proto::cluster_rpc::{PartitionKeys, SearchRequest};
 
 use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
 
@@ -32,6 +32,8 @@ pub struct RemoteScanRewriter {
     pub req: SearchRequest,
     pub nodes: Vec<Node>,
     pub file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+    pub partition_keys: Vec<PartitionKeys>,
+    pub match_all_keys: Vec<String>,
     pub is_changed: bool,
 }
 
@@ -39,13 +41,17 @@ impl RemoteScanRewriter {
     #[allow(dead_code)]
     pub fn new(
         req: SearchRequest,
-        file_lists: HashMap<String, Vec<Vec<FileKey>>>,
         nodes: Vec<Node>,
+        file_lists: HashMap<String, Vec<Vec<FileKey>>>,
+        partition_keys: Vec<PartitionKeys>,
+        match_all_keys: Vec<String>,
     ) -> Self {
         Self {
             req,
             nodes,
             file_lists,
+            partition_keys,
+            match_all_keys,
             is_changed: false,
         }
     }
@@ -66,6 +72,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .get(&visitor.table_name.clone().unwrap())
                         .unwrap()
                         .clone(),
+                    self.partition_keys.clone(),
+                    self.match_all_keys.clone(),
                     self.req.clone(),
                     self.nodes.clone(),
                 ));
@@ -89,6 +97,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .get(&visitor.table_name.clone().unwrap())
                         .unwrap()
                         .clone(),
+                    self.partition_keys.clone(),
+                    self.match_all_keys.clone(),
                     self.req.clone(),
                     self.nodes.clone(),
                 ));

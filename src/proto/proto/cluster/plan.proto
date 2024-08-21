@@ -21,16 +21,28 @@ message NewEmptyExecNode {
 
 // Search request
 message FlightSearchRequest {
-    string             trace_id = 1;
-    uint32            partition = 2;
-    string               org_id = 3;
-    string          stream_type = 4;
-    SearchType      search_type = 5;
-    bytes                  plan = 6;
-    repeated FileKey  file_list = 7;
-    int64            start_time = 8;
-    int64              end_time = 9;
-    int64              timeout = 10;
-    string          work_group = 11;
-    optional string    user_id = 12;
+    string                       trace_id = 1;
+    uint32                      partition = 2;
+    string                         org_id = 3;
+    string                    stream_type = 4;
+    SearchType                search_type = 5;
+    bytes                            plan = 6;
+    repeated FileKey            file_list = 7;
+    repeated PartitionKeys partition_keys = 8;
+    repeated string        match_all_keys = 9;
+    int64                     start_time = 10;
+    int64                       end_time = 11;
+    int64                        timeout = 12;
+    string                    work_group = 13;
+    optional string              user_id = 14;
+}
+
+message PartitionKeys {
+     string     stream_name = 1;
+     repeated KvPair fields = 2;
+}
+
+message KvPair {
+    string   key = 1;
+    string value = 2;
 }

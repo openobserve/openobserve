@@ -39,7 +39,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use futures::{Stream, StreamExt, TryStreamExt};
 use prost::Message;
-use proto::cluster_rpc::{self, FlightSearchRequest, SearchRequest};
+use proto::cluster_rpc::{self, FlightSearchRequest, PartitionKeys, SearchRequest};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -55,6 +55,8 @@ use crate::service::search::infra_cluster;
 pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
     file_list: Vec<Vec<FileKey>>,
+    partition_keys: Vec<PartitionKeys>,
+    match_all_keys: Vec<String>,
     req: SearchRequest,
     nodes: Vec<Node>,
     partitions: usize,
@@ -66,6 +68,8 @@ impl RemoteScanExec {
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
         file_list: Vec<Vec<FileKey>>,
+        partition_keys: Vec<PartitionKeys>,
+        match_all_keys: Vec<String>,
         req: SearchRequest,
         nodes: Vec<Node>,
     ) -> Self {
@@ -75,20 +79,12 @@ impl RemoteScanExec {
             input,
             req,
             file_list,
+            partition_keys,
+            match_all_keys,
             nodes,
             partitions: output_partitions,
             cache,
         }
-    }
-
-    /// Create a new RemoteScanExec with specified partition number
-    #[allow(dead_code)]
-    pub fn with_partitions(mut self, partitions: usize) -> Self {
-        self.partitions = partitions;
-        // Changing partitions may invalidate output partitioning, so update it:
-        let output_partitioning = Self::output_partitioning_helper(self.partitions);
-        self.cache = self.cache.with_partitioning(output_partitioning);
-        self
     }
 
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
@@ -170,7 +166,15 @@ impl ExecutionPlan for RemoteScanExec {
             vec![]
         };
         let req = self.req.clone();
-        let fut = get_batch(self.input.clone(), partition, node, file_list, req);
+        let fut = get_remote_batch(
+            self.input.clone(),
+            partition,
+            node,
+            file_list,
+            self.partition_keys.clone(),
+            self.match_all_keys.clone(),
+            req,
+        );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema().clone(),
@@ -183,11 +187,13 @@ impl ExecutionPlan for RemoteScanExec {
     }
 }
 
-async fn get_batch(
+async fn get_remote_batch(
     input: Arc<dyn ExecutionPlan>,
     partition: usize,
     node: Node,
     file_list: Vec<FileKey>,
+    partition_keys: Vec<PartitionKeys>,
+    match_all_keys: Vec<String>,
     req: SearchRequest,
 ) -> Result<SendableRecordBatchStream> {
     let proto = ComposedPhysicalExtensionCodec {
@@ -207,14 +213,14 @@ async fn get_batch(
         search_type: search_type.into(),
         plan: physical_plan_bytes.to_vec(),
         file_list: file_list.iter().map(cluster_rpc::FileKey::from).collect(),
+        partition_keys,
+        match_all_keys,
         start_time: req.query.as_ref().unwrap().start_time,
         end_time: req.query.as_ref().unwrap().end_time,
         timeout: req.timeout,
         work_group: req.work_group,
         user_id: None,
     };
-
-    // println!("\n\nrequest: {request:?}\n\n");
 
     let mut buf: Vec<u8> = Vec::new();
     request

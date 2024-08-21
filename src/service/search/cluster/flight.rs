@@ -85,7 +85,7 @@ pub async fn search(
     let file_lists = get_file_lists(&req, sql.clone()).await?;
 
     // 3. partition file list
-    let partition_file_lists = partition_filt_lists(file_lists, &nodes, node_group).await?;
+    let partition_file_lists = partition_file_lists(file_lists, &nodes, node_group).await?;
 
     // 4. construct physical plan
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -109,7 +109,19 @@ pub async fn search(
     }
 
     // 6. rewrite physical plan
-    let mut rewrite = RemoteScanRewriter::new(req, partition_file_lists, nodes);
+    let match_all_keys = sql.match_items.clone().unwrap_or_default();
+    let partition_keys = sql
+        .equal_items
+        .iter()
+        .map(|(stream_name, fields)| cluster_rpc::PartitionKeys::new(stream_name, fields.clone()))
+        .collect::<Vec<_>>();
+    let mut rewrite = RemoteScanRewriter::new(
+        req,
+        nodes,
+        partition_file_lists,
+        partition_keys,
+        match_all_keys,
+    );
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
     // add remote scan exec to top if physical plan is not changed
@@ -118,6 +130,8 @@ pub async fn search(
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
             rewrite.file_lists.get(table_name).unwrap().clone(),
+            rewrite.partition_keys.clone(),
+            rewrite.match_all_keys.clone(),
             rewrite.req,
             rewrite.nodes,
         ));
@@ -241,7 +255,7 @@ pub(crate) async fn get_file_list(
     files
 }
 
-pub async fn partition_filt_lists(
+pub async fn partition_file_lists(
     file_lists: HashMap<String, Vec<FileKey>>,
     nodes: &[Node],
     group: Option<RoleGroup>,

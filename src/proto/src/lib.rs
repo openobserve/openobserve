@@ -32,3 +32,21 @@ impl From<Vec<serde_json::Value>> for cluster_rpc::IngestionData {
         }
     }
 }
+
+impl cluster_rpc::PartitionKeys {
+    pub fn new(name: &str, fields: Vec<(String, String)>) -> Self {
+        Self {
+            stream_name: name.to_string(),
+            fields: fields.into_iter().map(|x| x.into()).collect(),
+        }
+    }
+}
+
+impl From<(String, String)> for cluster_rpc::KvPair {
+    fn from(pair: (String, String)) -> Self {
+        Self {
+            key: pair.0,
+            value: pair.1,
+        }
+    }
+}

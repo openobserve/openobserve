@@ -330,7 +330,7 @@ fn generate_schema_fields(
 
 /// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
 /// after [("a", ["3", "4"]), ("b", ["5", "6"])]
-fn generate_filter_from_equal_items(
+pub fn generate_filter_from_equal_items(
     equal_items: &Vec<(String, String)>,
 ) -> Vec<(&str, Vec<String>)> {
     let mut filters: HashMap<&str, Vec<String>> = HashMap::new();
@@ -483,64 +483,114 @@ impl<'a> VisitorMut for PartitionColumnVisitor<'a> {
             if let Some(expr) = select.selection.as_ref() {
                 let exprs = split_conjunction(expr);
                 for e in exprs {
-                    if let Expr::BinaryOp {
-                        left,
-                        op: BinaryOperator::Eq,
-                        right,
-                    } = e
-                    {
-                        let (left, right) = if matches!(left.as_ref(), Expr::Value(_))
-                            && matches!(
-                                right.as_ref(),
-                                Expr::Identifier(_) | Expr::CompoundIdentifier(_)
-                            ) {
-                            (right, left)
-                        } else if matches!(right.as_ref(), Expr::Value(_))
-                            && matches!(
-                                left.as_ref(),
-                                Expr::Identifier(_) | Expr::CompoundIdentifier(_)
-                            )
-                        {
-                            (left, right)
-                        } else {
-                            continue;
-                        };
-                        match left.as_ref() {
-                            Expr::Identifier(ident) => {
-                                let mut count = 0;
-                                let field_name = ident.value.clone();
-                                let mut table_name = "".to_string();
-                                for (name, schema) in self.schemas.iter() {
-                                    if schema.contains_field(&field_name) {
-                                        count += 1;
-                                        table_name = name.to_string();
+                    match e {
+                        Expr::BinaryOp {
+                            left,
+                            op: BinaryOperator::Eq,
+                            right,
+                        } => {
+                            let (left, right) = if matches!(left.as_ref(), Expr::Value(_))
+                                && matches!(
+                                    right.as_ref(),
+                                    Expr::Identifier(_) | Expr::CompoundIdentifier(_)
+                                ) {
+                                (right, left)
+                            } else if matches!(right.as_ref(), Expr::Value(_))
+                                && matches!(
+                                    left.as_ref(),
+                                    Expr::Identifier(_) | Expr::CompoundIdentifier(_)
+                                )
+                            {
+                                (left, right)
+                            } else {
+                                continue;
+                            };
+                            match left.as_ref() {
+                                Expr::Identifier(ident) => {
+                                    let mut count = 0;
+                                    let field_name = ident.value.clone();
+                                    let mut table_name = "".to_string();
+                                    for (name, schema) in self.schemas.iter() {
+                                        if schema.contains_field(&field_name) {
+                                            count += 1;
+                                            table_name = name.to_string();
+                                        }
+                                    }
+                                    if count == 1 {
+                                        self.equal_items.entry(table_name).or_default().push((
+                                            field_name,
+                                            trim_quotes(right.to_string().as_str()),
+                                        ));
                                     }
                                 }
-                                if count == 1 {
-                                    self.equal_items.entry(table_name).or_default().push((
-                                        field_name,
-                                        trim_quotes(right.to_string().as_str()),
-                                    ));
+                                Expr::CompoundIdentifier(idents) => {
+                                    let name = idents
+                                        .iter()
+                                        .map(|ident| ident.value.clone())
+                                        .collect::<Vec<_>>();
+                                    let table_name = name[0].clone();
+                                    let field_name = name[1].clone();
+                                    // check if table_name is in schemas, otherwise the table_name
+                                    // maybe is a alias
+                                    if self.schemas.contains_key(&table_name) {
+                                        self.equal_items.entry(table_name).or_default().push((
+                                            field_name,
+                                            trim_quotes(right.to_string().as_str()),
+                                        ));
+                                    }
                                 }
+                                _ => {}
                             }
-                            Expr::CompoundIdentifier(idents) => {
-                                let name = idents
-                                    .iter()
-                                    .map(|ident| ident.value.clone())
-                                    .collect::<Vec<_>>();
-                                let table_name = name[0].clone();
-                                let filed_name = name[1].clone();
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
-                                if self.schemas.contains_key(&table_name) {
-                                    self.equal_items.entry(table_name).or_default().push((
-                                        filed_name,
-                                        trim_quotes(right.to_string().as_str()),
-                                    ));
-                                }
-                            }
-                            _ => {}
                         }
+                        Expr::InList {
+                            expr,
+                            list,
+                            negated: false,
+                        } => {
+                            match expr.as_ref() {
+                                Expr::Identifier(ident) => {
+                                    let mut count = 0;
+                                    let field_name = ident.value.clone();
+                                    let mut table_name = "".to_string();
+                                    for (name, schema) in self.schemas.iter() {
+                                        if schema.contains_field(&field_name) {
+                                            count += 1;
+                                            table_name = name.to_string();
+                                        }
+                                    }
+                                    if count == 1 {
+                                        let entry = self.equal_items.entry(table_name).or_default();
+                                        for val in list.iter() {
+                                            entry.push((
+                                                field_name.clone(),
+                                                trim_quotes(val.to_string().as_str()),
+                                            ));
+                                        }
+                                    }
+                                }
+                                Expr::CompoundIdentifier(idents) => {
+                                    let name = idents
+                                        .iter()
+                                        .map(|ident| ident.value.clone())
+                                        .collect::<Vec<_>>();
+                                    let table_name = name[0].clone();
+                                    let field_name = name[1].clone();
+                                    // check if table_name is in schemas, otherwise the table_name
+                                    // maybe is a alias
+                                    if self.schemas.contains_key(&table_name) {
+                                        let entry = self.equal_items.entry(table_name).or_default();
+                                        for val in list.iter() {
+                                            entry.push((
+                                                field_name.clone(),
+                                                trim_quotes(val.to_string().as_str()),
+                                            ));
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
