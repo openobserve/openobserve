@@ -26,6 +26,7 @@ use config::{
         sql::resolve_stream_names,
         stream::{FileKey, StreamPartition, StreamType},
     },
+    utils::sql::AGGREGATE_UDF_LIST,
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{
@@ -118,7 +119,7 @@ impl NewSql {
             && !query.track_total_hits
             && stream_names.len() == 1
             && group_by.is_empty()
-            && !column_visitor.has_function
+            && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
             order_by.push((get_config().common.column_timestamp.clone(), false));
@@ -347,7 +348,7 @@ struct ColumnVisitor<'a> {
     schemas: &'a HashMap<String, Arc<SchemaCache>>,
     is_wildcard: bool,
     is_distinct: bool,
-    has_function: bool,
+    has_agg_function: bool,
     group_by: Vec<String>,
     order_by: Vec<(String, bool)>, // field_name, asc
 }
@@ -360,7 +361,7 @@ impl<'a> ColumnVisitor<'a> {
             schemas,
             is_wildcard: false,
             is_distinct: false,
-            has_function: false,
+            has_agg_function: false,
             group_by: Vec::new(),
             order_by: Vec::new(),
         }
@@ -399,8 +400,12 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
                     }
                 }
             }
-            Expr::Function(_) => {
-                self.has_function = true;
+            Expr::Function(f) => {
+                if AGGREGATE_UDF_LIST
+                    .contains(&trim_quotes(&f.name.to_string().to_lowercase()).as_str())
+                {
+                    self.has_agg_function = true;
+                }
             }
             _ => {}
         }
