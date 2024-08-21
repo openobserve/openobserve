@@ -501,6 +501,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
       <q-input
+        v-if="
+          [
+            'area',
+            'bar',
+            'line',
+            'h-bar',
+            'h-stacked',
+            'scatter',
+            'area-stacked',
+            'stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
         v-model.number="dashboardPanelData.data.config.top_results"
         :min="0"
         @update:model-value="
@@ -553,7 +565,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template></q-input
       >
 
-      <div class="row items-center">
+      <div
+        class="row items-center"
+        v-if="
+          [
+            'area',
+            'bar',
+            'line',
+            'h-bar',
+            'h-stacked',
+            'scatter',
+            'area-stacked',
+            'stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+      >
         <q-toggle
           v-model="dashboardPanelData.data.config.top_results_others"
           label="Add 'others' series"
