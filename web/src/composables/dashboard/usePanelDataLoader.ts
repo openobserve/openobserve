@@ -372,7 +372,7 @@ export const usePanelDataLoader = (
             const res = await queryService.partition({
               org_identifier: store.state.selectedOrganization.identifier,
               query: {
-                sql: changeHistogramInterval(query, histogramInterval),
+                sql: await changeHistogramInterval(query, histogramInterval),
                 sql_mode: "full",
                 start_time: startISOTimestamp,
                 end_time: endISOTimestamp,
@@ -403,13 +403,23 @@ export const usePanelDataLoader = (
 
               const currentQueryIndex = state.data.length - 1;
 
+              // copy of current abortController
+              // which is used to check whether the current query has been aborted
+              const abortControllerRef = abortController;
+
               for (const partition of partitionArr) {
+                if (abortControllerRef?.signal?.aborted) {
+                  break;
+                }
                 const searchRes = await queryService.search(
                   {
                     org_identifier: store.state.selectedOrganization.identifier,
                     query: {
                       query: {
-                        sql: changeHistogramInterval(query, histogramInterval),
+                        sql: await changeHistogramInterval(
+                          query,
+                          histogramInterval,
+                        ),
                         query_fn: it.vrlFunctionQuery
                           ? b64EncodeUnicode(it.vrlFunctionQuery)
                           : null,

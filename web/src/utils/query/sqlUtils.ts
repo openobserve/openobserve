@@ -463,7 +463,11 @@ export const getValidConditionObj = (condition: any) => {
   return condition;
 };
 
-export const changeHistogramInterval = (query: any, histogramInterval: any) => {
+export const changeHistogramInterval = async (
+  query: any,
+  histogramInterval: any,
+) => {
+  await importSqlParser();
   const ast: any = parser.astify(query);
 
   // Iterate over the columns to check if the column is histogram
