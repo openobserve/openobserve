@@ -164,7 +164,6 @@ pub(crate) async fn create_context(
         stream_name,
         &files,
         HashMap::default(),
-        false,
         &[],
         None,
     )

@@ -80,26 +80,8 @@ pub async fn search(
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    // let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
-    // let partition_time_level =
-    //     unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
-    // let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
-
     // get file list
-    let files = match file_list.is_empty() {
-        true => {
-            // TODO: get file list from remote object storage
-            vec![]
-            // get_file_list(
-            //     query.clone(),
-            //     partition_time_level,
-            //     &stream_settings.partition_keys,
-            // )
-            // .instrument(enter_span.clone())
-            // .await?
-        }
-        false => file_list.to_vec(),
-    };
+    let files = file_list.to_vec();
     if files.is_empty() {
         return Ok((vec![], vec![], ScanStats::default()));
     }

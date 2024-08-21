@@ -20,17 +20,14 @@ use config::{
     get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
-        search::{ScanStats, SearchEventType},
+        search::{ScanStats, SearchEventType, SearchType},
         stream::{
             FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
         },
     },
 };
 use datafusion::{
-    common::tree_node::TreeNode,
-    execution::{runtime_env::RuntimeEnv, session_state::SessionStateBuilder},
-    physical_plan::displayable,
-    prelude::SessionContext,
+    common::tree_node::TreeNode, physical_plan::displayable, prelude::SessionContext,
 };
 use infra::{
     errors::{Error, Result},
@@ -43,7 +40,7 @@ use crate::{
     service::search::{
         datafusion::{
             distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
-            exec::register_udf,
+            exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
             table_provider::empty_table::NewEmptyTable,
         },
@@ -56,6 +53,7 @@ pub async fn search(
     sql: Arc<NewSql>,
     req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
+    let _start = std::time::Instant::now();
     log::info!("[trace_id {trace_id}] start flight search");
     log::info!("[trace_id {trace_id}] sql: {}", sql);
 
@@ -67,8 +65,8 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, 0));
     }
 
-    let _start = std::time::Instant::now();
-    let group = req
+    let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+    let node_group = req
         .search_event_type
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
@@ -76,7 +74,7 @@ pub async fn search(
     let cfg = get_config();
 
     // 1. get nodes
-    let nodes = get_online_querier_nodes(&req).await?;
+    let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");
@@ -87,7 +85,7 @@ pub async fn search(
     let file_lists = get_file_lists(&req, sql.clone()).await?;
 
     // 3. partition file list
-    let partition_file_lists = partition_filt_lists(file_lists, &nodes, group).await?;
+    let partition_file_lists = partition_filt_lists(file_lists, &nodes, node_group).await?;
 
     // 4. construct physical plan
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -141,15 +139,12 @@ pub async fn search(
     Ok((data, ScanStats::new(), 0, false, 0))
 }
 
-async fn get_online_querier_nodes(req: &cluster_rpc::SearchRequest) -> Result<Vec<Node>> {
-    let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+async fn get_online_querier_nodes(
+    trace_id: &str,
+    node_group: Option<RoleGroup>,
+) -> Result<Vec<Node>> {
     // get nodes from cluster
-    let req_node_group = req
-        .search_event_type
-        .as_ref()
-        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
-        .unwrap_or(None);
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(req_node_group).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] service:search:cluster:run: no querier node online");
@@ -363,37 +358,39 @@ pub(crate) async fn partition_file_by_hash(
 
 pub async fn generate_context(
     req: &SearchRequest,
-    meta: &Arc<NewSql>,
+    sql: &Arc<NewSql>,
     target_partitions: usize,
 ) -> Result<SessionContext> {
-    let mut session_config =
-        datafusion::prelude::SessionConfig::new().with_target_partitions(target_partitions);
-    session_config
-        .options_mut()
-        .execution
-        .listing_table_ignore_subdirectory = false;
-    session_config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
+    // TODO: work_group
+    let work_group = None;
+    // TODO: search_type
+    let search_type = SearchType::Normal;
+    let optimizer_rules = generate_optimizer_rules(sql, req);
+    let ctx = prepare_datafusion_context(
+        work_group,
+        &search_type,
+        optimizer_rules,
+        sql.sorted_by_time,
+        target_partitions,
+        if sql.limit >= 0 {
+            Some(sql.limit as usize)
+        } else {
+            None
+        },
+    )
+    .await?;
 
-    let runtime = Arc::new(RuntimeEnv::default());
-    let state = SessionStateBuilder::new()
-        .with_config(session_config)
-        .with_runtime_env(runtime)
-        .with_default_features()
-        .with_optimizer_rules(generate_optimizer_rules(meta, req))
-        .build();
-    let ctx = SessionContext::new_with_state(state);
-
+    // register udf
     register_udf(&ctx, &req.org_id).await;
 
     Ok(ctx)
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &NewSql) -> Result<()> {
-    let cfg = get_config();
     for (stream_name, schema) in &sql.schemas {
         let table = Arc::new(
             NewEmptyTable::new(stream_name, schema.schema().clone())
-                .with_partitions(cfg.limit.cpu_num)
+                .with_partitions(ctx.state().config().target_partitions())
                 .with_sorted_by_time(sql.sorted_by_time),
         );
         ctx.register_table(stream_name, table)?;

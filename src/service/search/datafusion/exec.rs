@@ -45,6 +45,7 @@ use datafusion::{
         runtime_env::{RuntimeConfig, RuntimeEnv},
         session_state::SessionStateBuilder,
     },
+    optimizer::OptimizerRule,
     prelude::{Expr, SessionContext},
 };
 use hashbrown::HashMap;
@@ -57,7 +58,7 @@ use super::{
     table_provider::NewListingTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::service::search::{datafusion::ExtLimit, sql::RE_SELECT_WILDCARD};
+use crate::service::search::datafusion::ExtLimit;
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
@@ -80,7 +81,7 @@ pub async fn convert_parquet_file(
     ); //  select_wildcard -> without_optimizer
 
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, true, false, 0, None).await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, vec![], false, 0, None).await?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -189,11 +190,7 @@ pub async fn merge_parquet_files(
     };
 
     // create datafusion context
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
-    let without_optimizer = select_wildcard && stream_type != StreamType::Index;
-    let ctx =
-        prepare_datafusion_context(None, &SearchType::Normal, without_optimizer, false, 0, None)
-            .await?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, vec![], false, 0, None).await?;
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -225,7 +222,7 @@ pub async fn merge_parquet_files(
 
 pub fn create_session_config(
     search_type: &SearchType,
-    sort_by_timestamp_desc: bool,
+    sorted_by_time: bool,
     target_partitions: usize,
     limit: Option<usize>,
 ) -> Result<SessionConfig> {
@@ -239,11 +236,11 @@ pub fn create_session_config(
         .with_batch_size(PARQUET_BATCH_SIZE)
         .with_target_partitions(target_partitions)
         .with_information_schema(true);
-    config = config.set_bool(
-        "datafusion.execution.listing_table_ignore_subdirectory",
-        false,
-    );
-    config = config.set_str("datafusion.sql_parser.dialect", "postgres");
+    config
+        .options_mut()
+        .execution
+        .listing_table_ignore_subdirectory = false;
+    config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
@@ -254,8 +251,7 @@ pub fn create_session_config(
     if cfg.common.bloom_filter_disabled_on_search {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_on_read", false);
     }
-    if sort_by_timestamp_desc {
-        println!("---------------- sort_by_timestamp_desc ----------------");
+    if sorted_by_time {
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
         config = config.with_round_robin_repartition(false);
         config = config.with_coalesce_batches(false);
@@ -313,8 +309,8 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
 pub async fn prepare_datafusion_context(
     _work_group: Option<String>,
     search_type: &SearchType,
-    without_optimizer: bool,
-    sort_by_timestamp_desc: bool,
+    optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    sorted_by_time: bool,
     target_partitions: usize,
     limit: Option<usize>,
 ) -> Result<SessionContext, DataFusionError> {
@@ -344,14 +340,14 @@ pub async fn prepare_datafusion_context(
     }
 
     let session_config =
-        create_session_config(search_type, sort_by_timestamp_desc, target_partition, limit)?;
+        create_session_config(search_type, sorted_by_time, target_partition, limit)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
-    if without_optimizer {
+    if !optimizer_rules.is_empty() {
         let state = SessionStateBuilder::new()
             .with_config(session_config)
             .with_runtime_env(runtime_env)
-            .with_optimizer_rules(vec![])
-            .with_analyzer_rules(vec![])
+            .with_default_features()
+            .with_optimizer_rules(optimizer_rules)
             .build();
         Ok(SessionContext::new_with_state(state))
     } else {
@@ -400,20 +396,19 @@ pub async fn register_table(
     table_name: &str,
     files: &[FileKey],
     rules: HashMap<String, DataType>,
-    without_optimizer: bool,
     sort_key: &[(String, bool)],
     limit: Option<usize>,
 ) -> Result<SessionContext> {
     let cfg = get_config();
     // only sort by timestamp desc
-    let sort_by_timestamp_desc =
+    let sorted_by_time =
         sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
         &session.search_type,
-        without_optimizer,
-        sort_by_timestamp_desc,
+        vec![],
+        sorted_by_time,
         session.target_partitions,
         limit,
     )
@@ -449,7 +444,7 @@ pub async fn create_parquet_table(
     };
 
     // only sort by timestamp desc
-    let sort_by_timestamp_desc =
+    let sorted_by_time =
         sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
 
     // Configure listing options
@@ -459,7 +454,7 @@ pub async fn create_parquet_table(
         .with_target_partitions(target_partitions)
         .with_collect_stat(true);
 
-    if sort_by_timestamp_desc {
+    if sorted_by_time {
         // specify sort columns for parquet file
         listing_options = listing_options.with_file_sort_order(vec![vec![Expr::Sort(
             datafusion::logical_expr::SortExpr {

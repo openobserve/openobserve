@@ -132,7 +132,7 @@ pub(crate) async fn create_context(
         })?;
     for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
         if !record_batches.is_empty() {
-            let ctx = prepare_datafusion_context(None, &SearchType::Normal, false, false, 0, None)
+            let ctx = prepare_datafusion_context(None, &SearchType::Normal, vec![], false, 0, None)
                 .await?;
             // calculate schema diff
             let mut diff_fields = HashMap::new();
@@ -187,7 +187,6 @@ pub(crate) async fn create_context(
         stream_name,
         &[],
         hashbrown::HashMap::default(),
-        false,
         &[],
         None,
     )

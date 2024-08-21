@@ -46,8 +46,6 @@ const SQL_DELIMITERS: [u8; 12] = [
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-pub static RE_SELECT_WILDCARD: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
 pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 pub static RE_HISTOGRAM: Lazy<Regex> =

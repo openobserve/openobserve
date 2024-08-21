@@ -63,20 +63,14 @@ pub async fn search(
     //     cfg.limit.query_timeout
     // };
 
-    // create datafusion context
-    // TODO: reset these flags
-    let search_type = SearchType::Normal;
-    let without_optimizer = false;
-    let sort_by_timestamp_desc = false;
-    let target_partitions = cfg.limit.cpu_num; // TODO: need to calculate by if we can cache all the  parquet file 
-    let limit = None;
+    // create datafusion context, just used for decode plan, the params can use default
     let ctx = prepare_datafusion_context(
         Some(work_group.clone()),
-        &search_type,
-        without_optimizer,
-        sort_by_timestamp_desc,
-        target_partitions,
-        limit,
+        &SearchType::Normal,
+        vec![],
+        false,
+        cfg.limit.cpu_num,
+        None,
     )
     .await?;
 
@@ -128,10 +122,7 @@ pub async fn search(
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    // let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
-    // let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
-    // TODO the leader need check is_wildcard and defined_schema_fields to reduce the schema
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.to_string(),
