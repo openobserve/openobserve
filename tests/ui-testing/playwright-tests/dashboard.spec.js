@@ -9,7 +9,8 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
-  //  await page.getByText('Login as internal user').click();
+  // await page.getByText('Login as internal user').click();
+  await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -30,6 +31,29 @@ async function login(page) {
   await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
     waitUntil: "networkidle",
   });
+}
+
+async function ingestion(page) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
+
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+  const fetchResponse = await fetch(
+    `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+    {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(logsdata),
+    }
+  );
+  const response = await fetchResponse.json();
+  console.log(response);
 }
 
 async function waitForDashboardPage(page) {
@@ -76,71 +100,16 @@ test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
     await login(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
 
     // just to make sure org is set
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
-    // ("ingests logs via API", () => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    // const logsdata = {}; // Fill this with your actual data
-
-    const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-      {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(logsdata),
-      }
-    );
-    const response = await fetchResponse.json();
-
     await orgNavigation;
-
-    // Making a POST request using fetch API
-    // const response = await page.evaluate(
-    //     async ({ url, headers, orgId, streamName, logsdata }) => {
-    //         const fetchResponse = await fetch(
-    //             `${url}/api/${orgId}/${streamName}/_json`,
-    //             {
-    //                 method: "POST",
-    //                 headers: headers,
-    //                 body: JSON.stringify(logsdata),
-    //             }
-    //         );
-    //         return await fetchResponse.json();
-    //     },
-    //     {
-    //         url: process.env.INGESTION_URL,
-    //         headers: headers,
-    //         orgId: orgId,
-    //         streamName: streamName,
-    //         logsdata: logsdata,
-    //     }
-    // );
-
-    console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
-    //   await page.goto(
-    //   `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    //  );
-    //  const allsearch = page.waitForResponse("**/api/default/_search**");
-    //  await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    //  await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
   test("should create a new dashboar", async ({ page }) => {
@@ -1635,7 +1604,7 @@ test.describe("dashboard UI testcases", () => {
 
     page.once("dialog", (dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => {});
+      dialog.dismiss().catch(() => { });
     });
     // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
     //  await page.waitForTimeout(1000);
@@ -1757,7 +1726,7 @@ test.describe("dashboard UI testcases", () => {
 
     page.once("dialog", (dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => {});
+      dialog.dismiss().catch(() => { });
     });
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 
