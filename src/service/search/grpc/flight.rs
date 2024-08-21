@@ -215,6 +215,7 @@ pub async fn search(
         let (tbls, _, stats) = match super::wal::search_memtable(
             query_params.clone(),
             schema_latest.clone(),
+            search_partition_keys.clone(),
             empty_exec.sorted_by_time(),
         )
         .await

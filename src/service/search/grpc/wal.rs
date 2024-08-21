@@ -290,6 +290,7 @@ pub async fn search_parquet(
 pub async fn search_memtable(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
+    search_partition_keys: Option<Vec<(String, String)>>,
     sorted_by_time: bool,
 ) -> super::SearchTable {
     let mut scan_stats = ScanStats::new();
@@ -299,6 +300,7 @@ pub async fn search_memtable(
         &query.stream_type.to_string(),
         &query.stream_name,
         query.time_range,
+        search_partition_keys.clone(),
     )
     .await
     .unwrap_or_default();
@@ -308,6 +310,7 @@ pub async fn search_memtable(
             &query.stream_type.to_string(),
             &query.stream_name,
             query.time_range,
+            search_partition_keys.clone(),
         )
         .await
         .unwrap_or_default(),
