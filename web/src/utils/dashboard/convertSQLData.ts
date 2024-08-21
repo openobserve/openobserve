@@ -83,12 +83,22 @@ export const convertSQLData = async (
       : [];
   };
   console.log("getBreakDownKeys", getBreakDownKeys());
+  // Step 1: Get the X-Axis key
+  const xAxisKeys = getXAxisKeys();
+
+  // Step 2: Get the Y-Axis key
+  const yAxisKeys = getYAxisKeys();
+
+  const zAxisKeys = getZAxisKeys();
+
+  const breakDownKeys = getBreakDownKeys();
+  console.log("breakDownKeys-------", breakDownKeys);
 
   const processData = (data: any[], panelSchema: any) => {
     console.log("Processing data...");
     console.log("Data:", data);
     console.log("Panel schema:", panelSchema);
-    
+
     if (!data.length || !Array.isArray(data[0])) {
       console.log("No data or invalid data format. Returning empty array.");
       return [];
@@ -96,7 +106,7 @@ export const convertSQLData = async (
 
     const { top_results, top_results_others } = panelSchema.config;
     const innerDataArray = data[0];
-    if (!top_results) {
+    if (!top_results || !breakDownKeys.length) {
       console.log("No top results configured. Returning inner data array.");
       return innerDataArray;
     }
@@ -142,7 +152,11 @@ export const convertSQLData = async (
     if (top_results_others) {
       console.log("Adding 'others' aggregation to the result array...");
       Object.entries(othersObj).forEach(([x_axis_1, y_axis_1]) => {
-        console.log("Adding item to result array:", { breakdown_1: "others", x_axis_1, y_axis_1 });
+        console.log("Adding item to result array:", {
+          breakdown_1: "others",
+          x_axis_1,
+          y_axis_1,
+        });
         resultArray.push({ breakdown_1: "others", x_axis_1, y_axis_1 });
       });
     }
@@ -337,17 +351,6 @@ export const convertSQLData = async (
 
     return result;
   };
-
-  // Step 1: Get the X-Axis key
-  const xAxisKeys = getXAxisKeys();
-
-  // Step 2: Get the Y-Axis key
-  const yAxisKeys = getYAxisKeys();
-
-  const zAxisKeys = getZAxisKeys();
-
-  const breakDownKeys = getBreakDownKeys();
-  console.log("breakDownKeys-------", breakDownKeys);
 
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
