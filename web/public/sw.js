@@ -72,7 +72,7 @@ self.addEventListener("install", function (event) {
 
 self.addEventListener('activate', function(event) {
   event.waitUntil(
-    caches.keys().then(function (cacheNames) {
+    caches.keys().then(function(cacheNames) {
       return Promise.all(
         cacheNames.filter(function(cacheName) {
           // Check if cacheName starts with the cacheVersion or contains it as part of the name
@@ -132,7 +132,6 @@ self.addEventListener('activate', function(event) {
                 return;
               }
               var responseToCache = response.clone();
-
               caches
                 .open(cacheVersion)
                 .then(function (cache) {
