@@ -294,7 +294,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        min_step = meta.histogram_interval.unwrap_or(1) * min_step;
+        min_step *= meta.histogram_interval.unwrap_or(1);
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
