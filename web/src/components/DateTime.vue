@@ -332,6 +332,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
+import { max } from "moment";
 
 export default defineComponent({
   props: {
@@ -416,7 +417,7 @@ export default defineComponent({
       // ignore case
       timezone.value =
         timezoneOptions.find(
-          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
+          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase(),
         ) || currentTimezone;
 
       // call onTimezoneChange to set the timezone in the store
@@ -499,7 +500,10 @@ export default defineComponent({
 
         selectedType.value = props.defaultType;
         setAbsoluteTime(startTime, endTime);
+
         setRelativeTime(props.defaultRelativeTime);
+
+        if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
 
         if (props.autoApply) saveDate(props.defaultType);
@@ -524,7 +528,7 @@ export default defineComponent({
           saveDate("absolute");
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(
@@ -540,27 +544,27 @@ export default defineComponent({
           selectedTime.value.startTime = timestampToTimezoneDate(
             router.currentRoute.value.query?.from / 1000,
             store.state.timezone,
-            "HH:mm"
+            "HH:mm",
           );
           selectedTime.value.endTime = timestampToTimezoneDate(
             router.currentRoute.value.query?.to / 1000,
             store.state.timezone,
-            "HH:mm"
+            "HH:mm",
           );
           selectedDate.value.from = timestampToTimezoneDate(
             router.currentRoute.value.query?.from / 1000,
             store.state.timezone,
-            "yyyy/MM/dd"
+            "yyyy/MM/dd",
           );
           selectedDate.value.to = timestampToTimezoneDate(
             router.currentRoute.value.query?.to / 1000,
             store.state.timezone,
-            "yyyy/MM/dd"
+            "yyyy/MM/dd",
           );
           saveDate("absolute");
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // watch(
@@ -592,7 +596,9 @@ export default defineComponent({
     const onCustomPeriodSelect = () => {
       if (
         selectedType.value == "relative" &&
-        props.queryRangeRestrictionInHour > 0
+        props.queryRangeRestrictionInHour > 0 &&
+        relativeValue.value >
+          relativePeriodsMaxValue.value[relativePeriod.value]
       ) {
         relativeValue.value =
           relativePeriodsMaxValue.value[relativePeriod.value] > -1
@@ -748,7 +754,7 @@ export default defineComponent({
 
         const startTimeStamp = date.subtractFromDate(
           endTimeStamp,
-          JSON.parse(subtractObject)
+          JSON.parse(subtractObject),
         );
 
         return {
@@ -769,7 +775,7 @@ export default defineComponent({
           start = new Date();
         } else {
           start = new Date(
-            selectedDate.value.from + " " + selectedTime.value.startTime
+            selectedDate.value.from + " " + selectedTime.value.startTime,
           );
         }
 
@@ -777,7 +783,7 @@ export default defineComponent({
           end = new Date();
         } else {
           end = new Date(
-            selectedDate.value.to + " " + selectedTime.value.endTime
+            selectedDate.value.to + " " + selectedTime.value.endTime,
           );
         }
 
@@ -874,7 +880,7 @@ export default defineComponent({
       update(() => {
         const value = val.toLowerCase();
         filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
         );
       });
       return filteredOptions;
@@ -884,7 +890,7 @@ export default defineComponent({
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
-        "yyyy/MM/dd"
+        "yyyy/MM/dd",
       );
       return date >= "1999/01/01" && date <= formattedDate;
     };
@@ -906,7 +912,8 @@ export default defineComponent({
             }
 
             if (period.value == "h" && props.queryRangeRestrictionInHour > 0) {
-              relativePeriodsMaxValue.value[period.value] = 24;
+              relativePeriodsMaxValue.value[period.value] =
+                props.queryRangeRestrictionInHour;
             } else if (period.value == "h") {
               relativePeriodsMaxValue.value[period.value] = -1;
             }
@@ -932,7 +939,9 @@ export default defineComponent({
               period.value == "M" &&
               props.queryRangeRestrictionInHour > 24 * 30
             ) {
-              relativePeriodsMaxValue.value[period.value] = Math.round(props.queryRangeRestrictionInHour / (24 * 30)) || 100;
+              relativePeriodsMaxValue.value[period.value] =
+                Math.round(props.queryRangeRestrictionInHour / (24 * 30)) ||
+                100;
             } else if (period.value == "M") {
               relativePeriodsMaxValue.value[period.value] = -1;
             }
@@ -953,8 +962,30 @@ export default defineComponent({
           }
         });
 
-        relativeValue.value = "15";
-        relativePeriod.value = "m";
+        if (props.queryRangeRestrictionInHour > 0) {
+          const maxRelativeValue =
+            relativePeriodsMaxValue.value[relativePeriod.value];
+
+          try {
+            if (
+              maxRelativeValue !== -1 &&
+              relativeValue.value > maxRelativeValue
+            ) {
+              setRelativeDate(relativePeriod.value, maxRelativeValue);
+            } else if (maxRelativeValue === -1) {
+              const periods = ["m", "h", "d", "w", "M"];
+              const periodIndex = periods.indexOf(relativePeriod.value);
+              for (let i = periodIndex; i >= 0; i--) {
+                if (relativePeriodsMaxValue.value[periods[i]] > -1) {
+                  setRelativeDate(periods[i], relativeDates[periods[i]][0]);
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.log("Error while setting relative date", e);
+          }
+        }
       }
     };
 
