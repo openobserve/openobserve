@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'scatter',
             'area-stacked',
             'stacked',
-          ].includes(dashboardPanelData.data.type)
+          ].includes(dashboardPanelData.data.type) && !promqlMode
         "
         v-model.number="dashboardPanelData.data.config.top_results"
         :min="0"
@@ -577,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'scatter',
             'area-stacked',
             'stacked',
-          ].includes(dashboardPanelData.data.type)
+          ].includes(dashboardPanelData.data.type) && !promqlMode
         "
       >
         <q-toggle
@@ -946,6 +946,10 @@ export default defineComponent({
 
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
+      }
+
+      if (!dashboardPanelData.data.config.top_results_others) {
+        dashboardPanelData.data.config.top_results_others = false;
       }
 
       // Ensure that the nested structure is initialized
