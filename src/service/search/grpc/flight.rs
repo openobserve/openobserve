@@ -56,12 +56,6 @@ pub async fn search(
     let work_group = req.work_group.clone();
 
     let trace_id = Arc::new(req.trace_id.to_string());
-    // TODO: timeout
-    // let timeout = if req.timeout > 0 {
-    //     req.timeout as u64
-    // } else {
-    //     cfg.limit.query_timeout
-    // };
 
     // create datafusion context, just used for decode plan, the params can use default
     let ctx = prepare_datafusion_context(
@@ -158,7 +152,7 @@ pub async fn search(
     // search in object storage
     if req.search_type != cluster_rpc::SearchType::WalOnly as i32 {
         let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-        let (tbls, _, stats) = match super::storage::search(
+        let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             schema_latest.clone(),
             &file_list,
@@ -183,9 +177,8 @@ pub async fn search(
     }
 
     // search in WAL parquet
-    let mut wal_lock_files = Vec::new();
     if LOCAL_NODE.is_ingester() {
-        let (tbls, lock_files, stats) = match super::wal::search_parquet(
+        let (tbls, stats) = match super::wal::search_parquet(
             query_params.clone(),
             schema_latest.clone(),
             search_partition_keys.clone(),
@@ -207,12 +200,11 @@ pub async fn search(
         };
         tables.extend(tbls);
         scan_stats.add(&stats);
-        wal_lock_files = lock_files;
     }
 
     // search in WAL memory
     if LOCAL_NODE.is_ingester() {
-        let (tbls, _, stats) = match super::wal::search_memtable(
+        let (tbls, stats) = match super::wal::search_memtable(
             query_params.clone(),
             schema_latest.clone(),
             search_partition_keys.clone(),
@@ -222,10 +214,6 @@ pub async fn search(
         {
             Ok(v) => v,
             Err(e) => {
-                // clear session data
-                super::super::datafusion::storage::file_list::clear(&trace_id);
-                // release wal lock files
-                crate::common::infra::wal::release_files(&wal_lock_files).await;
                 log::error!(
                     "[trace_id {}] search->storage: search wal memtable error: {}",
                     trace_id,
@@ -251,12 +239,6 @@ pub async fn search(
         .await?;
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
-
-    // TODO: release wal files
-    // clear session data
-    // datafusion::storage::file_list::clear(&trace_id);
-    // release wal lock files
-    // crate::common::infra::wal::release_files(&wal_lock_files).await;
 
     log::info!("[trace_id {trace_id}] flight->search: finish generate physical plan",);
 

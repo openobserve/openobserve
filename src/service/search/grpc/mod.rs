@@ -26,7 +26,7 @@ pub mod flight;
 mod storage;
 mod wal;
 
-pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, Vec<String>, ScanStats)>;
+pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
 
 pub struct QueryParams {
     pub trace_id: String,

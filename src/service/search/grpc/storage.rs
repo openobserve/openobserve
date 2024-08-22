@@ -76,14 +76,14 @@ pub async fn search(
         schema_versions.len()
     );
     if schema_versions.is_empty() {
-        return Ok((vec![], vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
     // get file list
     let files = file_list.to_vec();
     if files.is_empty() {
-        return Ok((vec![], vec![], ScanStats::default()));
+        return Ok((vec![], ScanStats::default()));
     }
     log::info!(
         "[trace_id {}] search->storage: stream {}/{}/{}, load file_list num {}",
@@ -235,7 +235,7 @@ pub async fn search(
         tables.push(table);
     }
 
-    Ok((tables, vec![], scan_stats))
+    Ok((tables, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
