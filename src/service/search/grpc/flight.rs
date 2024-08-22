@@ -56,12 +56,6 @@ pub async fn search(
     let work_group = req.work_group.clone();
 
     let trace_id = Arc::new(req.trace_id.to_string());
-    // TODO: timeout
-    // let timeout = if req.timeout > 0 {
-    //     req.timeout as u64
-    // } else {
-    //     cfg.limit.query_timeout
-    // };
 
     // create datafusion context, just used for decode plan, the params can use default
     let ctx = prepare_datafusion_context(

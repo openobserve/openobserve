@@ -34,6 +34,7 @@ use infra::{
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use proto::cluster_rpc::{self, SearchRequest};
+use tracing::{info_span, Instrument};
 
 use crate::{
     common::infra::cluster as infra_cluster,
@@ -54,8 +55,17 @@ pub async fn search(
     req: cluster_rpc::SearchRequest,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let _start = std::time::Instant::now();
-    log::info!("[trace_id {trace_id}] start flight search");
-    log::info!("[trace_id {trace_id}] sql: {}", sql);
+    log::info!(
+        "[trace_id {trace_id}] search->flight[leader]: start, sql: {}",
+        sql
+    );
+
+    let cfg = get_config();
+    let timeout = if req.timeout > 0 {
+        req.timeout as u64
+    } else {
+        cfg.limit.query_timeout
+    };
 
     if sql
         .schemas
@@ -71,7 +81,6 @@ pub async fn search(
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let cfg = get_config();
 
     // 1. get nodes
     let nodes = get_online_querier_nodes(&trace_id, node_group).await?;
@@ -148,9 +157,42 @@ pub async fn search(
         println!("{}", plan);
     }
 
-    // TODO: run clean on every node: do_action
+    let datafusion_span = info_span!(
+        "service:search:flight:datafusion",
+        org_id = sql.org_id,
+        stream_name = sql.stream_names.first().unwrap(),
+        stream_type = sql.stream_type.to_string(),
+    );
 
-    let data = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx()).await?;
+    let trace_id2 = trace_id.clone();
+    let task = tokio::task::spawn(
+        async move {
+            tokio::select! {
+                ret = datafusion::physical_plan::collect(physical_plan, ctx.task_ctx()) => {
+                    match ret {
+                        Ok(ret) => Ok(ret),
+                        Err(err) => {
+                            log::error!("[trace_id {trace_id2}] search->flight[leader]: datafusion execute error: {}", err); 
+                            Err(err)
+                        }
+                    }
+                },
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
+                    log::error!("[trace_id {trace_id2}] search->flight[leader]: search timeout");
+                    Err(datafusion::error::DataFusionError::ResourcesExhausted(format!("[trace_id {trace_id2}] search->flight[leader]: task timeout")))
+                },
+            }
+        }
+        .instrument(datafusion_span),
+    );
+
+    let data = match task.await {
+        Ok(Ok(data)) => data,
+        Ok(Err(err)) => return Err(err.into()),
+        Err(err) => return Err(Error::Message(err.to_string())),
+    };
+
+    log::info!("[trace_id {trace_id}] search->flight[leader]: search finished");
 
     Ok((data, ScanStats::new(), 0, false, 0))
 }
