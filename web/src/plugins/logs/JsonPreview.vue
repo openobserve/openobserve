@@ -1,5 +1,13 @@
 <template>
   <div class="q-py-xs flex justify-start q-px-md log-detail-actions">
+    <app-tabs
+      class="logs-json-preview-tabs q-mr-sm"
+      style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
+      data-test="logs-json-preview-tabs"
+      :tabs="tabs"
+      v-model:active-tab="activeTab"
+    />
+
     <q-btn
       :label="t('common.copyToClipboard')"
       dense
@@ -91,7 +99,16 @@
       />
     </div>
   </div>
-  <div class="q-pl-md">
+  <div v-show="activeTab === 'nested'" class="q-pl-md">
+    <query-editor
+      v-model:query="nestedJson"
+      ref="queryEditorRef"
+      editor-id="logs-json-preview-nested-json-editor"
+      class="monaco-editor"
+      @update:query="updateQueryValue"
+    />
+  </div>
+  <div v-show="activeTab !== 'nested'" class="q-pl-md">
     {
     <div
       class="log_json_content"
@@ -203,7 +220,14 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  onBeforeMount,
+  computed,
+  onMounted,
+  watch,
+} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -213,6 +237,8 @@ import useLogs from "../../composables/useLogs";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
+import AppTabs from "@/components/common/AppTabs.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 export default {
   name: "JsonPreview",
@@ -227,7 +253,7 @@ export default {
       default: true,
     },
   },
-  components: { NotEqualIcon, EqualIcon },
+  components: { NotEqualIcon, EqualIcon, AppTabs, QueryEditor },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
@@ -241,8 +267,28 @@ export default {
 
     const tracesStreams = ref([]);
 
+    const activeTab = ref("flattened");
+
+    const nestedJson = ref("");
+
+    const tabs = [
+      {
+        value: "flattened",
+        label: t("search.flattened"),
+      },
+      {
+        value: "nested",
+        label: t("search.nested"),
+      },
+    ];
+
     const copyLogToClipboard = () => {
-      emit("copy", props.value);
+      emit(
+        "copy",
+        activeTab.value === "nested"
+          ? JSON.parse(nestedJson.value)
+          : props.value,
+      );
     };
     const addSearchTerm = (value: string) => {
       emit("addSearchTerm", value);
@@ -263,6 +309,17 @@ export default {
       });
       getTracesStreams();
     });
+
+    onMounted(() => {
+      nestedJson.value = getNestedJson();
+    });
+
+    watch(
+      () => props.value,
+      () => {
+        nestedJson.value = getNestedJson();
+      },
+    );
 
     const getTracesStreams = async () => {
       await getStreams("traces", false)
@@ -304,6 +361,47 @@ export default {
       );
     });
 
+    const getNestedJson = () => {
+      const result = {};
+
+      Object.keys(props.value).forEach((key) => {
+        const keys = key.split("_");
+
+        const newKeys = [];
+
+        let keyWithPrefix = "";
+        for (let i = 0; i < keys.length; i++) {
+          if (keys[i] === "") {
+            keyWithPrefix += "_";
+          } else {
+            if (keyWithPrefix.length) {
+              keyWithPrefix += keys[i];
+              keys[i] = keyWithPrefix;
+              keyWithPrefix = "";
+            }
+          }
+        }
+
+        console.log("newKeys", newKeys);
+
+        keys.reduce((acc, k, index) => {
+          if (index === keys.length - 1) {
+            acc[k] = props.value[key];
+          } else {
+            if (!(k in acc)) {
+              acc[k] = {};
+            }
+          }
+          return acc[k];
+        }, result);
+      });
+
+      console.log("result", props.value, result);
+      return JSON.stringify(result);
+    };
+
+    const updateQueryValue = () => {};
+
     return {
       t,
       copyLogToClipboard,
@@ -319,6 +417,10 @@ export default {
       filterStreamFn,
       streamSearchValue,
       showViewTraceBtn,
+      tabs,
+      activeTab,
+      nestedJson,
+      updateQueryValue,
     };
   },
 };
@@ -329,6 +431,10 @@ export default {
   white-space: pre-wrap;
   font-family: monospace;
   font-size: 12px;
+}
+.monaco-editor {
+  width: calc(100% - 16px) !important;
+  height: calc(100vh - 250px) !important;
 }
 </style>
 
@@ -368,6 +474,21 @@ export default {
       span {
         font-size: 11px;
       }
+    }
+  }
+}
+
+.logs-json-preview-tabs {
+  height: fit-content;
+  .rum-tab {
+    width: fit-content !important;
+    padding: 2px 12px !important;
+    border: none !important;
+    font-size: 12px !important;
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
     }
   }
 }
