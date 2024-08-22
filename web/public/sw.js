@@ -101,6 +101,7 @@ self.addEventListener('activate', function(event) {
           if (response) {
             return response.clone();
           }
+          console.log(event.request, "event.request 2 in fetch");
           var fetchRequest = event.request;
           return fetch(fetchRequest)
             .then(function (response) {
