@@ -37,8 +37,11 @@ use crate::common::meta::stream::StreamParams;
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
-static SEARCHING_FILES: Lazy<tokio::sync::RwLock<SearchingFileLocker>> =
-    Lazy::new(|| tokio::sync::RwLock::new(SearchingFileLocker::new()));
+static SEARCHING_FILES: Lazy<RwLock<SearchingFileLocker>> =
+    Lazy::new(|| RwLock::new(SearchingFileLocker::new()));
+
+// SEARCHING_REQUESTS for searching requests, in use, should not move to s3
+static SEARCHING_REQUESTS: Lazy<RwLock<HashMap<String, Vec<String>>>> = Lazy::new(Default::default);
 
 type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
 
@@ -390,6 +393,20 @@ pub async fn release_files(files: &[String]) {
 
 pub async fn lock_files_exists(file: &str) -> bool {
     SEARCHING_FILES.read().await.exist(file)
+}
+
+pub async fn lock_request(trace_id: &str, files: &[String]) {
+    let mut locker = SEARCHING_REQUESTS.write().await;
+    locker.insert(trace_id.to_string(), files.to_vec());
+}
+
+pub async fn release_request(trace_id: &str) {
+    let mut locker = SEARCHING_REQUESTS.write().await;
+    let files = locker.remove(trace_id);
+    drop(locker);
+    if let Some(files) = files {
+        release_files(&files).await;
+    }
 }
 
 #[cfg(test)]

@@ -73,7 +73,7 @@ pub async fn search_parquet(
     )
     .await?;
     if files.is_empty() {
-        return Ok((vec![], vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
 
     let mut scan_stats = ScanStats::new();
@@ -135,7 +135,7 @@ pub async fn search_parquet(
     if scan_stats.files == 0 {
         // release all files
         wal::release_files(&lock_files).await;
-        return Ok((vec![], vec![], scan_stats));
+        return Ok((vec![], scan_stats));
     }
 
     // fetch all schema versions, group files by version
@@ -160,7 +160,7 @@ pub async fn search_parquet(
     if schema_versions.is_empty() {
         // release all files
         wal::release_files(&lock_files).await;
-        return Ok((vec![], vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -282,7 +282,10 @@ pub async fn search_parquet(
         }
     }
 
-    Ok((tables, lock_files, scan_stats))
+    // lock these files for this request
+    wal::lock_request(&query.trace_id, &lock_files).await;
+
+    Ok((tables, scan_stats))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -317,7 +320,7 @@ pub async fn search_memtable(
     );
     scan_stats.files = batches.iter().map(|(_, k)| k.len()).sum::<usize>() as i64;
     if scan_stats.files == 0 {
-        return Ok((vec![], vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
 
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
@@ -378,7 +381,7 @@ pub async fn search_memtable(
         tables.push(table as _);
     }
 
-    Ok((tables, vec![], scan_stats))
+    Ok((tables, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]

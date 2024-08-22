@@ -30,7 +30,7 @@ use openobserve::{
     handler::{
         grpc::{
             auth::check_auth,
-            flight::server::FlightServiceImpl,
+            flight::FlightServiceImpl,
             request::{
                 event::Eventer,
                 file_list::Filelister,
